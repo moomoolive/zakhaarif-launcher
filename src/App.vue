@@ -2,7 +2,9 @@
   <header>
   </header>
 
-  <RouterView />
+  <div>
+    <RouterView />
+  </div>
 </template>
 
 <script setup lang="ts">

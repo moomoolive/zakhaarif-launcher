@@ -1,33 +1,41 @@
 <template>
   <main>
-    <div class="w-screen h-screen flex items-center justify-center bg-red-500">
+    <div class="w-screen h-screen flex items-center justify-center">
       <div>
-        <v-btn>
-          hi there
-        </v-btn>
+        <div>
+
+        </div>
+        <div>
+          <v-btn 
+            class="bg-green-600"
+            :disabled="!isLoading"
+            @click="updateFiles"
+          >
+            {{buttonMessage}}
+          </v-btn>
+        </div>
       </div>
     </div>
   </main>
 </template>
 
-<script lang="ts">
-import {VBtn} from "vuetify/components/VBtn"
-
-export default {
-  components: {
-    VBtn
-  }
-}
-</script>
-
 <script setup lang="ts">
-import {onBeforeMount} from "vue"
+import {VBtn} from "vuetify/components/VBtn"
+import {onBeforeMount, ref} from "vue"
 import {updateStdFiles} from "../lib/routines/updateCore"
+import {sleep} from "../lib/routines/sleep"
 
-onBeforeMount(async () => {
+let isLoading = ref(true)
+let buttonMessage = ref("Start")
+
+const test = () => console.log("hi")
+
+const updateFiles = async () => {
+  buttonMessage = "loading..."
   const res = await updateStdFiles({
     manifestUrl: "pkg/manifest.json"
   })
   console.log(res)
-})
+  buttonMessage = "finished"
+}
 </script>
