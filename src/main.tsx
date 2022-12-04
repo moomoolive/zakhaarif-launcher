@@ -11,6 +11,7 @@ import type {
   AppEntryPointer,
   AppExtensionModule
 } from "../sharedLib/types"
+import {ServiceWorkerMessage} from "../sharedLib/serviceWorkers"
 
 const enum log {
   name = "[🤖 app-controller]:",
@@ -18,19 +19,20 @@ const enum log {
 }
 
 if (navigator.serviceWorker) {
-  const url = import.meta.env.PROD 
-    ? "dev-sw.js"
-    : "dev-sw.js"
-  navigator.serviceWorker.register(url, {
-    scope: "/"
-  })
+  const url = import.meta.env.PROD ? "dev-sw.js" : "dev-sw.js"
+  navigator.serviceWorker.register(url, {scope: "/"})
   navigator.serviceWorker.addEventListener("message", (msg) => {
-    const {data} = msg
-    const d = data as {type: "error" | "info", contents: string}
-    if (d.type === "info") {
-      console.info(log.sw, d.contents)
-    } else {
-      console.error(log.sw, d.contents)
+    const {type, contents} = msg.data as ServiceWorkerMessage
+    switch (type) {
+      case "info":
+        console.info(log.sw, contents)
+        break
+      case "error":
+        console.error(log.sw, contents)
+        break
+      default:
+        console.warn(log.name, "recieved msg from service worker, but it was encoded incorrectly")
+        break
     }
   })
 }

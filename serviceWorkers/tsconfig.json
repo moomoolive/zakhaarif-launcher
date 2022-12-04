@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+        "lib": ["WebWorker", "ES6"],
+        "strict": true,
+        "target": "ES6"
+    }
+}
