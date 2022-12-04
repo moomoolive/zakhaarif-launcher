@@ -11,8 +11,20 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import {CodeManifest} from "../sharedLib/types"
-import {MANIFEST_NAME} from "../sharedLib/consts"
+import type {
+  CodeManifest,
+  AppEntryPointer
+} from "../sharedLib/types"
+import {
+  MANIFEST_NAME,
+  headers,
+  APP_CACHE,
+  CURRENT_APP_DIR,
+  CURRENT_APP_MANIFEST,
+  NO_EXPIRATION,
+  sources,
+  CURRENT_APP_ENTRY_PARAMS,
+} from "../sharedLib/consts"
 
 const CircularProgressWithLabel = (
   props: CircularProgressProps & { value: number },
@@ -69,9 +81,8 @@ const roundDecimal = (num: number, decimals: number) => {
 
 const toPercent = (dividend: number, divisor: number) => Math.floor((dividend / divisor) * 100)
 
-const logger = {
-  info: (...msgs: any[]) => console.info("[launcher]:", ...msgs),
-  error: (...msgs: any[]) => console.error("[launcher]:", ...msgs)
+const enum log {
+  name = "[🚀 launcher]:"
 }
 
 const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
@@ -90,16 +101,17 @@ async function retryPromise<T>(p: () => Promise<T>, count: number) {
     }
   }
   const msg = `Error fetching io operation after ${count} retries, err:${errorMsg}`
-  logger.error(msg)
+  console.error(log.name, msg)
   return new io(false, msg, null)
 }
 
 
-function App() {
+const  App = ({
+  openApp = async () => true
+} = {}) => {
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState("")
   const [downloadProgress, setDownloadProgress] = useState(0)
-  const [count, setCount] = useState(0)
 
   const gatherAssets = async () => {
     setShowProgress(true)
@@ -123,35 +135,92 @@ function App() {
       }
     })()
     if (!appManifest.data || !appManifest.success) {
-      logger.error("couldn't get app manifest, reason:", appManifest.msg)
+      console.error(log.name, "couldn't get app manifest, reason:", appManifest.msg)
       return
     }
     const totalAppSize = appManifest.data.body.files.reduce((total, {bytes}) => {
       return parseFloat(bytes) + total
     }, appManifest.data.size)
-    logger.info("successfully fetched app manifest, app_size is", roundDecimal(totalAppSize / bytes.per_mb, 2), "mb")
+    if (!import.meta.env.PROD) {
+      console.info(log.name, "dev mode detected, purging all cache files")
+      await caches.delete(APP_CACHE)
+    }
+    console.info(log.name, "successfully fetched app manifest, app_size is", roundDecimal(totalAppSize / bytes.per_mb, 2), "mb")
     let downloadedBytes = appManifest.data.size
     setDownloadProgress(1)
     const title = import.meta.env.VITE_APP_TITLE
     document.title = `(1%) ${title}`
     const appFiles = appManifest.data.body.files
     const baseUrl = import.meta.env.VITE_MANIFEST_URL.split(MANIFEST_NAME)[0]
+    const targetCache = await caches.open(APP_CACHE)
+    const failedRequests = []
+    const appEntryUrl = CURRENT_APP_DIR + appManifest.data.body.entry
+    const originalEntryUrl = baseUrl + appManifest.data.body.entry 
+    const appEntryPointer: AppEntryPointer = {
+      appShell: {
+        url: appEntryUrl, 
+        originalUrl: originalEntryUrl
+      }
+    }
+    await targetCache.put(
+      CURRENT_APP_ENTRY_PARAMS, 
+      new Response(JSON.stringify(appEntryPointer), {
+        status: 200,
+        statusText: "OK",
+        headers: {
+          "content-type": "application/json",
+          [headers.insertedAt]: Date.now().toString(),
+          [headers.expiration]: (NO_EXPIRATION).toString(),
+          [headers.source]: (sources.launcher).toString(),
+          [headers.origin]: appEntryUrl,
+          [headers.content_length]: (appManifest.data.size).toString()
+        }
+      })
+    )
+    console.info(log.name, `Inserted app entry ptr (ptr->${appEntryUrl})`)
     for (let i = 0; i < appFiles.length; i++) {
       const {name, bytes} = appFiles[i]
-      const url = baseUrl + name
+      const requestUrl = baseUrl + name
       setProgressMsg(`Fetching ${name}`)
-      const file = await retryPromise(() => fetch(url, {method: "GET"}), 3)
-      await sleep(10_000)
+      const file = await retryPromise(() => {
+        return fetch(requestUrl, {method: "GET"})
+      }, 3)
+      if (!file.data || !file.success) {
+        failedRequests.push({...file, name, requestUrl})
+        console.error(log.name, "failed to cache asset @", requestUrl, "retrying later")
+        continue
+      }
       downloadedBytes += parseFloat(bytes)
       const p = toPercent(downloadedBytes, totalAppSize)
       setDownloadProgress(p)
       document.title = `(${p}%) ${title}`
+      const fileType = file.data.headers.get("content-type") || "text/javascript"
+      const response = new Response(await file.data.text(), {
+        status: 200,
+        statusText: "OK",
+        headers: {
+          [headers.insertedAt]: Date.now().toString(),
+          [headers.expiration]: (NO_EXPIRATION).toString(),
+          [headers.source]: (sources.launcher).toString(),
+          [headers.origin]: requestUrl,
+          [headers.content_length]: (bytes).toString(),
+          "content-type": fileType
+        }
+      })
+      const cacheUrl = CURRENT_APP_DIR + name
+      await targetCache.put(cacheUrl, response)
+      console.info(log.name, `inserted file ${name} (${requestUrl}) into virtual drive (${cacheUrl})`)
     }
     setProgressMsg("Finished...")
     await sleep(1_000)
     setProgressMsg("Installing...")
     document.title = title
-    logger.info("successfully fetched assets!")
+    console.info(log.name, "successfully fetched assets! Opening App...")
+    const controllerResponse = await openApp()
+    if (controllerResponse) {
+      console.info(log.name, "closing now...")
+      return
+    }
   }
 
   return (

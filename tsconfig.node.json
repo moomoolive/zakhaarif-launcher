@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "lib": ["DOM"],
     "composite": true,
     "module": "ESNext",
     "moduleResolution": "Node",
