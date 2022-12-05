@@ -2,16 +2,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
-import {
-  dom_hooks,
-  CURRENT_APP_ENTRY_PARAMS,
-  APP_CACHE
-} from "../sharedLib/consts"
+import {dom_hooks} from "../sharedLib/consts"
 import type {
-  AppEntryPointer,
-  AppExtensionModule
+  AppEntryPointers,
 } from "../sharedLib/types"
 import {ServiceWorkerMessage} from "../serviceWorkers/types"
+import {entryRecords} from "../sharedLib/utils"
 
 const enum log {
   name = "[🤖 app-controller]:",
@@ -51,27 +47,23 @@ launcherRoot.render(
             if (!res.ok) {
               return null
             }
-            return await res.json() as AppEntryPointer
+            return await res.json() as AppEntryPointers
           } catch {
             return null
           }
-        })(CURRENT_APP_ENTRY_PARAMS)
-        if (!appEntryPtr) {
-          console.error(log.name, `app pointer has not been initialized (${CURRENT_APP_ENTRY_PARAMS})! Cancelling app launch...`)
+        })(entryRecords())
+        if (!appEntryPtr || appEntryPtr.entries.length < 1) {
+          console.error(log.name, `app pointer has not been initialized (${entryRecords()})! Cancelling app launch...`)
           return false
         }
-        console.info(log.name, "found app pointer")
-        const {appShell} = appEntryPtr
+        console.info(log.name, "found app pointers")
+        const appShell = appEntryPtr.entries[0]
+        //const {appShell} = appEntryPtr
         const appEntry = await (async (url: string) => {
           try {
             // this is a dynamic import, NOT code splitting
-            const ext = await import(
-              /* @vite-ignore */ window.location.href + url
-            )
-            if (!ext) {
-              return null
-            }
-            return ext as AppExtensionModule
+            await import(/* @vite-ignore */ url)
+            return {}
           } catch {
             return null
           }
@@ -89,9 +81,7 @@ launcherRoot.render(
         //while (root.firstChild) {
         //  root.removeChild(root.firstChild)
         //}
-        const {pkg} = appEntry
         console.info(log.name, "successfully unmounted launcher. Mounting app shell...")
-        pkg.onInit(root)
         console.info(log.name, "successfully mounted app-shell")
         return true
       }}

@@ -3,10 +3,13 @@
     "crateVersion": "0.1.0",
     "name": "app-std",
     "version": "0.1.0",
-    "entry": "index.rand0.mjs",
+    "entry": "index.rand0.js",
     "files": [
-        {"name": "index.rand0.mjs", "bytes": 21800000}
+        {"name": "index.rand0.js", "bytes": 21800000},
+        {"name": "chunk.rand1.js", "bytes": 5000},
+        {"name": "chunk.rand2.js", "bytes": 1800000}
     ],
     "description": "core module for game",
-    "authors": [{"name": "mostafa elbannan"}]
+    "authors": [{"name": "mostafa elbannan"}],
+    "invalidation": "url-diff"
 }

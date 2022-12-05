@@ -3,10 +3,11 @@
     "crateVersion": "0.1.0",
     "name": "std",
     "version": "0.1.0",
-    "description": "core module for game",
-    "authors": [{"name": "mostafa elbannan"}],
     "entry": "index.rand2.mjs",
     "files": [
         {"name": "index.rand2.mjs", "bytes": 500}
-    ]
+    ],
+    "description": "core module for game",
+    "authors": [{"name": "mostafa elbannan"}],
+    "invalidation": "url-diff"
 }

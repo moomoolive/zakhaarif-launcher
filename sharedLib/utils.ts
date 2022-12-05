@@ -3,14 +3,22 @@ import {
     NULL_FIELD, UUID_LENGTH,
     ALL_CRATE_VERSIONS,
     LATEST_CRATE_VERSION,
-    reservedIds
+    reservedIds,
+    APP_RECORDS,
+    APPS_FOLDER,
 } from "./consts"
 
-type CManifest = Required<CodeManifest> & {
+const loc = window.location.href
+
+export const entryRecords = () => loc + APP_RECORDS
+
+export const appFolder = (appId: number) => loc + APPS_FOLDER + appId.toString() + "/"
+
+export type CodeManifestSafe = Required<CodeManifest> & {
     authors: {name: string, email: string, url: string}[]
 }
 
-const orNull = <T extends string>(str?: T) => str || NULL_FIELD
+const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
 
 const typevalid = <T extends Record<string, unknown>>(
     obj: T,
@@ -45,10 +53,10 @@ const validVersion = (version: string) => {
 
 export const validateManifest = (
     cargo: unknown, 
-    disallowStdPkgs: boolean
+    allowStdPkgs: boolean
 ) => {
     const errors: string[] = []
-    const pkg: CManifest = {
+    const pkg: CodeManifestSafe = {
         uuid: "",
         crateVersion: "0.1.0",
         name: "",
@@ -57,6 +65,7 @@ export const validateManifest = (
         files: [],
 
         // optional fields
+        invalidation: "url-diff",
         description: NULL_FIELD,
         authors: [],
         crateLogoUrl: NULL_FIELD,
@@ -82,7 +91,7 @@ export const validateManifest = (
     } else if (
         // check if package uuid clashes with any of the
         // reserved ids
-        disallowStdPkgs && Object.values(reservedIds).includes(c.uuid as typeof reservedIds[keyof typeof reservedIds])
+        !allowStdPkgs && Object.values(reservedIds).includes(c.uuid as typeof reservedIds[keyof typeof reservedIds])
     ) {
         errors.push(`uuid can not be one of reserved ids: ${Object.values(reservedIds).join()}`)
     } else if (
@@ -103,7 +112,7 @@ export const validateManifest = (
     } else if (
         // check if package name clashes with any of the
         // reserved names
-        disallowStdPkgs && Object.keys(reservedIds).includes(c.name)
+        !allowStdPkgs && Object.keys(reservedIds).includes(c.name)
     ) {
         errors.push(`name cannot be reserved names: ${Object.keys(reservedIds).join()}`)
     }
@@ -136,6 +145,7 @@ export const validateManifest = (
         pkg.files = c.files
     }
 
+    pkg.invalidation = orNull(c.invalidation)
     pkg.description = orNull(c.description)
     pkg.authors = (c.authors || [])
         .filter(a => typeof a?.name === "string")
