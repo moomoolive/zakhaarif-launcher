@@ -1,32 +1,25 @@
+import type {CrateVersion, NullField} from "./consts"
+
+export type RepoType = "git" | "other" | NullField
+
+// this manifest format is heavily inspired by
+// Node's "package.json" format
 export type CodeManifest = {
     uuid: string
-    schemaVersion: string
+    crateVersion: CrateVersion
     name: string
     version: string
-    description?: string
-    authors?: string
-    displayPictureUrl?: string
     entry: string
-    files: {name: string, bytes: string}[]
-}
+    files: {name: string, bytes: number}[]
 
-export type PackageRecord = {
-    id?: number
-    uuid: string
-    recordVersion: string
-    name: string
-    type: "mod" | "extension"
-    version: string
-    description: string
-    authors: string
-    displayPictureUrl: string
-    entry: string
-    files: {name: string, bytes: string}[]
-    meta: {
-        totalSize: number
-        source: string
-        originalUrl: string
-    }
+    // optional fields
+    description?: string
+    authors?: {name: string, email?: string, url?: string}[]
+    crateLogoUrl?: string
+    keywords?: string[]
+    license?: string
+    repo?: {type: RepoType, url: string}
+    homepageUrl?: string
 }
 
 export type AppEntryPointer = {
@@ -43,4 +36,12 @@ export type AppExtension = {
 
 export interface AppExtensionModule {
     pkg: AppExtension
+}
+
+export type GamePackage = {
+    onInit: () => void
+}
+
+export type GameModule = {
+    pkg: GamePackage
 }

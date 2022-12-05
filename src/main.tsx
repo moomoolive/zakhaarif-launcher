@@ -11,7 +11,7 @@ import type {
   AppEntryPointer,
   AppExtensionModule
 } from "../sharedLib/types"
-import {ServiceWorkerMessage} from "../sharedLib/serviceWorkers"
+import {ServiceWorkerMessage} from "../serviceWorkers/types"
 
 const enum log {
   name = "[🤖 app-controller]:",

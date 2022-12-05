@@ -1,4 +1,6 @@
-import {ServiceWorkerMessageType as MsgType} from "../sharedLib/serviceWorkers"
+import {
+    ServiceWorkerMessageType as MsgType
+} from "./types"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
 

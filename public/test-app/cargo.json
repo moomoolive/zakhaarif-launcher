@@ -1,0 +1,12 @@
+{
+    "uuid": "XRFCvi60nXcM0ZPiEupkeW9eNmoPi9ybk_S",
+    "crateVersion": "0.1.0",
+    "name": "app-std",
+    "version": "0.1.0",
+    "entry": "index.rand0.mjs",
+    "files": [
+        {"name": "index.rand0.mjs", "bytes": 21800000}
+    ],
+    "description": "core module for game",
+    "authors": [{"name": "mostafa elbannan"}]
+}

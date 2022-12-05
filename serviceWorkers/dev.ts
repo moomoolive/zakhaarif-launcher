@@ -1,7 +1,7 @@
 import {
     ServiceWorkerMessageType as OutMsgType,
     ServiceWorkerOutBoundMessage as InMsgType
-} from "../sharedLib/serviceWorkers"
+} from "./types"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
 
