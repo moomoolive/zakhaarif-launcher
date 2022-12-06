@@ -7,10 +7,6 @@ export const APPS_FOLDER = CORE_FOLDER + "apps/"
 
 export const NO_EXPIRATION = -1
 
-export const dom_hooks = {
-    root_div: "root"
-} as const
-
 export const ALL_CRATE_VERSIONS = {
     "0.1.0": 1
 } as const

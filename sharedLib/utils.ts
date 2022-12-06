@@ -1,4 +1,4 @@
-import {CodeManifest} from "./types"
+import {CodeManifest, InvalidationStrategy} from "./types"
 import {
     NULL_FIELD, UUID_LENGTH,
     ALL_CRATE_VERSIONS,
@@ -8,14 +8,21 @@ import {
     APPS_FOLDER,
 } from "./consts"
 
-const loc = window.location.href
+export const entryRecords = (windowHref: string) => windowHref + APP_RECORDS
 
-export const entryRecords = () => loc + APP_RECORDS
-
-export const appFolder = (appId: number) => loc + APPS_FOLDER + appId.toString() + "/"
+export const appFolder = (windowHref: string, appId: number) => windowHref + APPS_FOLDER + appId.toString() + "/"
 
 export type CodeManifestSafe = Required<CodeManifest> & {
-    authors: {name: string, email: string, url: string}[]
+    authors: Array<{
+        name: string
+        email: string 
+        url: string
+    }>,
+    files: Array<{
+        name: string
+        bytes: number
+        invalidation: InvalidationStrategy
+    }>
 }
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
@@ -132,20 +139,28 @@ export const validateManifest = (
     if (!fIsArray) {
         errors.push(`files should be an array, got "${typeof c.files}"`)
     }
-    let validFiles = true
+    
     const f = !fIsArray ? [] : c.files
     for (let i = 0; i < f.length; i++) {
         const fi = f[i]
-        if (typeof fi?.name !== "string" || typeof fi?.bytes !== "number") {
-            errors.push(`file ${i} is not a valid file format`)
+        if (
+            typeof fi?.name !== "string" 
+            || typeof fi?.bytes !== "number"
+            || typeof (fi?.invalidation || "") !== "string" 
+        ) {
+            errors.push(`file ${i} is not a valid file format, file.name and file.invalidation must be a string, while file.bytes must be a number`)
             break
         }
-    }
-    if (validFiles) {
-        pkg.files = c.files
+        pkg.files.push({
+            name: fi.name,
+            bytes: fi.bytes,
+            invalidation: fi?.invalidation || "default"
+        })
     }
 
-    pkg.invalidation = orNull(c.invalidation)
+    pkg.invalidation = typeof c.invalidation === "string"
+        ? c.invalidation || "default"
+        : "default"
     pkg.description = orNull(c.description)
     pkg.authors = (c.authors || [])
         .filter(a => typeof a?.name === "string")

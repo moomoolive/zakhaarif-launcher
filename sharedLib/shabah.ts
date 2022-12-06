@@ -1,19 +1,40 @@
-import {io, roundDecimal, bytes, sleep} from "./utils"
 import {
     MANIFEST_NAME,
     APP_CACHE,
     NO_EXPIRATION,
 } from "../sharedLib/consts"
-import {AppEntryPointers} from "../sharedLib/types"
+import {AppEntryPointers} from "./types"
 import {
     validateManifest, 
     entryRecords,
     appFolder,
     CodeManifestSafe
-} from "../sharedLib/utils"
+} from "./utils"
+
+const ENTRY_RECORDS_URL = entryRecords(window.location.href)
 
 const enum log {
     name = "[👻 shabah]:"
+}
+
+const enum bytes {
+    per_mb = 1_000_000
+} 
+
+export class io<T> {
+    msg: string
+    success: boolean
+    data: T | null
+  
+    constructor(
+      success: boolean,
+      msg: string,
+      data: T | null
+    ) {
+      this.success = success
+      this.msg = msg
+      this.data = data
+    }
 }
 
 const retryPromise = async <T>(
@@ -39,10 +60,15 @@ const retryPromise = async <T>(
 
 const fetchRetry = (
     input: RequestInfo | URL, 
-    init?: RequestInit & {retryCount: number}
+    init: RequestInit & {retryCount: number}
 ) => {
-    return retryPromise(() => fetch(input, init), init?.retryCount || 3)
-} 
+    return retryPromise(() => fetch(input, init), init.retryCount || 3)
+}
+
+const roundDecimal = (num: number, decimals: number) => {
+    const factor = 10 ** decimals
+    return Math.round(num * factor) / factor
+}
 
 type AppIndex = Readonly<{
     id: number,
@@ -61,8 +87,7 @@ type ShabahModes = "dev" | "prod"
 
 export type ShabahOptions<Apps extends AppList> = Readonly<{
     apps: Apps,
-    entry: keyof Apps
-    mode: ShabahModes
+    mode: ShabahModes,
 }>
 
 const SHABAH_SOURCE = 1
@@ -78,13 +103,17 @@ const headers = (mimeType: string, contentLength: number) => {
     } as const
 }
 
+type AppLauncher = {
+    mount: () => void
+    unMount: () => void
+}
+
 export class Shabah<Apps extends AppList> {
     readonly apps: Apps
-    readonly entry: keyof Apps
     private tokenizedApps: (AppIndex & {name: string})[]
     requestEngine: "native-fetch"
     readonly mode: ShabahModes
-    readonly appEntries: AppEntryPointers
+    readonly appPointers: AppEntryPointers
     private updates: {
         id: number,
         totalBytes: number
@@ -101,22 +130,27 @@ export class Shabah<Apps extends AppList> {
     }
     private updatesThisSession: number
     downloadingPartition: number
+    private launcher: AppLauncher | null
 
-    constructor({apps, entry, mode}: ShabahOptions<Apps>) {
+    constructor({apps, mode}: ShabahOptions<Apps>) {
         if (Object.keys(apps).length < 1) {
             throw new TypeError(`${log.name} one or more apps must be defined`)
         }
-        this.apps = apps
-        if (!this.apps[entry]) {
-            throw new TypeError(`${log.name} entry must be the name of an app. Apps: ${Object.keys(this.apps).join()}`)
+        const idRecord: Record<number, number> = {}
+        for (const app of Object.values(apps)) {
+            if (!idRecord[app.id]) {
+                idRecord[app.id] = 1
+            } else {
+                throw new TypeError(`${log.name} app ids must be unique, app id ${app.id} was used twice or more`)
+            }
         }
-        this.entry = entry
+        this.apps = apps
         const self = this
         this.tokenizedApps = Object.keys(self.apps).map(k => ({name: k, ...self.apps[k]}))
         this.requestEngine = "native-fetch"
         this.mode = mode
-        this.appEntries = {
-            entryRecords: entryRecords(),
+        this.appPointers = {
+            entryRecords: ENTRY_RECORDS_URL,
             entries: []
         }
         this.updates = {
@@ -127,6 +161,7 @@ export class Shabah<Apps extends AppList> {
         }
         this.updatesThisSession = 0
         this.downloadingPartition = -1
+        this.launcher = null
     }
 
     async checkForUpdates() {
@@ -136,13 +171,13 @@ export class Shabah<Apps extends AppList> {
             await caches.delete(APP_CACHE)
         }
         const targetCache = await caches.open(APP_CACHE)
-        let previousAppPtrs = await targetCache.match(entryRecords())
+        let previousAppPtrs = await targetCache.match(ENTRY_RECORDS_URL)
         if (!previousAppPtrs) {
             console.info(log.name, "no previous app pointers found")
         } else {
             console.info(log.name, "previous app pointers found, diffing against new apps")
         }
-        const failedManifestRequests = []
+        const failedManifestRequests: number[] = []
         const updatePromises = apps.map(async (app, i) => {
             const baseUrl = app.appRootUrl.endsWith("/")
                 ? app.appRootUrl
@@ -152,7 +187,11 @@ export class Shabah<Apps extends AppList> {
                 method: "GET",
                 retryCount: 3
             })
-            if (!manifestRes.data || !manifestRes.success) {
+            if (
+                !manifestRes.data 
+                || !manifestRes.success
+                || !manifestRes.data.ok
+            ) {
                 console.error(log.name, `couldn't get manifest for app "${app.name}", reason: ${manifestRes.msg}`)
                 failedManifestRequests.push(i)
                 return
@@ -173,11 +212,16 @@ export class Shabah<Apps extends AppList> {
                 return total + bytes
             }, manifestBytes)
             console.info(log.name, `successfully fetched "${app.name}" manifest, app_size is ${roundDecimal(totalAppSize / bytes.per_mb, 2)}mb`)
-            const CURRENT_APP_DIR = appFolder(app.id)
+            const CURRENT_APP_DIR = appFolder(
+                window.location.href, app.id
+            )
             const appEntryUrl = CURRENT_APP_DIR + pkg.entry
-            this.appEntries.entries.push({
+            this.appPointers.entries.push({
                 url: appEntryUrl,
-                originalUrl: baseUrl + pkg.entry
+                originalUrl: baseUrl + pkg.entry,
+                name: app.name,
+                id: app.id,
+                bytes: totalAppSize
             })
             // insert manifest
             await targetCache.put(
@@ -200,13 +244,13 @@ export class Shabah<Apps extends AppList> {
             })
         })
         await Promise.all(updatePromises)
-        const strRecords = JSON.stringify(this.appEntries)
+        const strRecords = JSON.stringify(this.appPointers)
         const recordBytes = new TextEncoder()
             .encode(strRecords)
             .length
         await targetCache.put(
-            entryRecords(),
-            new Response(JSON.stringify(this.appEntries), {
+            ENTRY_RECORDS_URL,
+            new Response(JSON.stringify(this.appPointers), {
                 status: 200,
                 statusText: "OK",
                 headers: headers("application/json", recordBytes)
@@ -244,7 +288,11 @@ export class Shabah<Apps extends AppList> {
                     method: "GET",
                     retryCount: 3
                 })
-                if (!fileRes.data || !fileRes.success) {
+                if (
+                    !fileRes.data 
+                    || !fileRes.success
+                    || !fileRes.data.ok
+                ) {
                     failedRequests.push({...fileRes, name, requestUrl})
                     continue
                 }
@@ -270,5 +318,61 @@ export class Shabah<Apps extends AppList> {
                 console.info(log.name, `inserted file ${name} (${u.name}) into virtual drive (${cacheUrl})`)
             }
         }
+    }
+
+    defineLauncher<T extends AppLauncher>(launcher: T) {
+        if (!this.launcher) {
+            this.launcher = launcher
+        } else {
+            console.info(log.name, "launcher cannot be defined more than once")
+        }
+    }
+
+    showLauncher() {
+        if (this.launcher) {
+            this.launcher.mount()
+        } else {
+            console.error(log.name, "{😼 show-launcher} launcher has not been defined yet")
+        }
+    }
+
+    destroyLauncher() {
+        if (this.launcher) {
+            this.launcher.unMount()
+        } else {
+            console.error(log.name, "{🙀 destroy-launcher} launcher not defined yet")
+        }
+    }
+
+    async launchApp(appKey: keyof Apps & string) {
+        const ptrs = this.appPointers
+        console.info(log.name, `app "${appKey}" has been requested to launch`)
+        const app = ptrs.entries.find(({name}) => name === appKey)
+        if (!app) {
+            const msg = `app "${appKey}" does not exist`
+            console.error(log.name, msg)
+            return {success: false, msg}
+        }
+        // check if app entry file exists
+        const entryPing = await fetchRetry(app.url, {
+            method: "GET",
+            retryCount: 3
+        })
+        if (
+            !entryPing.data 
+            || !entryPing.success
+            || !entryPing.data.ok
+        ) {
+            const msg = `app "${appKey}" entry does not exist in virtual drive (/local).`
+            console.error(log.name, msg)
+            return {success: false, msg}
+        }
+        this.destroyLauncher()
+        // apply permissions before import
+
+        // this is a dynamic import, NOT code splitting
+        await import(/* @vite-ignore */ app.url)
+        console.info(log.name, `{📜 app-launcher} "${appKey}" has been launched`)
+        return {success: true, msg: `${appKey} is open`}
     }
 }

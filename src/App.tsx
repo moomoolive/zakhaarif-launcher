@@ -11,12 +11,7 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import {
-  toPercent, 
-  sleep, 
-  io
-} from "./utils"
-import {Shabah} from "./shabah"
+import {Shabah} from "../sharedLib/shabah"
 
 const CircularProgressWithLabel = (
   props: CircularProgressProps & { value: number },
@@ -50,66 +45,31 @@ const enum log {
   name = "[🚀 launcher]:"
 }
 
-async function retryPromise<T>(p: () => Promise<T>, count: number) {
-  let tryCount = 0
-  let errorMsg = ""
-  while (tryCount < count) {
-    try {
-      return new io(true, "sucess", await p())
-    } catch (err) {
-      if (tryCount >= count - 1) {
-        errorMsg = (err as Error || "unknown error").toString()
-      }
-      tryCount++
-    }
-  }
-  const msg = `Error fetching io operation after ${count} retries, err:${errorMsg}`
-  console.error(log.name, msg)
-  return new io(false, msg, null)
-}
+const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
 
+import type {AppController} from "./utils"
 
-const  App = ({
-  openApp = async () => true
-} = {}) => {
+const  App = ({appController}: {appController: AppController}) => {
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState("")
   const [downloadProgress, setDownloadProgress] = useState(0)
-  const [shabah] = useState(new Shabah({
-    apps: {
-      appShell: {
-        id: 1,
-        appRootUrl: import.meta.env.VITE_CARGO_APP_SHELL_ROOT_URL,
-        htmlTitle: import.meta.env.VITE_APP_TITLE,
-        permissions: {}
-      },
-      gameCore: {
-        id: 2,
-        appRootUrl: import.meta.env.VITE_CARGO_GAME_CORE_ROOT_URL,
-        htmlTitle: "none",
-        permissions: {}
-      }
-    },
-    entry: "appShell",
-    mode: "dev"
-  }))
 
   const gatherAssets = async () => {
     setShowProgress(true)
     setProgressMsg("Check for Updates...")
     const title = import.meta.env.VITE_APP_TITLE
-    await shabah.checkForUpdates()
-    if (!shabah.updatesAvailable()) {
+    await appController.checkForUpdates()
+    if (!appController.updatesAvailable()) {
       return
     }
     setProgressMsg("Found updates")
-    await shabah.execUpdates({
+    await appController.execUpdates({
       onProgress: ({downloaded, total, latestFile}) => {
         setProgressMsg(`Fetching ${latestFile}`)
-        const percent = toPercent(downloaded, total)
-        const p = percent < 1 ? 1 : percent
-        setDownloadProgress(p)
-        document.title = `(${p}%) ${title}`
+        const rawPercent = Math.floor((downloaded / total) * 100)
+        const percent = Math.max(rawPercent, 1)
+        setDownloadProgress(percent)
+        document.title = `(${percent}%) ${title}`
       },
     })
     setDownloadProgress(100)
@@ -119,11 +79,12 @@ const  App = ({
     setProgressMsg("Installing...")
     document.title = title
     console.info(log.name, "successfully fetched assets! Opening App...")
-    const controllerResponse = await openApp()
-    if (controllerResponse) {
+    const launchRes = await appController.launchApp("appShell")
+    if (launchRes.success) {
       console.info(log.name, "closing now...")
       return
     }
+    console.error(log.name, `couldn't launch app-shell, reason: ${launchRes.msg}`)
   }
 
   return (

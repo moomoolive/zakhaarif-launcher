@@ -2,7 +2,7 @@ import type {CrateVersion, NullField} from "./consts"
 
 export type RepoType = "git" | "other" | NullField
 
-export type InvalidationStrategy = "url-diff" | "purge" | NullField
+export type InvalidationStrategy = "url-diff" | "purge" | "default"
 
 // this manifest format is heavily inspired by
 // Node's "package.json" format
@@ -12,12 +12,20 @@ export type CodeManifest = {
     name: string
     version: string
     entry: string
-    files: {name: string, bytes: number}[]
+    files: Array<{
+        name: string, 
+        bytes: number,
+        invalidation?: InvalidationStrategy
+    }>
 
     // optional fields
     invalidation?: InvalidationStrategy
     description?: string
-    authors?: {name: string, email?: string, url?: string}[]
+    authors?: Array<{
+        name: string, 
+        email?: string, 
+        url?: string
+    }>
     crateLogoUrl?: string
     keywords?: string[]
     license?: string
@@ -27,5 +35,11 @@ export type CodeManifest = {
 
 export type AppEntryPointers = {
     readonly entryRecords: string, 
-    entries: {url: string, originalUrl: string}[]
+    entries: {
+        url: string, 
+        originalUrl: string
+        name: string
+        id: number
+        bytes: number
+    }[]
 }

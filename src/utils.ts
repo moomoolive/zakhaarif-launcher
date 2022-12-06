@@ -1,30 +1,21 @@
-export const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
+import {Shabah} from "../sharedLib/shabah"
 
-export const toPercent = (dividend: number, divisor: number) => Math.floor((dividend / divisor) * 100)
+export const shabah = new Shabah({
+    apps: {
+      appShell: {
+        id: 1,
+        appRootUrl: import.meta.env.VITE_CARGO_APP_SHELL_ROOT_URL,
+        htmlTitle: import.meta.env.VITE_APP_TITLE,
+        permissions: {}
+      },
+      gameCore: {
+        id: 2,
+        appRootUrl: import.meta.env.VITE_CARGO_GAME_CORE_ROOT_URL,
+        htmlTitle: "none",
+        permissions: {}
+      }
+    },
+    mode: "dev",
+})
 
-export const roundDecimal = (num: number, decimals: number) => {
-    const factor = 10 ** decimals
-    return Math.round(num * factor) / factor
-}
-
-export class io<T> {
-    msg: string
-    success: boolean
-    data: T | null
-  
-    constructor(
-      success: boolean,
-      msg: string,
-      data: T | null
-    ) {
-      this.success = success
-      this.msg = msg
-      this.data = data
-    }
-}
-
-export const enum bytes {
-    per_mb = 1_000_000
-}
-  
-  
+export type AppController = typeof shabah
