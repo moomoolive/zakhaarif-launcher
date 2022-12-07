@@ -2,16 +2,20 @@ import {
     MANIFEST_NAME,
     APP_CACHE,
     NO_EXPIRATION,
-} from "../sharedLib/consts"
-import {AppEntryPointers} from "./types"
+} from "./consts"
+import {
+    AppEntryPointers,
+    CodeManifestSafe
+} from "./types"
 import {
     validateManifest, 
     entryRecords,
     appFolder,
-    CodeManifestSafe
+    launcherCargo
 } from "./utils"
 
 const ENTRY_RECORDS_URL = entryRecords(window.location.href)
+const LAUNCHER_CARGO = launcherCargo(window.location.href)
 
 const enum log {
     name = "[👻 shabah]:"
@@ -69,6 +73,8 @@ const roundDecimal = (num: number, decimals: number) => {
     const factor = 10 ** decimals
     return Math.round(num * factor) / factor
 }
+
+const stringBytes = (str: string) => (new TextEncoder().encode(str)).length
 
 type AppIndex = Readonly<{
     id: number,
@@ -162,15 +168,19 @@ export class Shabah<Apps extends AppList> {
         this.updatesThisSession = 0
         this.downloadingPartition = -1
         this.launcher = null
+        if (this.mode === "dev") {
+            console.info(log.name, "dev mode detected, purging all cache files")
+            caches.delete(APP_CACHE)
+        }
+    }
+
+    private cache() {
+        return caches.open(APP_CACHE) 
     }
 
     async checkForUpdates() {
         const apps = this.tokenizedApps
-        if (this.mode === "dev") {
-            console.info(log.name, "dev mode detected, purging all cache files")
-            await caches.delete(APP_CACHE)
-        }
-        const targetCache = await caches.open(APP_CACHE)
+        const targetCache = await this.cache()
         let previousAppPtrs = await targetCache.match(ENTRY_RECORDS_URL)
         if (!previousAppPtrs) {
             console.info(log.name, "no previous app pointers found")
@@ -224,13 +234,12 @@ export class Shabah<Apps extends AppList> {
                 bytes: totalAppSize
             })
             // insert manifest
-            await targetCache.put(
+            await this.cacheFile(
+                targetCache,
+                JSON.stringify(pkg),
                 CURRENT_APP_DIR + MANIFEST_NAME,
-                new Response(JSON.stringify(pkg), {
-                    status: 200,
-                    statusText: "OK",
-                    headers: headers("application/json", manifestBytes)
-                })
+                "application/json",
+                manifestBytes
             )
             console.info(log.name, `Inserted app entry ptr for "${app.name}" (ptr->${appEntryUrl})`)
             this.updates.partitions.push({
@@ -245,16 +254,12 @@ export class Shabah<Apps extends AppList> {
         })
         await Promise.all(updatePromises)
         const strRecords = JSON.stringify(this.appPointers)
-        const recordBytes = new TextEncoder()
-            .encode(strRecords)
-            .length
-        await targetCache.put(
+        await this.cacheFile(
+            targetCache,
+            strRecords,
             ENTRY_RECORDS_URL,
-            new Response(JSON.stringify(this.appPointers), {
-                status: 200,
-                statusText: "OK",
-                headers: headers("application/json", recordBytes)
-            })
+            "application/json",
+            stringBytes(strRecords)
         )
         this.updates.manifestsTotalBytes = this.updates
             .partitions
@@ -275,7 +280,7 @@ export class Shabah<Apps extends AppList> {
         onProgress?: (params: {downloaded: number, total: number, latestFile: string, latestPartition: string}) => void
     }) {
         const updates = this.updates.partitions
-        const targetCache = await caches.open(APP_CACHE)
+        const targetCache = await this.cache()
         let downloaded = this.updates.manifestsTotalBytes
         for (let i = 0; i < updates.length; i++) {
             const u = updates[i]
@@ -305,15 +310,12 @@ export class Shabah<Apps extends AppList> {
                 // reliable?
                 downloaded += bytes
                 const cacheUrl = u.appDir + name
-                await targetCache.put(cacheUrl,
-                    new Response(await fileRes.data.text(), {
-                        status: 200,
-                        statusText: "OK",
-                        headers: headers(
-                            fileRes.data.headers.get("content-type") || "text/plain",
-                            bytes
-                        )
-                    })
+                await this.cacheFile(
+                    targetCache,
+                    await fileRes.data.text(),
+                    cacheUrl,
+                    fileRes.data.headers.get("content-type") || "text/plain",
+                    bytes
                 )
                 console.info(log.name, `inserted file ${name} (${u.name}) into virtual drive (${cacheUrl})`)
             }
@@ -374,5 +376,74 @@ export class Shabah<Apps extends AppList> {
         await import(/* @vite-ignore */ app.url)
         console.info(log.name, `{📜 app-launcher} "${appKey}" has been launched`)
         return {success: true, msg: `${appKey} is open`}
+    }
+
+    private cacheFile(
+        targetCache: Cache,
+        fileText: string, 
+        url: string,
+        mimeType: string,
+        bytes: number
+    ) {
+        return targetCache.put(url, new Response(fileText, {
+            status: 200,
+            statusText: "OK",
+            headers: headers(mimeType, bytes)
+        }))
+    }
+
+    async cacheLaucherAssets({
+        rootHtmlDoc = "",
+        rootHtmlUrl = "offline.html",
+        cargoUrl = "cargo.json",
+        useMiniCargoDiff = false,
+        miniCargoUrl = ""
+    } = {}) {
+        const targetCache = await this.cache()
+        const htmlDoc = rootHtmlDoc.length > 0
+            ? rootHtmlDoc
+            : "<!DOCTYPE html>\n" + document.documentElement.outerHTML
+        const htmlBytes = stringBytes(htmlDoc)
+        const htmlDocUrl = window.location.href + rootHtmlUrl
+        await this.cacheFile(
+            targetCache,
+            htmlDoc,
+            htmlDocUrl,
+            "text/html",
+            htmlBytes,
+        )
+        console.info(log.name, `cached root html document at ${htmlDocUrl}`)
+        let previousManifest: CodeManifestSafe
+        if (useMiniCargoDiff && miniCargoUrl.length > 0) {
+            const miniManifestRes = await fetchRetry(miniCargoUrl, {
+                method: "GET",
+                retryCount: 3
+            })
+            if (!miniManifestRes.data || !miniManifestRes.data.ok) {
+                console.error(log.name, "couldn't get mini manifest, reason", miniManifestRes.msg)
+                return
+            }
+            
+
+        } else if (useMiniCargoDiff && miniCargoUrl.length < 1) {
+            console.error(log.name, `mini cargo url must be more than one character`)
+            return
+        }
+        const manifestRes = await fetchRetry(cargoUrl, {
+            method: "GET",
+            retryCount: 1
+        })
+        if (!manifestRes.data || !manifestRes.data.ok) {
+            console.error(log.name, `couldn't get launcher manifest, reason: ${manifestRes.msg}`)
+            return
+        }
+        const {pkg, errors} = validateManifest(
+            await manifestRes.data.json(),
+            false
+        )
+        if (errors.length > 0) {
+            console.error(log.name, "launcher manifest is incorrectly encoded, errors:", errors.join())
+            return
+        }
     }
 }

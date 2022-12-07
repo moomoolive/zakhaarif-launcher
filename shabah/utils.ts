@@ -1,4 +1,8 @@
-import {CodeManifest, InvalidationStrategy} from "./types"
+import {
+    CodeManifest, 
+    InvalidationStrategy,
+    CodeManifestSafe
+} from "./types"
 import {
     NULL_FIELD, UUID_LENGTH,
     ALL_CRATE_VERSIONS,
@@ -6,26 +10,24 @@ import {
     reservedIds,
     APP_RECORDS,
     APPS_FOLDER,
+    LAUNCHER_CARGO
 } from "./consts"
+import {SemanticVersion} from "../miniSemver/index"
 
 export const entryRecords = (windowHref: string) => windowHref + APP_RECORDS
 
 export const appFolder = (windowHref: string, appId: number) => windowHref + APPS_FOLDER + appId.toString() + "/"
 
-export type CodeManifestSafe = Required<CodeManifest> & {
-    authors: Array<{
-        name: string
-        email: string 
-        url: string
-    }>,
-    files: Array<{
-        name: string
-        bytes: number
-        invalidation: InvalidationStrategy
-    }>
-}
+export const launcherCargo = (windowHref: string) => windowHref + LAUNCHER_CARGO
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
+
+const allElementsPassed = <T>(
+    arr: T[],
+    conditon: (element: T, index: number, array: T[]) => boolean 
+) => {
+    return arr.map(conditon).reduce((t, passed) => t && passed, true)
+}
 
 const typevalid = <T extends Record<string, unknown>>(
     obj: T,
@@ -39,23 +41,6 @@ const typevalid = <T extends Record<string, unknown>>(
     }
     errs.push(`${key as string} should be a ${type}, got "${t}"`)
     return false
-}
-
-const validVersion = (version: string) => {
-    if (version.length < 1) {
-        return false
-    }
-    const s = version.split("-")[0].split(".")
-    if (s.length !== 3) {
-        return false
-    }
-    for (let i = 0; i < s.length; i++) {
-        const vs = s[i]
-        if (typeof vs === "symbol" || Number.isNaN(parseInt(vs, 10))) {
-            return false
-        }
-    }
-    return true
 }
 
 export const validateManifest = (
@@ -127,8 +112,8 @@ export const validateManifest = (
 
     if (!typevalid(c, "version", "string", errors)) {
 
-    } else if (!validVersion(c.version)) {
-        errors.push(`${c.version} is not a vaild version`)
+    } else if (!SemanticVersion.fromString(c.version)) {
+        errors.push(`${c.version} is not a vaild semantic version`)
     }
     pkg.version = orNull(c.version)
 

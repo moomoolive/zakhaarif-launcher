@@ -1,4 +1,4 @@
-import {Shabah} from "../sharedLib/shabah"
+import {Shabah} from "../shabah/index"
 
 export const shabah = new Shabah({
     apps: {

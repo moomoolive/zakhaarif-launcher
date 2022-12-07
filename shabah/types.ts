@@ -33,6 +33,23 @@ export type CodeManifest = {
     homepageUrl?: string
 }
 
+export type CodeManifestSafe = Required<CodeManifest> & {
+    authors: Array<{
+        name: string
+        email: string 
+        url: string
+    }>,
+    files: Array<{
+        name: string
+        bytes: number
+        invalidation: InvalidationStrategy
+    }>
+}
+
+export type MiniCodeManifest = Pick<CodeManifestSafe, (
+    "version"
+)>
+
 export type AppEntryPointers = {
     readonly entryRecords: string, 
     entries: {
@@ -42,4 +59,10 @@ export type AppEntryPointers = {
         id: number
         bytes: number
     }[]
+}
+
+export type ShabahCliConfig = {
+    buildDir?: string
+    ignore?: string[]
+    generateMiniCargo?: boolean
 }

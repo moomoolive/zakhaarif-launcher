@@ -4,6 +4,7 @@ import App from './App'
 import './index.css'
 import {ServiceWorkerMessage} from "../serviceWorkers/types"
 import {shabah} from "./utils"
+import {ROOT_OFFLINE_HTML_URL} from "../serviceWorkers/consts"
 
 const enum log {
   name = "[🤖 app-controller]:",
@@ -61,4 +62,21 @@ shabah.defineLauncher({
   }
 })
 
+const htmlDoc = (
+  "<!DOCTYPE html>\n"
+  + document.documentElement.outerHTML
+)
+
+
 shabah.showLauncher()
+
+//shabah.cacheFile(
+//  htmlDoc, window.location.href + "offline.html", "text/html"
+//)
+
+shabah.cacheLaucherAssets({
+  rootHtmlDoc: htmlDoc,
+  rootHtmlUrl: ROOT_OFFLINE_HTML_URL,
+  cargoUrl: "cargo.json",
+  useMiniCargoDiff: false
+})

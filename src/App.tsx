@@ -11,7 +11,7 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import {Shabah} from "../sharedLib/shabah"
+import type {AppController} from "./utils"
 
 const CircularProgressWithLabel = (
   props: CircularProgressProps & { value: number },
@@ -46,8 +46,6 @@ const enum log {
 }
 
 const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
-
-import type {AppController} from "./utils"
 
 const  App = ({appController}: {appController: AppController}) => {
   const [showProgress, setShowProgress] = useState(false)

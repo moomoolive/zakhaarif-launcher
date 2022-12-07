@@ -1,9 +1,11 @@
 export const MANIFEST_NAME = "cargo.json"
+export const MANIFEST_MINI_NAME = "cargo.mini.json"
 export const APP_CACHE = "app-v1"
 export const VIRTUAL_DRIVE = "local/"
 export const CORE_FOLDER = VIRTUAL_DRIVE + "core/"
-export const APP_RECORDS = CORE_FOLDER + "__entry__.json"
+export const APP_RECORDS = CORE_FOLDER + "entryPointers.json"
 export const APPS_FOLDER = CORE_FOLDER + "apps/"
+export const LAUNCHER_CARGO = CORE_FOLDER + "launcher-cargo.json"
 
 export const NO_EXPIRATION = -1
 
