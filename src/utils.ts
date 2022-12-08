@@ -1,4 +1,5 @@
 import {Shabah} from "../shabah/index"
+import {APP_CACHE} from "../consts"
 
 export const shabah = new Shabah({
     apps: {
@@ -16,6 +17,7 @@ export const shabah = new Shabah({
       }
     },
     mode: "dev",
+    cacheName: APP_CACHE
 })
 
 export type AppController = typeof shabah

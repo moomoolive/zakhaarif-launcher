@@ -1,1 +1,0 @@
-export const ROOT_OFFLINE_HTML_URL = "offline.html"

@@ -21,48 +21,14 @@ export const MAX_VERSION_LENGTH = 256
 
 export const NO_BUILD_SPECIFIED = -1
 
-const getSemanticVersion = (version: string, Ver: typeof SemVer) => {
+const getSemanticVersion = (version: string) => {
     if (version.length < 1 || version.length > MAX_VERSION_LENGTH) {
         return null
     }
+
     const versionSplit = version.split("-")
     if (versionSplit.length > 2) {
         return null
-    }
-
-    const afterCore = ["none", NO_BUILD_SPECIFIED] as [SemVersionPrerelease, number]
-    if (versionSplit.length > 1) {
-        const prereleaseAndBuild = versionSplit[1]
-        const split = prereleaseAndBuild.split(".")
-        if (split.length > 2 || split.length < 0) {
-            return null
-        }
-        const prerelease = split[0]
-        const tags = Object.keys(prereleaseTags)
-        if (!Object.keys(prereleaseTags).includes(prerelease)) {
-            return null
-        } else {
-            afterCore[0] = prerelease as PrereleaseTag
-        }
-
-        if (split.length > 1) {
-            const build = split[1]
-            const parsedBuild = parseInt(build, 10)
-            if (isPositiveNumber(parsedBuild)) {
-                afterCore[1] = parsedBuild
-            } else if (tags.includes(build)) {
-                const b = build as PrereleaseTag
-                const tagVal = prereleaseTags[b]
-                const tagValToBuild = Math.max(
-                    tagVal - LOWEST_TAG_VAL, 0
-                )
-                afterCore[1] = tagValToBuild
-            }
-        } else {
-            // if no build number specified after
-            // prerelease tag, default to build zero
-            afterCore[1] = 0
-        }
     }
     
     const versionsCore = versionSplit[0]
@@ -71,6 +37,7 @@ const getSemanticVersion = (version: string, Ver: typeof SemVer) => {
     if (versionsCore.length !== 3) {
         return null
     }
+
     const parsedVersions = versionsCore.map(v => parseInt(v, 10))
     const validVersionNumbers = parsedVersions
         .map(v => isPositiveNumber(v))
@@ -78,10 +45,51 @@ const getSemanticVersion = (version: string, Ver: typeof SemVer) => {
     if (!validVersionNumbers) {
         return null
     }
-    return new Ver(
+    const semver = new SemVer(
         ...parsedVersions as [number, number, number], 
-        ...afterCore
+        "none", NO_BUILD_SPECIFIED
     )
+    if (versionSplit.length < 2) {
+        return semver
+    }
+    
+    const prereleaseAndBuild = versionSplit[1]
+    const split = prereleaseAndBuild.split(".")
+    if (split.length > 2 || split.length < 0) {
+        return null
+    }
+
+    const prerelease = split[0]
+    const tags = Object.keys(prereleaseTags)
+    if (!Object.keys(prereleaseTags).includes(prerelease)) {
+        return null
+    } else {
+        semver.prerelease = prerelease as PrereleaseTag
+    }
+
+    if (split.length < 2) {
+        // if no build number specified after
+        // prerelease tag, default to build zero
+        semver.build = 0
+        return semver
+    }
+
+    const build = split[1]
+    const parsedBuild = parseInt(build, 10)
+    if (isPositiveNumber(parsedBuild)) {
+        semver.build = parsedBuild
+    } else if (tags.includes(build)) {
+        const b = build as PrereleaseTag
+        const tagVal = prereleaseTags[b]
+        const tagValToBuild = Math.max(
+            tagVal - LOWEST_TAG_VAL, 0
+        )
+        semver.build = tagValToBuild
+    } else {
+        return null
+    }
+
+    return semver
 }
 
 const enum compare {
@@ -91,8 +99,10 @@ const enum compare {
 }
 
 export class SemVer {
+    static null = () => new SemVer(0, 0, 0, "none", NO_BUILD_SPECIFIED)
+
     static fromString(version: string) {
-        return getSemanticVersion(version, SemVer)
+        return getSemanticVersion(version)
     }
 
     major: number

@@ -82,7 +82,6 @@ const  App = ({appController}: {appController: AppController}) => {
       console.info(log.name, "closing now...")
       return
     }
-    console.error(log.name, `couldn't launch app-shell, reason: ${launchRes.msg}`)
   }
 
   return (

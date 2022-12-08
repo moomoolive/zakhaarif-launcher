@@ -1,21 +1,19 @@
+import {AppEntryPointers} from "./types"
 import {
-    MANIFEST_NAME,
-    APP_CACHE,
-    NO_EXPIRATION,
-} from "./consts"
-import {
-    AppEntryPointers,
-    CodeManifestSafe
-} from "./types"
-import {
-    validateManifest, 
     entryRecords,
     appFolder,
     launcherCargo
 } from "./utils"
+import {
+    validateManifest,
+} from "../cargo/index"
+import {
+    MANIFEST_NAME, 
+    CodeManifestSafe
+} from "../cargo/consts"
 
-const ENTRY_RECORDS_URL = entryRecords(window.location.href)
-const LAUNCHER_CARGO = launcherCargo(window.location.href)
+const ENTRY_RECORDS_URL = entryRecords(window.location.origin)
+const LAUNCHER_CARGO = launcherCargo(window.location.origin)
 
 const enum log {
     name = "[👻 shabah]:"
@@ -91,18 +89,12 @@ type AppList = {
 
 type ShabahModes = "dev" | "prod"
 
-export type ShabahOptions<Apps extends AppList> = Readonly<{
-    apps: Apps,
-    mode: ShabahModes,
-}>
-
 const SHABAH_SOURCE = 1
 
 const headers = (mimeType: string, contentLength: number) => {
     return {
-        "Sw-Inserted-At": Date.now().toString(),
-        "Sw-Expire-At": NO_EXPIRATION.toString(),
-        "Sw-Source": "shabah",
+        "Last-Modified": new Date().toUTCString(),
+        "Sw-Source": SHABAH_SOURCE.toString(),
         "Content-Length": contentLength.toString(),
         "Content-Type": mimeType,
         "Sw-Cache-Hit": SHABAH_SOURCE.toString()
@@ -137,8 +129,13 @@ export class Shabah<Apps extends AppList> {
     private updatesThisSession: number
     downloadingPartition: number
     private launcher: AppLauncher | null
+    readonly cacheName: string
 
-    constructor({apps, mode}: ShabahOptions<Apps>) {
+    constructor({apps, mode, cacheName}: Readonly<{
+        apps: Apps,
+        mode: ShabahModes,
+        cacheName: string
+    }>) {
         if (Object.keys(apps).length < 1) {
             throw new TypeError(`${log.name} one or more apps must be defined`)
         }
@@ -168,14 +165,15 @@ export class Shabah<Apps extends AppList> {
         this.updatesThisSession = 0
         this.downloadingPartition = -1
         this.launcher = null
+        this.cacheName = cacheName
         if (this.mode === "dev") {
             console.info(log.name, "dev mode detected, purging all cache files")
-            caches.delete(APP_CACHE)
+            caches.delete(this.cacheName)
         }
     }
 
     private cache() {
-        return caches.open(APP_CACHE) 
+        return caches.open(this.cacheName) 
     }
 
     async checkForUpdates() {
@@ -223,7 +221,7 @@ export class Shabah<Apps extends AppList> {
             }, manifestBytes)
             console.info(log.name, `successfully fetched "${app.name}" manifest, app_size is ${roundDecimal(totalAppSize / bytes.per_mb, 2)}mb`)
             const CURRENT_APP_DIR = appFolder(
-                window.location.href, app.id
+                window.location.origin, app.id
             )
             const appEntryUrl = CURRENT_APP_DIR + pkg.entry
             this.appPointers.entries.push({
@@ -360,12 +358,8 @@ export class Shabah<Apps extends AppList> {
             method: "GET",
             retryCount: 3
         })
-        if (
-            !entryPing.data 
-            || !entryPing.success
-            || !entryPing.data.ok
-        ) {
-            const msg = `app "${appKey}" entry does not exist in virtual drive (/local).`
+        if (!entryPing.data || !entryPing.data.ok) {
+            const msg = `couldn't launch app "${appKey}" because entry does not exist in virtual drive (/local).`
             console.error(log.name, msg)
             return {success: false, msg}
         }
@@ -394,7 +388,6 @@ export class Shabah<Apps extends AppList> {
 
     async cacheLaucherAssets({
         rootHtmlDoc = "",
-        rootHtmlUrl = "offline.html",
         cargoUrl = "cargo.json",
         useMiniCargoDiff = false,
         miniCargoUrl = ""
@@ -404,16 +397,15 @@ export class Shabah<Apps extends AppList> {
             ? rootHtmlDoc
             : "<!DOCTYPE html>\n" + document.documentElement.outerHTML
         const htmlBytes = stringBytes(htmlDoc)
-        const htmlDocUrl = window.location.href + rootHtmlUrl
+        const rootDoc = window.location.origin + "/"
         await this.cacheFile(
             targetCache,
             htmlDoc,
-            htmlDocUrl,
+            rootDoc,
             "text/html",
             htmlBytes,
         )
-        console.info(log.name, `cached root html document at ${htmlDocUrl}`)
-        let previousManifest: CodeManifestSafe
+        console.info(log.name, `cached root html document at ${rootDoc}`)
         if (useMiniCargoDiff && miniCargoUrl.length > 0) {
             const miniManifestRes = await fetchRetry(miniCargoUrl, {
                 method: "GET",
@@ -423,8 +415,6 @@ export class Shabah<Apps extends AppList> {
                 console.error(log.name, "couldn't get mini manifest, reason", miniManifestRes.msg)
                 return
             }
-            
-
         } else if (useMiniCargoDiff && miniCargoUrl.length < 1) {
             console.error(log.name, `mini cargo url must be more than one character`)
             return
@@ -437,12 +427,28 @@ export class Shabah<Apps extends AppList> {
             console.error(log.name, `couldn't get launcher manifest, reason: ${manifestRes.msg}`)
             return
         }
-        const {pkg, errors} = validateManifest(
+        const {pkg, errors, semanticVersion} = validateManifest(
             await manifestRes.data.json(),
             false
         )
         if (errors.length > 0) {
             console.error(log.name, "launcher manifest is incorrectly encoded, errors:", errors.join())
+            return
+        }
+        const previousManifestRes = await targetCache.match(LAUNCHER_CARGO)
+        if (!previousManifestRes) {
+            console.log(log.name, "launcher has not been installed yet. Installing now...")
+            const installFiles = pkg.files
+                .map(({name}) => name)
+                .filter((n) => {
+                    return (
+                        n !== "/"
+                        && n !== "/index.html"
+                        && n !== rootDoc
+                    )
+                })
+            await targetCache.addAll(installFiles)
+            console.log(log.name, "cache files successfully, list", installFiles.join())
             return
         }
     }

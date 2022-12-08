@@ -1,16 +1,16 @@
 {
   "name": "g-wrapper",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-beta.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run sw && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "sw": "npm run sw-dev && npm run sw-prod",
     "test:watch": "vitest watch",
-    "sw-dev": "esbuild ./serviceWorkers/dev.ts --bundle --minify --outfile=./public/dev-sw.js",
-    "sw-prod": "esbuild ./serviceWorkers/prod.ts --bundle --minify --outfile=./public/sw.js"
+    "sw-dev": "esbuild ./serviceWorkers/index.ts --format=esm --bundle --outfile=./public/dev-sw.js",
+    "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --minify --outfile=./public/sw.js"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",

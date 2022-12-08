@@ -2,9 +2,11 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
-import {ServiceWorkerMessage} from "../serviceWorkers/types"
+import type {
+  OutboundMessage as ServiceWorkerMessage, 
+  InboundMessage as ServiceWorkerOutBoundMessage
+} from "../serviceWorkers/types"
 import {shabah} from "./utils"
-import {ROOT_OFFLINE_HTML_URL} from "../serviceWorkers/consts"
 
 const enum log {
   name = "[🤖 app-controller]:",
@@ -70,13 +72,20 @@ const htmlDoc = (
 
 shabah.showLauncher()
 
-//shabah.cacheFile(
-//  htmlDoc, window.location.href + "offline.html", "text/html"
-//)
-
 shabah.cacheLaucherAssets({
   rootHtmlDoc: htmlDoc,
-  rootHtmlUrl: ROOT_OFFLINE_HTML_URL,
   cargoUrl: "cargo.json",
-  useMiniCargoDiff: false
+  useMiniCargoDiff: false,
+}).then(() => {
+  const msg = {action: "config:verbose_logs"} as ServiceWorkerOutBoundMessage
+  navigator.serviceWorker.controller?.postMessage(msg)
+}).then(() => {
+  const msg = {action: "list:connected_clients"} as ServiceWorkerOutBoundMessage
+  navigator.serviceWorker.controller?.postMessage(msg)
+}).then(() => {
+  const msg = {action: "list:consts"} as ServiceWorkerOutBoundMessage
+  navigator.serviceWorker.controller?.postMessage(msg)
+}).then(() => {
+  const msg = {action: "list:config"} as ServiceWorkerOutBoundMessage
+  navigator.serviceWorker.controller?.postMessage(msg)
 })
