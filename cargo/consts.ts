@@ -8,16 +8,14 @@ export type CrateVersion = keyof typeof ALL_CRATE_VERSIONS
 export const LATEST_CRATE_VERSION = "0.1.0"
 type NullField = typeof NULL_FIELD
 export const UUID_LENGTH = 35
-export const reservedIds = {
-    "std-app": "XRFCvi60nXcM0ZPiEupkeW9eNmoPi9ybk_S",
-    "std": "nZgOO5v-13AccpgJoAAzz6YWrGhM2bNZg5s"
-} as const
-export type ReservedUuids = typeof reservedIds[keyof typeof reservedIds]
-export type ReservedPackageNames = keyof typeof reservedIds
 export type RepoType = "git" | "other" | NullField
 
 
-export type InvalidationStrategy = "url-diff" | "purge" | "default"
+export type ValidDefaultStrategies = (
+    "url-diff" | "purge" 
+)
+
+export type InvalidationStrategy = ValidDefaultStrategies | "default"
 
 // this manifest format is heavily inspired by
 // Node's "package.json" format

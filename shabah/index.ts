@@ -6,14 +6,24 @@ import {
 } from "./utils"
 import {
     validateManifest,
+    dummyManifest,
+    ValidatedCodeManfiest,
+    CodeManifestSafe,
+    NULL_MANIFEST_VERSION
 } from "../cargo/index"
+import {SemVer} from "../nanoSemver/index"
 import {
-    MANIFEST_NAME, 
-    CodeManifestSafe
+    MANIFEST_NAME,
+    InvalidationStrategy
 } from "../cargo/consts"
+import {APP_INDEX, VIRTUAL_DRIVE} from "./consts"
+import {io, Result} from "../monads/result"
 
 const ENTRY_RECORDS_URL = entryRecords(window.location.origin)
 const LAUNCHER_CARGO = launcherCargo(window.location.origin)
+const APP_INDEX_URL = window.location.origin + "/" + APP_INDEX
+
+const appManifestUrl = (appId: number) => appFolder(window.location.origin, appId) + MANIFEST_NAME
 
 const enum log {
     name = "[👻 shabah]:"
@@ -21,50 +31,16 @@ const enum log {
 
 const enum bytes {
     per_mb = 1_000_000
-} 
-
-export class io<T> {
-    msg: string
-    success: boolean
-    data: T | null
-  
-    constructor(
-      success: boolean,
-      msg: string,
-      data: T | null
-    ) {
-      this.success = success
-      this.msg = msg
-      this.data = data
-    }
-}
-
-const retryPromise = async <T>(
-    p: () => Promise<T>, 
-    count: number
-) => {
-    let tryCount = 0
-    let errorMsg = ""
-    while (tryCount < count) {
-      try {
-        return new io(true, "sucess", await p())
-      } catch (err) {
-        if (tryCount >= count - 1) {
-          errorMsg = (err as Error || "unknown error").toString()
-        }
-        tryCount++
-      }
-    }
-    const msg = `Error fetching io operation after ${count} retries, err:${errorMsg}`
-    console.error(log.name, msg)
-    return new io(false, msg, null)
 }
 
 const fetchRetry = (
     input: RequestInfo | URL, 
     init: RequestInit & {retryCount: number}
 ) => {
-    return retryPromise(() => fetch(input, init), init.retryCount || 3)
+    return io.retry(
+        () => fetch(input, init), 
+        init.retryCount
+    )
 }
 
 const roundDecimal = (num: number, decimals: number) => {
@@ -78,9 +54,7 @@ type AppIndex = Readonly<{
     id: number,
     appRootUrl: string,
     htmlTitle: string
-    permissions: Readonly<{
-
-    }>
+    permissions: Readonly<{}>
 }>
 
 type AppList = {
@@ -106,15 +80,154 @@ type AppLauncher = {
     unMount: () => void
 }
 
+const tokenizeAppList = (apps: AppList) => Object.keys(apps).map(k => ({name: k, ...apps[k]}))
+type AppListTokens = ReturnType<typeof tokenizeAppList>
+
+const fetchManifestFromUrl = async (name: string, rootUrl: string) => {
+    const baseUrl = rootUrl.endsWith("/")
+        ? rootUrl
+        : rootUrl + "/"
+    const manifestUrl = baseUrl + MANIFEST_NAME
+    const manifestRes = await fetchRetry(manifestUrl, {
+        method: "GET",
+        retryCount: 3
+    })
+    if (!manifestRes.ok) {
+        console.error(log.name, `couldn't get manifest for app "${name}", reason: ${manifestRes.msg}`)
+        return manifestRes
+    }
+    const jsonManifestRes = await io.wrap(manifestRes.data.json())
+    if (!jsonManifestRes.ok) {
+        console.log(log.name, `manifest for ${name} was encoded as json`)
+        return jsonManifestRes
+    }
+    const manifest = validateManifest(jsonManifestRes.data)
+    return Result.ok({
+        manifest, 
+        size: parseInt(manifestRes.data.headers.get("content-length") || "0", 10)
+    })
+}
+
+type FileRefs = {
+    name: string, 
+    bytes: number,
+    requestUrl: string,
+    storageUrl: string,
+}[]
+
+type UpdateDetails = { delete: FileRefs, add: FileRefs }
+
+const standardizedUrl = (url: string, baseUrl: string) => {
+    if (url.startsWith("/")) {
+        return baseUrl + url
+    } else if (url.startsWith("./")) {
+        return baseUrl + url.slice(1)
+    } else {
+        return baseUrl + "/" + url
+    }
+}
+
+const stripRelativePath = (url: string) => {
+    if (url.startsWith("/")) {
+        return url.slice(1)
+    } else if (url.startsWith("./")) {
+        return url.slice(2)
+    } else {
+        return url
+    }
+}
+
+const invalidationType = <T extends InvalidationStrategy>(
+    type: InvalidationStrategy,
+    fallBack: T 
+) => {
+    return (type === "default" 
+        ? "url-diff"
+        : fallBack) as InvalidationStrategy
+}
+
+const DEFAULT_INVALIDATION: InvalidationStrategy = "url-diff"
+
+const diffManifests = async (
+    oldManifest: CodeManifestSafe | null,
+    newManifest: ValidatedCodeManfiest,
+    packageBaseUrl: string,
+    packageId: number
+) => {
+    const out = {delete: [], add: []} as UpdateDetails
+    const newFiles: Record<string, InvalidationStrategy> = {}
+    const newPkg = newManifest.pkg
+    for (let i = 0; i < newPkg.files.length; i++) {
+        const file = newPkg.files[i]
+        if (file.name.startsWith("https://")) {
+            // ignore if cross origin
+            continue
+        }
+        const strategy = invalidationType(file.invalidation, DEFAULT_INVALIDATION) 
+        newFiles[standardizedUrl(file.name, packageBaseUrl)] = strategy
+    }
+    const oldFiles: Record<string, {bytes: number}> = {}
+    const oldManifestFiles = oldManifest 
+        ? oldManifest.files 
+        : []
+    for (let i = 0; i < oldManifestFiles.length; i++) {
+        const {name, bytes} = oldManifestFiles[i]
+        oldFiles[standardizedUrl(name, packageBaseUrl)] = {bytes}
+    }
+    const packageDir = appFolder(
+        window.location.origin, packageId
+    )
+    for (let i = 0; i < newPkg.files.length; i++) {
+        const {name, bytes} = newPkg.files[i]
+        const stdName = standardizedUrl(name, packageBaseUrl)
+        if (!oldFiles[stdName] || newFiles[stdName] === "purge") {
+            out.add.push({
+                name, 
+                bytes, 
+                requestUrl: stdName,
+                storageUrl: (
+                    packageDir 
+                    + stripRelativePath(name)
+                )
+            })
+        }
+    }
+
+    const oldFileKeys = Object.keys(oldFiles)
+    for (let i = 0; i < oldFileKeys.length; i++) {
+        const name = oldFileKeys[i]
+        const stdName = standardizedUrl(name, packageBaseUrl)
+        const fileInvalidation = newFiles[stdName]
+        if (!fileInvalidation || fileInvalidation === "purge") {
+            const info = oldFiles[stdName] || {}
+            const {bytes = 0} = info
+            out.delete.push({
+                name, 
+                bytes, 
+                requestUrl: stdName,
+                storageUrl: (
+                    packageDir 
+                    + stripRelativePath(name)
+                )
+            })
+        }
+    }
+    return out
+}
+
+const NULL_PACKAGE_VERSION = NULL_MANIFEST_VERSION
+
 export class Shabah<Apps extends AppList> {
     readonly apps: Apps
-    private tokenizedApps: (AppIndex & {name: string})[]
+    private tokenizedApps: AppListTokens
     requestEngine: "native-fetch"
     readonly mode: ShabahModes
     readonly appPointers: AppEntryPointers
     private updates: {
         id: number,
-        totalBytes: number
+        totalBytes: number,
+        bytesToAdd: number,
+        bytesToDelete: number,
         manifestsTotalBytes: number,
         partitions: {
             appId: number,
@@ -124,6 +237,9 @@ export class Shabah<Apps extends AppList> {
             appDir: string
             totalBytes: number
             manifestBytes: number
+            details: UpdateDetails
+            addBytes: number
+            deleteBytes: number
         }[]
     }
     private updatesThisSession: number
@@ -131,10 +247,16 @@ export class Shabah<Apps extends AppList> {
     private launcher: AppLauncher | null
     readonly cacheName: string
 
-    constructor({apps, mode, cacheName}: Readonly<{
+    constructor({
+        apps, 
+        mode, 
+        cacheName, 
+        previousCaches = []
+    }: Readonly<{
         apps: Apps,
         mode: ShabahModes,
-        cacheName: string
+        cacheName: string,
+        previousCaches?: string[]
     }>) {
         if (Object.keys(apps).length < 1) {
             throw new TypeError(`${log.name} one or more apps must be defined`)
@@ -149,7 +271,7 @@ export class Shabah<Apps extends AppList> {
         }
         this.apps = apps
         const self = this
-        this.tokenizedApps = Object.keys(self.apps).map(k => ({name: k, ...self.apps[k]}))
+        this.tokenizedApps = tokenizeAppList(self.apps)
         this.requestEngine = "native-fetch"
         this.mode = mode
         this.appPointers = {
@@ -160,14 +282,19 @@ export class Shabah<Apps extends AppList> {
             id: -1,
             totalBytes: 0,
             manifestsTotalBytes: 0,
+            bytesToDelete: 0,
+            bytesToAdd: 0,
             partitions: []
         }
         this.updatesThisSession = 0
         this.downloadingPartition = -1
         this.launcher = null
         this.cacheName = cacheName
+        for (const prevCache of previousCaches) {
+            caches.delete(prevCache)
+        }
         if (this.mode === "dev") {
-            console.info(log.name, "dev mode detected, purging all cache files")
+            console.info(log.name, "dev mode detected, purging current cache")
             caches.delete(this.cacheName)
         }
     }
@@ -177,53 +304,116 @@ export class Shabah<Apps extends AppList> {
     }
 
     async checkForUpdates() {
-        const apps = this.tokenizedApps
         const targetCache = await this.cache()
-        let previousAppPtrs = await targetCache.match(ENTRY_RECORDS_URL)
-        if (!previousAppPtrs) {
+        let appListFile = await targetCache.match(APP_INDEX_URL)
+        if (!appListFile) {
             console.info(log.name, "no previous app pointers found")
         } else {
             console.info(log.name, "previous app pointers found, diffing against new apps")
         }
+        const previousAppsJson = await io.wrap(
+            (appListFile || new Response(JSON.stringify(this.tokenizedApps))).json()
+        )
+        if (!previousAppsJson.ok && appListFile) {
+            console.error(log.name, `previous app list found but couldn't parse correctly, json encoded incorrectly?`)
+            return
+        }
+        const apps = this.tokenizedApps
+        const previousApps = previousAppsJson.data as AppListTokens
+        const currentAppIds: Record<number, boolean> = {}
+        const appsToUpdate: (AppListTokens[number] & {
+            cargoSrc: {
+                manifest: null | ValidatedCodeManfiest,
+                size: number
+            },
+            previousCargo: CodeManifestSafe | null,
+        })[] = []
+        const newManifestPackage = dummyManifest().pkg
+        // set version to zero
+        newManifestPackage.version = NULL_PACKAGE_VERSION
+        await Promise.all(apps.map(async (app) => {
+            currentAppIds[app.id] = true
+            const manifestUrl = appManifestUrl(app.id)
+            const prevCargoFile = await targetCache.match(manifestUrl)
+            if (!prevCargoFile) {
+                console.info(log.name, `previous cargo not found for app ${app.name}`)
+            }
+            const prevParsed = !prevCargoFile
+                ? null
+                : await prevCargoFile.json() as CodeManifestSafe
+            const previousCargo = !prevParsed
+                ? newManifestPackage
+                : prevParsed
+            appsToUpdate.push({
+                ...app, 
+                cargoSrc: {manifest: null, size: 0},
+                previousCargo
+            })
+        }))
+
+        for (const prevApp of previousApps) {
+            if (currentAppIds[prevApp.id]) {
+                continue
+            }
+            const deletionManifest = dummyManifest()
+            // give it an astronomical version level
+            // so that isGreater always returns true
+            deletionManifest.pkg.version = "100000000.0.0"
+            // give it no files so it deletes
+            // all files associated with it
+            deletionManifest.pkg.files = []
+            appsToUpdate.push({
+                ...prevApp, 
+                cargoSrc: {
+                    manifest: deletionManifest,
+                    size: 0
+                },
+                previousCargo: null
+            })
+        }
+        
+
         const failedManifestRequests: number[] = []
-        const updatePromises = apps.map(async (app, i) => {
+        const updatePromises = appsToUpdate.map(async (app, i) => {
+            const pkgRes = app.cargoSrc.manifest
+                ? io.ok(app.cargoSrc)
+                : await fetchManifestFromUrl(app.name, app.appRootUrl)
+            if (!pkgRes.ok || !pkgRes.data.manifest) {
+                failedManifestRequests.push(i)
+                return 
+            }
+            const {manifest, size} = pkgRes.data
+            const {pkg, errors, semanticVersion: currentSemVer} = manifest 
             const baseUrl = app.appRootUrl.endsWith("/")
                 ? app.appRootUrl
                 : app.appRootUrl + "/"
             const manifestUrl = baseUrl + MANIFEST_NAME
-            const manifestRes = await fetchRetry(manifestUrl, {
-                method: "GET",
-                retryCount: 3
-            })
-            if (
-                !manifestRes.data 
-                || !manifestRes.success
-                || !manifestRes.data.ok
-            ) {
-                console.error(log.name, `couldn't get manifest for app "${app.name}", reason: ${manifestRes.msg}`)
-                failedManifestRequests.push(i)
-                return
-            }
-            // error check this
-            const jsonManifest = await manifestRes.data.json()
-            const {pkg, errors} = validateManifest(jsonManifest, true)
             if (errors.length > 0) {
                 console.error(log.name, `manifest for "${app.name}" (${manifestUrl}) is not a valid ${MANIFEST_NAME} format. Errors: ${errors.join()}`)
                 return
             }
-            console.log(pkg)
-            const manifestContentLength = manifestRes.data.headers.get("content-length")
-            const manifestBytes = manifestContentLength 
-                ? parseInt(manifestContentLength, 10)
-                : 0
+            const prevVersion = app.previousCargo?.version || NULL_PACKAGE_VERSION
+            const prevSemVer = SemVer.fromString(prevVersion)
+            if (
+                prevVersion !== NULL_PACKAGE_VERSION
+                && prevSemVer
+                && !prevSemVer.isLower(currentSemVer)
+            ) {
+                console.info(log.name, `app "${app.name}" is update to date (${pkg.version})`)
+                return
+            }
+            const manifestBytes = size
             const totalAppSize = pkg.files.reduce((total, {bytes}) => {
                 return total + bytes
             }, manifestBytes)
-            console.info(log.name, `successfully fetched "${app.name}" manifest, app_size is ${roundDecimal(totalAppSize / bytes.per_mb, 2)}mb`)
+            console.info(log.name, `successfully fetched "${app.name}" manifest, app_size is ${Math.max(roundDecimal(totalAppSize / bytes.per_mb, 2), 0.01)}mb`)
             const CURRENT_APP_DIR = appFolder(
                 window.location.origin, app.id
             )
-            const appEntryUrl = CURRENT_APP_DIR + pkg.entry
+            const appEntryUrl = (
+                CURRENT_APP_DIR 
+                + stripRelativePath(pkg.entry)
+            )
             this.appPointers.entries.push({
                 url: appEntryUrl,
                 originalUrl: baseUrl + pkg.entry,
@@ -240,6 +430,11 @@ export class Shabah<Apps extends AppList> {
                 manifestBytes
             )
             console.info(log.name, `Inserted app entry ptr for "${app.name}" (ptr->${appEntryUrl})`)
+            const details = await diffManifests(
+                app.previousCargo, manifest,
+                baseUrl,
+                app.id
+            )
             this.updates.partitions.push({
                 appId: app.id,
                 name: app.name,
@@ -248,17 +443,32 @@ export class Shabah<Apps extends AppList> {
                 totalBytes: totalAppSize,
                 manifestBytes,
                 baseUrl,
+                details,
+                addBytes: details.add
+                    .reduce((t, {bytes}) => t + bytes, 0),
+                deleteBytes: details.delete
+                    .reduce((t, {bytes}) => t + bytes, 0),
             })
         })
         await Promise.all(updatePromises)
-        const strRecords = JSON.stringify(this.appPointers)
-        await this.cacheFile(
-            targetCache,
-            strRecords,
-            ENTRY_RECORDS_URL,
-            "application/json",
-            stringBytes(strRecords)
-        )
+        const ptrRecords = JSON.stringify(this.appPointers)
+        const indexRecords = JSON.stringify(this.apps)
+        await Promise.all([
+            this.cacheFile(
+                targetCache,
+                ptrRecords,
+                ENTRY_RECORDS_URL,
+                "application/json",
+                stringBytes(ptrRecords)
+            ),
+            this.cacheFile(
+                targetCache,
+                indexRecords,
+                APP_INDEX_URL,
+                "application/json",
+                stringBytes(indexRecords)
+            )
+        ])
         this.updates.manifestsTotalBytes = this.updates
             .partitions
             .reduce((t, {manifestBytes}) => t + manifestBytes, 0)
@@ -266,6 +476,12 @@ export class Shabah<Apps extends AppList> {
             .partitions
             .reduce((t, {totalBytes}) => t + totalBytes, 0)
         this.updates.id = ++this.updatesThisSession
+        this.updates.bytesToAdd = this.updates
+            .partitions
+            .reduce((t, {addBytes}) => t + addBytes, 0)
+        this.updates.bytesToDelete = this.updates
+            .partitions
+            .reduce((t, {deleteBytes}) => t + deleteBytes, 0)
     }
 
     updatesAvailable() {
@@ -280,42 +496,43 @@ export class Shabah<Apps extends AppList> {
         const updates = this.updates.partitions
         const targetCache = await this.cache()
         let downloaded = this.updates.manifestsTotalBytes
+        const totalBytes = this.updates.bytesToAdd
         for (let i = 0; i < updates.length; i++) {
             const u = updates[i]
             const failedRequests = []
             this.downloadingPartition = u.appId
-            for (let f = 0; f < u.manifest.files.length; f++) {
-                const {name, bytes} = u.manifest.files[f]
-                const requestUrl = u.baseUrl + name
+            const deleteFiles = u.details.delete
+            await Promise.all(deleteFiles.map(({storageUrl}) => {
+                return targetCache.delete(storageUrl)
+            }))
+            console.info(log.name, `deleted all stale files for app "${u.name}" (count=${deleteFiles.length})`)
+            const addFiles = u.details.add
+            for (let f = 0; f < addFiles.length; f++) {
+                const file = addFiles[f]
+                const {name, bytes, requestUrl, storageUrl} = file
                 const fileRes = await fetchRetry(requestUrl, {
                     method: "GET",
                     retryCount: 3
                 })
-                if (
-                    !fileRes.data 
-                    || !fileRes.success
-                    || !fileRes.data.ok
-                ) {
-                    failedRequests.push({...fileRes, name, requestUrl})
+                if (!fileRes.ok || !fileRes.data.ok) {
+                    failedRequests.push({...file})
                     continue
                 }
                 onProgress({
                     downloaded,
-                    total:  this.updates.totalBytes,
-                    latestFile: name,
+                    total:  totalBytes,
+                    latestFile: stripRelativePath(name),
                     latestPartition: u.name 
                 })
-                // reliable?
                 downloaded += bytes
-                const cacheUrl = u.appDir + name
                 await this.cacheFile(
                     targetCache,
                     await fileRes.data.text(),
-                    cacheUrl,
+                    storageUrl,
                     fileRes.data.headers.get("content-type") || "text/plain",
                     bytes
                 )
-                console.info(log.name, `inserted file ${name} (${u.name}) into virtual drive (${cacheUrl})`)
+                console.info(log.name, `inserted file ${name} (${u.name}) into virtual drive (${storageUrl})`)
             }
         }
     }
@@ -330,6 +547,7 @@ export class Shabah<Apps extends AppList> {
 
     showLauncher() {
         if (this.launcher) {
+            console.info(log.name, "{😼 show-launcher} mounting launcher")
             this.launcher.mount()
         } else {
             console.error(log.name, "{😼 show-launcher} launcher has not been defined yet")
@@ -338,6 +556,7 @@ export class Shabah<Apps extends AppList> {
 
     destroyLauncher() {
         if (this.launcher) {
+            console.info(log.name, "{🙀 destroy-launcher} unmounting launcher")
             this.launcher.unMount()
         } else {
             console.error(log.name, "{🙀 destroy-launcher} launcher not defined yet")
@@ -359,7 +578,7 @@ export class Shabah<Apps extends AppList> {
             retryCount: 3
         })
         if (!entryPing.data || !entryPing.data.ok) {
-            const msg = `couldn't launch app "${appKey}" because entry does not exist in virtual drive (/local).`
+            const msg = `couldn't launch app "${appKey}" because entry does not exist in virtual drive (${VIRTUAL_DRIVE.slice(1) + "/"}).`
             console.error(log.name, msg)
             return {success: false, msg}
         }
@@ -429,7 +648,6 @@ export class Shabah<Apps extends AppList> {
         }
         const {pkg, errors, semanticVersion} = validateManifest(
             await manifestRes.data.json(),
-            false
         )
         if (errors.length > 0) {
             console.error(log.name, "launcher manifest is incorrectly encoded, errors:", errors.join())

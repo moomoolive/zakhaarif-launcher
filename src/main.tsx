@@ -76,16 +76,4 @@ shabah.cacheLaucherAssets({
   rootHtmlDoc: htmlDoc,
   cargoUrl: "cargo.json",
   useMiniCargoDiff: false,
-}).then(() => {
-  const msg = {action: "config:verbose_logs"} as ServiceWorkerOutBoundMessage
-  navigator.serviceWorker.controller?.postMessage(msg)
-}).then(() => {
-  const msg = {action: "list:connected_clients"} as ServiceWorkerOutBoundMessage
-  navigator.serviceWorker.controller?.postMessage(msg)
-}).then(() => {
-  const msg = {action: "list:consts"} as ServiceWorkerOutBoundMessage
-  navigator.serviceWorker.controller?.postMessage(msg)
-}).then(() => {
-  const msg = {action: "list:config"} as ServiceWorkerOutBoundMessage
-  navigator.serviceWorker.controller?.postMessage(msg)
 })
