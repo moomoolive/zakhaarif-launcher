@@ -1,4 +1,4 @@
-const resultifyAsync = <P extends unknown[], R>(fn: (...args: P) => Promise<R>) => {
+export const resultifyAsync = <P extends unknown[], R>(fn: (...args: P) => Promise<R>) => {
     return async (...args: P) => {
         try {
             return Result.ok(await fn(...args))
@@ -9,7 +9,7 @@ const resultifyAsync = <P extends unknown[], R>(fn: (...args: P) => Promise<R>) 
     } 
 }
 
-const resultifySync = <A extends unknown[], R>(fn: (...args: A) => R) => {
+export const resultifySync = <A extends unknown[], R>(fn: (...args: A) => R) => {
     return (...args: A) => {
         try {
             return Result.ok(fn(...args))

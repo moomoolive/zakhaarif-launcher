@@ -3,6 +3,7 @@ export type AppEntryPointers = {
     entries: {
         url: string, 
         originalUrl: string
+        version: string
         name: string
         id: number
         bytes: number

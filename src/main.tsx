@@ -64,16 +64,6 @@ shabah.defineLauncher({
   }
 })
 
-const htmlDoc = (
-  "<!DOCTYPE html>\n"
-  + document.documentElement.outerHTML
-)
-
-
 shabah.showLauncher()
 
-shabah.cacheLaucherAssets({
-  rootHtmlDoc: htmlDoc,
-  cargoUrl: "cargo.json",
-  useMiniCargoDiff: false,
-})
+shabah.cacheLaucherAssets({useMiniCargoDiff: false})

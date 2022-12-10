@@ -17,7 +17,8 @@ export const shabah = new Shabah({
       }
     },
     mode: "dev",
-    cacheName: APP_CACHE
+    cacheName: APP_CACHE,
+    loggingMode: "verbose"
 })
 
 export type AppController = typeof shabah

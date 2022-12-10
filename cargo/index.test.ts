@@ -1,5 +1,9 @@
 import {describe, it, expect} from "vitest"
-import {cargoIsUpdatable, CodeManifestSafe} from "./index"
+import {
+    cargoIsUpdatable, 
+    CodeManifestSafe, 
+    NULL_MANIFEST_VERSION
+} from "./index"
 import {LATEST_CRATE_VERSION} from "./consts"
 import {nanoid} from "nanoid"
 
@@ -24,18 +28,28 @@ describe("cargo update detection function", () => {
         }
     })
 
-    it("should return false if old package has null version (0.0.0)", () => {
-        const newPkg = manifest
+    it("should return false if new and old packages have null version (0.0.0)", () => {
+        const newPkg = manifest.clone()
+        newPkg.version = NULL_MANIFEST_VERSION
         const oldPkg = manifest.clone()
-        oldPkg.version = "0.0.0"
+        oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
     })
 
-    it("should return true if new package has null version (0.0.0)", () => {
+    it("should return false if new package has null version (0.0.0)", () => {
         const oldPkg = manifest
         const newPkg = manifest.clone()
-        newPkg.version = "0.0.0"
+        newPkg.version = NULL_MANIFEST_VERSION
+        const res = cargoIsUpdatable(newPkg, oldPkg)
+        expect(res.updateAvailable).toBe(false)
+    })
+
+    it("should return true if old package has null version (0.0.0) and new package is non-null", () => {
+        const newPkg = manifest.clone()
+        newPkg.version = "0.1.0"
+        const oldPkg = manifest.clone()
+        oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(true)
     })
@@ -224,10 +238,14 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
-    it("should return error if cargo.entry is not the name of one of files", () => {
+    it("should return error if cargo.entry is not the name of one of files, unless there are zero files in listed", () => {
         const m = manifest.clone()
         m.entry = "random_file_not_listed.js"
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
+        const empty = manifest.clone()
+        empty.files = []
+        empty.entry = ""
+        expect(validateManifest(empty).errors.length).toBe(0)
     })
 
     it("should return no errors when missing all optional fields", () => {

@@ -66,6 +66,7 @@ export class CodeManifestSafe {
         version = NULL_MANIFEST_VERSION,
         entry = "",
         files = [],
+
         // optionalfields
         invalidation = "default",
         description = NULL_FIELD,
@@ -235,7 +236,7 @@ export const validateManifest = <T>(cargo: T) => {
 
     if (typevalid(c, "entry", "string", errors)) {}
     pkg.entry = c.entry || ""
-    if (!fileRecord[pkg.entry]) {
+    if (!fileRecord[pkg.entry] && pkg.files.length > 0) {
         errors.push(`entry must be one of package listed files, got ${pkg.entry}`)
     }
 
@@ -249,7 +250,8 @@ export const validateManifest = <T>(cargo: T) => {
             name,  email: orNull(email), url: orNull(url)
         }))
     pkg.crateLogoUrl = orNull(c.crateLogoUrl)
-    pkg.keywords = (c.keywords || []).filter(w => typeof w === "string")
+    pkg.keywords = (c.keywords || [])
+        .filter(w => typeof w === "string")
     pkg.license = orNull(c.license)
     pkg.repo.type = orNull(c.repo?.type)
     pkg.repo.url = orNull(c.repo?.url)
@@ -274,11 +276,12 @@ export const cargoIsUpdatable = (
         return out
     }
     const oldVersionIsNull = validatedOld.pkg.version === NULL_MANIFEST_VERSION
-    if (oldVersionIsNull) {
-        return out
-    }
     const newVersionIsNull = validatedNew.pkg.version === NULL_MANIFEST_VERSION
-    if (newVersionIsNull) {
+    if (oldVersionIsNull && newVersionIsNull) {
+        return out
+    } else if (newVersionIsNull) {
+        return out
+    } else if (oldVersionIsNull && !newVersionIsNull) {
         out.updateAvailable = true
         return out
     }
