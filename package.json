@@ -1,7 +1,7 @@
 {
   "name": "g-wrapper",
   "private": true,
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta",
   "type": "module",
   "scripts": {
     "dev": "npm run sw && vite",
@@ -11,7 +11,7 @@
     "test-watch": "vitest watch",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --format=esm --bundle --outfile=./public/dev-sw.js",
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --minify --outfile=./public/sw.js",
-    "shabah-cli": "node ./shabah/cli.mjs"
+    "cargo-cli": "node ./cargo/cli.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
@@ -31,9 +31,11 @@
     "filehound": "^1.17.6",
     "nanoid": "^4.0.0",
     "postcss": "^8.4.19",
+    "semver": "^7.3.8",
     "tailwindcss": "^3.2.4",
     "typescript": "^4.6.4",
     "vite": "^3.2.3",
-    "vitest": "^0.25.5"
+    "vitest": "^0.25.5",
+    "zod": "^3.19.1"
   }
 }

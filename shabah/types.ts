@@ -15,7 +15,6 @@ export type ShabahCliConfig = {
     ignore?: string[]
     generateMiniCargo?: boolean,
     uuid?: string
-    fillMissingFieldsFromPackageJson?: boolean,
     entry?: string
     version?: string
     name?: string

@@ -8,5 +8,4 @@ export const config = {
         "dev-sw.js",
         "sw.js"
     ],
-    fillMissingFieldsFromPackageJson: true
 }
