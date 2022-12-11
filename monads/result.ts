@@ -52,8 +52,7 @@ export const io = {
     err: Result.err,
     wrap: Result.wrapPromise,
     retry: async <P>(p: () => Promise<P>, count: number) => {
-        const end = Math.max(count, 1)
-        for (let i = 0; i < end - 1; i++) {
+        for (let i = 0; i < count - 1; i++) {
             const res = await Result.wrapAsync(p)
             if (res.ok) {
                 return res

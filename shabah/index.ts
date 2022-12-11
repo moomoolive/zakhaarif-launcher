@@ -1,8 +1,6 @@
 import {AppEntryPointers} from "./types"
 import {
-    entryRecords,
-    appFolder,
-    launcherCargo
+    fetchRetry
 } from "./utils"
 import {
     validateManifest,
@@ -16,15 +14,19 @@ import {
     APP_INDEX, 
     VIRTUAL_DRIVE,
     PARTIAL_UPDATES,
-    LAUNCHER_PARTIAL_UPDATES
+    LAUNCHER_PARTIAL_UPDATES,
+    APP_RECORDS,
+    LAUNCHER_CARGO as LAUNCHER_CARGO_EXTENSION,
+    APPS_FOLDER,
 } from "./consts"
 import {io, Result} from "../monads/result"
 
-const ENTRY_RECORDS_URL = entryRecords(window.location.origin)
-const LAUNCHER_CARGO = launcherCargo(window.location.origin)
+const ENTRY_RECORDS_URL = window.location.origin + "/" + APP_RECORDS
+const LAUNCHER_CARGO = window.location.origin + "/" + LAUNCHER_CARGO_EXTENSION
 const APP_INDEX_URL = window.location.origin + "/" + APP_INDEX
 const UPDATES_BACKUP_URL = window.location.origin + "/" + PARTIAL_UPDATES
 
+const appFolder = (windowOrigin: string, appId: number) => windowOrigin + "/" + APPS_FOLDER + appId.toString() + "/"
 const appManifestUrl = (appId: number) => appFolder(window.location.origin, appId) + MANIFEST_NAME
 
 const enum log {
@@ -33,16 +35,6 @@ const enum log {
 
 const enum bytes {
     per_mb = 1_000_000
-}
-
-const fetchRetry = (
-    input: RequestInfo | URL, 
-    init: RequestInit & {retryCount: number}
-) => {
-    return io.retry(
-        () => fetch(input, init), 
-        init.retryCount
-    )
 }
 
 const roundDecimal = (num: number, decimals: number) => {
