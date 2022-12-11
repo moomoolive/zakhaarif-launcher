@@ -1,9 +1,13 @@
 export const urlToMime = (url: string) => {
     const split = url.split(".")
-    if (split.length < 2 || split[1].length < 1) {
+    if (split.length < 2) {
         return ""
     }
-    return extensionToMime(split[1])
+    const extension = split.at(-1)
+    if (!extension || extension.length < 1) {
+        return ""
+    }
+    return extensionToMime(extension)
 }
 
 // taken from https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
@@ -12,151 +16,151 @@ export const extensionToMime = (extension: string) => {
         case "aac":
             return "audio/aac"
         case "abw":
-                return "application/x-abiword"
+            return "application/x-abiword"
         case "arc":
-                return "application/x-freearc"
+            return "application/x-freearc"
         case "avif":
-                return "image/avif"
+            return "image/avif"
         case "avi":
-                return "video/x-msvideo"
+            return "video/x-msvideo"
         case "azw":
-                return "application/vnd.amazon.ebook"
+            return "application/vnd.amazon.ebook"
         case "bin":
-                return "application/octet-stream"
+            return "application/octet-stream"
         case "bmp":
-                return "image/bmp"
+            return "image/bmp"
         case "bz":
-                return "application/x-bzip"
+            return "application/x-bzip"
         case "bz2":
-                return "application/x-bzip2"
+            return "application/x-bzip2"
         case "cda":
-                return "application/x-cdf"
+            return "application/x-cdf"
         case "csh":
-                return "application/x-csh"
+            return "application/x-csh"
         case "css":
-                return "text/css"
+            return "text/css"
         case "csv":
-                return "text/csv"
+            return "text/csv"
         case "doc":
-                return "application/msword"
+            return "application/msword"
         case "docx":
-                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         case "eot":
-                return "application/vnd.ms-fontobject"
+            return "application/vnd.ms-fontobject"
         case "epub":
-                return "application/epub+zip"
+            return "application/epub+zip"
         case "gz":
-                return "application/gzip"
+            return "application/gzip"
         case "gif":
-                return "image/gif"
+            return "image/gif"
         case "htm":
         case "html":
-                return "text/html"
+            return "text/html"
         case "ico":
-                return "image/vnd.microsoft.icon"
+            return "image/vnd.microsoft.icon"
         case "ics":
-                return "text/calendar"
+            return "text/calendar"
         case "jar":
-                return "application/java-archive"
+            return "application/java-archive"
         case "jpeg":
         case "jpg":
-                return "image/jpeg"
+            return "image/jpeg"
         case "js":
-                return "text/javascript"
+            return "text/javascript"
         case "json":
-                return "application/json"
+            return "application/json"
         case "jsonld":
-                return "application/ld+json"
+            return "application/ld+json"
         case "mid":
         case "midi":
-                return "audio/midi"
+            return "audio/midi"
         case "mjs":
-                return "text/javascript"
+            return "text/javascript"
         case "mp3":
-                return "audio/mpeg"
+            return "audio/mpeg"
         case "mp4":
-                return "video/mp4"
+            return "video/mp4"
         case "mpeg":
-                return "video/mpeg"
+            return "video/mpeg"
         case "mpkg":
-                return "application/vnd.apple.installer+xml"
+            return "application/vnd.apple.installer+xml"
         case "odp":
-                return "application/vnd.oasis.opendocument.presentation"
+            return "application/vnd.oasis.opendocument.presentation"
         case "ods":
-                return "application/vnd.oasis.opendocument.spreadsheet"
+            return "application/vnd.oasis.opendocument.spreadsheet"
         case "odt":
-                return "application/vnd.oasis.opendocument.text"
+            return "application/vnd.oasis.opendocument.text"
         case "oga":
-                return "audio/ogg"
+            return "audio/ogg"
         case "ogv":
-                return "video/ogg"
+            return "video/ogg"
         case "ogx":
-                return "application/ogg"
+            return "application/ogg"
         case "opus":
-                return "audio/opus"
+            return "audio/opus"
         case "otf":
-                return "font/otf"
+            return "font/otf"
         case "png":
-                return "image/png"
+            return "image/png"
         case "pdf":
-                return "application/pdf"
+            return "application/pdf"
         case "php":
-                return "application/x-httpd-php"
+            return "application/x-httpd-php"
         case "ppt":
-                return "application/vnd.ms-powerpoint"
+            return "application/vnd.ms-powerpoint"
         case "pptx":
-                return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         case "rar":
-                return "application/vnd.rar"
+            return "application/vnd.rar"
         case "rtf":
-                return "application/rtf"
+            return "application/rtf"
         case "sh":
-                return "application/x-sh"
+            return "application/x-sh"
         case "svg":
-                return "image/svg+xml"
+            return "image/svg+xml"
         case "tar":
-                return "application/x-tar"
+            return "application/x-tar"
         case "tif":
         case "tiff":
-                return "image/tiff"
+            return "image/tiff"
         case "ts":
-                return "video/mp2t"
+            return "video/mp2t"
         case "ttf":
-                return "font/ttf"
+            return "font/ttf"
         case "txt":
-                return "text/plain"
+            return "text/plain"
         case "vsd":
-                return "application/vnd.visio"
+            return "application/vnd.visio"
         case "wav":
-                return "audio/wav"
+            return "audio/wav"
         case "weba":
-                return "audio/webm"
+            return "audio/webm"
         case "webm":
-                return "video/webm"
+            return "video/webm"
         case "webp":
-                return "image/webp"
+            return "image/webp"
         case "woff":
-                return "font/woff"
+            return "font/woff"
         case "woff2":
-                return "font/woff2"
+            return "font/woff2"
         case "xhtml":
-                return "application/xhtml+xml"
+            return "application/xhtml+xml"
         case "xls":
-                return "application/vnd.ms-excel"
+            return "application/vnd.ms-excel"
         case "xlsx":
-                return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         case "xml":
-                return "application/xml"
+            return "application/xml"
         case "xul":
-                return "application/vnd.mozilla.xul+xml"
+            return "application/vnd.mozilla.xul+xml"
         case "zip":
-                return "application/zip"
+            return "application/zip"
         case "3gp":
-                return "video/3gpp"
+            return "video/3gpp"
         case "3g2":
-                return "video/3gpp2"
+            return "video/3gpp2"
         case "7z":
-                return "application/x-7z-compressed"
+            return "application/x-7z-compressed"
         default:
             return "text/plain"
     }

@@ -11,8 +11,12 @@ export type AppEntryPointers = {
 }
 
 export type ShabahCliConfig = {
-    buildDir?: string
+    buildDir: string
     ignore?: string[]
     generateMiniCargo?: boolean,
-    fillMissingFieldsFromPackageJson?: boolean
+    uuid?: string
+    fillMissingFieldsFromPackageJson?: boolean,
+    entry?: string
+    version?: string
+    name?: string
 }
