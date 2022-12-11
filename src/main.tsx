@@ -66,4 +66,4 @@ shabah.defineLauncher({
 
 shabah.showLauncher()
 
-shabah.cacheLaucherAssets({useMiniCargoDiff: false})
+shabah.cacheLaucherAssets()

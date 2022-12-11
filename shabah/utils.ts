@@ -1,4 +1,5 @@
 import {io} from "../monads/result"
+import {urlToMime, Mime} from "../miniMime/index"
 
 export const fetchRetry = (
     input: RequestInfo | URL, 
@@ -10,7 +11,7 @@ export const fetchRetry = (
     )
 }
 
-type FileRef = {
+export type FileRef = {
     name: string
     bytes: number
     requestUrl: string
@@ -41,7 +42,7 @@ const stripRelativePath = (url: string) => {
 
 const SHABAH_SOURCE = 1
 
-const headers = (mimeType: string, contentLength: number) => {
+const headers = (mimeType: Mime, contentLength: number) => {
     return {
         "Last-Modified": new Date().toUTCString(),
         "Sw-Source": SHABAH_SOURCE.toString(),
@@ -97,7 +98,11 @@ const persistAsset = async (
         logger.warn(`failed to fetch ${name} (partition=${assetListName})`)
         return fileRes
     }
-    const mimeType = fileRes.data.headers.get("content-type") || "text/plain"
+    const extensionMime = urlToMime(requestUrl)
+    const requestMime = fileRes.data.headers.get("content-type") as Mime | null
+    const mimeType = extensionMime === ""
+        ? requestMime || "text/plain"
+        : extensionMime
     await cacheEngine.put(storageUrl, new Response(
         await fileRes.data.text(), 
         {

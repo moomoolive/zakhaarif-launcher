@@ -1,6 +1,8 @@
 import {AppEntryPointers} from "./types"
 import {
-    fetchRetry
+    fetchRetry,
+    persistAssetList,
+    FileRef,
 } from "./utils"
 import {
     validateManifest,
@@ -9,7 +11,7 @@ import {
     cargoIsUpdatable,
     diffManifestFiles
 } from "../cargo/index"
-import {MANIFEST_MINI_NAME, MANIFEST_NAME} from "../cargo/consts"
+import {MANIFEST_NAME} from "../cargo/consts"
 import {
     APP_INDEX, 
     VIRTUAL_DRIVE,
@@ -20,6 +22,7 @@ import {
     APPS_FOLDER,
 } from "./consts"
 import {io, Result} from "../monads/result"
+import {urlToMime, Mime} from "../miniMime/index"
 
 const ENTRY_RECORDS_URL = window.location.origin + "/" + APP_RECORDS
 const LAUNCHER_CARGO = window.location.origin + "/" + LAUNCHER_CARGO_EXTENSION
@@ -152,6 +155,17 @@ type UpdateOptions = {
     onProgress?: (params: UpdateOnProgressParams) => void
 }
 
+type RequestEngineType = (
+    "fetch"
+    | "background-fetch"
+)
+
+const deepCopy = <T>(val: T) => JSON.parse(JSON.stringify(val)) as T
+
+const deleteCacheFiles = (cache: Cache, files: {storageUrl: string}[]) => {
+    return Promise.all(files.map(({storageUrl}) => cache.delete(storageUrl)))
+}
+
 export class Shabah<Apps extends AppList> {
     readonly apps: Apps
     private tokenizedApps: Array<(
@@ -159,7 +173,7 @@ export class Shabah<Apps extends AppList> {
             name: string
         }>
     )>
-    requestEngine: "native-fetch"
+    requestEngine: RequestEngineType
     readonly mode: ShabahModes
     readonly appPointers: AppEntryPointers
     private updates: AppUpdates
@@ -168,6 +182,10 @@ export class Shabah<Apps extends AppList> {
     private launcher: AppLauncher | null
     readonly cacheName: string
     private rootHtmlDoc: string
+    private logger: {
+        warn: (...args: any[]) => void
+        info: (...args: any[]) => void
+    }
     loggingMode: "verbose" | "silent"
 
     constructor({
@@ -197,7 +215,7 @@ export class Shabah<Apps extends AppList> {
         this.apps = apps
         const self = this
         this.tokenizedApps = Object.keys(self.apps).map(k => ({name: k, ...self.apps[k]}))
-        this.requestEngine = "native-fetch"
+        this.requestEngine = "fetch"
         this.mode = mode
         this.appPointers = {
             entryRecords: ENTRY_RECORDS_URL,
@@ -226,6 +244,10 @@ export class Shabah<Apps extends AppList> {
         }
         this.loggingMode = loggingMode
         this.rootHtmlDoc = "<!DOCTYPE html>\n" + document.documentElement.outerHTML
+        this.logger = {
+            warn: (...msgs: any[]) => console.warn(log.name, ...msgs),
+            info: (...msgs: any[]) => console.info(log.name, ...msgs),
+        }
     }
 
     private createUpdateId() {
@@ -354,15 +376,14 @@ export class Shabah<Apps extends AppList> {
                 return io.err(`${log.name} err occurred when checking for update. old-cargo encoded correctly=${oldManifest.errors.length < 1}, errs=${oldManifest.errors.join()}. new-cargo is encoded correctly=${newManifest.errors.length < 1}, errs=${newManifest.errors.join()}`)
             } else if (!updateAvailable) {
                 console.info(log.name, `app "${app.name}" is update to date (v=${oldManifest.pkg.version})`)
-                return io.ok({})
-            } else if (
-                !updateAvailable
-                && partialUpdate 
-                && partialUpdateIndex !== -1
-                && partialUpdate.partitions[partialUpdateIndex].details.add.length > 0
-            ) {
-                const partialPartition = partialUpdate.partitions[partialUpdateIndex]
-                this.updates.partitions.push(partialPartition)
+                if (
+                    partialUpdate 
+                    && partialUpdateIndex !== -1
+                    && partialUpdate.partitions[partialUpdateIndex].details.add.length > 0
+                ) {
+                    const partialPartition = partialUpdate.partitions[partialUpdateIndex]
+                    this.updates.partitions.push(partialPartition)
+                }
                 return io.ok({})
             }
             const {pkg} = newManifest
@@ -477,7 +498,6 @@ export class Shabah<Apps extends AppList> {
     }
 
     async execUpdates(params: UpdateOptions) {
-
         let appUpdates = this.updates
         let error = false
         // max retries is 3
@@ -520,59 +540,35 @@ export class Shabah<Apps extends AppList> {
         appUpdates: AppUpdates
         attemptCount: number
     })) {
-        const {
-            partitions: updates, 
-            manifestsTotalBytes,
-            bytesToAdd
-        } =  appUpdates
-        const backup = JSON.parse(
-            JSON.stringify(appUpdates)
-        ) as typeof this.updates
+        const {partitions, manifestsTotalBytes, bytesToAdd} =  appUpdates
+        const backup = deepCopy(appUpdates)
         const targetCache = await this.cache()
-        appUpdates.bytesCompleted = manifestsTotalBytes
+        let bytesCompleted = attemptCount < 1 
+            ? manifestsTotalBytes
+            : appUpdates.bytesCompleted
         const totalBytes = bytesToAdd
-        for (let i = 0; i < updates.length; i++) {
-            const {details, appId, name: updateName} = updates[i]
+        for (let i = 0; i < partitions.length; i++) {
+            const {details, appId, name} = partitions[i]
             this.downloadingPartition = appId
-            const deleteFiles = details.delete
-            await Promise.all(deleteFiles.map(({storageUrl}) => {
-                return targetCache.delete(storageUrl)
-            }))
-            console.info(log.name, `deleted all stale files for app "${updateName}" (count=${deleteFiles.length})`)
-            const addFiles = details.add
-            const failedRequests = [] as (typeof addFiles[number])[]
-            for (let f = 0; f < addFiles.length; f++) {
-                const file = addFiles[f]
-                const {name, bytes, requestUrl, storageUrl} = file
-                onProgress({
-                    downloaded: appUpdates.bytesCompleted,
-                    total:  totalBytes,
-                    latestFile: stripRelativePath(name),
-                    latestPartition: updateName,
-                    attemptCount 
-                })
-                const fileRes = await fetchRetry(requestUrl, {
-                    method: "GET",
-                    retryCount: 3
-                })
-                if (!fileRes.ok || !fileRes.data.ok) {
-                    console.warn(log.name, `failed to fetch ${name} (partition=${updateName})`)
-                    failedRequests.push({...file})
-                    continue
-                }
-                appUpdates.bytesCompleted += bytes
-                await this.cacheFile(
-                    targetCache,
-                    await fileRes.data.text(),
-                    storageUrl,
-                    fileRes.data.headers.get("content-type") || "text/plain",
-                    bytes
-                )
-                console.info(log.name, `inserted file ${name} (partition=${updateName}) into virtual drive (${storageUrl})`)
-            }
+            await deleteCacheFiles(targetCache, details.delete)
+            console.info(log.name, `deleted all stale files for app "${name}" (count=${details.delete.length})`)
+            const {failedRequests, downloaded} = await persistAssetList({
+                requestEngine: fetchRetry,
+                cacheEngine: targetCache,
+                files: details.add,
+                logger: this.logger,
+                concurrent: false,
+                totalBytes,
+                onProgress,
+                name,
+                attemptCount,
+                bytesCompleted
+            })
+            bytesCompleted += downloaded
             backup.partitions[i].details.delete = []
             backup.partitions[i].details.add = failedRequests
         }
+        appUpdates.bytesCompleted = bytesCompleted
         backup.failedRequests = backup.partitions.reduce((t, {details}) => {
             return t + details.add.length
         }, 0)
@@ -639,7 +635,7 @@ export class Shabah<Apps extends AppList> {
         targetCache: Cache,
         fileText: string, 
         url: string,
-        mimeType: string,
+        mimeType: Mime,
         bytes: number
     ) {
         return targetCache.put(url, new Response(fileText, {
@@ -650,44 +646,36 @@ export class Shabah<Apps extends AppList> {
     }
 
     private async persistLauncherAssetList(
-        urls: string[],
+        urls: FileRef[],
         targetCache: Cache,
         failedRequestsUrl: string,
         isRetry: boolean
     ) {
-        const assetRes = await Promise.all([urls.map(async (url) => {
-            const res = await fetchRetry(url, {
-                retryCount: 3,
-                method: "GET"
-            })
-            if (!res.ok || !res.data.ok) {
-                console.warn(`${log.name}${isRetry ? " [RETRY]" : ""} couldn't cache laucher asset ${url}`)
-                return url
-            }
-            await targetCache.put(url, res.data)
-            return ""
-        })])
-        const retryAssetsLater = assetRes.filter(s => s.length > 0)
-        if (retryAssetsLater.length > 0) {
-            const str = JSON.stringify(retryAssetsLater)
-            await this.cacheFile(
-                targetCache,
-                str,
-                failedRequestsUrl,
-                "application/json",
-                stringBytes(str)
-            )
-        } else {
+        const {failedRequests} = await persistAssetList({
+            files: urls,
+            requestEngine: fetchRetry,
+            cacheEngine: await this.cache(),
+            logger: this.logger,
+            concurrent: true,
+            name: "launcher"
+        })
+        if (failedRequests.length < 1) {
             await targetCache.delete(failedRequestsUrl)
+            return io.ok({})
         }
+        const str = JSON.stringify(failedRequests)
+        await this.cacheFile(
+            targetCache,
+            str,
+            failedRequestsUrl,
+            "application/json",
+            stringBytes(str)
+        )
         return io.ok({})
     }
 
-    async cacheLaucherAssets({
-        useMiniCargoDiff = false
-    } = {}) {
+    async cacheLaucherAssets() {
         const rootDoc = window.location.origin + "/"
-        const miniCargoUrl = rootDoc + MANIFEST_MINI_NAME
         const targetCache = await this.cache()
         await this.cacheFile(
             targetCache,
@@ -699,21 +687,6 @@ export class Shabah<Apps extends AppList> {
         console.info(log.name, `cached root html document at ${rootDoc}`)
         this.rootHtmlDoc = ""
         const previousManifestRes = await targetCache.match(LAUNCHER_CARGO)
-        /*
-        if (useMiniCargoDiff && miniCargoUrl.length > 0) {
-            const miniManifestRes = await fetchRetry(miniCargoUrl, {
-                method: "GET",
-                retryCount: 3
-            })
-            if (!miniManifestRes.data || !miniManifestRes.data.ok) {
-                console.error(log.name, "couldn't get mini manifest, reason", miniManifestRes.msg)
-                return
-            }
-        } else if (useMiniCargoDiff && miniCargoUrl.length < 1) {
-            console.error(log.name, `mini cargo url must be more than one character`)
-            return
-        }
-        */
         const cargoRes = await fetchManifestFromUrl(
             "launcher", rootDoc
         )
@@ -729,19 +702,37 @@ export class Shabah<Apps extends AppList> {
         }
         pkg.files = pkg.files
             .filter(({name}) => {
-                return name.length > 0 && name!== "/" && name!== rootDoc
+                return (
+                    name.length > 0 
+                    && name !== "/" 
+                    && name !== rootDoc
+                    && name !== "index.html"
+                    && name !== "/index.html"
+                )
             })
+        const pkgStr = JSON.stringify(pkg)
+        await this.cacheFile(
+            targetCache,
+            pkgStr,
+            LAUNCHER_CARGO,
+            "application/json",
+            stringBytes(pkgStr)
+        )
         const retryLaterUrl = rootDoc + LAUNCHER_PARTIAL_UPDATES
         if (!previousManifestRes) {
             console.info(log.name, "launcher has not been installed yet. Installing now...")
-            const installFiles = pkg.files.map(({name}) => name)
             await this.persistLauncherAssetList(
-                installFiles,
+                pkg.files.map(({name, bytes}) => ({
+                    name,
+                    bytes,
+                    requestUrl: rootDoc + name,
+                    storageUrl: rootDoc + name,
+                })),
                 targetCache,
                 retryLaterUrl,
                 false
             )
-            console.info(log.name, "cache files successfully, list", installFiles.join())
+            console.info(log.name, "cache files root files successfully")
             return io.ok({})
         }
         const updateRes = cargoIsUpdatable(
@@ -761,7 +752,7 @@ export class Shabah<Apps extends AppList> {
                 return io.ok({})
             }
             return await this.persistLauncherAssetList(
-                await assets.json() as string[],
+                await assets.json() as FileRef[],
                 targetCache,
                 retryLaterUrl,
                 true
@@ -773,7 +764,12 @@ export class Shabah<Apps extends AppList> {
         )
         
         const cacheRes = await this.persistLauncherAssetList(
-            diff.add.map(({name}) => rootDoc + name),
+            diff.add.map(({name, bytes}) => ({
+                name,
+                bytes,
+                requestUrl: rootDoc + name,
+                storageUrl: rootDoc + name,
+            })),
             targetCache,
             retryLaterUrl,
             false
