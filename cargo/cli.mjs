@@ -195,7 +195,8 @@ const main = async () => {
     }
     const entry = stripRelativePath(configEntry) || "index.html"
     if (!fileMap[entry] && files.length > 0) {
-        throw new Error(`entry file ${entry}${configEntry ? "" : " (default entry)"} is not one of the files in build directory ${buildDir}.`)
+        console.error(`entry file ${entry}${configEntry ? "" : " (default entry)"} is not one of the files in build directory ${buildDir}.`)
+        return
     }
 
     // generate cargos
