@@ -38,6 +38,7 @@ const launcherTheme = createTheme({
   }
 })
 
+
 const  App = ({appController}: {appController: AppController}) => {
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState("")
@@ -46,6 +47,16 @@ const  App = ({appController}: {appController: AppController}) => {
   const [showTerminal, setShowTerminal] = useState(false)
 
   const closeSettings = () => setSettingsMenuElement(null)
+
+  useEffect(() => {
+    const callBack = (event: KeyboardEvent) => {
+      if (event.key === "`") {
+        setShowTerminal(val => !val)
+      }
+    }
+    window.addEventListener("keyup", callBack)
+    return () => window.removeEventListener("keyup", callBack)
+  }, [])
 
   const gatherAssets = async () => {
     setShowProgress(true)
