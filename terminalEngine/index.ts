@@ -1,6 +1,6 @@
 type MsgType = "error" | "info" | "warn" | "log" | "cmd"
 
-type ExitStatus = 0 | 1
+
 
 export class TerminalMsg {
     readonly type: MsgType
@@ -11,8 +11,6 @@ export class TerminalMsg {
         this.type = type
     }
 }
-
-type CommandStatus = ExitStatus | void
 
 class OutputDevice {
     private onStream: OutputSteamCallback
@@ -76,10 +74,14 @@ class OutputDevice {
     }
 }
 
-type CommandCallback = (
+type ExitStatus = 0 | 1
+
+type CommandStatus = ExitStatus | void
+
+export type CommandCallback = (
     output: OutputDevice, 
     args: CommandArgs
-) => Promise<CommandStatus>
+) => Promise<CommandStatus> | CommandStatus
 
 type Command = {
     fn: CommandCallback
@@ -88,6 +90,7 @@ type Command = {
 type CommandArgs = {
     raw: string
     input: string
+    self: Readonly<TerminalEngine>
 }
 
 type OutputSteamCallback = (msg: TerminalMsg) => void
@@ -135,8 +138,8 @@ export class TerminalEngine {
         this.fallbackOutput = fatalErrorCallback
     }
 
-    addCommand(name: string, details: Command) {
-        this.commands[name] = details
+    setStreamOutput(fn: OutputSteamCallback) {
+        this.output["onStream"] = fn
     }
 
     addCommandFn(name: string, fn: CommandCallback) {
@@ -177,7 +180,8 @@ export class TerminalEngine {
             const raw = trimmed.slice(firstSpace + 1)
             const res = await command.fn(output, {
                 raw,
-                input: trimmed
+                input: trimmed,
+                self: this
             })
             exitCode = res || statusCodes.ok
         } catch (err) {

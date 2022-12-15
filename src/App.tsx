@@ -1,52 +1,81 @@
-import { useState, useEffect } from 'react'
+import {useState, useEffect, lazy, Suspense} from 'react'
 import {
-  Button, 
-  IconButton, 
-  Menu,
-  MenuItem,
-  Tooltip,
-  CircularProgress,
-  Box,
-  Typography,
-  CircularProgressProps,
-  Collapse,
   createTheme,
   ThemeProvider
 } from "@mui/material"
-import SettingsIcon from "@mui/icons-material/Settings"
-import type {AppController} from "./utils"
-import LoadingIcon from "@mui/icons-material/Loop"
-import VersionIcon from "@mui/icons-material/Source"
-import TerminalIcon from "@mui/icons-material/Terminal"
-import {TerminalUi} from "./terminalUi"
+import {Launcher} from "./Launcher"
+import {Shabah} from "../shabah/index"
+import {APP_CACHE} from "../consts"
+import type {OutboundMessage as ServiceWorkerMessage} from "../serviceWorkers/types"
+import {storeContext} from  "./store/index"
+import {Terminal} from "./components/terminal"
+import {TerminalEngine} from "../terminalEngine/index"
 
 const enum log {
-  name = "[🚀 launcher]:"
+  name = "[🤖 app-controller]:",
+  sw = "[💾 service-worker]:"
 }
 
-const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
+const AppRoot = lazy(() => import("./AppRoot"))
 
-const launcherTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#0077c0"
+const  App = () => {
+  const [launcherTheme] = useState(createTheme({
+    palette: {
+      mode: "dark",
+      primary: {
+        main: "#0077c0"
+      },
+      secondary: {
+        main: "#c4ced4"
+      },
+    }
+  }))
+
+  const [appController] = useState(new Shabah({
+    apps: {
+      appShell: {
+        id: 1,
+        appRootUrl: import.meta.env.VITE_CARGO_APP_SHELL_ROOT_URL,
+        htmlTitle: import.meta.env.VITE_APP_TITLE,
+        permissions: {}
+      },
+      gameCore: {
+        id: 2,
+        appRootUrl: import.meta.env.VITE_CARGO_GAME_CORE_ROOT_URL,
+        htmlTitle: "none",
+        permissions: {}
+      }
     },
-    secondary: {
-      main: "#c4ced4"
-    },
-  }
-})
+    mode: "dev",
+    cacheName: APP_CACHE,
+    loggingMode: "verbose"
+  }))
 
+  useEffect(() => {
+    if (!navigator.serviceWorker || !import.meta.env.PROD) {
+      return
+    }
+    const url = "sw.js"
+    navigator.serviceWorker.register(url, {scope: "/"})
+    navigator.serviceWorker.addEventListener("message", (msg) => {
+      const {type, contents} = msg.data as ServiceWorkerMessage
+      switch (type) {
+        case "info":
+          console.info(log.sw, contents)
+          break
+        case "error":
+          console.error(log.sw, contents)
+          break
+        default:
+          console.warn(log.name, "recieved msg from service worker, but it was encoded incorrectly")
+          break
+      }
+    })
+  }, [])
 
-const  App = ({appController}: {appController: AppController}) => {
-  const [showProgress, setShowProgress] = useState(false)
-  const [progressMsg, setProgressMsg] = useState("")
-  const [downloadProgress, setDownloadProgress] = useState(0)
-  const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [showTerminal, setShowTerminal] = useState(false)
-
-  const closeSettings = () => setSettingsMenuElement(null)
+  const [showLauncher, setShowLauncher] = useState(true)
+  const [terminalEngine] = useState(new TerminalEngine())
 
   useEffect(() => {
     const callBack = (event: KeyboardEvent) => {
@@ -55,124 +84,49 @@ const  App = ({appController}: {appController: AppController}) => {
       }
     }
     window.addEventListener("keyup", callBack)
+    
+    const t = terminalEngine
+    {
+    (async () => {
+      const {createCommands} = await import("./lib/terminalCommands")
+      const commands = createCommands({
+        setShowTerminal, 
+        setShowLauncher
+      })
+      for (let i = 0; i < commands.length; i++) {
+        const {name, fn} = commands[i]
+        t.addCommandFn(name, fn)
+      }
+    })()
+    }
     return () => window.removeEventListener("keyup", callBack)
   }, [])
-
-  const gatherAssets = async () => {
-    setShowProgress(true)
-    setProgressMsg("Check for Updates...")
-    const title = import.meta.env.VITE_APP_TITLE
-    await appController.checkForUpdates()
-    if (!appController.updatesAvailable()) {
-      return
-    }
-    setProgressMsg("Found updates")
-    await appController.execUpdates({
-      onProgress: ({downloaded, total, latestFile}) => {
-        setProgressMsg(`Fetching ${latestFile}`)
-        const rawPercent = Math.floor((downloaded / total) * 100)
-        const percent = Math.max(rawPercent, 1)
-        setDownloadProgress(percent)
-        document.title = `(${percent}%) ${title}`
-      },
-    })
-    setDownloadProgress(100)
-    document.title = `(100%) ${title}`
-    setProgressMsg("Finished...")
-    await sleep(1_000)
-    setProgressMsg("Installing...")
-    document.title = title
-    console.info(log.name, "successfully fetched assets! Opening App...")
-    const launchRes = await appController.launchApp("appShell")
-    if (launchRes.success) {
-      console.info(log.name, "closing now...")
-      return
-    }
-  }
 
   return (
     <div>
       <main className="bg-neutral-800">
         <ThemeProvider theme={launcherTheme}>
-          <div className="relative text-center z-0 w-screen h-screen flex justify-center items-center">
-            <div className="relative z-0">
-              {showTerminal ? <>
-                <TerminalUi/>
-              </> : <></>}
+          <storeContext.Provider
+            value={{
+              launchApp: () => setShowLauncher(false),
+              downloadClient: appController,
+              setTerminalVisibility: setShowTerminal
+            }}
+          >
+            {showTerminal ? <>
+              <Terminal
+                engine={terminalEngine}
+              />
+            </> : <></>}
 
-              <div className="fixed top-2 left-0">
-                <Tooltip title="Settings">
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={(e) => {
-                      if (settingsMenuElement) {
-                        closeSettings()
-                      } else {
-                        setSettingsMenuElement(e.currentTarget)
-                      }
-                    }}
-                  >
-                    <SettingsIcon/>
-                  </Button>
-                </Tooltip>
-
-                <Menu
-                  anchorEl={settingsMenuElement}
-                  open={!!settingsMenuElement}
-                  onClose={closeSettings}
-                  className="text-xs"
-                >
-                  <MenuItem 
-                    className="text-xs"
-                    onClick={() => {
-                      setShowTerminal(true)
-                      closeSettings()
-                    }}
-                  >
-                    <span className="mr-2">
-                      <TerminalIcon/>
-                    </span>
-                    Terminal
-                  </MenuItem>
-                </Menu>
-              </div>
-
-              <div>
-                <Button
-                  variant="contained"
-                  onClick={gatherAssets}
-                  className="bg-green-700"
-                >
-                  {!showProgress 
-                    ? "Enter"
-                    : <span className='animate-spin'>
-                      <LoadingIcon/>
-                      </span>
-                  }
-                </Button>
-              </div>
-
-              <div className={`mt-4 ${showProgress ? "" : "invisible"}`}>
-                <Collapse in={showProgress}>
-                  <div className="text-xs text-gray-400 mt-2 mb-4">
-                      {downloadProgress.toFixed(1) + "%"}
-                  </div>
-
-                  <div className="mt-2 text-sm">
-                    {progressMsg}
-                  </div>
-                </Collapse>
-              </div>
-
-              <div className="fixed z-10 text-xs bottom-2 left-2 text-gray-500">
-                <span className="mr-2 text-blue-400">
-                  <VersionIcon/>
-                </span>
-                {"v0.1.0-beta.0"}
-              </div>
-            </div>
-          </div>
+            {showLauncher ? <>
+              <Launcher id={"app-shell-launcher"}/>
+            </> : <>
+              <Suspense>
+                <AppRoot id={"app-shell-root"}/>
+              </Suspense>
+            </>}
+          </storeContext.Provider>
         </ThemeProvider>
       </main>
     </div>

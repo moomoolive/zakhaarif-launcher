@@ -1,6 +1,6 @@
 import {Collapse} from "@mui/material"
 import {useState, useEffect, ChangeEvent} from "react"
-import {TerminalEngine, TerminalMsg} from "../terminalEngine/index"
+import type {TerminalEngine, TerminalMsg} from "../../terminalEngine/index"
  
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 
@@ -17,13 +17,32 @@ const terminalState = {
     incrementHistoryCursor: (inc: number) => {}
 }
 
-export const TerminalUi = () => {
+const LAST_SESSION_KEY = "last-terminal-session"
+
+const enum time {
+    milliseconds_per_second = 1_000,
+    seconds_per_minute = 60,
+    minutes_per_hour = 60,
+    hours_per_day = 24,
+    milliseconds_per_day = (
+        milliseconds_per_second
+        * seconds_per_minute
+        * minutes_per_hour
+        * hours_per_day
+    )
+}
+
+export const Terminal = ({engine} : {
+    engine: TerminalEngine
+}) => {
     const [promptText, setPromptText] = useState("")
     const [commandHistory, setCommandHistory] = useState([] as string[])
     const [historyCursor, setHistoryCursor] = useState(0)
     const [terminalOutput, setTerminalOutput] = useState([] as TerminalMsg[])
-    const [terminal] = useState(new TerminalEngine({
-        onStreamOutput: (msg) => {
+    const [showCommandPrompt, setShowCommandPrompt] = useState(true)
+
+    useEffect(() => {
+        engine.setStreamOutput((msg) => {
             setTerminalOutput((out) => {
                 const copy = [...out, msg]
                 if (copy.length > 19) {
@@ -31,48 +50,37 @@ export const TerminalUi = () => {
                 }
                 return copy
             })
-        }
-    }))
-
-    useEffect(() => {
+        })
         terminalFocus()
-        return () => {
-            if (!getTerminalOutput()) {
-                terminal.exit("Closing terminal session. Goodbye.")
-            }
+        const lastSession = localStorage.getItem(LAST_SESSION_KEY)
+        localStorage.setItem(LAST_SESSION_KEY, Date.now().toString())
+        if (!lastSession) {
+            setTerminalOutput([{type: "info", text: "Hey there stranger!"}])
+            return
         }
-    }, [])
-
-    useEffect(() => {
-        terminal.addCommandFn("echo", async (output, {raw}) => {
-            const [type, ...rest] = raw.split(" ")
-            if (type === "-w") {
-                output.warn(rest.join(" "))
-            } else if (type === "-e") {
-                output.error(rest.join(" "))
-            } else {
-                output.info(raw)
-            }
-        })
-        terminal.addCommandFn("input-test", async (output) => {
-            const anwser = await output.input("can you respond with y?")
-            output.info(`you responded with "${anwser}"`)
-        })
-
-        terminal.addCommandFn("multi-io", async (output) => {
-            output.info("step 1")
-            await new Promise(res => setTimeout(res, 1_000))
-            output.info("step 2")
-        })
+        const now = Date.now()
+        const then = parseInt(lastSession, 10)
+        const diff = now - then
+        if (diff >= time.milliseconds_per_second) {
+            setTerminalOutput([{type: "info", text: "Been a while, how are you? 😺"}])
+        } else {
+            setTerminalOutput([{type: "info", text: "Welcome back 😀"}])
+        }
+        return () => engine.exit("Closing terminal session. Goodbye.")
     }, [])
 
     terminalState.execCommand = async () => {
         const cmd = promptText
-        setCommandHistory((prev) => [...prev, cmd])
+        const prevCommand = commandHistory.at(-1)
+        if (prevCommand !== cmd) {
+            setCommandHistory((prev) => [...prev, cmd])
+        }
         setHistoryCursor(0)
         const text = promptText
         setPromptText("")
-        await terminal.exec(text)
+        setShowCommandPrompt(false)
+        await engine.exec(text)
+        setShowCommandPrompt(true)
     }
 
     terminalState.incrementHistoryCursor = (n) => {
@@ -81,16 +89,15 @@ export const TerminalUi = () => {
         }
         const len = commandHistory.length
         const inc = historyCursor + n
-        if (inc === 0 || inc + len < 0) {
-            setHistoryCursor(0)
-            setPromptText("")
-        } else if (inc > 0) {
-            setHistoryCursor(-len)
-            setPromptText(commandHistory[0])
-        } else {
+        if (inc > 0 || len + inc < 0) {
+            return
+        } else if (inc === 0) {
             setHistoryCursor(inc)
-            setPromptText(commandHistory[commandHistory.length + inc])
+            setPromptText("")
+            return
         }
+        setHistoryCursor(inc)
+        setPromptText(commandHistory[commandHistory.length + inc])
     }
 
     useEffect(() => {
@@ -100,10 +107,10 @@ export const TerminalUi = () => {
                     terminalState.execCommand()
                     break
                 case "arrowup":
-                    terminalState.incrementHistoryCursor(1)
+                    terminalState.incrementHistoryCursor(-1)
                     break
                 case "arrowdown":
-                    terminalState.incrementHistoryCursor(-1)
+                    terminalState.incrementHistoryCursor(1)
                     break
             }
         }
@@ -151,8 +158,8 @@ export const TerminalUi = () => {
                         })}
                     </div>
                     <div className="relative z-20 flex items-center justify-center">
-                        <div className="w-full">
-                            <span className="mr-1">
+                        <div className={`w-full`}>
+                            <span className={`mr-1 ${!showCommandPrompt ? "hidden" : ""}`}>
                                 <span className="text-green-400">{"root"}</span>
                                 {":"}
                                 <span className="text-blue-500">

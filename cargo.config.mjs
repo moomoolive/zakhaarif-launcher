@@ -6,6 +6,7 @@ export const config = {
         "test-app", 
         "test-game", 
         "dev-sw.js",
-        "sw.js"
+        "sw.js",
+        "build-manifest.json"
     ],
 }

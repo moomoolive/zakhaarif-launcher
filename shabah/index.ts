@@ -166,8 +166,8 @@ const deleteCacheFiles = (cache: Cache, files: {storageUrl: string}[]) => {
     return Promise.all(files.map(({storageUrl}) => cache.delete(storageUrl)))
 }
 
-export class Shabah<Apps extends AppList> {
-    readonly apps: Apps
+export class Shabah {
+    readonly apps: AppList
     private tokenizedApps: Array<(
         Readonly<AppIndex> & Readonly<{
             name: string
@@ -179,7 +179,6 @@ export class Shabah<Apps extends AppList> {
     private updates: AppUpdates
     private updatesThisSession: number
     downloadingPartition: number
-    private launcher: AppLauncher | null
     readonly cacheName: string
     private rootHtmlDoc: string
     private logger: {
@@ -195,7 +194,7 @@ export class Shabah<Apps extends AppList> {
         previousCaches = [],
         loggingMode = "silent"
     }: Readonly<{
-        apps: Apps,
+        apps: AppList,
         mode: ShabahModes,
         cacheName: string,
         previousCaches?: string[],
@@ -233,7 +232,6 @@ export class Shabah<Apps extends AppList> {
         }
         this.updatesThisSession = 0
         this.downloadingPartition = -1
-        this.launcher = null
         this.cacheName = cacheName
         for (const prevCache of previousCaches) {
             caches.delete(prevCache)
@@ -577,33 +575,7 @@ export class Shabah<Apps extends AppList> {
         return io.ok(backup)
     }
 
-    defineLauncher<T extends AppLauncher>(launcher: T) {
-        if (!this.launcher) {
-            this.launcher = launcher
-        } else {
-            console.info(log.name, "launcher cannot be defined more than once")
-        }
-    }
-
-    showLauncher() {
-        if (this.launcher) {
-            console.info(log.name, "{😼 show-launcher} mounting launcher")
-            this.launcher.mount()
-        } else {
-            console.error(log.name, "{😼 show-launcher} launcher has not been defined yet")
-        }
-    }
-
-    destroyLauncher() {
-        if (this.launcher) {
-            console.info(log.name, "{🙀 destroy-launcher} unmounting launcher")
-            this.launcher.unMount()
-        } else {
-            console.error(log.name, "{🙀 destroy-launcher} launcher not defined yet")
-        }
-    }
-
-    async launchApp(appKey: keyof Apps & string) {
+    async launchApp(appKey: string) {
         const ptrs = this.appPointers
         console.info(log.name, `app "${appKey}" has been requested to launch`)
         const app = ptrs.entries.find(({name}) => name === appKey)
@@ -622,7 +594,6 @@ export class Shabah<Apps extends AppList> {
             console.error(log.name, msg)
             return {success: false, msg}
         }
-        this.destroyLauncher()
         // apply permissions before import
 
         // this is a dynamic import, NOT code splitting
