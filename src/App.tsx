@@ -3,20 +3,49 @@ import {
   createTheme,
   ThemeProvider
 } from "@mui/material"
-import {Launcher} from "./Launcher"
+import {Root as LauncherRoot} from "./launcher/Root"
 import {Shabah} from "../shabah/index"
 import {APP_CACHE} from "../consts"
 import type {OutboundMessage as ServiceWorkerMessage} from "../serviceWorkers/types"
-import {storeContext} from  "./store/index"
+import {storeContext} from  "./store"
 import {Terminal} from "./components/terminal"
 import {TerminalEngine} from "../terminalEngine/index"
+import {isIframe} from "./lib/checks/index"
 
 const enum log {
   name = "[🤖 app-controller]:",
   sw = "[💾 service-worker]:"
 }
 
-const AppRoot = lazy(() => import("./AppRoot"))
+const AppShellRoot = lazy(() => import("./appShell/Root"))
+const GameRoot = lazy(() => import("./game/Root"))
+
+const parseQuery = (query: string) => {
+  const record = {} as Record<string, string>
+  const withoutQuestionMark = query.split("?")
+  if (withoutQuestionMark.length < 2) {
+    return record
+  }
+  const base = withoutQuestionMark[1]
+  const parts = base.split("&").filter(s => s.length > 0)
+  if (parts.length < 1) {
+    return record
+  }
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    const parsedTerm = part.split("=")
+    if (parsedTerm.length === 1) {
+      record[parsedTerm[0]] = "true"
+    } else if (parsedTerm.length > 1) {
+      record[parsedTerm[0]] = parsedTerm[1]
+    }
+  }
+  return record
+}
+
+const firstQuery = parseQuery(location.search)
+
+const isLoadedInIframe = isIframe()
 
 const  App = () => {
   const [launcherTheme] = useState(createTheme({
@@ -46,13 +75,13 @@ const  App = () => {
         permissions: {}
       }
     },
-    mode: "dev",
+    mode: isLoadedInIframe ? "prod" : "dev",
     cacheName: APP_CACHE,
     loggingMode: "verbose"
   }))
 
   useEffect(() => {
-    if (!navigator.serviceWorker || !import.meta.env.PROD) {
+    if (isLoadedInIframe || !navigator.serviceWorker || !import.meta.env.PROD) {
       return
     }
     const url = "sw.js"
@@ -73,8 +102,12 @@ const  App = () => {
     })
   }, [])
 
+  
+
   const [showTerminal, setShowTerminal] = useState(false)
-  const [showLauncher, setShowLauncher] = useState(true)
+  const [showLauncher, setShowLauncher] = useState(
+    firstQuery.mode === "game" ? false : true
+  )
   const [terminalEngine] = useState(new TerminalEngine())
 
   useEffect(() => {
@@ -114,17 +147,29 @@ const  App = () => {
             }}
           >
             {showTerminal ? <>
-              <Terminal
-                engine={terminalEngine}
-              />
+              <Suspense>
+                <Terminal
+                  engine={terminalEngine}
+                />
+              </Suspense>
             </> : <></>}
 
             {showLauncher ? <>
-              <Launcher id={"app-shell-launcher"}/>
+              <LauncherRoot id={"app-shell-launcher"}/>
             </> : <>
-              <Suspense>
-                <AppRoot id={"app-shell-root"}/>
-              </Suspense>
+            {((q: typeof firstQuery) => {
+              const mode = q.mode || "default"
+              switch (mode) {
+                case "game":
+                  return <Suspense>
+                    <GameRoot id={"game-root"}/>
+                  </Suspense>
+                default:
+                  return <Suspense>
+                    <AppShellRoot id={"app-shell-root"}/>
+                  </Suspense>
+              }
+            })(firstQuery)}
             </>}
           </storeContext.Provider>
         </ThemeProvider>

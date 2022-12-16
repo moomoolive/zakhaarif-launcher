@@ -1,5 +1,5 @@
 import {createContext, useContext} from "react"
-import type {Shabah} from "../../shabah/index"
+import type {Shabah} from "../shabah/index"
 
 type Store = {
     launchApp: () => void

@@ -11,7 +11,7 @@ import SettingsIcon from "@mui/icons-material/Settings"
 import LoadingIcon from "@mui/icons-material/Loop"
 import VersionIcon from "@mui/icons-material/Source"
 import TerminalIcon from "@mui/icons-material/Terminal"
-import {useStoreContext} from "./store/index"
+import {useStoreContext} from "../store"
 
 const enum log {
   name = "[🚀 launcher]:"
@@ -31,7 +31,7 @@ const launcherTheme = createTheme({
   }
 })
 
-export const Launcher = ({id}: {id: string}) => {
+export const Root = ({id}: {id: string}) => {
   const {
     downloadClient, 
     launchApp,

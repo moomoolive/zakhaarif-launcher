@@ -1,9 +1,10 @@
 import {RouterProvider, createBrowserRouter} from "react-router-dom"
-import {AppLaunch} from "./views/AppLaunch"
+import {AppLaunch} from "./AppLaunch"
 import {Suspense, lazy} from "react"
 
-const StartMenu = lazy(() => import("./views/StartMenu"))
-const NotFound = lazy(() => import("./views/NotFound"))
+const StartMenu = lazy(() => import("./StartMenu"))
+const NotFound = lazy(() => import("./NotFound"))
+const GameShell = lazy(() => import("./GameShell"))
 
 const router = createBrowserRouter([
     {
@@ -14,6 +15,12 @@ const router = createBrowserRouter([
         path: "/start",
         element: <Suspense>
             <StartMenu/>
+        </Suspense>
+    },
+    {
+        path: "/game",
+        element: <Suspense>
+            <GameShell/>
         </Suspense>
     }
 ])

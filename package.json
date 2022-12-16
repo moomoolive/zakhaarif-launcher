@@ -21,9 +21,14 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@mui/icons-material": "^5.10.16",
     "@mui/material": "^5.10.16",
+    "alea": "^1.0.1",
+    "babylonjs": "^5.38.0",
+    "babylonjs-loaders": "^5.38.0",
+    "babylonjs-materials": "^5.38.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.4.5"
+    "react-router-dom": "^6.4.5",
+    "simplex-noise": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^18.11.10",
@@ -32,6 +37,7 @@
     "@vitejs/plugin-react": "^2.2.0",
     "autoprefixer": "^10.4.13",
     "esbuild": "^0.15.17",
+    "fast-png": "^6.1.0",
     "filehound": "^1.17.6",
     "nanoid": "^4.0.0",
     "postcss": "^8.4.19",

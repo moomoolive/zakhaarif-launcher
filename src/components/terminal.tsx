@@ -1,7 +1,7 @@
 import {Collapse} from "@mui/material"
 import {useState, useEffect, ChangeEvent} from "react"
 import type {TerminalEngine, TerminalMsg} from "../../terminalEngine/index"
- 
+
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 
 const terminalFocus = () => {
@@ -16,8 +16,6 @@ const terminalState = {
     execCommand: async () => {},
     incrementHistoryCursor: (inc: number) => {}
 }
-
-const LAST_SESSION_KEY = "last-terminal-session"
 
 const enum time {
     milliseconds_per_second = 1_000,
@@ -51,21 +49,7 @@ export const Terminal = ({engine} : {
                 return copy
             })
         })
-        terminalFocus()
-        const lastSession = localStorage.getItem(LAST_SESSION_KEY)
-        localStorage.setItem(LAST_SESSION_KEY, Date.now().toString())
-        if (!lastSession) {
-            setTerminalOutput([{type: "info", text: "Hey there stranger!"}])
-            return
-        }
-        const now = Date.now()
-        const then = parseInt(lastSession, 10)
-        const diff = now - then
-        if (diff >= time.milliseconds_per_second) {
-            setTerminalOutput([{type: "info", text: "Been a while, how are you? 😺"}])
-        } else {
-            setTerminalOutput([{type: "info", text: "Welcome back 😀"}])
-        }
+        setTerminalOutput([{type: "info", text: "Welcome back 😀"}])
         return () => engine.exit("Closing terminal session. Goodbye.")
     }, [])
 

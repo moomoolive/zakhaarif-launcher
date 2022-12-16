@@ -4,7 +4,8 @@ export const config = {
     buildDir: "dist",
     ignore: [
         "test-app", 
-        "test-game", 
+        "test-game",
+        "large-assets",
         "dev-sw.js",
         "sw.js",
         "build-manifest.json"
