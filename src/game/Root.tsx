@@ -1,6 +1,9 @@
 import {main} from "./index"
 import {useEffect} from "react"
 
+const gameCanvas = document.createElement("canvas")
+gameCanvas.setAttribute("id", "game-frame-canvas")
+
 let inited = false
 
 const GameRoot = ({id}: {id: string}) => {
@@ -9,14 +12,18 @@ const GameRoot = ({id}: {id: string}) => {
         if (inited) {
             return
         }
-        const root = document.getElementById("game-root")
-        console.log(root)
+        const root = document.getElementById("game-root")!
+        if (!document.getElementById("game-frame-canvas")) {
+            root.append(gameCanvas)
+        }
+        main(gameCanvas)
         inited = true
-        main(root!)
     }, [])
 
     return <>
-        <div className="z-50" id={id}/>
+        <div id={id}>
+
+        </div>
     </>
 }
 

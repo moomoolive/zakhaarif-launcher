@@ -45,7 +45,7 @@ const GameShell = () => {
         
         <iframe 
             id="game-frame"
-            className="relative w-screen h-screen z-0"
+            className="fixed left-0 top-0 w-screen h-screen z-0"
             src={`${location.origin}/?mode=game&sandbox=std`}
             allowFullScreen
             name="game-frame"
