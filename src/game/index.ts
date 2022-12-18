@@ -49,11 +49,18 @@ export const main = async (canvas: HTMLCanvasElement) => {
         adaptToDeviceRatio: true,
         powerPreference: "high-performance",
     })
+    
+    // turn off all systems that 
+    // use indexeddb, as they will fail 
+    // in sandboxed iframe.
+    // caching will be dealt with 
+    // in a different way...
+    engine.enableOfflineSupport = false
     engine.disableManifestCheck = true
-    console.log("indexeddb is used", Database.IDBStorageEnabled)
+    Database.IDBStorageEnabled = false
+
     const scene = new Scene(engine, {})
     scene.debugLayer.show({embedMode: true})
-    console.log("hi")
     
     const camera = new ArcRotateCamera(
         "camera", 
@@ -276,22 +283,22 @@ export const main = async (canvas: HTMLCanvasElement) => {
         "model.gltf", 
         scene,
     )
-    // const player = p.meshes[0]
-    const player = CreateBox("boxCollider", {
-        width: playerEntity.collider.x * 2,
-        height: playerEntity.collider.y * 2,
-        depth: playerEntity.collider.z * 2,
-    }, scene)
+    const player = p.meshes[0] as Mesh
+    //const player = CreateBox("boxCollider", {
+    //    width: playerEntity.collider.x * 2,
+    //    height: playerEntity.collider.y * 2,
+    //    depth: playerEntity.collider.z * 2,
+    //}, scene)
     player.position.y -= 1.0
-    //player.rotationQuaternion!.multiplyInPlace(
-    //    createAxisRotation(0.0, 1.0, 0.0, Math.PI)
-    //)
-    //player.bakeCurrentTransformIntoVertices()
-    //player.position = new Vector3(
-    //    playerEntity.position.x, 
-    //    playerEntity.position.y, 
-    //    playerEntity.position.z
-    //)
+    player.rotationQuaternion!.multiplyInPlace(
+        createAxisRotation(0.0, 1.0, 0.0, Math.PI)
+    )
+    player.bakeCurrentTransformIntoVertices()
+    player.position = new Vector3(
+        playerEntity.position.x, 
+        playerEntity.position.y, 
+        playerEntity.position.z
+    )
 
     const boxCollider = CreateBox("boxCollider", {
         width: playerEntity.collider.x * 2,
@@ -471,13 +478,13 @@ export const main = async (canvas: HTMLCanvasElement) => {
                 if (!fpEqual(playerStats.rotation, angleRotation, 0.5)) {
                     const t = 1 - Math.pow(0.99, deltaTime)
                     /* player rotation change code */
-                    //const rotation = Quaternion.Slerp(
-                    //    player.rotationQuaternion!,
-                    //    createAxisRotation(0.0, 1.0, 0.0, toRadians(movementVec.angle + 90.0)),
-                    //    t
-                    //)
-                    //playerStats.rotation = toDegrees(rotation.toEulerAngles().y)
-                    //player.rotationQuaternion = rotation
+                    const rotation = Quaternion.Slerp(
+                        player.rotationQuaternion!,
+                        createAxisRotation(0.0, 1.0, 0.0, toRadians(movementVec.angle + 90.0)),
+                        t
+                    )
+                    playerStats.rotation = toDegrees(rotation.toEulerAngles().y)
+                    player.rotationQuaternion = rotation
                 }
         
             }

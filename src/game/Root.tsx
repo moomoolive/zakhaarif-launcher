@@ -4,6 +4,17 @@ import {useEffect} from "react"
 const gameCanvas = document.createElement("canvas")
 gameCanvas.setAttribute("id", "game-frame-canvas")
 
+/*
+{(() => {
+    try {
+        console.log("idb type", typeof window.indexedDB)
+        const db = window.indexedDB
+    } catch {
+        console.log("failed idb call")
+    }
+})()}
+*/
+
 let inited = false
 
 const GameRoot = ({id}: {id: string}) => {
