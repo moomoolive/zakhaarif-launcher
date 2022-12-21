@@ -296,3 +296,31 @@ describe("manifest validation function", () => {
         expect(res.pkg.authors.length).toBe(0)
     })
 })
+
+import {validateMiniCargo} from "./index"
+
+describe("mini-cargo validation function", () => {
+    it("should return errors if non-object is provided", () => {
+        const v = <T>(val: T) => validateMiniCargo(val)
+        expect(v(null).errors.length).toBeGreaterThan(0)
+        expect(v(undefined).errors.length).toBeGreaterThan(0)
+        expect(v([]).errors.length).toBeGreaterThan(0)
+        expect(v(Symbol()).errors.length).toBeGreaterThan(0)
+        expect(v(1).errors.length).toBeGreaterThan(0)
+        expect(v(true).errors.length).toBeGreaterThan(0)
+        expect(v("str").errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return errors if version is missing or not a valid semver", () => {
+        const v = <T>(val: T) => validateMiniCargo(val)
+        expect(v({}).errors.length).toBeGreaterThan(0)
+        expect(v({version: "not a semver"}).errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return no errors if mini cargo is valid", () => {
+        const v = <T>(val: T) => validateMiniCargo(val)
+        expect(v({version: "0.1.0"}).errors.length).toBe(0) 
+        expect(v({version: "2.0.0"}).errors.length).toBe(0) 
+        expect(v({version: "3.0.2"}).errors.length).toBe(0) 
+    })
+})

@@ -131,6 +131,8 @@ export const extensionToMime = (extension: string) => {
             return "text/plain"
         case "vsd":
             return "application/vnd.visio"
+        case "wasm":
+            return "application/wasm"
         case "wav":
             return "audio/wav"
         case "weba":

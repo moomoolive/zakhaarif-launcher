@@ -21,3 +21,5 @@ const op = () => {
     const color = c(blue)
     return color
 }
+
+export {}

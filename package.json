@@ -7,9 +7,10 @@
     "dev": "npm run sw && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "sw": "npm run sw-prod",
+    "sw": "npm run sw-prod && npm run sw-dev",
     "test-watch": "vitest watch",
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --minify --outfile=./public/sw.js",
+    "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.js",
     "cargo-cli": "node ./cargo/cli.mjs"
   },
   "dependencies": {

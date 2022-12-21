@@ -1,6 +1,7 @@
 import {expect, it, describe} from "vitest"
 import {sweepPoint, sweepBox} from "./index"
-
+export {}
+/*
 class World {
     data: {active: boolean}[][][]
     worldSize: number
@@ -494,4 +495,4 @@ describe("box raycasting", () => {
             collision
         )).toThrow()
     })
-})
+})*/

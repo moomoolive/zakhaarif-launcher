@@ -20,6 +20,8 @@ export const resultifySync = <A extends unknown[], R>(fn: (...args: A) => R) => 
     }
 }
 
+export type ResultType<T> = Result<T, true> | Result<null, false>
+
 export class Result<T, Status extends boolean = true> {
     static ok = <R>(data: R) => new Result(data, "", true)
     static err = (msg: string) => new Result(null, msg, false)

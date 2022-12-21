@@ -27,7 +27,7 @@ const GameRoot = ({id}: {id: string}) => {
         if (!document.getElementById("game-frame-canvas")) {
             root.append(gameCanvas)
         }
-        main(gameCanvas)
+        //main(gameCanvas)
         inited = true
     }, [])
 

@@ -112,6 +112,11 @@ export class CodeManifestSafe {
         copy.repo = {...copy.repo}
         return copy
     }
+
+    toMini() {
+        const {version} = this
+        return {version}
+    }
 }
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
@@ -158,13 +163,42 @@ const toInvalidation = (invalidation: string) => {
     }
 }
 
+export const validateMiniCargo = <T>(miniCargo: T) => {
+    const out = {
+        miniPkg: {version: "0.1.0-prealpha.1"},
+        errors: [] as string[],
+        semanticVersion: SemVer.null()
+    }
+    const miniC = miniCargo as ReturnType<CodeManifestSafe["toMini"]>
+    const baseType = type(miniC)
+    if (baseType !== "object") {
+        out.errors.push(`expected mini cargo to be type "object" got "${baseType}"`)
+        return out
+    }
+    
+    if (!typevalid(miniC, "version", "string", out.errors)) {
+        return out
+    }
+    out.miniPkg.version = miniC.version
+
+    const semver = SemVer.fromString(miniC.version)
+    if (!semver) {
+        out.errors.push(`${miniC.version} is not a vaild semantic version`)
+        return out
+    }
+    out.semanticVersion = semver
+    return out
+}
+
+export type ValidatedMiniCargo = ReturnType<typeof validateMiniCargo>
+
 export const validateManifest = <T>(cargo: T) => {
     const out = dummyManifest()
     const {pkg, errors} = out
     const c = cargo as CodeManifest
     const baseType = type(c)
     if (baseType !== "object") {
-        errors.push(`expected manifest to be type "object" got "${baseType}"`)
+        errors.push(`expected cargo to be type "object" got "${baseType}"`)
         return out
     }
 

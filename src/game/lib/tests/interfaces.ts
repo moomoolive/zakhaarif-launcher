@@ -53,3 +53,5 @@ type BaseTypeArgs<T, K extends Array<keyof T>> = {
 }
 
 const inputFn = (...arg: BaseTypeArgs<BaseType, BaseTypeTuple>) => { }
+
+export {}
