@@ -1,5 +1,25 @@
-import {checkForUpdates, FetchFunction} from "./client"
-import {io, ResultType, Result} from "../monads/result"
+import {
+    checkForUpdates,
+    createResourceMap,
+} from "./client"
+import {io} from "../monads/result"
+import {
+    CargoIndexWithoutMeta,
+    CargoIndices,
+    saveCargoIndices,
+    getCargoIndices,
+    updateCargoIndex,
+    DownloadIndexCollection,
+    saveDownloadIndices,
+    headers,
+    downloadIncidesUrl, 
+    cargoIndicesUrl,
+    FetchFunction,
+    getDownloadIndices,
+    updateDownloadIndex,
+    FileCache,
+    stringBytes
+} from "./shared"
 
 const enum bytes {
     bytes_per_kb = 1_024,
@@ -9,35 +29,12 @@ const enum bytes {
 
 const SYSTEM_RESERVED_BYTES = 200 * bytes.bytes_per_mb
 
-type CargoIndex = {
-    storageUrl: string
-    requestUrl: string
-    category: number
-    entry: string
-    name: string
-    id: string,
-    bytes: number
-}
-
-const fetchRetry: FetchFunction = (input, init) => {
-    return io.retry(
-        () => fetch(input, init), 
-        init.retryCount || 1
-    )
-}
-
-const getDiskUsage = async () => {
-    const {quota = 0, usage = 0} = await navigator.storage.estimate()
-    return {quota, usage}
-}
-
 const DISK_CLEAR_MULTIPLIER = 3
 
 type ShabahOptions = {
-    fetchFile?: FetchFunction
-    getCacheFile: FetchFunction,
-    mutateCacheFile: (url: string, file: Response) => Promise<ResultType<void>>
-    queryDiskUsage?: () => Promise<{quota: number, usage: number}>
+    origin: string,
+    fileCache: FileCache
+    fetchFile: FetchFunction
 }
 
 const roundDecimal = (num: number, decimals: number) => {
@@ -45,53 +42,44 @@ const roundDecimal = (num: number, decimals: number) => {
     return Math.round(num * factor) / factor
 }
 
+type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
+
 export class Shabah {
-    static cacheRequester(targetCache: string) {
-        const notFound = new Response("", {
-            status: 404,
-            statusText: "NOT FOUND"
-        })
-        const getCacheFile: FetchFunction = async (input) => {
-            const cache = await caches.open(targetCache)
-            const file = await cache.match(input)
-            if (file) {
-                return io.ok(file)
-            }
-            return io.ok(notFound)
-        }
-        return getCacheFile
-    }
+    static readonly NO_PREVIOUS_INSTALLATION = "none"
 
-    static cacheMutator(targetCache: string) {
-        return async (url: string, file: Response) => {
-            const cache = await caches.open(targetCache)
-            return io.wrap(cache.put(url, file))
-        }
-    }
+    static readonly statuses = {
+        updateError: 0,
+        updateNotEnoughDiskSpace: 1,
+        updateNotAvailable: 2,
+        updateQueued: 3,
+        sameUpdateInProgress: 4
+    } as const
 
-    downloadedCargos: CargoIndex[]
     fetchFile: FetchFunction
-    getCacheFile: FetchFunction
-    mutateCacheFile: (url: string, file: Response) => Promise<ResultType<void>>
-    queryDiskUsage: NonNullable<ShabahOptions["queryDiskUsage"]>
+    fileCache: FileCache
+    queueUpdate: Function
+    readonly origin: string
+
+    private cargoIndicesCache: null | CargoIndices
 
     constructor({
-        fetchFile = fetchRetry,
-        queryDiskUsage = getDiskUsage,
-
-        // required options
-        getCacheFile,
-        mutateCacheFile,
+        fetchFile,
+        fileCache,
+        origin
     }: ShabahOptions) {
-        this.downloadedCargos = []
         this.fetchFile = fetchFile
-        this.queryDiskUsage = queryDiskUsage
-        this.getCacheFile = getCacheFile
-        this.mutateCacheFile = mutateCacheFile
+        this.fileCache = fileCache
+        this.queueUpdate = () => {
+            console.log("update queued")
+        }
+        this.origin = origin.endsWith("/")
+            ? origin.slice(0, -1)
+            : origin
+        this.cargoIndicesCache = null
     }
 
     async diskInfo() {
-        const diskusage = await this.queryDiskUsage()
+        const diskusage = await this.fileCache.queryUsage()
         const used = diskusage.usage
         const total = Math.max(
             diskusage.quota - SYSTEM_RESERVED_BYTES,
@@ -107,12 +95,12 @@ export class Shabah {
         name: string
         id: string
     }) {
-        const {fetchFile, getCacheFile} = this
+        const {fetchFile, fileCache} = this
         const response = await checkForUpdates({
             requestRootUrl: cargo.requestUrl,
             storageRootUrl: cargo.storageUrl,
             name: cargo.name
-        }, fetchFile, getCacheFile)
+        }, fetchFile, fileCache)
         const disk = await this.diskInfo()
         const diskWithCargo = disk.used + response.bytesToDownload
         const enoughSpaceForPackage = disk.total < 1
@@ -130,11 +118,20 @@ export class Shabah {
                 return {factor: bytes.bytes_per_kb, metric: "kb"}
             }
         })(bytesNeededToDownload)
+        const previousVersion = (
+            response.previousCargo?.version 
+            || Shabah.NO_PREVIOUS_INSTALLATION
+        )
+        const newVersion = (
+             response.newCargo?.parsed.version
+            || Shabah.NO_PREVIOUS_INSTALLATION
+        )
         return {
             updateCheckResponse: response,
+            versions: {new: newVersion, old: previousVersion},
             errorOccurred: response.errors.length > 0,
             enoughSpaceForPackage,
-            updateAvailable: response.newCargos.length > 0,
+            updateAvailable: !!response.newCargo,
             diskInfo: {
                 ...disk,
                 usageAfterDownload: diskWithCargo,
@@ -146,7 +143,152 @@ export class Shabah {
                     ).toString()
                     + byteMultiplier.metric
                 ),
-            }
+            },
+            ...cargo,
         }  
+    }
+
+    private async getDownloadIndices() {
+        const {origin, fileCache} = this
+        const url = downloadIncidesUrl(origin)
+        return await getDownloadIndices(url, fileCache)
+    }
+
+    private async persistDownloadIndices(indices: DownloadIndexCollection) {
+        const {origin, fileCache} = this
+        return await saveDownloadIndices(indices, origin, fileCache)
+    }
+
+    async updateState(updateId: string) {
+        const downloadsIndex = await this.getDownloadIndices()
+        const updateIndex = downloadsIndex.downloads.findIndex((index) => {
+            return index.id === updateId
+        })
+        if (updateIndex < 0) {
+            return {
+                updating: false, 
+                updateVersion: "none",
+                previousVersion: "none"
+            }
+        }
+        const targetUpdate =  downloadsIndex.downloads[updateIndex]
+        return {
+            updating: true,
+            updateVersion: targetUpdate.version,
+            previousVersion: targetUpdate.previousVersion
+        }
+    }
+
+    private async getCargoIndices() {
+        if (this.cargoIndicesCache) {
+            return this.cargoIndicesCache
+        }
+        const {origin, fileCache} = this
+        const url = cargoIndicesUrl(origin)
+        const cargos = await getCargoIndices(url, fileCache)
+        this.cargoIndicesCache = cargos
+        return cargos
+    }
+
+    private async persistCargoIndices(indices: CargoIndices) {
+        const {origin, fileCache} = this
+        return await saveCargoIndices(indices, origin, fileCache)
+
+    }
+
+    private async putCargoIndex(
+        newIndex: CargoIndexWithoutMeta,
+        {persistChanges}: {persistChanges: boolean}
+    ) {
+        const indices = await this.getCargoIndices()
+        updateCargoIndex(indices, newIndex)
+        if (persistChanges) {
+            await this.persistCargoIndices(indices)
+        }
+    }
+
+    async executeUpdates(
+        details: UpdateDetails,
+        updateTitle: string
+    ) {
+        if (!details.updateAvailable) {
+            return io.ok({
+                msg: "update not available", 
+                code: Shabah.statuses.updateNotAvailable
+            })
+        } else if (!details.enoughSpaceForPackage) {
+            return io.ok({
+                msg: "not enough disk space for update", 
+                code: Shabah.statuses.updateNotEnoughDiskSpace
+            })
+        } else if (details.errorOccurred) {
+            return io.ok({
+                msg: "error occurred when searching for update", 
+                code: Shabah.statuses.updateError
+            })
+        }
+        const downloadsIndex = await this.getDownloadIndices()
+        const prevUpdateIndex = downloadsIndex.downloads.findIndex((index) => {
+            return index.id === details.id
+        })
+        const updateInProgress = prevUpdateIndex > -1
+        if (updateInProgress) {
+            return io.ok({
+                msg: "update is already in progress",
+                code: Shabah.statuses.sameUpdateInProgress
+            })
+        }       
+        const updateIndex = {
+            id: details.id,
+            bytes: details.updateCheckResponse.totalBytes,
+            map: createResourceMap(
+                details.updateCheckResponse.downloadableResources
+            ),
+            version: details.versions.new,
+            previousVersion: details.versions.old,
+            title: updateTitle
+        }
+        updateDownloadIndex(downloadsIndex, updateIndex)
+        this.queueUpdate()
+        await this.persistDownloadIndices(downloadsIndex)
+        // save cargo manifest
+        const newCargo = details.updateCheckResponse.newCargo!
+        await this.fileCache.putFile(
+            newCargo.storageUrl, 
+            new Response(newCargo.text, {
+                status: 200,
+                statusText: "OK",
+                headers: headers(
+                    "application/json", 
+                    stringBytes(newCargo.text)
+                )
+            })
+        )
+        await this.putCargoIndex(
+            {
+                name: details.name,
+                id: details.id,
+                state: "updating",
+                version: details.versions.new,
+                entry: newCargo.parsed.entry,
+                bytes: details.updateCheckResponse.totalBytes,
+                storageRootUrl: details.storageUrl,
+                requestRootUrl: details.requestUrl
+            },
+            {persistChanges: true}
+        )
+        return io.ok({
+            msg: "update queued", 
+            code: Shabah.statuses.updateQueued
+        })
+    }
+
+    async getCargoMeta(cargoId: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.id === cargoId)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
     }
 }

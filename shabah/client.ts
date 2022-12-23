@@ -1,4 +1,3 @@
-import type {Mime} from "../miniMime/index"
 import {ResultType, io, Result} from "../monads/result"
 import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "../cargo/consts"
 import {
@@ -9,22 +8,12 @@ import {
     CodeManifestSafe
 } from "../cargo/index"
 import {urlToMime} from "../miniMime/index"
+import {
+    FileCache, 
+    FetchFunction,
+    stringBytes
+} from "./shared"
 
-const VIRTUAL_DRIVE_NAME = ".vdrive"
-const virtualDriveUrl = (origin: string) => origin + "/" + VIRTUAL_DRIVE_NAME
-
-export const stringBytes = (str: string) => (new TextEncoder().encode(str)).length
-
-const headers = (contentType: Mime, bytes: number) => {
-    return {
-        "Cross-Origin-Embedder-Policy": "require-corp",
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "X-Cache": "SW HIT",
-        "Last-Modified": new Date().toUTCString(),
-        "Content-Type": contentType,
-        "Content-Length": bytes.toString()
-    } as const
-}
 
 type RequestableResource = {
     requestUrl: string
@@ -37,11 +26,6 @@ type CargoReference = {
     storageRootUrl: string
     name: string
 }
-
-export type FetchFunction = (
-    input: RequestInfo | URL, 
-    init: RequestInit & {retryCount?: number}
-) => Promise<ResultType<Response>>
 
 const addSlashToEnd = (str: string) => str.endsWith("/") ? str : str + "/"
 
@@ -59,38 +43,41 @@ type DownloadResponse = {
     downloadableResources: RequestableResource[] 
     errors: string[]
     bytesToDownload: number
-    newCargos: Array<{
+    newCargo: {
         storageUrl: string 
         text: string
         parsed: CodeManifestSafe
-    }>
+    } | null
     resoucesToDelete: RequestableResource[]
     totalBytes: number
     bytesToDelete: number
     cargoManifestBytes: number
     previousVersionExists: boolean
+    previousCargo: null | CodeManifestSafe
 }
 
 const downloadResponse = ({
     downloadableResources = [], 
     errors = [],
     bytesToDownload = 0,
-    newCargos = [],
+    newCargo = null,
     resoucesToDelete = [],
     totalBytes = 0,
     bytesToDelete = 0,
     cargoManifestBytes = 0,
     previousVersionExists = true,
+    previousCargo = null,
 }: Partial<DownloadResponse>) => ({
     downloadableResources, 
     errors,
     bytesToDownload,
-    newCargos,
+    newCargo,
     resoucesToDelete,
     totalBytes,
     bytesToDelete,
     cargoManifestBytes,
-    previousVersionExists
+    previousVersionExists,
+    previousCargo
 })
 
 const errDownloadResponse = (
@@ -105,44 +92,46 @@ const updateToDateDownloadResponse = () => downloadResponse({})
 export const checkForUpdates = async (
     {storageRootUrl, requestRootUrl, name}: CargoReference, 
     fetchFn: FetchFunction,
-    getCacheFile: FetchFunction
+    fileCache: FileCache
 ) => {
     const storageFileBase = addSlashToEnd(storageRootUrl)
     const requestFileBase = addSlashToEnd(requestRootUrl)
     const cargoUrl = storageFileBase + MANIFEST_NAME
-    const storedCargoRes = await getCacheFile(cargoUrl, {
-        method: "GET",
-        retryCount: 1
-    })
+    const storedCargoRes = await fileCache.getFile(cargoUrl)
 
+    const found = !!storedCargoRes
     if (
-        !storedCargoRes.ok
-        || !storedCargoRes.data.ok && storedCargoRes.data.status !== 404
+        found 
+        && !storedCargoRes.ok 
+        && storedCargoRes.status !== 404
     ) {
         return errDownloadResponse(
-            `error when requesting segment "${name}": ${storedCargoRes.msg}`,
+            `previous cargo for "${name}" returned with a non-404 error http code`,
             false
         )
     }
 
-    if (storedCargoRes.data.status === 404) {
-        const newCargoRes = await fetchFn(
+    const notFound = !storedCargoRes
+    if (notFound || storedCargoRes.status === 404) {
+        const newCargoFetch = await io.wrap(fetchFn(
             requestFileBase + MANIFEST_NAME, {
             method: "GET",
             retryCount: 3
-        })
-        if (!newCargoRes.ok) {
+        }))
+        if (!newCargoFetch.ok) {
             return errDownloadResponse(
-                `error when requesting new package for segment "${name}": ${newCargoRes.msg}`,
-                false
-            )
-        } else if (!newCargoRes.data.ok) {
-            return errDownloadResponse(
-                `error http code when requesting new package for segment "${name}": status=${newCargoRes.data.status}, status_text=${newCargoRes.data.statusText}."`,
+                `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
                 false
             )
         }
-        const newCargoText = await io.wrap(newCargoRes.data.text())
+        const newCargoRes = newCargoFetch.data
+        if (!newCargoRes.ok) {
+            return errDownloadResponse(
+                `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
+                false
+            )
+        }
+        const newCargoText = await io.wrap(newCargoRes.text())
         if (!newCargoText.ok) {
             return errDownloadResponse(
                     `new cargo for "${name}" found no text. Error: ${newCargoText.msg}`,
@@ -179,9 +168,11 @@ export const checkForUpdates = async (
         return downloadResponse({
             bytesToDownload,
             downloadableResources: filesToDownload,
-            newCargos: [
-                {storageUrl: cargoUrl, text: newCargoText.data, parsed: newCargoPkg.pkg}
-            ],
+            newCargo: {
+                storageUrl: cargoUrl, 
+                text: newCargoText.data, 
+                parsed: newCargoPkg.pkg
+            },
             totalBytes: bytesToDownload,
             cargoManifestBytes: stringBytes(newCargoText.data),
             previousVersionExists: false
@@ -190,7 +181,7 @@ export const checkForUpdates = async (
 
     // if cargo has been saved before assume that it's
     // encoded correctly
-    const storedCargoJson = await storedCargoRes.data.json()
+    const storedCargoJson = await storedCargoRes.json()
     const oldCargo = validateManifest(storedCargoJson)
 
     const newMiniCargoUrl = requestFileBase + MANIFEST_MINI_NAME
@@ -198,7 +189,7 @@ export const checkForUpdates = async (
     let newMiniCargoJson: ResultType<any>
     let newMiniCargoPkg: ValidatedMiniCargo
     if (
-        (newMiniCargoRes = await fetchFn(newMiniCargoUrl, {method: "GET", retryCount: 3})).ok
+        (newMiniCargoRes = await io.wrap(fetchFn(newMiniCargoUrl, {method: "GET", retryCount: 3}))).ok
         && newMiniCargoRes.data.ok
         && (newMiniCargoJson = await io.wrap(newMiniCargoRes.data.json())).ok
         && (newMiniCargoPkg = validateMiniCargo(newMiniCargoJson.data)).errors.length < 1
@@ -207,22 +198,25 @@ export const checkForUpdates = async (
         return updateToDateDownloadResponse()
     }
 
-    const newCargoRes = await fetchFn(
+    const newCargoFetch = await io.wrap(fetchFn(
         requestFileBase + MANIFEST_NAME, {
             retryCount: 3,
             method: "GET"        
         }
-    )
-    if (!newCargoRes.ok) {
+    ))
+    if (!newCargoFetch.ok) {
         return errDownloadResponse(
-            `network error, could not fetch new cargo: ${newCargoRes}`
-        )
-    } else if (!newCargoRes.data.ok) {
-        return errDownloadResponse(
-            `http error, could not fetch new cargo: status=${newCargoRes.data.status}, status_text=${newCargoRes.data.statusText}`
+            `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
+            false
         )
     }
-    const newCargoText = await io.wrap(newCargoRes.data.text())
+    const newCargoRes = newCargoFetch.data
+    if (!newCargoRes.ok) {
+        return errDownloadResponse(
+            `http error, could not fetch new cargo: status=${newCargoRes.status}, status_text=${newCargoRes.statusText}`
+        )
+    }
+    const newCargoText = await io.wrap(newCargoRes.text())
     if (!newCargoText.ok) {
         return errDownloadResponse(
             `new cargo request returned no body: ${newCargoText.msg}`
@@ -287,17 +281,16 @@ export const checkForUpdates = async (
         cargoManifestBytes: stringBytes(newCargoText.data),
         totalBytes: totalBytesOfCargo,
         resoucesToDelete: filesToDelete,
-        newCargos: [
-            {storageUrl: cargoUrl, text: newCargoText.data, parsed: newCargoPkg.pkg}
-        ]
+        newCargo: {
+            storageUrl: cargoUrl, 
+            text: newCargoText.data, 
+            parsed: newCargoPkg.pkg
+        },
+        previousCargo: oldCargo.pkg
     })
 }
 
-type ResourceMap = Record<string, {
-    bytes: number,
-    mime: Mime,
-    storageUrl: string
-}>
+import {ResourceMap} from "./shared"
 
 export const createResourceMap = (resources: RequestableResource[]) => {
     const map = {} as ResourceMap

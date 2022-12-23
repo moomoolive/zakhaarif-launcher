@@ -3,6 +3,34 @@
   // consts.ts
   var APP_CACHE = "app-v1";
 
+  // serviceWorkers/handlers.ts
+  var makeFetchHandler = (options) => {
+    const { rootDoc, cache } = options;
+    return async (event) => {
+      if (event.request.url !== rootDoc) {
+        const cached = await (await cache).match(event.request);
+        if (cached && cached.ok) {
+          return event.respondWith(cached);
+        }
+        return;
+      }
+      try {
+        const res = await fetch(event.request);
+        return event.respondWith(res);
+      } catch (err) {
+        const cached = await (await cache).match(event.request);
+        if (cached && cached.ok) {
+          return event.respondWith(cached);
+        }
+        return event.respondWith(new Response("", {
+          status: 500,
+          statusText: "Internal Server Error",
+          headers: { "Sw-Net-Err": String(err) || "1" }
+        }));
+      }
+    };
+  };
+
   // serviceWorkers/index.ts
   var sw = globalThis.self;
   var ROOT_DOC = sw.location.origin + "/";
@@ -52,44 +80,7 @@
       infoMsg(`{\u{1F525} activate} new script in control, started with args: silent_log=${config.log}`, "all", true);
     })());
   };
-  var networkErr = (err) => {
-    return new Response("", {
-      status: 500,
-      statusText: "Internal Server Error",
-      headers: { "Sw-Net-Err": String(err) || "1" }
-    });
-  };
-  var networkFirst = async (event) => {
-    try {
-      const res = await fetch(event.request);
-      return res;
-    } catch (err) {
-      const cached = await (await CACHE).match(event.request);
-      if (!cached || !cached.ok) {
-        return networkErr(err);
-      }
-      return cached;
-    }
-  };
-  var cacheFirst = async (event) => {
-    const cached = await (await CACHE).match(event.request);
-    if (cached && cached.ok) {
-      return cached;
-    }
-    try {
-      return await fetch(event.request);
-    } catch (err) {
-      return networkErr(err);
-    }
-  };
-  sw.onfetch = (event) => {
-    const isRoot = event.request.url === ROOT_DOC;
-    if (isRoot) {
-      event.respondWith(networkFirst(event));
-    } else {
-      event.respondWith(cacheFirst(event));
-    }
-  };
+  sw.onfetch = makeFetchHandler({ cache: CACHE, rootDoc: ROOT_DOC });
   var swAction = {
     "config:silent_logs": () => {
       config.log = true;

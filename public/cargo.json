@@ -2,7 +2,7 @@
     "uuid": "5-NZCQxgVj7Iv_Xqa3MK4RQmmMKWnN297VP",
     "crateVersion": "0.1.0",
     "name": "app-launcher",
-    "version": "0.1.0",
+    "version": "0.1.0-alpha.0",
     "entry": "index.html",
     "files": [
         {"name": "index.html", "bytes": 100}

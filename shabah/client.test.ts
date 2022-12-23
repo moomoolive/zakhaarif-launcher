@@ -1,5 +1,6 @@
 import {describe, it, expect} from "vitest"
-import {checkForUpdates, FetchFunction} from "./client"
+import {checkForUpdates} from "./client"
+import {FetchFunction} from "./shared"
 import {ResultType, io} from "../monads/result"
 import {CodeManifestSafe} from "../cargo/index"
 import {LATEST_CRATE_VERSION} from "../cargo/consts"
@@ -7,33 +8,31 @@ import {nanoid} from "nanoid"
 
 type FileRecord = Record<string, () => ResultType<Response>>
 const requester = (files: FileRecord) => {
-    const fileFetcher: FetchFunction = async (input, options) => {
+    const fileFetcher: FetchFunction = async (input) => {
         const url = ((i: typeof input) => {
             return i instanceof URL 
                 ? i.href
                 : i instanceof Request ? i.url : i
         })(input)
-        if (options?.method?.toLowerCase() === "post") {
-            files[url] = () => {
-                return io.ok(new Response(options?.body?.toString() || "", {
-                    status: 200,
-                    statusText: "OK"
-                }))
-            }
-            return io.ok(new Response("sucess", {status: 200, statusText: "OK"}))
-        }
         const file = files[url]
         if (file) {
             try {
-                return file()
+                const f = file()
+                if (!f.ok) {
+                    throw("should never be here!!")
+                }
+                return f.data 
             } catch (err) {
-                return io.err(String(err))
+                return new Response(String(err), {
+                    status: 400,
+                    statusText: "BAD REQUEST"
+                })
             }
         }
-        return io.ok(new Response("", {
+        return new Response("", {
             status: 404,
             statusText: "NOT FOUND"
-        }))
+        })
     }
     return fileFetcher
 }
@@ -60,7 +59,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -78,7 +81,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -99,7 +106,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -121,7 +132,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -143,7 +158,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -167,18 +186,19 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
         expect(res.resoucesToDelete.length).toBe(0)
         expect(res.bytesToDownload).toBeGreaterThan(0)
-        expect(res.newCargos.length).toBeGreaterThan(0)
-        expect(
-            res.newCargos.some(c => (
-                c.storageUrl === "https://local.com/store/cargo.json"
-                && c.text === cargoString
-            ))
-        ).toBe(true)
+        expect(res.newCargo?.storageUrl).toBe(
+            "https://local.com/store/cargo.json"
+        )
+        expect(res.newCargo?.text).toBe(cargoString)
         expect(res.previousVersionExists).toBe(false)
     })
 
@@ -197,7 +217,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -243,7 +267,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBe(0)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
@@ -292,7 +320,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(true)
@@ -337,7 +369,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(true)
@@ -371,7 +407,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -404,7 +444,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -438,7 +482,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -471,7 +519,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -504,7 +556,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -546,7 +602,11 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(
             newResources.length
@@ -555,12 +615,8 @@ describe("diff cargos function", () => {
             expiredResources.length
         )
         const cargoString = JSON.stringify(newCargo)
-        expect(
-            res.newCargos.some(c => (
-                c.storageUrl === "https://local.com/store/cargo.json"
-                && c.text === cargoString
-            ))
-        ).toBe(true)
+        expect(res.newCargo?.storageUrl).toBe("https://local.com/store/cargo.json")
+        expect(res.newCargo?.text).toBe(cargoString)
         expect(res.previousVersionExists).toBe(true)
     })
 
@@ -601,9 +657,321 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, fileFetcher)
+        , fileFetcher, {
+            getFile: (url) => fileFetcher(url, {}),
+            putFile: async () => {},
+            queryUsage: async () => ({usage: 0, quota: 0})
+        })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
+    })
+})
+
+import {
+    getDownloadIndices,
+    updateDownloadIndex,
+    emptyDownloadIndex,
+    operationCodes,
+    removeDownloadIndex,
+    saveDownloadIndices
+} from "./shared"
+
+const createFileCache = (initFiles: Record<string, Response>) => {
+    const cache = {
+        getFile: async (url: string) => initFiles[url],
+        putFile: async (url: string, file: Response) => { 
+            initFiles[url] = file 
+        },
+        queryUsage: async () => ({usage: 0, quota: 0})
+    }
+    return cache
+}
+
+describe("reading and writing to download index", () => {
+    it("if download index collection hasn't been created yet, should return empty index", async () => {
+        const fileCache = createFileCache({})
+        const index = await getDownloadIndices(
+            "/__dl-index__.json",
+            fileCache
+        )
+        expect(!!index.downloads).toBe(true)
+        expect(!!index.updatedAt).toBe(true)
+        expect(!!index.createdAt).toBe(true)
+    })
+
+    it("if download index is not in index collection new index should be created", () => {
+        const index = emptyDownloadIndex()
+        expect(index.downloads.length).toBe(0)
+        const res = updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.downloads.length).toBe(1)
+        expect(res).toBe(operationCodes.createdNew)
+    })
+
+    it("if download index is not in index collection download index total bytes should be incremented", () => {
+        const index = emptyDownloadIndex()
+        expect(index.downloads.length).toBe(0)
+        expect(index.totalBytes).toBe(0)
+        const bytes = 10
+        const res = updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.totalBytes).toBe(bytes)
+        expect(index.downloads.length).toBe(1)
+        expect(res).toBe(operationCodes.createdNew)
+    })
+
+    it("if download index is in index collection new index should overwrite old", () => {
+        const index = emptyDownloadIndex()
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.downloads.length).toBe(1)
+        const res = updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0"}
+        )
+        expect(index.downloads.length).toBe(1)
+        expect(index.downloads.find((d) => d.id === "pkg")?.bytes).toBe(1)
+        expect(res).toBe(operationCodes.updatedExisting)
+    })
+
+    it("if download index is in index collection download index total bytes should be be incremented by the bytes difference between the two", async () => {
+        const fileCache = createFileCache({})
+        const origin = "https://a-cool-place.site"
+        const index = await getDownloadIndices(origin, fileCache)
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+        )
+        updateDownloadIndex(
+            index,
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+        )
+        const res = await saveDownloadIndices(index, origin, fileCache)
+        expect(res).toBe(operationCodes.saved)
+        expect(
+            JSON.stringify(await getDownloadIndices(origin, fileCache))
+        ).toEqual(JSON.stringify(index))
+    })
+
+    it("if download index is in index collection download index total bytes should be be incremented by the bytes difference between the two, even if origin has a trailing slash", async () => {
+        const fileCache = createFileCache({})
+        const origin = "https://a-cool-place.site/"
+        const index = await getDownloadIndices(origin, fileCache)
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+        )
+        updateDownloadIndex(
+            index,
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+        )
+        const res = await saveDownloadIndices(index, origin, fileCache)
+        expect(res).toBe(operationCodes.saved)
+        expect(
+            JSON.stringify(await getDownloadIndices(origin, fileCache))
+        ).toEqual(JSON.stringify(index))
+    })
+
+    it("if remove download index is called with an existing id, index with id should be removed and download collection bytes should be decremented by the amount of bytes in the removed index", () => {
+        const index = emptyDownloadIndex()
+        expect(index.totalBytes).toBe(0)
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+        )
+        updateDownloadIndex(
+            index,
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.totalBytes).toBe(70)
+        const res = removeDownloadIndex(index, "pkg")
+        expect(index.totalBytes).toBe(50)
+        expect(index.downloads.length).toBe(1)
+        expect(res).toBe(operationCodes.removed)
+    })
+
+    it("if remove download index is called with an non existing id, nothing should occur", () => {
+        const index = emptyDownloadIndex()
+        expect(index.totalBytes).toBe(0)
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+        )
+        updateDownloadIndex(
+            index,
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.totalBytes).toBe(70)
+        const res = removeDownloadIndex(index, "random-pkg")
+        expect(index.totalBytes).toBe(70)
+        expect(index.downloads.length).toBe(2)
+        expect(res).toBe(operationCodes.notFound)
+    })
+
+    it("saved download indices should be able to be fetched with the getDownloadIndices function", () => {
+        const index = emptyDownloadIndex()
+        expect(index.totalBytes).toBe(0)
+        updateDownloadIndex(
+            index,
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+        )
+        updateDownloadIndex(
+            index,
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+        )
+        expect(index.totalBytes).toBe(70)
+        const res = removeDownloadIndex(index, "random-pkg")
+        expect(index.totalBytes).toBe(70)
+        expect(index.downloads.length).toBe(2)
+        expect(res).toBe(operationCodes.notFound)
+    })
+})
+
+import {
+    getCargoIndices,
+    emptyCargoIndices,
+    updateCargoIndex,
+    saveCargoIndices,
+} from "./shared"
+import { json } from "stream/consumers"
+import { exec } from "child_process"
+
+describe("reading and writing to cargo indices", () => {
+    it("should return empty cargo indices if one is not found", async () => {
+        const fileFetcher = createFileCache({})
+        const index = await getCargoIndices(
+            "https://myhouse.com",
+            fileFetcher
+        )
+        expect(!!index.cargos).toBe(true)
+        expect(!!index.updatedAt).toBe(true)
+        expect(!!index.createdAt).toBe(true)
+    })
+
+    it("if download index is not in index collection new index should be created", () => {
+        const index = emptyCargoIndices()
+        expect(index.cargos.length).toBe(0)
+        const res = updateCargoIndex(
+            index,
+            {
+                id: "pkg",
+                name: "pkg",
+                state: "updating",
+                version: "0.1.0",
+                bytes: 0,
+                entry: "store/index.js",
+                storageRootUrl: "store/",
+                requestRootUrl: "store/",
+            }
+        )
+        expect(index.cargos.length).toBe(1)
+        expect(res).toBe(operationCodes.createdNew)
+    })
+
+    it("if cargo index is not in index collection new index should be created", () => {
+        const index = emptyCargoIndices()
+        const first = {
+            id: "pkg",
+            name: "pkg",
+            state: "updating",
+            version: "0.1.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        updateCargoIndex(index, first)
+        expect(index.cargos.length).toBe(1)
+        const second = {
+            id: "pkg",
+            name: "pkg",
+            state: "cached",
+            version: "0.2.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        const res = updateCargoIndex(index, second)
+        expect(index.cargos.length).toBe(1)
+        expect(index.cargos[0].version).toBe("0.2.0")
+        expect(res).toBe(operationCodes.updatedExisting)
+    })
+
+    it("saved cargo indices should be able to be fetched with the get download indices function", async () => {
+        const fileCache = createFileCache({})
+        const origin = "https://myhouse.com"
+        const index = await getCargoIndices(origin, fileCache)
+        const first = {
+            id: "pkg",
+            name: "pkg",
+            state: "updating",
+            version: "0.1.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        updateCargoIndex(index, first)
+        const second = {
+            id: "pkg-2",
+            name: "pkg",
+            state: "cached",
+            version: "0.2.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        updateCargoIndex(index, second)
+        expect(index.cargos.length).toBe(2)
+        const res = await saveCargoIndices(
+            index, origin, fileCache
+        )
+        expect(res).toBe(operationCodes.saved)
+        const indexAgain = await getCargoIndices(origin, fileCache)
+        expect(JSON.stringify(indexAgain)).toEqual(JSON.stringify(index))
+    })
+
+    it("saved cargo indices should be able to be fetched with the get download indices function even when origin has a trailing slash", async () => {
+        const fileCache = createFileCache({})
+        const origin = "https://myhouse.com/"
+        const index = await getCargoIndices(origin, fileCache)
+        const first = {
+            id: "pkg",
+            name: "pkg",
+            state: "updating",
+            version: "0.1.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        updateCargoIndex(index, first)
+        const second = {
+            id: "pkg-2",
+            name: "pkg",
+            state: "cached",
+            version: "0.2.0",
+            bytes: 0,
+            entry: "store/index.js",
+            storageRootUrl: "store/",
+            requestRootUrl: "store/",
+        } as const
+        updateCargoIndex(index, second)
+        expect(index.cargos.length).toBe(2)
+        const res = await saveCargoIndices(
+            index, origin, fileCache
+        )
+        expect(res).toBe(operationCodes.saved)
+        const indexAgain = await getCargoIndices(origin, fileCache)
+        expect(JSON.stringify(indexAgain)).toEqual(JSON.stringify(index))
     })
 })

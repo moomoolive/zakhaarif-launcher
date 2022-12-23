@@ -1,7 +1,29 @@
 import {APP_CACHE} from "../consts"
 import {OutMessageType, InboundMessageAction, InboundMessage} from "./types"
+import type {BackgroundFetchUIEventCore} from "./handlers"
 
-const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
+type BackgroundFetchUIEvent = BackgroundFetchUIEventCore & Event
+
+type BackgroundFetchEvents = {
+    "backgroundfetchsuccess": BackgroundFetchUIEvent
+    "backgroundfetchfailure": BackgroundFetchUIEvent
+    "backgroundfetchabort": BackgroundFetchUIEvent
+    "backgroundfetchclick": BackgroundFetchUIEvent
+}
+
+type AllServiceWorkerEvents = (
+    ServiceWorkerGlobalScopeEventMap & BackgroundFetchEvents
+) 
+
+type ModifiedEvents = {
+    addEventListener<K extends keyof AllServiceWorkerEvents>(type: K, listener: (this: ServiceWorkerGlobalScope, ev: AllServiceWorkerEvents[K]) => any, options?: boolean | AddEventListenerOptions): void
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void
+}
+
+const sw = globalThis.self as unknown as (
+    ServiceWorkerGlobalScope & ModifiedEvents
+)
+
 const ROOT_DOC = sw.location.origin + "/"
 const CONFIG_URL = ROOT_DOC + "__sw-config__.json"
 
@@ -59,47 +81,28 @@ sw.onactivate = (event) => {
     })())
 }
 
-const networkErr = (err: unknown) => {
-    return new Response("", {
-        status: 500,
-        statusText: "Internal Server Error",
-        headers: {"Sw-Net-Err": String(err) || "1"}
-    })
-}
+import {makeFetchHandler} from "./handlers"
 
-const networkFirst = async (event: FetchEvent) => {
-    try {
-        const res = await fetch(event.request)
-        return res
-    } catch (err) {
-        const cached = await (await CACHE).match(event.request)
-        if (!cached || !cached.ok) {
-            return networkErr(err)
+sw.onfetch = makeFetchHandler({
+    cache: CACHE, 
+    rootDoc: ROOT_DOC,
+    fetchFile: fetch
+}) 
+
+import {makeBackgroundFetchSuccessHandler} from "./handlers"
+
+sw.addEventListener<"backgroundfetchsuccess">(
+    "backgroundfetchsuccess",
+    makeBackgroundFetchSuccessHandler({
+        origin: sw.location.origin,
+        fileCache: {
+            getFile: async url => (await CACHE).match(url),
+            putFile: async (url, file) => (await CACHE).put(url, file),
+            // make later?
+            queryUsage: async () => ({quota: 0, usage: 0})
         }
-        return cached
-    }
-}
-
-const cacheFirst = async (event: FetchEvent) => {
-    const cached = await (await CACHE).match(event.request)
-    if (cached && cached.ok) {
-        return cached
-    }
-    try {
-        return await fetch(event.request)
-    } catch (err) {
-        return networkErr(err)
-    }
-}
-
-sw.onfetch = (event) => {
-    const isRoot = event.request.url === ROOT_DOC
-    if (isRoot) {
-        event.respondWith(networkFirst(event))
-    } else {
-        event.respondWith(cacheFirst(event))
-    }
-}
+    })
+)
 
 const swAction = {
     "config:silent_logs": () => {
@@ -129,6 +132,7 @@ const swAction = {
         infoMsg(`config: ${JSON.stringify(config)}`, id, true)
     }
 } as const satisfies Record<InboundMessageAction, Function>
+
 
 sw.onmessage = async (msg) => {
     const d = msg.data as InboundMessage

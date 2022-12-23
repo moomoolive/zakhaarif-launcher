@@ -5,7 +5,6 @@ import {
   MenuItem,
   Tooltip,
   Collapse,
-  createTheme,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
 import LoadingIcon from "@mui/icons-material/Loop"
@@ -25,19 +24,6 @@ const enum log {
 }
 
 const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
-
-const launcherTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#0077c0"
-    },
-    secondary: {
-      main: "#c4ced4"
-    },
-  }
-})
-
 
 const featureCheck = () => {
   if (isIframe()) {
@@ -124,6 +110,9 @@ const UnsupportedFeatures = ({features}: {
 
 let serviceWorkerRegistered = false
 
+const appPackageId = "std-pkg"
+
+import {webFetch, webCacheFileCache} from "../../shabah/webAdaptors"
 
 export const Root = ({id}: {id: string}) => {
   const {
@@ -136,8 +125,9 @@ export const Root = ({id}: {id: string}) => {
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [supportedFeatures] = useState(featureCheck())
   const [downloadClient] = useState(new Shabah({
-    getCacheFile: Shabah.cacheRequester(APP_CACHE),
-    mutateCacheFile: Shabah.cacheMutator(APP_CACHE)
+    fetchFile: webFetch(),
+    fileCache: webCacheFileCache(APP_CACHE),
+    origin: location.origin
   }))
   const [downloadError, setDownloadError] = useState("")
   const [buttonElement, setButtonElement] = useState(<>
@@ -148,22 +138,24 @@ export const Root = ({id}: {id: string}) => {
     setAfterUpdateCheckAction
   ] = useState<null | Function>(null)
   const [checkedForUpdates, setCheckedForUpdates] = useState(false)
+  const [appUpdateInProgress, setAppUpdateInProgress] = useState(false)
+  const [nextUpdateVersion, setNextUpdateVersion] = useState("none")
   const [
-    updateNowFn, 
-    setUpdateNowFn
-  ] = useState<Function>(() => {})
-  const [updateAvailable, setUpdateAvailable] = useState(false)
-
+    currentAppVersion, 
+    setCurrentAppVersion
+  ] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
   const allFeaturesSupported = supportedFeatures[5].supported
 
   const closeSettings = () => setSettingsMenuElement(null)
 
   const gatherAssets = async () => {
+    if (isIframe()) {
+      return
+    }
     if (checkedForUpdates && afterUpdateCheckAction) {
       return afterUpdateCheckAction()
     }
     setDownloadError("")
-    
     setShowProgress(true)
     setButtonElement(
       <span className='animate-spin'>
@@ -176,15 +168,15 @@ export const Root = ({id}: {id: string}) => {
       requestUrl: root,
       storageUrl: root,
       name: "std",
-      id: "std-pkg"
+      id: appPackageId
     })
-    await sleep(2_000)
+    await sleep(500)
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
     
     console.log(res)
     setCheckedForUpdates(true)
     if (previousVersionExists && !res.enoughSpaceForPackage) {
-      const updateVersion = res.updateCheckResponse.newCargos[0].parsed.version
+      const updateVersion = res.versions.new
       setDownloadError(`Not enough disk space for update v${updateVersion} (${res.diskInfo.bytesNeededToDownloadFriendly} required)`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
@@ -211,20 +203,20 @@ export const Root = ({id}: {id: string}) => {
       return
     }
 
-    if (res.updateAvailable) {
-      setUpdateNowFn(() => {
-        return () => console.log("update", res)
-      })
-      setUpdateAvailable(true)
-      setShowProgress(false)
-      setButtonElement(<>{"Start Anyway"}</>)
+    if (!res.updateAvailable) {
+      launchApp()
       return
     }
-    await sleep(1_000)
-    console.info(log.name, "successfully fetched assets! Opening App...")
-    console.info(log.name, "closing now...")
-    //launchApp()
-    return
+    setProgressMsg(`Update Found! Queuing...`)
+    const updateQueueRes = await downloadClient.executeUpdates(
+      res,
+      `game core v${res.versions.new}`
+    )
+    console.log("update queue res", updateQueueRes)
+    await sleep(3_000)
+    setProgressMsg("Updating App...")
+    setAppUpdateInProgress(true)
+    setNextUpdateVersion(res.versions.new)
   }
 
   useEffect(() => {
@@ -251,6 +243,28 @@ export const Root = ({id}: {id: string}) => {
       }
     }
     serviceWorkerRegistered = true
+  }, [])
+
+  useEffect(() => {
+    (async () => {
+      const [currentAppPkg, updateInfo] = await Promise.all([
+        downloadClient.getCargoMeta(appPackageId),
+        downloadClient.updateState(appPackageId)
+      ] as const)
+      const {updating, updateVersion, previousVersion} = updateInfo
+      if (!updating) {
+        setCurrentAppVersion(
+          currentAppPkg?.version
+          || Shabah.NO_PREVIOUS_INSTALLATION
+        )
+        return
+      }
+      setCurrentAppVersion(previousVersion)
+      setAppUpdateInProgress(true)
+      setShowProgress(true)
+      setProgressMsg(`Updating App...`)
+      setNextUpdateVersion(updateVersion)
+    })()
   }, [])
 
   return (
@@ -299,32 +313,30 @@ export const Root = ({id}: {id: string}) => {
 
             <div className="flex items-center flex-wrap justify-center">
               <div>
-                <Button
+                {appUpdateInProgress ? <>
+                  <Button
                     variant="contained"
                     onClick={gatherAssets}
-                    disabled={
-                      !allFeaturesSupported 
-                      || showProgress
-                    }
-                >
-                    {buttonElement}
+                    disabled={true}
+                  >
+                    <span className='animate-spin'>
+                      <LoadingIcon/>
+                    </span>
                 </Button>
-              </div>
-
-              {updateAvailable ? <>
-                <div className="ml-3">
+                </> : <>
                   <Button
                       variant="contained"
-                      onClick={() => updateNowFn()}
-                      color="success"
+                      onClick={gatherAssets}
                       disabled={
-                        !checkedForUpdates
+                        !allFeaturesSupported 
+                        || showProgress
                       }
                   >
-                      Update
+                      {buttonElement}
                   </Button>
-                </div>
-              </> : <></>}
+                </>}
+                
+              </div>
             </div>
 
             {!allFeaturesSupported ? <>
@@ -333,7 +345,6 @@ export const Root = ({id}: {id: string}) => {
               />
             </> : <></>}
             
-
             <Collapse in={showProgress}>
                 <div className="mt-4 text-sm">
                   {progressMsg}
@@ -347,11 +358,20 @@ export const Root = ({id}: {id: string}) => {
             </Collapse>
 
             <div className="fixed z-10 text-xs bottom-2 left-2 text-gray-500">
-            <span className="mr-2 text-blue-400">
-                <VersionIcon/>
-            </span>
-            {"v0.1.0-beta.0"}
+              <span className="mr-2 text-blue-400">
+                  <VersionIcon/>
+              </span>
+              {currentAppVersion}
+              {appUpdateInProgress ? <>
+                <span className="ml-1 text-blue-500">
+                  {"=>"}
+                </span>
+                <span className="ml-1 text-green-700 animate-pulse">
+                  {nextUpdateVersion}
+                </span> 
+              </> : <></>}
             </div>
+            
         </div>
     </div>
   )

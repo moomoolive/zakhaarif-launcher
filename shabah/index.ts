@@ -236,10 +236,10 @@ export class Shabah {
         for (const prevCache of previousCaches) {
             caches.delete(prevCache)
         }
-        if (this.mode === "dev") {
-            console.info(log.name, "dev mode detected, purging current cache")
-            caches.delete(this.cacheName)
-        }
+        //if (this.mode === "dev") {
+        //    console.info(log.name, "dev mode detected, purging current cache")
+        //    caches.delete(this.cacheName)
+        //}
         this.loggingMode = loggingMode
         this.rootHtmlDoc = "<!DOCTYPE html>\n" + document.documentElement.outerHTML
         this.logger = {
