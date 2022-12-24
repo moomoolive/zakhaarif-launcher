@@ -2,8 +2,9 @@ import type {Mime} from "../miniMime/index"
 
 export type FileCache = {
     getFile: (url: string) => Promise<Response | void>,
-    putFile: (url: string, file: Response) => Promise<void>
+    putFile: (url: string, file: Response) => Promise<boolean>
     queryUsage: () => Promise<{quota: number, usage: number}>
+    deleteFile: (url: string) => Promise<boolean>
 }
 
 export const headers = (mimeType: Mime, contentLength: number) => ({
@@ -15,6 +16,30 @@ export const headers = (mimeType: Mime, contentLength: number) => ({
     "Cross-Origin-Embedder-Policy": "require-corp",
     "Cross-Origin-Opener-Policy": "same-origin"
 } as const)
+
+type DownloadState = {
+    id: string
+    downloaded: number
+    total: number
+    failed: boolean
+    finished: boolean
+    failureReason: string
+}
+
+type OnProgressFn = (values: DownloadState) => any
+
+export type DownloadManager = {
+    queueDownload: (
+        id: string, 
+        urls: string[], 
+        options: {downloadTotal: number, title?: string}
+    ) => Promise<boolean>,
+    addProgressListener: (id: string, callback: OnProgressFn) => Promise<boolean>
+    removeProgressListener: (id: string) => Promise<boolean>
+    getDownloadState: (id: string) => Promise<DownloadState | null>
+    cancelDownload: (id: string) => Promise<boolean>
+    currentDownloads: () => Promise<string[]>
+}
 
 const removeSlashAtEnd = (str: string) => str.endsWith("/") ? str.slice(0, -1) : str
 

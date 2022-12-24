@@ -40,6 +40,8 @@ export const makeFetchHandler = (options: FetchOptions) => {
     }
 }
 
+// the below types are an incomplete type implementation
+// of the background fetch api. link: https://developer.mozilla.org/en-US/docs/Web/API/Background_Fetch_API
 export type BackgroundFetchRecord = {
     readonly request: Request
     readonly responseReady: Promise<Response>
@@ -84,6 +86,16 @@ export type BackgroundFetchRegistration = {
     callback: (event: Event) => any
    ) => void
    onprogress: (event: Event) => any
+}
+
+export type BackgroundFetchManager = {
+    fetch: (
+        id: string, 
+        requests: string[], 
+        options?: Partial<{title: string, downloadTotal: number}>
+    ) => Promise<BackgroundFetchRegistration>
+    get: (id: string) => Promise<BackgroundFetchRegistration | undefined>
+    getIds: () => Promise<string[]>
 }
 
 export type BackgroundFetchUIEventCore = {

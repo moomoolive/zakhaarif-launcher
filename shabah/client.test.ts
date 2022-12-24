@@ -61,8 +61,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -83,8 +84,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -108,8 +110,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -134,8 +137,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -160,8 +164,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -188,8 +193,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
@@ -219,8 +225,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -269,8 +276,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBe(0)
@@ -322,8 +330,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
@@ -371,8 +380,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
@@ -409,8 +419,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -446,8 +457,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -484,8 +496,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -521,8 +534,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -558,8 +572,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -604,8 +619,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(
@@ -659,8 +675,9 @@ describe("diff cargos function", () => {
             }
         , fileFetcher, {
             getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => {},
-            queryUsage: async () => ({usage: 0, quota: 0})
+            putFile: async () => true,
+            queryUsage: async () => ({usage: 0, quota: 0}),
+            deleteFile: async () => true
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -682,8 +699,10 @@ const createFileCache = (initFiles: Record<string, Response>) => {
         getFile: async (url: string) => initFiles[url],
         putFile: async (url: string, file: Response) => { 
             initFiles[url] = file 
+            return true
         },
-        queryUsage: async () => ({usage: 0, quota: 0})
+        queryUsage: async () => ({usage: 0, quota: 0}),
+        deleteFile: async () => true
     }
     return cache
 }

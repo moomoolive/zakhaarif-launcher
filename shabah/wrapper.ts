@@ -18,7 +18,8 @@ import {
     getDownloadIndices,
     updateDownloadIndex,
     FileCache,
-    stringBytes
+    stringBytes,
+    DownloadManager
 } from "./shared"
 
 const enum bytes {
@@ -35,6 +36,7 @@ type ShabahOptions = {
     origin: string,
     fileCache: FileCache
     fetchFile: FetchFunction
+    downloadManager: DownloadManager
 }
 
 const roundDecimal = (num: number, decimals: number) => {
@@ -57,30 +59,34 @@ export class Shabah {
 
     fetchFile: FetchFunction
     fileCache: FileCache
-    queueUpdate: Function
+    downloadManager: DownloadManager
     readonly origin: string
 
     private cargoIndicesCache: null | CargoIndices
+    private downloadIndicesCache: null | DownloadIndexCollection
 
     constructor({
         fetchFile,
         fileCache,
+        downloadManager,
         origin
     }: ShabahOptions) {
         this.fetchFile = fetchFile
         this.fileCache = fileCache
-        this.queueUpdate = () => {
-            console.log("update queued")
-        }
+        this.downloadManager = downloadManager
         this.origin = origin.endsWith("/")
             ? origin.slice(0, -1)
             : origin
         this.cargoIndicesCache = null
+        this.downloadIndicesCache = null
     }
 
     async diskInfo() {
-        const diskusage = await this.fileCache.queryUsage()
-        const used = diskusage.usage
+        const [diskusage, downloadIndices] = await Promise.all([
+            this.fileCache.queryUsage(),
+            this.getDownloadIndices()
+        ] as const)
+        const used = diskusage.usage + downloadIndices.totalBytes
         const total = Math.max(
             diskusage.quota - SYSTEM_RESERVED_BYTES,
             0
@@ -149,9 +155,14 @@ export class Shabah {
     }
 
     private async getDownloadIndices() {
+        if (this.downloadIndicesCache) {
+            return this.downloadIndicesCache
+        }
         const {origin, fileCache} = this
         const url = downloadIncidesUrl(origin)
-        return await getDownloadIndices(url, fileCache)
+        const indices = await getDownloadIndices(url, fileCache)
+        this.downloadIndicesCache = indices
+        return indices
     }
 
     private async persistDownloadIndices(indices: DownloadIndexCollection) {
@@ -209,7 +220,10 @@ export class Shabah {
 
     async executeUpdates(
         details: UpdateDetails,
-        updateTitle: string
+        updateTitle: string,
+        {
+            removeExpiredFiles = true
+        } = {}
     ) {
         if (!details.updateAvailable) {
             return io.ok({
@@ -237,10 +251,11 @@ export class Shabah {
                 msg: "update is already in progress",
                 code: Shabah.statuses.sameUpdateInProgress
             })
-        }       
+        }
+        const updateBytes = details.updateCheckResponse.bytesToDownload
         const updateIndex = {
             id: details.id,
-            bytes: details.updateCheckResponse.totalBytes,
+            bytes: updateBytes,
             map: createResourceMap(
                 details.updateCheckResponse.downloadableResources
             ),
@@ -248,35 +263,53 @@ export class Shabah {
             previousVersion: details.versions.old,
             title: updateTitle
         }
+        const {fileCache, downloadManager} = this
         updateDownloadIndex(downloadsIndex, updateIndex)
-        this.queueUpdate()
-        await this.persistDownloadIndices(downloadsIndex)
-        // save cargo manifest
+        const requestUrls = details
+            .updateCheckResponse
+            .downloadableResources
+            .map((f) => f.requestUrl)
         const newCargo = details.updateCheckResponse.newCargo!
-        await this.fileCache.putFile(
-            newCargo.storageUrl, 
-            new Response(newCargo.text, {
-                status: 200,
-                statusText: "OK",
-                headers: headers(
-                    "application/json", 
-                    stringBytes(newCargo.text)
-                )
-            })
-        )
-        await this.putCargoIndex(
-            {
-                name: details.name,
-                id: details.id,
-                state: "updating",
-                version: details.versions.new,
-                entry: newCargo.parsed.entry,
-                bytes: details.updateCheckResponse.totalBytes,
-                storageRootUrl: details.storageUrl,
-                requestRootUrl: details.requestUrl
-            },
-            {persistChanges: true}
-        )
+        const expiredUrls = details
+            .updateCheckResponse
+            .resoucesToDelete
+            .map((f) => f.storageUrl)
+        const removalPromises = removeExpiredFiles
+            ? expiredUrls.map((url) => fileCache.deleteFile(url))
+            : []
+        await Promise.all([
+            downloadManager.queueDownload(
+                details.id,
+                requestUrls,
+                {title: updateTitle, downloadTotal: updateBytes}
+            ),
+            this.persistDownloadIndices(downloadsIndex),
+            fileCache.putFile(
+                newCargo.storageUrl, 
+                new Response(newCargo.text, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: headers(
+                        "application/json", 
+                        stringBytes(newCargo.text)
+                    )
+                })
+            ),
+            this.putCargoIndex(
+                {
+                    name: details.name,
+                    id: details.id,
+                    state: "updating",
+                    version: details.versions.new,
+                    entry: newCargo.parsed.entry,
+                    bytes: details.updateCheckResponse.totalBytes,
+                    storageRootUrl: details.storageUrl,
+                    requestRootUrl: details.requestUrl
+                },
+                {persistChanges: true}
+            ),
+            ...removalPromises
+        ] as const)
         return io.ok({
             msg: "update queued", 
             code: Shabah.statuses.updateQueued

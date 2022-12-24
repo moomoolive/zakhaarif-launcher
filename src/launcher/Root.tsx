@@ -112,7 +112,11 @@ let serviceWorkerRegistered = false
 
 const appPackageId = "std-pkg"
 
-import {webFetch, webCacheFileCache} from "../../shabah/webAdaptors"
+import {
+  webFetch, 
+  webCacheFileCache,
+  webBackgroundFetchDownloadManager
+} from "../../shabah/webAdaptors"
 
 export const Root = ({id}: {id: string}) => {
   const {
@@ -127,6 +131,7 @@ export const Root = ({id}: {id: string}) => {
   const [downloadClient] = useState(new Shabah({
     fetchFile: webFetch(),
     fileCache: webCacheFileCache(APP_CACHE),
+    downloadManager: webBackgroundFetchDownloadManager(),
     origin: location.origin
   }))
   const [downloadError, setDownloadError] = useState("")
@@ -210,7 +215,8 @@ export const Root = ({id}: {id: string}) => {
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueRes = await downloadClient.executeUpdates(
       res,
-      `game core v${res.versions.new}`
+      `game core v${res.versions.new}`,
+      {removeExpiredFiles: true}
     )
     console.log("update queue res", updateQueueRes)
     await sleep(3_000)
