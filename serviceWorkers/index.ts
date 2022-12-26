@@ -1,14 +1,15 @@
 import {APP_CACHE} from "../consts"
 import {OutMessageType, InboundMessageAction, InboundMessage} from "./types"
-import type {BackgroundFetchUIEventCore} from "./handlers"
+import type {BackgroundFetchUIEventCore, BackgroundFetchEvent} from "./handlers"
+import type {FileCache} from "../shabah/shared"
 
 type BackgroundFetchUIEvent = BackgroundFetchUIEventCore & Event
 
 type BackgroundFetchEvents = {
     "backgroundfetchsuccess": BackgroundFetchUIEvent
     "backgroundfetchfailure": BackgroundFetchUIEvent
-    "backgroundfetchabort": BackgroundFetchUIEvent
-    "backgroundfetchclick": BackgroundFetchUIEvent
+    "backgroundfetchabort": BackgroundFetchEvent
+    "backgroundfetchclick": BackgroundFetchEvent
 }
 
 type AllServiceWorkerEvents = (
@@ -18,6 +19,7 @@ type AllServiceWorkerEvents = (
 type ModifiedEvents = {
     addEventListener<K extends keyof AllServiceWorkerEvents>(type: K, listener: (this: ServiceWorkerGlobalScope, ev: AllServiceWorkerEvents[K]) => any, options?: boolean | AddEventListenerOptions): void
     removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void
+
 }
 
 const sw = globalThis.self as unknown as (
@@ -27,26 +29,25 @@ const sw = globalThis.self as unknown as (
 const ROOT_DOC = sw.location.origin + "/"
 const CONFIG_URL = ROOT_DOC + "__sw-config__.json"
 
-const config = {
+let config = {
+    version: 1,
     log: true,
     savedAt: -1
 }
 
-const CACHE = caches.open(APP_CACHE).then(async (cache) => {
+caches.open(APP_CACHE).then(async (cache) => {
     const file = await cache.match(CONFIG_URL)
     if (!file) {
-        persistConfig(Promise.resolve(cache))
-        return cache
+        return persistConfig()
     }
     const parsed = await file.json() as Partial<typeof config>
-    config.log = parsed.log ?? true
-    config.savedAt = parsed.savedAt || -1
-    return cache
+    config = {...config, ...parsed}
 })
 
-const persistConfig = async (cache: typeof CACHE) => {
+const persistConfig = async () => {
+    const cache = await caches.open(APP_CACHE)
     config.savedAt = Date.now()
-    return (await cache).put(
+    return cache.put(
         CONFIG_URL, 
         new Response(JSON.stringify(config), {
             status: 200,
@@ -65,51 +66,103 @@ const msgAll = async (type: OutMessageType, contents: string, id = "all") => {
 }
 
 const infoMsg = (msg: string, id = "all", forceMsg = false) => {
-    if (!config.log || forceMsg) {
+    if (config.log || forceMsg) {
         return msgAll("info", msg, id)
     }
 }
-const errorMsg = (msg: string, id = "all") => msgAll("error", msg, id)
 
 sw.oninstall = (event) => event.waitUntil(sw.skipWaiting())
 
 sw.onactivate = (event) => {
     event.waitUntil((async () => {
         await sw.clients.claim()
-        infoMsg("{📥 install} new script installed", "all", true)
-        infoMsg(`{🔥 activate} new script in control, started with args: silent_log=${config.log}`, "all", true)
+        console.info("{📥 install} new script installed")
+        console.info(`{🔥 activate} new script in control, started with config`, config)
     })())
 }
 
 import {makeFetchHandler} from "./handlers"
 
-sw.onfetch = makeFetchHandler({
-    cache: CACHE, 
-    rootDoc: ROOT_DOC,
-    fetchFile: fetch
-}) 
+const fileCache = {
+    getFile: async (url) => {
+        const cache = await caches.open(APP_CACHE)
+        return (await cache.match(url)) || null
+    },
+    putFile: async (url, file) => {
+        const cache = await caches.open(APP_CACHE)
+        await cache.put(url, file)
+        return true
+    },
+    // make later?
+    queryUsage: async () => ({quota: 0, usage: 0}),
+    deleteAllFiles: async () => true,
+    deleteFile: async () => true,
+} as FileCache
 
-import {makeBackgroundFetchSuccessHandler} from "./handlers"
+const logger = (...msgs: any[]) => {
+    if (config.log) {
+        console.info(...msgs)
+    }
+}
+
+const fetchHandler = makeFetchHandler({
+    cache: fileCache, 
+    rootDoc: ROOT_DOC,
+    fetchFile: fetch,
+    log: logger
+})
+
+sw.onfetch = (event) => event.respondWith(fetchHandler(event))
+
+import {makeBackgroundFetchHandler} from "./handlers"
+
+const bgFetchSuccessHandle = makeBackgroundFetchHandler({
+    origin: sw.location.origin,
+    fileCache,
+    log: logger,
+    type: "success"
+})
 
 sw.addEventListener<"backgroundfetchsuccess">(
     "backgroundfetchsuccess",
-    makeBackgroundFetchSuccessHandler({
-        origin: sw.location.origin,
-        fileCache: {
-            getFile: async url => (await CACHE).match(url),
-            putFile: async (url, file) => (await CACHE).put(url, file),
-            // make later?
-            queryUsage: async () => ({quota: 0, usage: 0})
-        }
-    })
+    (event) => event.waitUntil(bgFetchSuccessHandle(event))
+)
+
+sw.addEventListener(
+    "backgroundfetchclick", 
+    () => sw.clients.openWindow("/")
+)
+
+const bgFetchAbortHandle = makeBackgroundFetchHandler({
+    origin: sw.location.origin,
+    fileCache,
+    log: logger,
+    type: "abort"
+})
+
+sw.addEventListener<"backgroundfetchabort">(
+    "backgroundfetchabort",
+    (event) => event.waitUntil(bgFetchAbortHandle(event))
+)
+
+const bgFetchFailHandle = makeBackgroundFetchHandler({
+    origin: sw.location.origin,
+    fileCache,
+    log: logger,
+    type: "fail"
+})
+
+sw.addEventListener<"backgroundfetchfailure">(
+    "backgroundfetchfailure",
+    (event) => event.waitUntil(bgFetchFailHandle(event))
 )
 
 const swAction = {
     "config:silent_logs": () => {
-        config.log = true
+        config.log = false
     },
     "config:verbose_logs": () => {
-        config.log = false
+        config.log = true
     },
     "list:consts": (id: string) => {
         infoMsg(
@@ -134,19 +187,15 @@ const swAction = {
 } as const satisfies Record<InboundMessageAction, Function>
 
 
-sw.onmessage = async (msg) => {
-    const d = msg.data as InboundMessage
-    const id = (msg.source as Client).id
-    if (!swAction[d?.action]) {
-        errorMsg(
-            `received incorrectly encoded message ${msg.data}`,
-            id
-        )
-        return
+sw.onmessage = (event) => event.waitUntil((async () => {
+    const data = event.data as InboundMessage
+    const id = (event.source as Client).id
+    if (!swAction[data?.action]) {
+        return console.warn(`received incorrectly encoded message ${data} from client ${id}`)
     }
-    await swAction[d.action](id)
-    if (d.action.startsWith("config:")) {
-        persistConfig(CACHE)
-        infoMsg(`persisted new config @ ${CONFIG_URL}`)
+    await swAction[data.action](id)
+    if (data.action.startsWith("config:")) {
+        persistConfig()
+        console.info(`config changed, new config:`, config)
     }
-}
+})())

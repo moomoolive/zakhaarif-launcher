@@ -1,9 +1,9 @@
 import {useState, useEffect, lazy, Suspense} from 'react'
 import {
   createTheme,
-  ThemeProvider
+  ThemeProvider,
 } from "@mui/material"
-import {Root as LauncherRoot} from "./launcher/Root"
+import {LauncherRoot} from "./launcher/Root"
 import {Shabah} from "../shabah/index"
 import {APP_CACHE} from "../consts"
 import type {OutboundMessage as ServiceWorkerMessage} from "../serviceWorkers/types"
@@ -155,7 +155,7 @@ const  App = () => {
             </> : <></>}
 
             {showLauncher ? <>
-              <LauncherRoot id={"app-shell-launcher"}/>
+              <LauncherRoot id={"launcher-root"}/>
             </> : <>
             {((q: typeof firstQuery) => {
               const mode = q.mode || "default"

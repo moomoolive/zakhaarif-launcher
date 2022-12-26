@@ -11,7 +11,8 @@ import {urlToMime} from "../miniMime/index"
 import {
     FileCache, 
     FetchFunction,
-    stringBytes
+    stringBytes,
+    serviceWorkerPolicies,
 } from "./shared"
 
 
@@ -116,7 +117,8 @@ export const checkForUpdates = async (
         const newCargoFetch = await io.wrap(fetchFn(
             requestFileBase + MANIFEST_NAME, {
             method: "GET",
-            retryCount: 3
+            retryCount: 3,
+            headers: serviceWorkerPolicies.networkOnly
         }))
         if (!newCargoFetch.ok) {
             return errDownloadResponse(
@@ -185,11 +187,17 @@ export const checkForUpdates = async (
     const oldCargo = validateManifest(storedCargoJson)
 
     const newMiniCargoUrl = requestFileBase + MANIFEST_MINI_NAME
-    let newMiniCargoRes: ResultType<Response>
+    const newMiniCargoRes = await io.wrap(
+        fetchFn(newMiniCargoUrl, {
+            method: "GET", 
+            retryCount: 3, 
+            headers: serviceWorkerPolicies.networkOnly
+        })
+    )
     let newMiniCargoJson: ResultType<any>
     let newMiniCargoPkg: ValidatedMiniCargo
     if (
-        (newMiniCargoRes = await io.wrap(fetchFn(newMiniCargoUrl, {method: "GET", retryCount: 3}))).ok
+        newMiniCargoRes.ok
         && newMiniCargoRes.data.ok
         && (newMiniCargoJson = await io.wrap(newMiniCargoRes.data.json())).ok
         && (newMiniCargoPkg = validateMiniCargo(newMiniCargoJson.data)).errors.length < 1
@@ -201,7 +209,8 @@ export const checkForUpdates = async (
     const newCargoFetch = await io.wrap(fetchFn(
         requestFileBase + MANIFEST_NAME, {
             retryCount: 3,
-            method: "GET"        
+            method: "GET",
+            headers: serviceWorkerPolicies.networkOnly    
         }
     ))
     if (!newCargoFetch.ok) {
@@ -299,7 +308,9 @@ export const createResourceMap = (resources: RequestableResource[]) => {
         map[requestUrl] = {
             storageUrl,
             bytes,
-            mime: urlToMime(requestUrl) || "text/plain"
+            mime: urlToMime(requestUrl) || "text/plain",
+            status: 0,
+            statusText: ""
         }
     }
     return map

@@ -1,23 +1,36 @@
 import type {Mime} from "../miniMime/index"
 
 export type FileCache = {
-    getFile: (url: string) => Promise<Response | void>,
+    getFile: (url: string) => Promise<Response | null>
     putFile: (url: string, file: Response) => Promise<boolean>
     queryUsage: () => Promise<{quota: number, usage: number}>
     deleteFile: (url: string) => Promise<boolean>
+    deleteAllFiles: () => Promise<boolean>
 }
+
+export const serviceWorkerCacheHitHeader = {
+    key: "X-Cache-Hit",
+    value: "SW HIT"
+} as const
+
+export const serviceWorkerErrorCatchHeader = "Sw-Net-Err"
+
+export const serviceWorkerPolicyHeader = "Sw-Policy"
+
+export const serviceWorkerPolicies = {
+    networkOnly: {"Sw-Policy": "network-only"},
+    networkFirst: {"Sw-Policy": "network-first"},
+    cacheFirst: {"Sw-Policy": "cache-first"},
+} as const
 
 export const headers = (mimeType: Mime, contentLength: number) => ({
     "Last-Modified": new Date().toUTCString(),
     "Sw-Source": "shabah",
     "Content-Length": contentLength.toString(),
-    "Content-Type": mimeType,
-    "X-Cache-Hit": "SW HIT",
-    "Cross-Origin-Embedder-Policy": "require-corp",
-    "Cross-Origin-Opener-Policy": "same-origin"
+    "Content-Type": mimeType
 } as const)
 
-type DownloadState = {
+export type DownloadState = {
     id: string
     downloaded: number
     total: number
@@ -26,22 +39,18 @@ type DownloadState = {
     failureReason: string
 }
 
-type OnProgressFn = (values: DownloadState) => any
-
 export type DownloadManager = {
     queueDownload: (
         id: string, 
         urls: string[], 
         options: {downloadTotal: number, title?: string}
     ) => Promise<boolean>,
-    addProgressListener: (id: string, callback: OnProgressFn) => Promise<boolean>
-    removeProgressListener: (id: string) => Promise<boolean>
     getDownloadState: (id: string) => Promise<DownloadState | null>
     cancelDownload: (id: string) => Promise<boolean>
-    currentDownloads: () => Promise<string[]>
+    currentDownloadIds: () => Promise<string[]>
 }
 
-const removeSlashAtEnd = (str: string) => str.endsWith("/") ? str.slice(0, -1) : str
+export const removeSlashAtEnd = (str: string) => str.endsWith("/") ? str.slice(0, -1) : str
 
 export const downloadIncidesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__download-indices__.json`
 
@@ -51,11 +60,13 @@ export type ResourceMeta = {
     bytes: number,
     mime: Mime,
     storageUrl: string
+    status: number
+    statusText: string
 }
 
 export type ResourceMap = Record<string, ResourceMeta>
 
-type DownloadIndex = {
+export type DownloadIndex = {
     id: string
     map: ResourceMap
     title: string
@@ -63,11 +74,53 @@ type DownloadIndex = {
     bytes: number
     version: string
     previousVersion: string
+    storageRootUrl: string
+}
+
+export const operationCodes = {
+    updatedExisting: 0,
+    createdNew: 1,
+    notFound: 2,
+    removed: 3,
+    saved: 4,
+} as const
+
+const errDownloadIndexUrl = (storageRootUrl: string) => `${removeSlashAtEnd(storageRootUrl)}/__err-download-index__.json`
+
+const isRelativeUrl = (url: string) => !url.startsWith("http://") && !url.startsWith("https://")
+
+export const getErrorDownloadIndex = async (
+    storageRootUrl: string,
+    fileCache: FileCache
+) => {
+    const url = errDownloadIndexUrl(storageRootUrl)
+    const file = await fileCache.getFile(url)
+    if (!file) {
+        return null
+    }
+    const index = await file.json() as DownloadIndex
+    return {index, url}
+}
+
+export const saveErrorDownloadIndex = async (
+    storageRootUrl: string,
+    index: DownloadIndex,
+    fileCache: FileCache
+) => {
+    if (isRelativeUrl(storageRootUrl)) {
+        throw new Error("error download indices storage url must be a full url and not a relative one. Got " + storageRootUrl)
+    }
+    const url = errDownloadIndexUrl(storageRootUrl)
+    const text = JSON.stringify(index)
+    const response = new Response(text, {status: 200, statusText: "OK"})
+    await fileCache.putFile(url, response)
+    return operationCodes.saved
 }
 
 export const emptyDownloadIndex = () => ({
     downloads: [] as Array<DownloadIndex>,
     totalBytes: 0,
+    version: 1,
     updatedAt: Date.now(),
     createdAt: Date.now(),
     savedAt: Date.now(),
@@ -95,14 +148,6 @@ export const getDownloadIndices = async (
         return emptyDownloadIndex()
     }
 }
-
-export const operationCodes = {
-    updatedExisting: 0,
-    createdNew: 1,
-    notFound: 2,
-    removed: 3,
-    saved: 4,
-} as const
 
 export const updateDownloadIndex = (
     indices: DownloadIndexCollection,
@@ -176,7 +221,8 @@ export const emptyCargoIndices = () => ({
     cargos: [] as Array<CargoIndex>,
     updatedAt: Date.now(),
     createdAt: Date.now(),
-    savedAt: Date.now()
+    savedAt: Date.now(),
+    version: 1
 })
 
 export type CargoIndices = ReturnType<typeof emptyCargoIndices>

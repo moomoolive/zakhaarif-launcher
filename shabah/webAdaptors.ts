@@ -2,13 +2,15 @@ import type {FetchFunction, FileCache} from "./shared"
 import {io} from "../monads/result"
 
 export const webCacheFileCache = (cacheName: string) => {
-    const targetCache = caches.open(cacheName)
     return {
         getFile: async (url: string) => {
-            return (await targetCache).match(url)
+            const targetCache = await caches.open(cacheName)
+            const res = await targetCache.match(url)
+            return res || null
         },
         putFile: async (url: string, file: Response) => {
-            (await targetCache).put(url, file)
+            const targetCache = await caches.open(cacheName)
+            targetCache.put(url, file)
             return true
         },
         queryUsage: async () => {
@@ -16,9 +18,10 @@ export const webCacheFileCache = (cacheName: string) => {
             return {quota, usage}
         },
         deleteFile: async (url: string) => {
-            (await targetCache).delete(url)
-            return true
-        }
+            const targetCache = await caches.open(cacheName)
+            return targetCache.delete(url)
+        },
+        deleteAllFiles: async () => await caches.delete(cacheName)
     } as FileCache
 }
 
@@ -53,7 +56,6 @@ export const webBackgroundFetchDownloadManager = () => {
         ServiceWorkerRegistration 
         & BackgroundFetchExtension
     >
-    const emptyFn = () => {}
     return {
         queueDownload: async (id, urls, options) => {
             const sw = await serviceWorkerRegistration
@@ -61,35 +63,6 @@ export const webBackgroundFetchDownloadManager = () => {
                 id, urls, options
             )
             return registration.result !== "failure"
-        },
-        addProgressListener: async (id, callback) => {
-            const sw = await serviceWorkerRegistration
-            const registration = await sw.backgroundFetch.get(id)
-            if (!registration) {
-                return false
-            }
-            registration.addEventListener("progress", () => {
-                callback({
-                    id,
-                    downloaded: registration.downloaded,
-                    total: registration.downloadTotal,
-                    failed: registration.result === "failure",
-                    finished: registration.result === "success",
-                    failureReason: registration.failureReason
-                })
-            })
-            return true
-        },
-        removeProgressListener: async (id) => {
-            const sw = await serviceWorkerRegistration
-            const registration = await sw.backgroundFetch.get(id)
-            if (!registration) {
-                return false
-            }
-            // how do actually stop the listener
-            // doesn't seem to be anything in the spec
-            registration.addEventListener("progress", emptyFn)
-            return true
         },
         getDownloadState: async (id) => {
             const sw = await serviceWorkerRegistration
@@ -118,7 +91,7 @@ export const webBackgroundFetchDownloadManager = () => {
             }
             return await registration.abort()
         },
-        currentDownloads: async () => {
+        currentDownloadIds: async () => {
             const sw = await serviceWorkerRegistration
             return sw.backgroundFetch.getIds()
         }

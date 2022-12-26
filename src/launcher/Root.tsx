@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, ReactNode } from 'react'
 import {
   Button, 
   Menu,
@@ -13,10 +13,12 @@ import TerminalIcon from "@mui/icons-material/Terminal"
 import {useStoreContext} from "../store"
 import {isIframe} from "../lib/checks/index"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
-import {faTimes, faCheck} from "@fortawesome/free-solid-svg-icons"
+import {
+  faTimes, faCheck, faBox
+} from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import type {OutboundMessage as ServiceWorkerMessage} from "../../serviceWorkers/types"
-import {Shabah} from "../../shabah/wrapper"
+import {Shabah, roundDecimal, bytes} from "../../shabah/wrapper"
 import {APP_CACHE} from "../../consts"
 
 const enum log {
@@ -108,8 +110,6 @@ const UnsupportedFeatures = ({features}: {
   </>
 }
 
-let serviceWorkerRegistered = false
-
 const appPackageId = "std-pkg"
 
 import {
@@ -118,14 +118,42 @@ import {
   webBackgroundFetchDownloadManager
 } from "../../shabah/webAdaptors"
 
-export const Root = ({id}: {id: string}) => {
-  const {
-    launchApp,
-    setTerminalVisibility
-  } = useStoreContext()
+const toGigabytes = (number: number) => {
+  const decimal = number / bytes.bytes_per_gb
+  const rounded = roundDecimal(decimal, 1)
+  return Math.max(rounded, 0.1)
+}
+
+const toPercent = (fraction: number, decimals: number) => {
+  return roundDecimal(fraction * 100, decimals)
+}
+
+const progressIndicator = (downloaded: number, total: number) => {
+  return <div>
+    <div>Updating App...</div>
+      <div className="mt-1.5 flex items-center justify-center text-xs text-gray-400">
+        <div className="mr-2 text-blue-500 animate-bounce">
+          <FontAwesomeIcon
+            icon={faBox}
+          />
+        </div>
+        <div>
+          {toGigabytes(downloaded)} GB / {toGigabytes(total)} GB 
+        </div>
+        <div className="ml-2 text-blue-500">
+          <span></span>{`(${toPercent(downloaded / total, 1)}%)`}
+        </div>
+      </div>
+  </div>
+}
+
+const APP_TITLE = "Game Launcher"
+
+export const LauncherRoot = ({id}: {id: string}) => {
+  const {launchApp, setTerminalVisibility} = useStoreContext()
 
   const [showProgress, setShowProgress] = useState(false)
-  const [progressMsg, setProgressMsg] = useState("")
+  const [progressMsg, setProgressMsg] = useState<ReactNode>("")
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [supportedFeatures] = useState(featureCheck())
   const [downloadClient] = useState(new Shabah({
@@ -153,6 +181,27 @@ export const Root = ({id}: {id: string}) => {
 
   const closeSettings = () => setSettingsMenuElement(null)
 
+  const addProgressListener = () => {
+    downloadClient.addProgressListener(appPackageId, async (progress) => {
+      const {finished, installing, total, downloaded, failed} = progress
+      if (finished) {
+        setProgressMsg("Installing...")
+        document.title = "Installing..."
+        await sleep(2_000)
+        document.title = APP_TITLE
+        launchApp()
+      } else if (installing) {
+        setProgressMsg("Installing...")
+        document.title = "Installing..."
+      } else if (!failed) {
+        const percent = toPercent(downloaded / total, 1)
+        console.log("p", percent)
+        document.title = `(${percent}%) Updating...`
+        setProgressMsg(progressIndicator(downloaded, total))
+      }
+    })
+  }
+
   const gatherAssets = async () => {
     if (isIframe()) {
       return
@@ -176,9 +225,9 @@ export const Root = ({id}: {id: string}) => {
       id: appPackageId
     })
     await sleep(500)
+    
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
     
-    console.log(res)
     setCheckedForUpdates(true)
     if (previousVersionExists && !res.enoughSpaceForPackage) {
       const updateVersion = res.versions.new
@@ -215,18 +264,27 @@ export const Root = ({id}: {id: string}) => {
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueRes = await downloadClient.executeUpdates(
       res,
-      `game core v${res.versions.new}`,
-      {removeExpiredFiles: true}
+      `core v${res.versions.new}`,
     )
-    console.log("update queue res", updateQueueRes)
-    await sleep(3_000)
-    setProgressMsg("Updating App...")
+    
+    if (updateQueueRes.data.code !== Shabah.statuses.updateQueued) {
+      await sleep(2_000)
+      setShowProgress(false)
+      setDownloadError("Couldn't Queue Update")
+      setButtonElement(<>{"Retry"}</>)
+      return
+    }
+    await sleep(1_000)
+    setProgressMsg("Updating...")
+    document.title = "Updating..."
     setAppUpdateInProgress(true)
+    setCurrentAppVersion(res.versions.old)
     setNextUpdateVersion(res.versions.new)
+    addProgressListener()
   }
 
   useEffect(() => {
-    if (isIframe() || serviceWorkerRegistered) {
+    if (isIframe() || !allFeaturesSupported) {
       return
     }
     const swUrl = import.meta.env.DEV
@@ -248,29 +306,37 @@ export const Root = ({id}: {id: string}) => {
           console.warn("recieved message from service worker that is encoded incorrectly", msg.data)
       }
     }
-    serviceWorkerRegistered = true
   }, [])
 
   useEffect(() => {
     (async () => {
-      const [currentAppPkg, updateInfo] = await Promise.all([
-        downloadClient.getCargoMeta(appPackageId),
-        downloadClient.updateState(appPackageId)
-      ] as const)
-      const {updating, updateVersion, previousVersion} = updateInfo
-      if (!updating) {
-        setCurrentAppVersion(
-          currentAppPkg?.version
-          || Shabah.NO_PREVIOUS_INSTALLATION
-        )
+      const currentAppPkg = await downloadClient.getCargoMeta(appPackageId)
+      if (!currentAppPkg || currentAppPkg.state === "deleted") {
         return
       }
+      const {state} = currentAppPkg
+      if (state === "cached") {
+        return setCurrentAppVersion(currentAppPkg.version)
+      }
+      const updateInfo = await downloadClient.getDownloadState(appPackageId)
+      if (!updateInfo) {
+        return
+      }
+      const {previousVersion, version} = updateInfo
       setCurrentAppVersion(previousVersion)
+      setButtonElement(
+        <span className='animate-spin'>
+          <LoadingIcon/>
+        </span>
+      )
       setAppUpdateInProgress(true)
       setShowProgress(true)
-      setProgressMsg(`Updating App...`)
-      setNextUpdateVersion(updateVersion)
+      setProgressMsg(`Updating...`)
+      document.title = "Updating..."
+      setNextUpdateVersion(version)
+      addProgressListener()
     })()
+    return downloadClient.removeProgressListener(appPackageId)
   }, [])
 
   return (
@@ -317,31 +383,19 @@ export const Root = ({id}: {id: string}) => {
             </Menu>
             </div>
 
-            <div className="flex items-center flex-wrap justify-center">
+            <div className="flex w-screen items-center flex-wrap justify-center">
               <div>
-                {appUpdateInProgress ? <>
-                  <Button
-                    variant="contained"
-                    onClick={gatherAssets}
-                    disabled={true}
-                  >
-                    <span className='animate-spin'>
-                      <LoadingIcon/>
-                    </span>
-                </Button>
-                </> : <>
                   <Button
                       variant="contained"
                       onClick={gatherAssets}
                       disabled={
                         !allFeaturesSupported 
                         || showProgress
+                        || appUpdateInProgress
                       }
                   >
                       {buttonElement}
                   </Button>
-                </>}
-                
               </div>
             </div>
 
@@ -352,7 +406,7 @@ export const Root = ({id}: {id: string}) => {
             </> : <></>}
             
             <Collapse in={showProgress}>
-                <div className="mt-4 text-sm">
+                <div className="mt-4 w-4/5 mx-auto text-sm">
                   {progressMsg}
                 </div>
             </Collapse>

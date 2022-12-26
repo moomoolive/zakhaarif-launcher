@@ -63,7 +63,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -86,7 +87,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -112,7 +114,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -139,7 +142,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -166,7 +170,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -195,7 +200,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
@@ -227,7 +233,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -278,7 +285,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBe(0)
@@ -332,7 +340,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
@@ -382,7 +391,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
@@ -421,7 +431,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -459,7 +470,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -498,7 +510,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -536,7 +549,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -574,7 +588,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -621,7 +636,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(
@@ -677,7 +693,8 @@ describe("diff cargos function", () => {
             getFile: (url) => fileFetcher(url, {}),
             putFile: async () => true,
             queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true
+            deleteFile: async () => true,
+            deleteAllFiles: async () => true,
         })
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -702,7 +719,8 @@ const createFileCache = (initFiles: Record<string, Response>) => {
             return true
         },
         queryUsage: async () => ({usage: 0, quota: 0}),
-        deleteFile: async () => true
+        deleteFile: async () => true,
+        deleteAllFiles: async () => true
     }
     return cache
 }
@@ -724,7 +742,7 @@ describe("reading and writing to download index", () => {
         expect(index.downloads.length).toBe(0)
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.downloads.length).toBe(1)
         expect(res).toBe(operationCodes.createdNew)
@@ -737,7 +755,7 @@ describe("reading and writing to download index", () => {
         const bytes = 10
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.totalBytes).toBe(bytes)
         expect(index.downloads.length).toBe(1)
@@ -748,12 +766,12 @@ describe("reading and writing to download index", () => {
         const index = emptyDownloadIndex()
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.downloads.length).toBe(1)
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0"}
+            {id: "pkg", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0", storageRootUrl: ""}
         )
         expect(index.downloads.length).toBe(1)
         expect(index.downloads.find((d) => d.id === "pkg")?.bytes).toBe(1)
@@ -766,11 +784,11 @@ describe("reading and writing to download index", () => {
         const index = await getDownloadIndices(origin, fileCache)
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         const res = await saveDownloadIndices(index, origin, fileCache)
         expect(res).toBe(operationCodes.saved)
@@ -785,11 +803,11 @@ describe("reading and writing to download index", () => {
         const index = await getDownloadIndices(origin, fileCache)
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         const res = await saveDownloadIndices(index, origin, fileCache)
         expect(res).toBe(operationCodes.saved)
@@ -803,11 +821,11 @@ describe("reading and writing to download index", () => {
         expect(index.totalBytes).toBe(0)
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.totalBytes).toBe(70)
         const res = removeDownloadIndex(index, "pkg")
@@ -821,11 +839,11 @@ describe("reading and writing to download index", () => {
         expect(index.totalBytes).toBe(0)
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.totalBytes).toBe(70)
         const res = removeDownloadIndex(index, "random-pkg")
@@ -839,11 +857,11 @@ describe("reading and writing to download index", () => {
         expect(index.totalBytes).toBe(0)
         updateDownloadIndex(
             index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none"}
+            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", storageRootUrl: ""}
         )
         expect(index.totalBytes).toBe(70)
         const res = removeDownloadIndex(index, "random-pkg")
@@ -859,8 +877,6 @@ import {
     updateCargoIndex,
     saveCargoIndices,
 } from "./shared"
-import { json } from "stream/consumers"
-import { exec } from "child_process"
 
 describe("reading and writing to cargo indices", () => {
     it("should return empty cargo indices if one is not found", async () => {
@@ -992,5 +1008,61 @@ describe("reading and writing to cargo indices", () => {
         expect(res).toBe(operationCodes.saved)
         const indexAgain = await getCargoIndices(origin, fileCache)
         expect(JSON.stringify(indexAgain)).toEqual(JSON.stringify(index))
+    })
+})
+
+import {getErrorDownloadIndex, saveErrorDownloadIndex} from "./shared"
+
+describe("reading and writing error download indices", () => {
+    it("if error index doesn't exist return null", async () => {
+        const fileFetcher = createFileCache({})
+        const origin = "https://potato-house.com"
+        const storageRootUrl = `${origin}/potato/`
+        const res = await getErrorDownloadIndex(
+            storageRootUrl, fileFetcher
+        )
+        expect(res).toBe(null)
+    })
+
+    it("if error index exists, getting index should return a valid index", async () => {
+        const fileFetcher = createFileCache({})
+        const origin = "https://potato-house.com"
+        const storageRootUrl = `${origin}/potato/`
+        const index = {
+            id: "tmp",
+            map: {},
+            title: "none",
+            startedAt: Date.now(),
+            bytes: 0,
+            version: "0.1.0",
+            previousVersion: "0.1.0-beta",
+            storageRootUrl: "",
+        } as const
+        await saveErrorDownloadIndex(
+            storageRootUrl, index, fileFetcher
+        )
+        const res = await getErrorDownloadIndex(
+            storageRootUrl, fileFetcher
+        )
+        expect(res).not.toBe(null)
+    })
+
+    it("attempting to save an error download index with a relative url should throw an error", async () => {
+        const fileFetcher = createFileCache({})
+        const storageRootUrl = `/potato/`
+        const index = {
+            id: "tmp",
+            map: {},
+            title: "none",
+            startedAt: Date.now(),
+            bytes: 0,
+            version: "0.1.0",
+            previousVersion: "0.1.0-beta",
+            storageRootUrl: "",
+        } as const
+        
+        expect(async () => await saveErrorDownloadIndex(
+            storageRootUrl, index, fileFetcher
+        )).rejects.toThrow()
     })
 })

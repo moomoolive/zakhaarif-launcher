@@ -12,12 +12,14 @@ export const AppLaunch = () => {
     const navigate = useNavigate()
 
     useEffect(() => {
-        const id = setTimeout(() => navigate("/start"), 2_500)
-        return () => clearTimeout(id)
+        const navId = setTimeout(() => navigate("/start"), 2_500)
+        return () => clearTimeout(navId)
     }, [])
 
     return <>
-        <div className="relative text-center z-0 w-screen h-screen flex justify-center items-center">
+        <div 
+            className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
+        >
             <div className="w-full">
                 <div className="text-center text-gray-400 text-xl mb-5">
                     Made with
@@ -25,10 +27,10 @@ export const AppLaunch = () => {
 
                 <div className="flex items-center justify-center relative flex-wrap w-4/5 mx-auto">
                     {([
-                        {icon: faJs, className: "text-yellow-500"},
-                        {icon: faCss3, className: "text-blue-600"},
-                        {icon: faHtml5, className: "text-orange-500"},
-                        {icon: faReact, className: "text-blue-400"},
+                        {icon: faJs, className: "text-yellow-500 animate-bounce"},
+                        {icon: faCss3, className: "text-blue-600 animate-wiggle"},
+                        {icon: faHtml5, className: "text-orange-500 animate-pulse"},
+                        {icon: faReact, className: "text-blue-400 animate-spin-slow"},
                     ] as const).map(({icon, className}, i) => {
                         return <div
                             key={`icon-${i}`}

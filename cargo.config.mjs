@@ -5,6 +5,7 @@ export const config = {
     ignore: [
         "test-app", 
         "test-game",
+        "bg-fetch-test",
         "large-assets",
         "dev-sw.js",
         "sw.js",

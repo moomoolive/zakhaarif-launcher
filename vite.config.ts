@@ -13,11 +13,24 @@ const allowSharedArrayBuffer = () => ({
   }
 } as const) as PluginOption
 
+const logServerRequests = ({silent = false} = {}) => ({
+  name: "log server-requests",
+  configureServer: (server) => {
+    server.middlewares.use((req, _, next) => {
+      if (!silent) {
+        console.info(`[${req.method}] ${req.originalUrl}`)
+      }
+      next()
+    })
+  }
+} as const) as PluginOption
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    allowSharedArrayBuffer()
+    allowSharedArrayBuffer(),
+    logServerRequests({silent: true})
   ],
   build: {
     manifest: "build-manifest.json",

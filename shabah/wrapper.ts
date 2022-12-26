@@ -12,17 +12,17 @@ import {
     DownloadIndexCollection,
     saveDownloadIndices,
     headers,
-    downloadIncidesUrl, 
-    cargoIndicesUrl,
     FetchFunction,
     getDownloadIndices,
     updateDownloadIndex,
     FileCache,
     stringBytes,
-    DownloadManager
+    DownloadManager,
+    serviceWorkerPolicies,
+    DownloadState,
 } from "./shared"
 
-const enum bytes {
+export const enum bytes {
     bytes_per_kb = 1_024,
     bytes_per_mb = 1_000 * bytes_per_kb,
     bytes_per_gb = 1_000 * bytes_per_mb
@@ -39,22 +39,44 @@ type ShabahOptions = {
     downloadManager: DownloadManager
 }
 
-const roundDecimal = (num: number, decimals: number) => {
+export const roundDecimal = (num: number, decimals: number) => {
     const factor = 10 ** decimals
     return Math.round(num * factor) / factor
 }
 
 type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
 
+type ProgressIndicator = DownloadState & {
+    installing: boolean
+    ready: boolean
+}
+
+type onProgressCallback = (progress: ProgressIndicator) => any
+
+const INVALID_LISTENER_ID = -1
+
+const defaultDownloadState = (id: string) => ({
+    id,
+    downloaded: 0,
+    total: 0,
+    failed: false,
+    finished: false,
+    failureReason: "",
+    installing: false,
+    ready: false
+} as const)
+
 export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = "none"
+    static readonly POLICIES = {...serviceWorkerPolicies} as const
 
     static readonly statuses = {
         updateError: 0,
         updateNotEnoughDiskSpace: 1,
         updateNotAvailable: 2,
         updateQueued: 3,
-        sameUpdateInProgress: 4
+        sameUpdateInProgress: 4,
+        updateAlreadyQueue: 5,
     } as const
 
     fetchFile: FetchFunction
@@ -64,6 +86,11 @@ export class Shabah {
 
     private cargoIndicesCache: null | CargoIndices
     private downloadIndicesCache: null | DownloadIndexCollection
+    private progressListeners: Array<{
+        id: string
+        callback: onProgressCallback
+    }>
+    private progressListenerTimeoutId: string | number | NodeJS.Timeout
 
     constructor({
         fetchFile,
@@ -79,6 +106,8 @@ export class Shabah {
             : origin
         this.cargoIndicesCache = null
         this.downloadIndicesCache = null
+        this.progressListeners = []
+        this.progressListenerTimeoutId = INVALID_LISTENER_ID
     }
 
     async diskInfo() {
@@ -154,15 +183,18 @@ export class Shabah {
         }  
     }
 
+    private async refreshDownloadIndicies() {
+        const {origin, fileCache} = this
+        const indices = await getDownloadIndices(origin, fileCache)
+        this.downloadIndicesCache = indices
+        return indices
+    }
+
     private async getDownloadIndices() {
         if (this.downloadIndicesCache) {
             return this.downloadIndicesCache
         }
-        const {origin, fileCache} = this
-        const url = downloadIncidesUrl(origin)
-        const indices = await getDownloadIndices(url, fileCache)
-        this.downloadIndicesCache = indices
-        return indices
+        return this.refreshDownloadIndicies()
     }
 
     private async persistDownloadIndices(indices: DownloadIndexCollection) {
@@ -170,35 +202,30 @@ export class Shabah {
         return await saveDownloadIndices(indices, origin, fileCache)
     }
 
-    async updateState(updateId: string) {
+    async getDownloadState(updateId: string) {
         const downloadsIndex = await this.getDownloadIndices()
         const updateIndex = downloadsIndex.downloads.findIndex((index) => {
             return index.id === updateId
         })
         if (updateIndex < 0) {
-            return {
-                updating: false, 
-                updateVersion: "none",
-                previousVersion: "none"
-            }
+            return null
         }
         const targetUpdate =  downloadsIndex.downloads[updateIndex]
-        return {
-            updating: true,
-            updateVersion: targetUpdate.version,
-            previousVersion: targetUpdate.previousVersion
-        }
+        return {...targetUpdate}
+    }
+
+    private async refreshCargoIndices() {
+        const {origin, fileCache} = this
+        const cargos = await getCargoIndices(origin, fileCache)
+        this.cargoIndicesCache = cargos
+        return cargos
     }
 
     private async getCargoIndices() {
         if (this.cargoIndicesCache) {
             return this.cargoIndicesCache
         }
-        const {origin, fileCache} = this
-        const url = cargoIndicesUrl(origin)
-        const cargos = await getCargoIndices(url, fileCache)
-        this.cargoIndicesCache = cargos
-        return cargos
+        return this.refreshCargoIndices()
     }
 
     private async persistCargoIndices(indices: CargoIndices) {
@@ -221,9 +248,6 @@ export class Shabah {
     async executeUpdates(
         details: UpdateDetails,
         updateTitle: string,
-        {
-            removeExpiredFiles = true
-        } = {}
     ) {
         if (!details.updateAvailable) {
             return io.ok({
@@ -261,28 +285,13 @@ export class Shabah {
             ),
             version: details.versions.new,
             previousVersion: details.versions.old,
-            title: updateTitle
+            title: updateTitle,
+            storageRootUrl: details.storageUrl
         }
         const {fileCache, downloadManager} = this
         updateDownloadIndex(downloadsIndex, updateIndex)
-        const requestUrls = details
-            .updateCheckResponse
-            .downloadableResources
-            .map((f) => f.requestUrl)
         const newCargo = details.updateCheckResponse.newCargo!
-        const expiredUrls = details
-            .updateCheckResponse
-            .resoucesToDelete
-            .map((f) => f.storageUrl)
-        const removalPromises = removeExpiredFiles
-            ? expiredUrls.map((url) => fileCache.deleteFile(url))
-            : []
         await Promise.all([
-            downloadManager.queueDownload(
-                details.id,
-                requestUrls,
-                {title: updateTitle, downloadTotal: updateBytes}
-            ),
             this.persistDownloadIndices(downloadsIndex),
             fileCache.putFile(
                 newCargo.storageUrl, 
@@ -308,8 +317,17 @@ export class Shabah {
                 },
                 {persistChanges: true}
             ),
-            ...removalPromises
         ] as const)
+        const expiredUrls = details.updateCheckResponse.resoucesToDelete
+        await Promise.all(
+            expiredUrls.map(({storageUrl}) => fileCache.deleteFile(storageUrl))
+        )
+        const requestUrls = details.updateCheckResponse.downloadableResources
+        await downloadManager.queueDownload(
+            details.id,
+            requestUrls.map((f) => f.requestUrl),
+            {title: updateTitle, downloadTotal: updateBytes}
+        )
         return io.ok({
             msg: "update queued", 
             code: Shabah.statuses.updateQueued
@@ -323,5 +341,95 @@ export class Shabah {
             return null
         }
         return indices.cargos[index]
+    }
+
+    addProgressListener(
+        id: string, 
+        callback: onProgressCallback
+    ) {
+        const listenerIndex = this.progressListeners
+            .findIndex((listener) => listener.id === id)
+        const alreadyRegistered = listenerIndex > -1
+        if (alreadyRegistered) {
+            const target = this.progressListeners[listenerIndex]
+            target.callback = callback
+            return
+        }
+        this.progressListeners.push({id, callback})
+        const alreadySet = this.progressListenerTimeoutId !== INVALID_LISTENER_ID
+        if (alreadySet) {
+            return
+        }
+        const self = this
+        const globalListener = async () => {
+            const listeners = self.progressListeners
+            await Promise.all([
+                self.refreshCargoIndices(),
+                self.refreshDownloadIndicies()
+            ])
+            const KEEP_ON_QUEUE = -1
+            const indexesToRemove = await Promise.all(listeners.map(async (listener, index) => {
+                const {id, callback} = listener
+                const managerState = await self
+                    .downloadManager
+                    .getDownloadState(id)
+                const downloading = !!managerState
+                if (downloading) {
+                    callback({
+                        ...defaultDownloadState(id), 
+                        ...managerState
+                    })
+                    return KEEP_ON_QUEUE
+                }
+                const downloadIndex = await self
+                    .getDownloadState(id)
+                const installing = !!downloadIndex
+                if (installing) {
+                    callback({
+                        ...defaultDownloadState(id), 
+                        installing: true, 
+                        finished: true
+                    })
+                    return KEEP_ON_QUEUE
+                }
+
+                callback({
+                    ...defaultDownloadState(id), 
+                    finished: true, 
+                    ready: true
+                })
+                return index
+            }))
+            const validIndexes = indexesToRemove.filter((index) => index !== KEEP_ON_QUEUE)
+            
+            for (const index of validIndexes) {
+                listeners.splice(index, 1)
+            }
+
+            if (listeners.length < 1) {
+                clearInterval(self.progressListenerTimeoutId)
+                self.progressListenerTimeoutId = INVALID_LISTENER_ID
+            }
+        }
+        const pollingMilliseconds = 2_000
+        const listenerId = setInterval(
+            globalListener, pollingMilliseconds
+        )
+        this.progressListenerTimeoutId = listenerId
+    }
+
+    removeProgressListener(id: string) {
+        const listeners = this.progressListeners
+        const listenerIndex = listeners
+            .findIndex((listener) => listener.id === id)
+        const notFound = listenerIndex < 0
+        if (notFound) {
+            return
+        }
+        listeners.splice(listenerIndex, 1)
+        if (listeners.length < 1) {
+            clearInterval(this.progressListenerTimeoutId)
+            this.progressListenerTimeoutId = INVALID_LISTENER_ID
+        }
     }
 }

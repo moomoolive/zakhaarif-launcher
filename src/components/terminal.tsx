@@ -49,7 +49,9 @@ export const Terminal = ({engine} : {
                 return copy
             })
         })
-        setTerminalOutput([{type: "info", text: "Welcome back 😀"}])
+        setTerminalOutput([
+            {type: "info", text: "😀 Welcome! Press <span style='color: yellow;'>`</span> to toggle terminal at anytime."},
+        ])
         return () => engine.exit("Closing terminal session. Goodbye.")
     }, [])
 
