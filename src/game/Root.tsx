@@ -1,19 +1,13 @@
 import {main} from "./index"
 import {useEffect} from "react"
+import {isIframe} from "@/lib/checks/index"
+
+if (!isIframe()) {
+    throw new Error("game component must run in an iframe")
+}
 
 const gameCanvas = document.createElement("canvas")
 gameCanvas.setAttribute("id", "game-frame-canvas")
-
-/*
-{(() => {
-    try {
-        console.log("idb type", typeof window.indexedDB)
-        const db = window.indexedDB
-    } catch {
-        console.log("failed idb call")
-    }
-})()}
-*/
 
 let inited = false
 

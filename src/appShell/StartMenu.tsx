@@ -15,6 +15,14 @@ const StartMenu = () => {
                         Start Game
                     </Button>
                 </div>
+                <div>
+                    <Button
+                        color="info"
+                        onClick={() => navigate("/add-ons")}
+                    >
+                        {"Add-ons"}
+                    </Button>
+                </div>
             </div>
         </div>
     </>

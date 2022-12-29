@@ -1,4 +1,4 @@
-/** @type {import("./shabah/types").ShabahCliConfig} */
+/** @type {import("./src/lib/cargo/cliTypes").CargoCliConfig} */
 export const config = {
     generateMiniCargo: true,
     buildDir: "dist",

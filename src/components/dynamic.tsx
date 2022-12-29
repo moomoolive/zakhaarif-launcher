@@ -1,5 +1,12 @@
 import {lazy, Suspense} from "react"
 
-const Dynamic = () => {
-    
+export const lazyRoute = (
+    factory: () => Promise<{default: () => JSX.Element}>
+) => {
+    const Route = lazy(factory)
+    return (() => {
+        return <Suspense>
+            <Route/>
+        </Suspense>
+    })()
 }

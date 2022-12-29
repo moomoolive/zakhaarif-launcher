@@ -6,10 +6,13 @@ import {
 } from "react-router-dom"
 import {AppLaunch} from "./AppLaunch"
 import NotFound from "./NotFound"
-import {Suspense, lazy, useState, useEffect} from "react"
+import {useState, useEffect} from "react"
+import {lazyRoute} from "@/components/dynamic"
+import {isIframe} from "@/lib/checks"
 
-const StartMenu = lazy(() => import("./StartMenu"))
-const GameShell = lazy(() => import("./GameShell"))
+if (isIframe()) {
+    new Error("app-shell cannot run inside an iframe")
+}
 
 const fadeOut = "animate-fade-out"
 const fadeIn = "animate-fade-in"
@@ -39,8 +42,18 @@ const PageDisplay = () => {
         <Routes location={displayLocation}>
             <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<AppLaunch/>}/>
-            <Route path="/start" element={<Suspense><StartMenu/></Suspense>}/>
-            <Route path="/game" element={<Suspense><GameShell/></Suspense>}/>
+            <Route 
+                path="/start" 
+                element={lazyRoute(() => import("./StartMenu"))}
+            />
+            <Route 
+                path="/game" 
+                element={lazyRoute(() => import("./GameShell"))}
+            />
+            <Route 
+                path="/add-ons" 
+                element={lazyRoute(() => import("./Addons"))}
+            />
         </Routes>
     </div>
 }

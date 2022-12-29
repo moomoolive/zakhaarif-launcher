@@ -1,19 +1,25 @@
 "use strict";
 (() => {
-  // consts.ts
+  // src/config.ts
   var APP_CACHE = "app-v1";
 
-  // shabah/shared.ts
+  // src/lib/shabah/backend.ts
+  var rootDocumentFallBackUrl = (origin) => `${removeSlashAtEnd(origin)}/offline.html`;
   var serviceWorkerCacheHitHeader = {
     key: "X-Cache-Hit",
     value: "SW HIT"
   };
   var serviceWorkerErrorCatchHeader = "Sw-Net-Err";
   var serviceWorkerPolicyHeader = "Sw-Policy";
+  var NETWORK_FIRST_POLICY = 1;
+  var NETWORK_ONLY_POLICY = 2;
+  var CACHE_FIRST_POLICY = 3;
+  var CACHE_ONLY_POLICY = 4;
   var serviceWorkerPolicies = {
-    networkOnly: { "Sw-Policy": "network-only" },
-    networkFirst: { "Sw-Policy": "network-first" },
-    cacheFirst: { "Sw-Policy": "cache-first" }
+    networkOnly: { "Sw-Policy": NETWORK_ONLY_POLICY.toString() },
+    networkFirst: { "Sw-Policy": NETWORK_FIRST_POLICY.toString() },
+    cacheFirst: { "Sw-Policy": CACHE_FIRST_POLICY.toString() },
+    cacheOnly: { "Sw-Policy": CACHE_ONLY_POLICY.toString() }
   };
   var headers = (mimeType, contentLength) => ({
     "Last-Modified": new Date().toUTCString(),
@@ -24,6 +30,25 @@
   var removeSlashAtEnd = (str) => str.endsWith("/") ? str.slice(0, -1) : str;
   var downloadIncidesUrl = (origin) => `${removeSlashAtEnd(origin)}/__download-indices__.json`;
   var cargoIndicesUrl = (origin) => `${removeSlashAtEnd(origin)}/__cargo-indices__.json`;
+  var operationCodes = {
+    updatedExisting: 0,
+    createdNew: 1,
+    notFound: 2,
+    removed: 3,
+    saved: 4
+  };
+  var errDownloadIndexUrl = (storageRootUrl) => `${removeSlashAtEnd(storageRootUrl)}/__err-download-index__.json`;
+  var isRelativeUrl = (url) => !url.startsWith("http://") && !url.startsWith("https://");
+  var saveErrorDownloadIndex = async (storageRootUrl, index, fileCache2) => {
+    if (isRelativeUrl(storageRootUrl)) {
+      throw new Error("error download indices storage url must be a full url and not a relative one. Got " + storageRootUrl);
+    }
+    const url = errDownloadIndexUrl(storageRootUrl);
+    const text = JSON.stringify(index);
+    const response = new Response(text, { status: 200, statusText: "OK" });
+    await fileCache2.putFile(url, response);
+    return operationCodes.saved;
+  };
   var emptyDownloadIndex = () => ({
     downloads: [],
     totalBytes: 0,
@@ -43,13 +68,6 @@
     } catch {
       return emptyDownloadIndex();
     }
-  };
-  var operationCodes = {
-    updatedExisting: 0,
-    createdNew: 1,
-    notFound: 2,
-    removed: 3,
-    saved: 4
   };
   var removeDownloadIndex = (indices, targetId) => {
     const targetIndex = indices.downloads.findIndex((download) => download.id === targetId);
@@ -121,63 +139,18 @@
     return operationCodes.saved;
   };
 
-  // serviceWorkers/handlers.ts
-  var CACHE_HIT_HEADER = serviceWorkerCacheHitHeader.key;
-  var CACHE_HIT_VALUE = serviceWorkerCacheHitHeader.value;
-  var NETWORK_ONLY = serviceWorkerPolicies.networkOnly["Sw-Policy"];
-  var NETWORK_FIRST = serviceWorkerPolicies.networkFirst["Sw-Policy"];
-  var makeFetchHandler = (options) => {
-    const { rootDoc, cache, fetchFile, log } = options;
+  // src/lib/shabah/serviceWorker/backgroundFetchHandler.ts
+  var makeBackgroundFetchHandler = (options) => {
+    const { fileCache: fileCache2, origin, log, type: eventType } = options;
     return async (event) => {
-      const { request } = event;
-      const policy = request.headers.get(serviceWorkerPolicyHeader);
-      if (policy === NETWORK_ONLY) {
-        log(`incoming request (network-only): url=${event.request.url}`);
-        return fetchFile(request);
-      }
-      if (policy === NETWORK_FIRST || request.url === rootDoc) {
-        try {
-          const res = await fetchFile(event.request);
-          log(`incoming request (network-first): url=${event.request.url}, status=${res.status}`);
-          return res;
-        } catch (err) {
-          const cached2 = await cache.getFile(event.request.url);
-          const validCachedDoc = cached2 && cached2.ok;
-          log(`incoming request (network-first): url=${event.request.url}, network_err=true, cache_fallback=${validCachedDoc}`);
-          if (cached2 && cached2.ok) {
-            cached2.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
-            return cached2;
-          }
-          return new Response("", {
-            status: 500,
-            statusText: "Internal Server Error",
-            headers: {
-              [serviceWorkerErrorCatchHeader]: String(err) || "1"
-            }
-          });
-        }
-      }
-      const cached = await cache.getFile(event.request.url);
-      log(`incoming request (cache-first): url=${event.request.url}, cache_hit=${!!cached}, status=${cached?.status || "none"}`);
-      if (cached && cached.ok) {
-        cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
-        return cached;
-      }
-      return fetchFile(event.request);
-    };
-  };
-  var makeBackgroundFetchSuccessHandler = (options) => {
-    const { fileCache: fileCache2, origin, log } = options;
-    return async (event) => {
+      const eventName = `[\u{1F415}\u200D\u{1F9BA} bg-fetch ${eventType}]`;
       const bgfetch = event.registration;
-      log("bg-fetch registration:", bgfetch);
-      if (!bgfetch.recordsAvailable || bgfetch.result !== "success") {
-        return;
-      }
+      log(eventName, "registration:", bgfetch);
       const targetId = bgfetch.id;
       const fetchedResources = await bgfetch.matchAll();
       log(
-        "bg-fetch resources downloaded",
+        eventName,
+        "resources downloaded",
         fetchedResources.map((r) => r.request.url)
       );
       if (fetchedResources.length < 0) {
@@ -187,18 +160,30 @@
         getDownloadIndices(origin, fileCache2),
         getCargoIndices(origin, fileCache2)
       ]);
-      const downloadIndexPosition = downloadIndices.downloads.findIndex(({ id }) => id === targetId);
+      const downloadIndexPosition = downloadIndices.downloads.findIndex(({ id: id2 }) => id2 === targetId);
       const cargoIndexPosition = cargoIndices.cargos.findIndex((cargo) => cargo.id === targetId);
-      log(`bg-fetch found: cargo=${cargoIndexPosition > -1}, download=${downloadIndexPosition > -1}`);
+      log(
+        eventName,
+        `found: cargo=${cargoIndexPosition > -1}, download=${downloadIndexPosition > -1}`
+      );
       if (downloadIndexPosition < 0 || cargoIndexPosition < 0) {
         return;
       }
-      const { map: urlMap, title: updateTitle } = downloadIndices.downloads[downloadIndexPosition];
+      const targetDownloadIndex = downloadIndices.downloads[downloadIndexPosition];
+      const { map: urlMap, title: updateTitle, id } = targetDownloadIndex;
       const len = fetchedResources.length;
+      log(eventName, "processing download for pkg", id);
       const maxFileProcessed = 30;
       let start = 0;
       let end = Math.min(len, maxFileProcessed);
       let resourcesProcessed = 0;
+      let failedResources = 0;
+      const errorDownloadIndex = {
+        ...targetDownloadIndex,
+        map: {},
+        bytes: 0,
+        startedAt: Date.now()
+      };
       while (start < len) {
         const promises = [];
         for (let i = start; i < end; i++) {
@@ -214,10 +199,23 @@
             })(resource.request.url);
             const targetResource = urlMap[targetUrl];
             if (!targetResource) {
-              return log(`bg-fetch orphaned resource found url=${targetUrl}, couldn't map to resource`);
+              return log(
+                eventName,
+                `orphaned resource found url=${targetUrl}, couldn't map to resource`
+              );
             }
             resourcesProcessed++;
             const { storageUrl, bytes, mime } = targetResource;
+            if (!response.ok) {
+              errorDownloadIndex.map[targetUrl] = {
+                ...targetResource,
+                status: response.status,
+                statusText: response.statusText || "UNKNOWN STATUS"
+              };
+              failedResources++;
+              errorDownloadIndex.bytes += bytes;
+              return;
+            }
             const text = await response.text();
             return fileCache2.putFile(
               storageUrl,
@@ -233,29 +231,200 @@
         start += maxFileProcessed;
         end = Math.min(len, end + maxFileProcessed);
       }
-      log(`processed ${resourcesProcessed} out of ${len}. orphan_count=${len - resourcesProcessed}`);
+      log(
+        eventName,
+        `processed ${resourcesProcessed} out of ${len}. orphan_count=${len - resourcesProcessed}, fail_count=${failedResources}`
+      );
       removeDownloadIndex(downloadIndices, targetId);
       updateCargoIndex(cargoIndices, {
         ...cargoIndices.cargos[cargoIndexPosition],
-        state: "cached"
+        state: ((event2) => {
+          switch (event2) {
+            case "abort":
+              return "update-aborted";
+            case "fail":
+              return "update-failed";
+            case "success":
+            default:
+              return "cached";
+          }
+        })(eventType)
       });
       await Promise.all([
         saveCargoIndices(cargoIndices, origin, fileCache2),
         saveDownloadIndices(downloadIndices, origin, fileCache2)
       ]);
-      log("bg-fetch successfully persisted changes");
-      await event.updateUI({ title: `${updateTitle} finished!` });
+      if (eventType === "abort" || eventType === "fail") {
+        const { storageRootUrl } = targetDownloadIndex;
+        let targetUrl = storageRootUrl;
+        if (!targetUrl.startsWith("https://") && !targetUrl.startsWith("http://")) {
+          const base = removeSlashAtEnd(origin);
+          const extension = ((str) => {
+            if (str.startsWith("./")) {
+              return str.slice(2);
+            } else if (str.startsWith("/")) {
+              return str.slice(1);
+            } else {
+              return str;
+            }
+          })(targetUrl);
+          targetUrl = `${base}/${extension}`;
+          log(
+            eventName,
+            `detected storage root url as a relative url - full url is required. Adding origin to url original=${storageRootUrl}, new=${targetUrl}`
+          );
+        }
+        await saveErrorDownloadIndex(
+          targetUrl,
+          errorDownloadIndex,
+          fileCache2
+        );
+        log(eventName, "successfully saved error log");
+      }
+      log(eventName, "successfully persisted changes");
+      if ((eventType === "fail" || eventType === "success") && event.updateUI) {
+        const suffix = eventType === "fail" ? "failed" : "finished";
+        await event.updateUI({
+          title: `${updateTitle} ${suffix}!`
+        });
+      }
     };
+  };
+
+  // src/lib/shabah/serviceWorker/fetchHandler.ts
+  var CACHE_HIT_HEADER = serviceWorkerCacheHitHeader.key;
+  var CACHE_HIT_VALUE = serviceWorkerCacheHitHeader.value;
+  var CACHE_FIRST = serviceWorkerPolicies.cacheFirst["Sw-Policy"];
+  var errorResponse = (err) => new Response("", {
+    status: 500,
+    statusText: "Internal Server Error",
+    headers: {
+      [serviceWorkerErrorCatchHeader]: String(err) || "1"
+    }
+  });
+  var NOT_FOUND_RESPONSE = new Response("not in cache", {
+    status: 404,
+    statusText: "NOT FOUND"
+  });
+  var makeFetchHandler = (options) => {
+    const { origin, fileCache: fileCache2, fetchFile, log } = options;
+    const rootDoc = origin.endsWith("/") ? origin : origin + "/";
+    const rootDocFallback = rootDocumentFallBackUrl(origin);
+    return async (event) => {
+      const { request } = event;
+      const strippedQuery = request.url.split("?")[0];
+      const isRootDocument = strippedQuery === rootDoc;
+      if (isRootDocument) {
+        try {
+          const res = await fetchFile(request);
+          log(`requesting root document (network-first): url=${request.url}, status=${res.status}`);
+          return res;
+        } catch (err) {
+          const cached = await fileCache2.getFile(rootDocFallback);
+          log(`root doc request failed: fallback_url=${rootDocFallback}, network_err=true, status=${cached?.status || "none"}, status_text=${cached?.statusText || "none"}`);
+          if (cached && cached.ok) {
+            cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
+            return cached;
+          }
+          return errorResponse(err);
+        }
+      }
+      const isRootFallback = strippedQuery === rootDocFallback;
+      if (isRootFallback) {
+        const cached = await fileCache2.getFile(rootDocFallback);
+        log(`requesting root document fallback (cache-only): url=${request.url}, exists=${!!cached}, status=${cached?.status || "none"}`);
+        if (cached && cached.ok) {
+          cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
+          return cached;
+        }
+        return NOT_FOUND_RESPONSE;
+      }
+      const policyHeader = request.headers.get(serviceWorkerPolicyHeader) || CACHE_FIRST;
+      const policy = parseInt(policyHeader, 10);
+      switch (policy) {
+        case NETWORK_FIRST_POLICY: {
+          try {
+            const res = await fetchFile(request);
+            log(`incoming request (network-first): url=${request.url}, status=${res.status}`);
+            return res;
+          } catch (err) {
+            const cached = await fileCache2.getFile(request.url);
+            const validCachedDoc = cached && cached.ok;
+            log(`incoming request (network-first): url=${request.url}, network_err=true, cache_fallback=${validCachedDoc}`);
+            if (cached && cached.ok) {
+              cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
+              return cached;
+            }
+            return errorResponse(err);
+          }
+        }
+        case NETWORK_ONLY_POLICY: {
+          log(`incoming request (network-only): url=${event.request.url}`);
+          return fetchFile(request);
+        }
+        case CACHE_ONLY_POLICY: {
+          const cached = await fileCache2.getFile(request.url);
+          log(`incoming request (cache-only): url=${request.url}, found=${!!cached}, status=${cached?.status || "none"}`);
+          if (cached && cached.ok) {
+            cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
+            return cached;
+          }
+          return NOT_FOUND_RESPONSE;
+        }
+        case CACHE_FIRST_POLICY:
+        default: {
+          const cached = await fileCache2.getFile(request.url);
+          log(`incoming request (cache-first): url=${request.url}, cache_hit=${!!cached}, status=${cached?.status || "none"}`);
+          if (cached && cached.ok) {
+            cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE);
+            return cached;
+          }
+          return fetchFile(event.request);
+        }
+      }
+    };
+  };
+
+  // src/lib/shabah/adaptors/fileCache/webCache.ts
+  var webCacheFileCache = (cacheName) => {
+    const cache = {
+      getFile: async (url) => {
+        const targetCache = await caches.open(cacheName);
+        const res = await targetCache.match(url);
+        return res || null;
+      },
+      putFile: async (url, file) => {
+        const targetCache = await caches.open(cacheName);
+        await targetCache.put(url, file);
+        return true;
+      },
+      deleteFile: async (url) => {
+        const targetCache = await caches.open(cacheName);
+        return targetCache.delete(url);
+      },
+      listFiles: async () => {
+        const targetCache = await caches.open(cacheName);
+        return await targetCache.keys();
+      },
+      deleteAllFiles: async () => await caches.delete(cacheName),
+      queryUsage: async () => {
+        const { quota = 0, usage = 0 } = await navigator.storage.estimate();
+        return { quota, usage };
+      },
+      isPersisted: async () => await navigator.storage.persisted(),
+      requestPersistence: async () => await navigator.storage.persist()
+    };
+    return cache;
   };
 
   // serviceWorkers/index.ts
   var sw = globalThis.self;
-  var ROOT_DOC = sw.location.origin + "/";
-  var CONFIG_URL = ROOT_DOC + "__sw-config__.json";
+  var CONFIG_URL = `${sw.location.origin}/__sw-config__.json`;
   var config = {
     version: 1,
     log: true,
-    savedAt: -1
+    updatedAt: -1,
+    createdAt: Date.now()
   };
   caches.open(APP_CACHE).then(async (cache) => {
     const file = await cache.match(CONFIG_URL);
@@ -267,79 +436,55 @@
   });
   var persistConfig = async () => {
     const cache = await caches.open(APP_CACHE);
-    config.savedAt = Date.now();
+    config.updatedAt = Date.now();
     return cache.put(
       CONFIG_URL,
-      new Response(JSON.stringify(config), {
-        status: 200,
-        statusText: "OK"
-      })
+      new Response(JSON.stringify(config), { status: 200 })
     );
-  };
-  var msgAll = async (type, contents, id = "all") => {
-    const clients = id === "all" || !id ? await sw.clients.matchAll({}) : ((val) => !val ? [] : [val])(await sw.clients.get(id));
-    for (const client of clients) {
-      client.postMessage({ type, contents });
-    }
-  };
-  var infoMsg = (msg, id = "all", forceMsg = false) => {
-    if (config.log || forceMsg) {
-      return msgAll("info", msg, id);
-    }
   };
   sw.oninstall = (event) => event.waitUntil(sw.skipWaiting());
   sw.onactivate = (event) => {
     event.waitUntil((async () => {
       await sw.clients.claim();
-      console.info("{\u{1F4E5} install} new script installed");
-      console.info(`{\u{1F525} activate} new script in control, started with config`, config);
+      console.info("[\u{1F4E5} install] new service-worker installed");
+      console.info(`[\u{1F525} activate] new sevice worker in control, started with config`, config);
     })());
   };
-  var fileCache = {
-    getFile: async (url) => {
-      const cache = await caches.open(APP_CACHE);
-      return await cache.match(url) || null;
-    },
-    putFile: async (url, file) => {
-      const cache = await caches.open(APP_CACHE);
-      await cache.put(url, file);
-      return true;
-    },
-    queryUsage: async () => ({ quota: 0, usage: 0 }),
-    deleteAllFiles: async () => true,
-    deleteFile: async () => true
-  };
+  var fileCache = webCacheFileCache(APP_CACHE);
   var logger = (...msgs) => {
     if (config.log) {
       console.info(...msgs);
     }
   };
   var fetchHandler = makeFetchHandler({
-    cache: fileCache,
-    rootDoc: ROOT_DOC,
+    fileCache,
+    origin: sw.location.origin,
     fetchFile: fetch,
     log: logger
   });
   sw.onfetch = (event) => event.respondWith(fetchHandler(event));
-  var bgFetchSuccessHandle = makeBackgroundFetchSuccessHandler({
+  var bgFetchSuccessHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
     fileCache,
-    log: logger
+    log: logger,
+    type: "success"
   });
-  sw.addEventListener(
-    "backgroundfetchsuccess",
-    (event) => event.waitUntil(bgFetchSuccessHandle(event))
-  );
-  sw.addEventListener(
-    "backgroundfetchclick",
-    () => sw.clients.openWindow("/")
-  );
-  sw.addEventListener("backgroundfetchabort", () => {
-    infoMsg("bg fetch aborted");
+  sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event));
+  sw.onbackgroundfetchclick = () => sw.clients.openWindow("/");
+  var bgFetchAbortHandle = makeBackgroundFetchHandler({
+    origin: sw.location.origin,
+    fileCache,
+    log: logger,
+    type: "abort"
   });
-  sw.addEventListener("backgroundfetchfailure", () => {
-    infoMsg("bg fetch failed");
+  sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event));
+  var bgFetchFailHandle = makeBackgroundFetchHandler({
+    origin: sw.location.origin,
+    fileCache,
+    log: logger,
+    type: "fail"
   });
+  sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event));
   var swAction = {
     "config:silent_logs": () => {
       config.log = false;
@@ -347,26 +492,17 @@
     "config:verbose_logs": () => {
       config.log = true;
     },
-    "list:consts": (id) => {
-      infoMsg(
-        `listed constants: config_file_url=${CONFIG_URL}, ROOT_DOC=${ROOT_DOC}`,
-        id,
-        true
-      );
-    },
     "list:connected_clients": async (id) => {
       const clients = await sw.clients.matchAll();
-      infoMsg(
+      console.info(
         `connected clients (${clients.length}): ${clients.map((c) => {
           return `(id=${c.id || "unknown"}, url=${c.url}, type=${c.type})
 `;
-        }).join(",")}`,
-        id,
-        true
+        }).join(",")}`
       );
     },
     "list:config": (id) => {
-      infoMsg(`config: ${JSON.stringify(config)}`, id, true);
+      console.info("config:", config);
     }
   };
   sw.onmessage = (event) => event.waitUntil((async () => {

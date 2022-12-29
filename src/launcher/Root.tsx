@@ -8,51 +8,25 @@ import {
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
 import LoadingIcon from "@mui/icons-material/Loop"
-import VersionIcon from "@mui/icons-material/Source"
-import TerminalIcon from "@mui/icons-material/Terminal"
-import {useStoreContext} from "../store"
-import {isIframe} from "../lib/checks/index"
+import {isIframe} from "@/lib/checks/index"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
-  faTimes, faCheck, faBox
+  faTimes, faCheck, faBox, faCodeBranch,
+  faLink, faTerminal
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import type {OutboundMessage as ServiceWorkerMessage} from "../../serviceWorkers/types"
-import {Shabah, roundDecimal, bytes} from "../../shabah/wrapper"
-import {APP_CACHE} from "../../consts"
+import {BYTES_PER_GB} from "@/lib/consts/storage"
+import {Shabah} from "@/lib/shabah/wrapper"
+import {roundDecimal} from "@/lib/math/rounding"
+import {APP_CACHE} from "@/config"
+import {adaptors} from "@/lib/shabah/adaptors/web-preset"
+import {featureCheck} from "@/lib/checks/features"
 
-const enum log {
-  name = "[🚀 launcher]:"
+if (isIframe()) {
+  new Error("launcher cannot run inside of an iframe")
 }
 
 const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
-
-const featureCheck = () => {
-  if (isIframe()) {
-    const supported = false
-    return [
-      {name: "service-worker", supported},
-      {name: "background-fetch", supported},
-      {name: "storage-estimate", supported},
-      {name: "shared-array-buffer", supported},
-      {name: "multiple-cores", supported},
-      {name: "all-supported", supported},
-    ] as const
-  }
-  const sw = ('serviceWorker' in navigator)
-  const bgfetch = ("BackgroundFetchManager" in self)
-  const storageQuery = typeof navigator?.storage?.estimate !== "undefined"
-  const sharedBuffer = typeof SharedArrayBuffer !== "undefined"
-  const multipleCpuCores = navigator.hardwareConcurrency > 1
-  return [
-    {name: "service-worker", supported: sw},
-    {name: "background-fetch", supported: bgfetch},
-    {name: "storage-estimate", supported: storageQuery},
-    {name: "shared-array-buffer", supported: sharedBuffer},
-    {name: "multiple-cores", supported: multipleCpuCores},
-    {name: "all-supported", supported: sw && bgfetch && sharedBuffer && storageQuery && multipleCpuCores}
-  ] as const
-}
 
 const UnsupportedFeatures = ({features}: {
   features: {name: string, supported: boolean}[]
@@ -112,14 +86,8 @@ const UnsupportedFeatures = ({features}: {
 
 const appPackageId = "std-pkg"
 
-import {
-  webFetch, 
-  webCacheFileCache,
-  webBackgroundFetchDownloadManager
-} from "../../shabah/webAdaptors"
-
 const toGigabytes = (number: number) => {
-  const decimal = number / bytes.bytes_per_gb
+  const decimal = number / BYTES_PER_GB
   const rounded = roundDecimal(decimal, 1)
   return Math.max(rounded, 0.1)
 }
@@ -147,22 +115,46 @@ const progressIndicator = (downloaded: number, total: number) => {
   </div>
 }
 
-const APP_TITLE = "Game Launcher"
+type PwaInstallPrompt = {
+  prompt: () => void
+  userChoice: () => Promise<"accepted" | "dismissed">
+}
 
-export const LauncherRoot = ({id}: {id: string}) => {
-  const {launchApp, setTerminalVisibility} = useStoreContext()
+type PwaInstallEvent = Event & PwaInstallPrompt
+
+const APP_TITLE = "Game Launcher"
+let pwaInstallPrompt = null as null | PwaInstallEvent
+
+const createDownloadClient = () => {
+  const {fileCache, networkRequest, downloadManager} = adaptors(APP_CACHE)
+  const origin = location.origin
+  return new Shabah({
+    fileCache, 
+    downloadManager, 
+    origin,
+    networkRequest
+  })
+}
+
+export const LauncherRoot = ({
+  id,
+  globalState
+}: {
+  id: string
+  globalState: Readonly<{
+    launchApp: () => void
+    setTerminalVisibility: (visible: boolean) => void
+  }>
+}) => {
+  const {launchApp, setTerminalVisibility} = globalState
 
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState<ReactNode>("")
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [supportedFeatures] = useState(featureCheck())
-  const [downloadClient] = useState(new Shabah({
-    fetchFile: webFetch(),
-    fileCache: webCacheFileCache(APP_CACHE),
-    downloadManager: webBackgroundFetchDownloadManager(),
-    origin: location.origin
-  }))
+  const [downloadClient] = useState(createDownloadClient())
   const [downloadError, setDownloadError] = useState("")
+  const [previousUpdateFailed, setPreviousUpdateFailed] = useState(false)
   const [buttonElement, setButtonElement] = useState(<>
     {"start"}
   </>)
@@ -184,7 +176,16 @@ export const LauncherRoot = ({id}: {id: string}) => {
   const addProgressListener = () => {
     downloadClient.addProgressListener(appPackageId, async (progress) => {
       const {finished, installing, total, downloaded, failed} = progress
-      if (finished) {
+      if (failed) {
+        setShowProgress(false)
+        setAppUpdateInProgress(false)
+        setPreviousUpdateFailed(true)
+        setDownloadError("Update Failed...")
+        setButtonElement(<>{"Retry"}</>)
+        document.title = APP_TITLE
+        const meta = await downloadClient.getCargoMeta(appPackageId)
+        setCurrentAppVersion(meta?.version || Shabah.NO_PREVIOUS_INSTALLATION)
+      } else if (finished) {
         setProgressMsg("Installing...")
         document.title = "Installing..."
         await sleep(2_000)
@@ -193,7 +194,7 @@ export const LauncherRoot = ({id}: {id: string}) => {
       } else if (installing) {
         setProgressMsg("Installing...")
         document.title = "Installing..."
-      } else if (!failed) {
+      } else {
         const percent = toPercent(downloaded / total, 1)
         console.log("p", percent)
         document.title = `(${percent}%) Updating...`
@@ -218,13 +219,16 @@ export const LauncherRoot = ({id}: {id: string}) => {
     )
     setProgressMsg("Checking for Updates...")
     const root = location.origin + "/"
-    const res = await downloadClient.checkForCargoUpdates({
-      requestUrl: root,
-      storageUrl: root,
-      name: "std",
-      id: appPackageId
-    })
-    await sleep(500)
+    const [res] = await Promise.all([
+      downloadClient.checkForCargoUpdates({
+        requestUrl: root,
+        storageUrl: root,
+        name: "std",
+        id: appPackageId
+      }),
+      // should take at least 500ms
+      sleep(500),
+    ] as const)
     
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
     
@@ -257,17 +261,30 @@ export const LauncherRoot = ({id}: {id: string}) => {
       return
     }
 
+    if (!res.updateAvailable && previousUpdateFailed) {
+      setProgressMsg("Updating...")
+      document.title = "Updating..."
+      setAppUpdateInProgress(true)
+      addProgressListener()
+      await downloadClient.retryFailedDownload(appPackageId)
+      return
+    }
+
     if (!res.updateAvailable) {
       launchApp()
       return
     }
+    await downloadClient.cacheRootDocumentFallback({
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Opener-Policy": "same-origin"
+    })
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueRes = await downloadClient.executeUpdates(
       res,
       `core v${res.versions.new}`,
     )
     
-    if (updateQueueRes.data.code !== Shabah.statuses.updateQueued) {
+    if (updateQueueRes.data !== Shabah.STATUS.updateQueued) {
       await sleep(2_000)
       setShowProgress(false)
       setDownloadError("Couldn't Queue Update")
@@ -284,31 +301,6 @@ export const LauncherRoot = ({id}: {id: string}) => {
   }
 
   useEffect(() => {
-    if (isIframe() || !allFeaturesSupported) {
-      return
-    }
-    const swUrl = import.meta.env.DEV
-      ? "dev-sw.js"
-      : "sw.js"
-    navigator.serviceWorker.register(swUrl)
-    const prefix = "[👷 service-worker]: "
-    navigator.serviceWorker.onmessage = (msg) => {
-      const {type, contents} = msg.data as ServiceWorkerMessage
-      const contentsWithPrefix = prefix + contents
-      switch (type) {
-        case "error":
-          console.error(contentsWithPrefix)
-          break
-        case "info":
-          console.info(contentsWithPrefix)
-          break
-        default:
-          console.warn("recieved message from service worker that is encoded incorrectly", msg.data)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
     (async () => {
       const currentAppPkg = await downloadClient.getCargoMeta(appPackageId)
       if (!currentAppPkg || currentAppPkg.state === "deleted") {
@@ -316,7 +308,20 @@ export const LauncherRoot = ({id}: {id: string}) => {
       }
       const {state} = currentAppPkg
       if (state === "cached") {
-        return setCurrentAppVersion(currentAppPkg.version)
+        setCurrentAppVersion(currentAppPkg.version)
+        return 
+      }
+      if (state === "update-aborted" || state === "update-failed") {
+        setPreviousUpdateFailed(true)
+        setCurrentAppVersion(currentAppPkg.version)
+        if (state === "update-aborted") {
+          setDownloadError("Update Aborted...")
+          setButtonElement(<>{"Resume"}</>)
+        } else {
+          setDownloadError("Update Failed...")
+          setButtonElement(<>{"Retry"}</>)
+        }
+        return
       }
       const updateInfo = await downloadClient.getDownloadState(appPackageId)
       if (!updateInfo) {
@@ -346,41 +351,59 @@ export const LauncherRoot = ({id}: {id: string}) => {
     >
         <div className="relative z-0">
             <div className="fixed top-2 left-0">
-            <Tooltip title="Settings">
-                <Button
-                variant="text"
-                size="small"
-                onClick={(e) => {
-                    if (settingsMenuElement) {
-                    closeSettings()
-                    } else {
-                    setSettingsMenuElement(e.currentTarget)
-                    }
-                }}
-                >
-                <SettingsIcon/>
-                </Button>
-            </Tooltip>
+              <Tooltip title="Settings">
+                  <Button
+                  variant="text"
+                  size="small"
+                  onClick={(e) => {
+                      if (settingsMenuElement) {
+                      closeSettings()
+                      } else {
+                      setSettingsMenuElement(e.currentTarget)
+                      }
+                  }}
+                  >
+                  <SettingsIcon/>
+                  </Button>
+              </Tooltip>
 
-            <Menu
-                anchorEl={settingsMenuElement}
-                open={!!settingsMenuElement}
-                onClose={closeSettings}
-                className="text-xs"
-            >
-                <MenuItem 
-                className="text-xs"
-                onClick={() => {
-                    setTerminalVisibility(true)
-                    closeSettings()
-                }}
-                >
-                <span className="mr-2">
-                    <TerminalIcon/>
-                </span>
-                Terminal
-                </MenuItem>
-            </Menu>
+              <Menu
+                  anchorEl={settingsMenuElement}
+                  open={!!settingsMenuElement}
+                  onClose={closeSettings}
+                  className="text-xs"
+              >
+                  <MenuItem 
+                    onClick={() => {
+                        setTerminalVisibility(true)
+                        closeSettings()
+                    }}
+                  >
+                    <div className="text-sm hover:text-green-500">
+                      <span className="mr-2 text-xs">
+                          <FontAwesomeIcon
+                            icon={faTerminal}
+                          />
+                      </span>
+                      Terminal
+                    </div>
+                  </MenuItem>
+
+                  <MenuItem 
+                    onClick={() => {
+                        console.log("bookmark", pwaInstallPrompt)
+                    }}
+                  >
+                    <div className="text-sm hover:text-green-500">
+                      <span className="mr-2 text-xs">
+                          <FontAwesomeIcon
+                            icon={faLink}
+                          />
+                      </span>
+                      Create Desktop Link
+                    </div>
+                  </MenuItem>
+              </Menu>
             </div>
 
             <div className="flex w-screen items-center flex-wrap justify-center">
@@ -418,11 +441,13 @@ export const LauncherRoot = ({id}: {id: string}) => {
             </Collapse>
 
             <div className="fixed z-10 text-xs bottom-2 left-2 text-gray-500">
-              <span className="mr-2 text-blue-400">
-                  <VersionIcon/>
+              <span className={`mr-1.5 ${previousUpdateFailed ? "text-yellow-400" : "text-blue-400"}`}>
+                  <FontAwesomeIcon 
+                    icon={faCodeBranch}
+                  />
               </span>
               {currentAppVersion}
-              {appUpdateInProgress ? <>
+              {appUpdateInProgress && !previousUpdateFailed ? <>
                 <span className="ml-1 text-blue-500">
                   {"=>"}
                 </span>

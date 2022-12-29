@@ -1,38 +1,30 @@
-import {APP_CACHE} from "../consts"
-import {OutMessageType, InboundMessageAction, InboundMessage} from "./types"
-import type {BackgroundFetchUIEventCore, BackgroundFetchEvent} from "./handlers"
-import type {FileCache} from "../shabah/shared"
-
-type BackgroundFetchUIEvent = BackgroundFetchUIEventCore & Event
-
-type BackgroundFetchEvents = {
-    "backgroundfetchsuccess": BackgroundFetchUIEvent
-    "backgroundfetchfailure": BackgroundFetchUIEvent
-    "backgroundfetchabort": BackgroundFetchEvent
-    "backgroundfetchclick": BackgroundFetchEvent
-}
-
-type AllServiceWorkerEvents = (
-    ServiceWorkerGlobalScopeEventMap & BackgroundFetchEvents
-) 
-
-type ModifiedEvents = {
-    addEventListener<K extends keyof AllServiceWorkerEvents>(type: K, listener: (this: ServiceWorkerGlobalScope, ev: AllServiceWorkerEvents[K]) => any, options?: boolean | AddEventListenerOptions): void
-    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void
-
-}
+import {APP_CACHE} from "../src/config"
+import type {
+    InboundMessageAction, 
+    InboundMessage,
+    BackgroundFetchEventHandlerSetters
+} from "../src/lib/types/serviceWorkers"
+import { 
+    makeBackgroundFetchHandler
+} from "../src/lib/shabah/serviceWorker/backgroundFetchHandler"
+import {
+    makeFetchHandler, 
+} from "../src/lib/shabah/serviceWorker/fetchHandler"
+import {
+    webCacheFileCache
+} from "../src/lib/shabah/adaptors/fileCache/webCache"
 
 const sw = globalThis.self as unknown as (
-    ServiceWorkerGlobalScope & ModifiedEvents
+    ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
 )
 
-const ROOT_DOC = sw.location.origin + "/"
-const CONFIG_URL = ROOT_DOC + "__sw-config__.json"
+const CONFIG_URL =  `${sw.location.origin}/__sw-config__.json`
 
 let config = {
     version: 1,
     log: true,
-    savedAt: -1
+    updatedAt: -1,
+    createdAt: Date.now()
 }
 
 caches.open(APP_CACHE).then(async (cache) => {
@@ -46,58 +38,25 @@ caches.open(APP_CACHE).then(async (cache) => {
 
 const persistConfig = async () => {
     const cache = await caches.open(APP_CACHE)
-    config.savedAt = Date.now()
+    config.updatedAt = Date.now()
     return cache.put(
         CONFIG_URL, 
-        new Response(JSON.stringify(config), {
-            status: 200,
-            statusText: "OK"
-        })
+        new Response(JSON.stringify(config), {status: 200})
     )
 }
 
-const msgAll = async (type: OutMessageType, contents: string, id = "all") => {
-    const clients = id === "all" || !id
-        ? await sw.clients.matchAll({})
-        : (<T>(val: T) => !val ? [] : [val])(await sw.clients.get(id))
-    for (const client of clients) {
-        client.postMessage({type, contents})
-    }
-}
-
-const infoMsg = (msg: string, id = "all", forceMsg = false) => {
-    if (config.log || forceMsg) {
-        return msgAll("info", msg, id)
-    }
-}
 
 sw.oninstall = (event) => event.waitUntil(sw.skipWaiting())
 
 sw.onactivate = (event) => {
     event.waitUntil((async () => {
         await sw.clients.claim()
-        console.info("{📥 install} new script installed")
-        console.info(`{🔥 activate} new script in control, started with config`, config)
+        console.info("[📥 install] new service-worker installed")
+        console.info(`[🔥 activate] new sevice worker in control, started with config`, config)
     })())
 }
 
-import {makeFetchHandler} from "./handlers"
-
-const fileCache = {
-    getFile: async (url) => {
-        const cache = await caches.open(APP_CACHE)
-        return (await cache.match(url)) || null
-    },
-    putFile: async (url, file) => {
-        const cache = await caches.open(APP_CACHE)
-        await cache.put(url, file)
-        return true
-    },
-    // make later?
-    queryUsage: async () => ({quota: 0, usage: 0}),
-    deleteAllFiles: async () => true,
-    deleteFile: async () => true,
-} as FileCache
+const fileCache = webCacheFileCache(APP_CACHE)
 
 const logger = (...msgs: any[]) => {
     if (config.log) {
@@ -106,15 +65,13 @@ const logger = (...msgs: any[]) => {
 }
 
 const fetchHandler = makeFetchHandler({
-    cache: fileCache, 
-    rootDoc: ROOT_DOC,
+    fileCache, 
+    origin: sw.location.origin,
     fetchFile: fetch,
     log: logger
 })
 
 sw.onfetch = (event) => event.respondWith(fetchHandler(event))
-
-import {makeBackgroundFetchHandler} from "./handlers"
 
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
@@ -123,15 +80,9 @@ const bgFetchSuccessHandle = makeBackgroundFetchHandler({
     type: "success"
 })
 
-sw.addEventListener<"backgroundfetchsuccess">(
-    "backgroundfetchsuccess",
-    (event) => event.waitUntil(bgFetchSuccessHandle(event))
-)
+sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
 
-sw.addEventListener(
-    "backgroundfetchclick", 
-    () => sw.clients.openWindow("/")
-)
+sw.onbackgroundfetchclick = () => sw.clients.openWindow("/")
 
 const bgFetchAbortHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
@@ -140,10 +91,7 @@ const bgFetchAbortHandle = makeBackgroundFetchHandler({
     type: "abort"
 })
 
-sw.addEventListener<"backgroundfetchabort">(
-    "backgroundfetchabort",
-    (event) => event.waitUntil(bgFetchAbortHandle(event))
-)
+sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
 
 const bgFetchFailHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
@@ -152,10 +100,7 @@ const bgFetchFailHandle = makeBackgroundFetchHandler({
     type: "fail"
 })
 
-sw.addEventListener<"backgroundfetchfailure">(
-    "backgroundfetchfailure",
-    (event) => event.waitUntil(bgFetchFailHandle(event))
-)
+sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))
 
 const swAction = {
     "config:silent_logs": () => {
@@ -164,25 +109,16 @@ const swAction = {
     "config:verbose_logs": () => {
         config.log = true
     },
-    "list:consts": (id: string) => {
-        infoMsg(
-            `listed constants: config_file_url=${CONFIG_URL}, ROOT_DOC=${ROOT_DOC}`,
-            id,
-            true
-        )
-    },
     "list:connected_clients": async (id: string) => {
         const clients = await sw.clients.matchAll()
-        infoMsg(
+        console.info(
             `connected clients (${clients.length}): ${clients.map((c) => {
                 return `(id=${c.id || "unknown"}, url=${c.url}, type=${c.type})\n`
             }).join(",")}`,
-            id,
-            true
         )
     },
     "list:config": (id: string) => {
-        infoMsg(`config: ${JSON.stringify(config)}`, id, true)
+        console.info("config:", config)
     }
 } as const satisfies Record<InboundMessageAction, Function>
 

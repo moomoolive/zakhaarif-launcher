@@ -1,4 +1,4 @@
-import type {CommandCallback} from "../../terminalEngine/index"
+import type {CommandCallback} from "@/lib/terminalEngine/index"
 import type {SetStateAction} from "react"
 
 type TerminalDependencies = {
@@ -31,16 +31,16 @@ export const createCommands = ({
     }})
 
     commands.push({name: "list", fn: (out, {self}) => {
-        const allCommands = Object.keys(self.commands)
-        const cmdsHtml = allCommands.reduce((total, cmd) => {
-          return total + `<div style="margin-right: 1rem;">${cmd}</div>`
+        const allCommands = self.getAllCommands()
+        const cmdsHtml = allCommands.reduce((total, {name}) => {
+          return total + `<div style="margin-right: 1rem;">${name}</div>`
         }, "")
         out.info(`<div style="width: 100%;display: flex;flex-wrap: wrap;color: pink;">${cmdsHtml}</div>`)
     }})
 
     commands.push({name: "exit", fn: (out) => {
         out.info("goodbye")
-        setTimeout(() => setShowTerminal(false), 200)
+        setTimeout(() => setShowTerminal(false), 400)
     }})
 
     return commands

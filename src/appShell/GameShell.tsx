@@ -1,17 +1,23 @@
 import {useNavigate} from "react-router-dom"
-import {useState} from "react"
+import {useEffect, useState} from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button} from "@mui/material"
 
-console.log("from game shelll....")
-
-window.onmessage = (msg) => {
-    console.log(msg.data)
-}
+const rootDoc = import.meta.env.DEV
+    ? location.origin + "/"
+    : location.origin + "/offline.html"
 
 const GameShell = () => {
     const navigate = useNavigate()
+
+    useEffect(() => {
+        try {
+            
+        } catch {
+            console.error("sw access failed")
+        }
+    }, [])
 
     const [error, setError] = useState(false)
     return <div>
@@ -42,14 +48,18 @@ const GameShell = () => {
                 </div>
             </div>
         </> : <></>}
+
+        <div id="cool-div">
+
+        </div>
         
         <iframe 
             id="game-frame"
             className="fixed left-0 top-0 w-screen h-screen z-0"
-            src={`${location.origin}/?mode=game&sandbox=std`}
+            src={`${rootDoc}?mode=game&sandbox=std`}
             allowFullScreen
             name="game-frame"
-            sandbox="allow-orientation-lock allow-pointer-lock allow-scripts"
+            sandbox="allow-orientation-lock allow-pointer-lock allow-scripts allow-same-origin"
         />
     </div>
 }
