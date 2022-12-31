@@ -4,7 +4,7 @@ import {
   ThemeProvider,
 } from "@mui/material"
 import {LauncherRoot} from "./launcher/Root"
-import {TerminalEngine} from "./lib/terminalEngine/index"
+import {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
 import {isIframe} from "./lib/checks/index"
 import type {
   OutboundMessage as ServiceWorkerMessage
@@ -19,7 +19,7 @@ const terminalState = {
   onBackTick: () => {}
 }
 
-const ALL_APIS_SUPPORTED = featureCheck()[5].supported
+const ALL_APIS_SUPPORTED = featureCheck().every((feature) => feature.supported)
 
 const parseQuery = (query: string) => {
   const record = {} as Record<string, string>
@@ -88,20 +88,17 @@ const  App = () => {
     }
     window.addEventListener("keyup", callBack)
     
-    const t = terminalEngine
     {
     (async () => {
       const {createCommands} = await import("./lib/terminalCommands")
       const commands = createCommands({
         setShowTerminal, 
-        setShowLauncher
+        setShowLauncher,
+        source: "std"
       })
       for (let i = 0; i < commands.length; i++) {
-        const {name, fn} = commands[i]
-        t.addCommandFn(
-          name, 
-          fn, 
-          {source: "std"}
+        terminalEngine.addCommand(
+          commands[i] as CommandDefinition
         )
       }
     })()

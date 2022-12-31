@@ -62,7 +62,10 @@ const UnsupportedFeatures = ({features}: {
               className="text-sm mb-1"
             >
               <span className="mr-2">
-                {f.name}
+                {f.name
+                  .split("-")
+                  .map((str) => str[0].toUpperCase() + str.slice(1))
+                  .join(" ")}
               </span>
               {f.supported ? <span 
                 className="text-green-500"
@@ -169,7 +172,7 @@ export const LauncherRoot = ({
     currentAppVersion, 
     setCurrentAppVersion
   ] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
-  const allFeaturesSupported = supportedFeatures[5].supported
+  const allFeaturesSupported = supportedFeatures.every((feature) => feature.supported)
 
   const closeSettings = () => setSettingsMenuElement(null)
 

@@ -12,7 +12,10 @@
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --minify --outfile=./public/sw.js",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.js",
     "cargo-cli": "node ./src/lib/cargo/cli.mjs",
-    "check-types": "tsc"
+    "check-types": "tsc",
+    "compile-embedder-script": "esbuild ./src/lib/embedIframe/static/index.mjs --bundle --minify --outfile=./src/lib/embedIframe/index.compiled.js",
+    "embedder-build": "npm run compile-embedder-script",
+    "embedder-dev": "node ./src/lib/embedIframe/staticServer.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
@@ -30,7 +33,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.5",
-    "simplex-noise": "^4.0.1"
+    "simplex-noise": "^4.0.1",
+    "wasm-check": "^2.1.2"
   },
   "devDependencies": {
     "@types/node": "^18.11.10",
@@ -38,7 +42,10 @@
     "@types/react-dom": "^18.0.8",
     "@vitejs/plugin-react": "^2.2.0",
     "autoprefixer": "^10.4.13",
+    "clean-css": "^5.3.1",
+    "cors": "^2.8.5",
     "esbuild": "^0.15.17",
+    "express": "^4.18.2",
     "fast-png": "^6.1.0",
     "filehound": "^1.17.6",
     "nanoid": "^4.0.0",

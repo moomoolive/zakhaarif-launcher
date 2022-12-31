@@ -105,5 +105,4 @@ export type BackgroundFetchEventHandlerSetters = {
     onbackgroundfetchabort: (event: BackgroundFetchEvent & Event) => any
     onbackgroundfetchclick: (event: BackgroundFetchEvent & Event) => any
 }
-
 // background fetch types end

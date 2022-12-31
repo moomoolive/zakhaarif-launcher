@@ -9,10 +9,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Build Artifacts
+**/*.compiled.*
 node_modules
 dist
 dist-ssr
 *.local
+ dist-embedder
 
 # Editor directories and files
 .vscode/*
@@ -24,3 +27,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
