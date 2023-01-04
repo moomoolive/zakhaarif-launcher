@@ -353,7 +353,7 @@ export const LauncherRoot = ({
       className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
     >
         <div className="relative z-0">
-            <div className="fixed top-2 left-0">
+            <div id="launcher-menu" className="fixed top-2 left-0">
               <Tooltip title="Settings">
                   <Button
                   variant="text"

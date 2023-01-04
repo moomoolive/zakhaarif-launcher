@@ -1,14 +1,13 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {Collapse, Tooltip} from "@mui/material"
-import {useState, useEffect, ChangeEvent} from "react"
+import {useState, useEffect, ChangeEvent, useRef} from "react"
 import {
     TerminalEngine, 
     TerminalMsg,
     CommandsList,
-    ValidInputType,
-    InputDefinitionTokens
+    ValidInputType
 } from "@/lib/terminalEngine/index"
-import {faTerminal, faGhost, faTimes, faGamepad} from "@fortawesome/free-solid-svg-icons"
+import {faTerminal, faGhost, faTimes, faKeyboard, faQuestionCircle} from "@fortawesome/free-solid-svg-icons"
 import {useDebounce} from "@/lib/hooks/index"
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
@@ -19,13 +18,6 @@ const terminalFocus = () => {
         return
     }
     promptElement.focus()
-}
-
-const terminalState = {
-    execCommand: async () => {},
-    onArrowKey: (inc: number) => {},
-    onBackTick: () => {},
-    onTabClick: () => {}
 }
 
 type IntellisensePrediction = {
@@ -162,8 +154,6 @@ const Terminal = ({
     const [currentPath] = useState("~")
     const [machineName] = useState("terminal-std")
     const [promptText, setPromptText] = useState("")
-    const [commandHistory, setCommandHistory] = useState([] as string[])
-    const [historyCursor, setHistoryCursor] = useState(0)
     const [terminalOutput, setTerminalOutput] = useState([] as TerminalMsg[])
     const [showCommandPrompt, setShowCommandPrompt] = useState(true)
 
@@ -172,9 +162,19 @@ const Terminal = ({
     const [intellisensePrediction, setIntellisensePredictions] = useState(
         [] as IntellisensePrediction[]
     )
-    const [terminalCommands] = useState(
+
+    const {current: terminalCommands} = useRef(
         engine.getAllCommands()
     )
+    const {current: windowHooks} = useRef({
+        execCommand: async () => {},
+        onArrowKey: (inc: number) => {},
+        close: () => {},
+        onIntellisenseInteract: () => {}
+    })
+    const {current: commandHistory} = useRef([] as string[])
+    const historyCursorRef = useRef(0)
+    const {current: historyCursor} = historyCursorRef
     
     const chooseInputPrediction = (index: number) => {
         if (index < 0 || index >= intellisensePrediction.length) {
@@ -202,9 +202,22 @@ const Terminal = ({
             }
         })(prediction.dataType, prediction.name)
         text[text.length - 1] = predictedText
-        setPromptText(text.join(" "))
+        const resultText = text.join(" ")
+        setPromptText(resultText)
         setShowIntellisense(false)
         terminalFocus()
+        // string datatype
+        const element = document.getElementById("terminal-prompt")
+        if (prediction.dataType.startsWith("str") && element) {
+            // set cursor in middle of double quotes
+            // after promptText is set
+            setTimeout(() => {
+                const e = element as HTMLInputElement
+                const middleOfDoubleQuotes = resultText.length - 1
+                e.selectionStart = middleOfDoubleQuotes
+                e.selectionEnd = middleOfDoubleQuotes
+            }, 0)
+        }
     }
 
     const chooseCommandPrediction = (index: number) => {
@@ -220,37 +233,66 @@ const Terminal = ({
 
     useEffect(() => {
         engine.setStreamOutput((msg) => {
-            setTerminalOutput((out) => {
-                const continuePrevious = TerminalEngine.OUTPUT_TYPES.CONTINUE_STREAM
-                const copy = [...out]
-                if (msg.type === continuePrevious && copy.length > 0) {
-                    const copy = [...out]
-                    const last = copy.length - 1
-                    const {type, text: prevText} = copy[last]
-                    copy[last] = {
-                        type, 
-                        text: prevText + msg.text
+            const {append, remove, preappend, replace} = TerminalEngine.OUTPUT_TYPES
+            setTerminalOutput((allMsgs) => {
+                switch (msg.type) {
+                    case remove: {
+                        if (allMsgs.length < 1) {
+                            return allMsgs
+                        }
+                        const index = allMsgs.findIndex(({id}) => id === msg.id)
+                        if (index < 0) {
+                            return allMsgs
+                        }
+                        const copy = [...allMsgs]
+                        copy.splice(index, 1)
+                        return copy
                     }
-                    return copy
+                    case append:
+                    case preappend:
+                    case replace: {
+                        if (allMsgs.length < 1) {
+                            return allMsgs
+                        }
+                        const index = allMsgs.findIndex(({id}) => id === msg.id)
+                        if (index < 0) {
+                            return allMsgs
+                        }
+                        const copy = [...allMsgs]
+                        const target = copy[index]
+                        let newText = ""
+                        if (msg.type === append) {
+                            newText = target.text + msg.text
+                        } else if (msg.type === preappend) {
+                            newText = msg.text + target.text
+                        } else {
+                            newText = target.text
+                        }
+                        copy[index] = {...target, text: newText}
+                        return copy
+                    }
+                    default: {
+                        const copy = [...allMsgs, msg]
+                        if (copy.length > 19) {
+                            copy.shift()
+                        }
+                        return copy
+                    }
                 }
-                copy.push(msg)
-                if (copy.length > 19) {
-                    copy.shift()
-                }
-                return copy
             })
         })
         setTerminalOutput([
-            {
-                type: TerminalEngine.OUTPUT_TYPES.INFO, 
-                text: "<div class='mb-4'>😀 Welcome! Press <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>`</span> to toggle terminal or intellisense. For documentation type <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>help</span> directly after a command.</div>"
-            }
+            TerminalMsg.info(
+                "start-msg",
+                "<div class='mb-4'>😀 Welcome! Press <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>`</span> to toggle terminal or intellisense. For documentation type <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>help</span> directly after a command.</div>"
+            )
         ])
         terminalFocus()
         return () => engine.exit("Closing terminal session. Goodbye.")
     }, [])
 
-    terminalState.execCommand = async () => {
+    windowHooks.execCommand = async () => {
+        const cmd = promptText
         if (
             showIntellisense 
             && intellisensePrediction.length > 0
@@ -262,12 +304,12 @@ const Terminal = ({
             }
             return
         }
-        const cmd = promptText
+        
         const prevCommand = commandHistory.at(-1)
         if (prevCommand !== cmd) {
-            setCommandHistory((prev) => [...prev, cmd])
+            commandHistory.push(cmd)
         }
-        setHistoryCursor(0)
+        historyCursorRef.current = 0
         const text = promptText
         setPromptText("")
         setShowCommandPrompt(false)
@@ -275,7 +317,7 @@ const Terminal = ({
         setShowCommandPrompt(true)
     }
 
-    terminalState.onArrowKey = (n) => {
+    windowHooks.onArrowKey = (n) => {
         
         const element = document.getElementById("terminal-prompt")
         if (element) {
@@ -324,16 +366,16 @@ const Terminal = ({
         const inc = historyCursor + n
         if (inc > 0 || len + inc < 0) {
             return
-        } else if (inc === 0) {
-            setHistoryCursor(inc)
+        } 
+        historyCursorRef.current = inc
+        if (inc === 0) {
             setPromptText("")
             return
         }
-        setHistoryCursor(inc)
         setPromptText(commandHistory[commandHistory.length + inc])
     }
 
-    terminalState.onBackTick = () => {
+    windowHooks.close = () => {
         if (showIntellisense) {
             setShowIntellisense(false)
         } else {
@@ -341,10 +383,32 @@ const Terminal = ({
         }
     }
 
-    terminalState.onTabClick = () => {
-        if (!showIntellisense && intellisensePrediction.length > 0) {
+    windowHooks.onIntellisenseInteract = () => {
+        if (!showIntellisense) {
+            const prompt = promptText.trim()
+            if (prompt.length > 1) {
+                return
+            }
+            const allCommmands = terminalCommands.map((command, index) => {
+                const {name, source} = command
+                return {
+                    name, 
+                    source, 
+                    dataType: "none",
+                    category: "command",
+                    commandIndex: index
+                } as const
+            })
+            setIntellisensePredictions(allCommmands)
+            setShowIntellisense(true)
+            terminalFocus()
             return
         }
+        
+        if (intellisensePrediction.length < 1) {
+            return
+        }
+
         if (intellisensePrediction[0].category === "option") {
             chooseInputPrediction(predicitionIndex)
         } else {
@@ -356,19 +420,20 @@ const Terminal = ({
         const fn = async (e: KeyboardEvent) => {
             switch (e.key.toLowerCase()) {
                 case "enter":
-                    terminalState.execCommand()
+                    windowHooks.execCommand()
                     break
                 case "arrowup":
-                    terminalState.onArrowKey(-1)
+                    windowHooks.onArrowKey(-1)
                     break
                 case "arrowdown":
-                    terminalState.onArrowKey(1)
+                    windowHooks.onArrowKey(1)
                     break
                 case "`":
-                    terminalState.onBackTick()
+                case "escape":
+                    windowHooks.close()
                     break
                 case "tab":
-                    terminalState.onTabClick()
+                    windowHooks.onIntellisenseInteract()
                     break
             }
         }
@@ -390,7 +455,8 @@ const Terminal = ({
             })
             setPredictionIndex(0)
             const commandExists = commandIndex > -1
-            const commandAlreadyTyped = wordsSplit.length > 0 
+            const commandAlreadyTyped = wordsSplit.length > 0
+            const helpCommand = TerminalEngine.DOCUMENTATION_COMMAND
             if (
                 commandAlreadyTyped 
                 && commandExists 
@@ -398,20 +464,49 @@ const Terminal = ({
             ) {
                 const command = terminalCommands[commandIndex]
                 const {inputs} = command
-                const predictions = [] as IntellisensePrediction[]
+                const predictions = [
+                    {
+                        name: helpCommand,
+                        dataType: "bool",
+                        category: "option",
+                        source: "std",
+                        commandIndex
+                    } as const
+                ] as IntellisensePrediction[]
                 const existingInputs = inputToKeyValuePairs(prompt).map(({key}) => key)
+                let endOfRequiredArguments = 0
                 for (let i = 0; i < inputs.length; i++) {
                     const {name, type} = inputs[i]
                     if (existingInputs.includes(name)) {
                         continue
                     }
-                    predictions.push({
+                    const prediction = {
                         name,
                         dataType: type,
                         category: "option",
                         source: command.source,
                         commandIndex
-                    })
+                    } as const
+
+                    if (
+                        predictions.length < 1
+                        || type.endsWith("?") 
+                        || type === "bool"
+                    ) {
+                        predictions.push(prediction)
+                        continue
+                    }
+
+                    if (predictions.length < 2) {
+                        predictions.unshift(prediction)
+                        continue
+                    }
+
+                    const targetIndex = endOfRequiredArguments + 1
+                    const target = predictions[targetIndex]
+                    predictions[targetIndex] = prediction
+                    predictions.push(target)
+                    endOfRequiredArguments++
                 }
                 if (predictions.length > 0) {
                     setShowIntellisense(true)
@@ -446,6 +541,18 @@ const Terminal = ({
                             commandIndex: commandIndex
                         })
                     }
+                }
+                if (
+                    helpCommand.includes(latestWord) 
+                    && !existingInputs.includes(helpCommand)
+                ) {
+                    predictions.push({
+                        name: helpCommand,
+                        dataType: "bool",
+                        category: "option",
+                        source: "std",
+                        commandIndex
+                    } as const)
                 }
                 if (predictions.length > 0) {
                     setShowIntellisense(true)
@@ -530,9 +637,9 @@ const Terminal = ({
                         {[...terminalOutput].reverse().map((msg, i) => {
                             return <div 
                                 key={`terminal-msg-${i}`}
-                                className={`${msg.type === TerminalMsg.TYPES.ERROR ? "text-red-500" : ""} ${msg.type === TerminalMsg.TYPES.WARN ? "text-yellow-500" : ""}`}
+                                className={`${msg.type === TerminalMsg.TYPES.error ? "text-red-500" : ""} ${msg.type === TerminalMsg.TYPES.warn ? "text-yellow-500" : ""}`}
                                 dangerouslySetInnerHTML={{
-                                    __html: msg.type === TerminalMsg.TYPES.COMMAND
+                                    __html: msg.type === TerminalMsg.TYPES.command
                                         ? `<span class="mr-1"><span class="text-green-400">root</span><span class="mx-0.5">:</span><span class="text-blue-500">~/<span>$</span></span></span>${msg.text}`
                                         : msg.text
                                 }}
@@ -584,7 +691,7 @@ const Terminal = ({
                                                             {name}
                                                             {i === predicitionIndex ? <>
                                                                 <span className="ml-3 text-xs text-gray-400">
-                                                                {"(command)"}
+                                                                {"[command]"}
                                                                 </span>
                                                                 <span className="ml-2 text-xs text-gray-400">
                                                                     {`from`}
@@ -593,8 +700,11 @@ const Terminal = ({
                                                                     </span>
                                                                 </span>
                                                                 {terminalCommands[commandIndex].inputs.length ? <>
-                                                                    <span className="ml-2 text-xs text-green-500">
-                                                                        {terminalCommands[commandIndex].inputs.length} options
+                                                                    <span className="ml-2 text-xs text-yellow-500">
+                                                                        {terminalCommands[commandIndex]
+                                                                            .inputs
+                                                                            .filter((input) => input.type !== "bool" && !input.type.endsWith("?"))
+                                                                            .length} args
                                                                     </span>
                                                                 </> : <></>}
                                                             </> : <></>}
@@ -608,28 +718,35 @@ const Terminal = ({
                                                             id={`intellisense-prediction-${i}`}
                                                             data-class="prediction"
                                                         >
-                                                            <span className={`mr-2 text-xs ${dataType.endsWith("?") || dataType === "bool" ? "text-green-500" : "text-yellow-500"}`}>
-                                                                <FontAwesomeIcon 
-                                                                    icon={faGamepad}
-                                                                />
-                                                            </span>
+                                                            {name === "help" ? <>
+                                                                <span className={`mr-2 text-xs text-blue-500`}>
+                                                                    
+                                                                    <FontAwesomeIcon 
+                                                                        icon={faQuestionCircle}
+                                                                    />
+                                                                </span>
+                                                            </> : <>
+                                                                <span className={`mr-2 text-xs ${dataType.endsWith("?") || dataType === "bool" ? "text-green-500" : "text-yellow-500"}`}>
+                                                                    <FontAwesomeIcon 
+                                                                        icon={faKeyboard}
+                                                                    />
+                                                                </span>
+                                                            </>} 
                                                             {name}
                                                             {i === predicitionIndex ? <>
                                                                 <span className="ml-3 text-xs text-gray-400">
-                                                                {"(input)"}
+                                                                {"[argument]"}
                                                                 </span>
                                                                 <span className="ml-2 text-xs text-gray-400">
-                                                                {`${terminalCommands[commandIndex].name}.${name}${dataType.endsWith("?") ? "?" : ""}:`}
+                                                                {`${name === "help" ? "std" : terminalCommands[commandIndex].name}.${name}${dataType.endsWith("?") ? "?" : ""}:`}
                                                                 </span>
                                                                 <span className="ml-2 text-xs text-gray-400">
                                                                     {((type: typeof dataType) => {
                                                                         switch (type) {
                                                                             case "int?":
                                                                             case "int":
-                                                                                return "integer"
                                                                             case "float":
                                                                             case "float?":
-                                                                                return "float"
                                                                             case "num":
                                                                             case "num?":
                                                                                 return "number"
@@ -642,6 +759,7 @@ const Terminal = ({
                                                                                 return type
                                                                         }
                                                                     })(dataType)}
+                                                                    {dataType.startsWith("float") || dataType.startsWith("int") ? ` (${dataType.replace("?", "")})` : ""}
                                                                     {dataType.endsWith("?") || dataType === "bool" ? " | undefined" : ""}
                                                                 </span>
                                                                 <span className={`ml-2 text-xs ${dataType.endsWith("?") || dataType === "bool" ? "text-green-500" : "text-yellow-500"}`}>

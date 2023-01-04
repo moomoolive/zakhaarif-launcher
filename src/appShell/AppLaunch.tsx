@@ -34,11 +34,19 @@ export const AppLaunch = () => {
                     ] as const).map(({icon, className}, i) => {
                         return <div
                             key={`icon-${i}`}
-                            className={`${className} mr-8 text-5xl sm:text-6xl mb-4`}
+                            className={`${className} mr-8 text-6xl mb-4`}
                         >
                             <FontAwesomeIcon icon={icon}/>
                         </div>
                     })}
+                    <div>
+                        <img 
+                            src="babylon_logo_color.png"
+                            width={64}
+                            height={64}
+                            className="mb-3 animate-swing"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

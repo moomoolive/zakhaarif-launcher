@@ -2,24 +2,17 @@ import {type} from "@/lib/betterTypeof/index"
 import {Result} from "@/lib/monads/result"
 
 const messageTypes = {
-    INPUT: 0,
-    LOG: 1,
-    ERROR: 2,
-    WARN: 3,
-    COMMAND: 4,
-    INFO: 5,
-    CONTINUE_STREAM: 6
+    input: 0,
+    log: 1,
+    error: 2,
+    warn: 3,
+    command: 4,
+    info: 5,
+    append: 100,
+    preappend: 101,
+    replace: 102,
+    remove: 103
 } as const
-
-const {
-    ERROR, 
-    INFO, 
-    LOG, 
-    WARN, 
-    COMMAND, 
-    INPUT,
-    CONTINUE_STREAM
-} = messageTypes
 
 type MsgType = typeof messageTypes[keyof typeof messageTypes]
 
@@ -30,10 +23,23 @@ const defaultDocumentation = async () => {
 export class TerminalMsg {
     static readonly TYPES = messageTypes
 
+    static remove = (id: string) => new TerminalMsg(id, messageTypes.remove, "")
+    static replace = (id: string, msg: string) => new TerminalMsg(id, messageTypes.replace, msg)
+    static preappend = (id: string, msg: string) => new TerminalMsg(id, messageTypes.preappend, msg)
+    static append = (id: string, msg: string) => new TerminalMsg(id, messageTypes.append, msg)
+    static info = (id: string, msg: string) => new TerminalMsg(id, messageTypes.info, msg)
+    static command = (id: string, msg: string) => new TerminalMsg(id, messageTypes.command, msg)
+    static warn = (id: string, msg: string) => new TerminalMsg(id, messageTypes.warn, msg)
+    static error = (id: string, msg: string) => new TerminalMsg(id, messageTypes.error, msg)
+    static log = (id: string, msg: string) => new TerminalMsg(id, messageTypes.log, msg)
+    static input = (id: string, msg: string) => new TerminalMsg(id, messageTypes.input, msg)
+
     readonly type: MsgType
     readonly text: string
+    readonly id: string
 
-    constructor(type: MsgType, text: string) {
+    constructor(id: string, type: MsgType, text: string) {
+        this.id = id
         this.text = text
         this.type = type
     }
@@ -45,12 +51,14 @@ class OutputDevice {
         resolve: (value: string) => void,
         reject: (reason?: any) => void
     }
+    private idCount: number
 
     constructor(params: {
         onStream: OutputSteamCallback
     }) {
         this.onStream = params.onStream 
         this.inputPromise = null
+        this.idCount = 0
     }
 
     reset() {
@@ -62,32 +70,52 @@ class OutputDevice {
         this.inputPromise = null
     }
 
+    private generateId() {
+        return (this.idCount++).toString()
+    }
+
     error(text: string) {
-        this.onStream(new TerminalMsg(ERROR, text))
+        this.onStream(TerminalMsg.error(this.generateId(), text))
     }
 
     warn(text: string) {
-        this.onStream(new TerminalMsg(WARN, text))
+        this.onStream(TerminalMsg.warn(this.generateId(), text))
     }
 
     info(text: string) {
-        this.onStream(new TerminalMsg(INFO, text))
+        this.onStream(TerminalMsg.info(this.generateId(), text))
     }
 
     log(text: string) {
-        this.onStream(new TerminalMsg(LOG, text))
+        this.onStream(TerminalMsg.log(this.generateId(), text))
     }
 
     command(text: string) {
-        this.onStream(new TerminalMsg(COMMAND, text))
+        this.onStream(TerminalMsg.command(this.generateId(), text))
     }
 
-    continuePrevious(text: string) {
-        this.onStream(new TerminalMsg(CONTINUE_STREAM, text))
+    previousId() {
+        return (this.idCount - 1).toString()
+    }
+
+    append(id: string, text: string) {
+        this.onStream(TerminalMsg.append(id, text))
+    }
+
+    preappend(id: string, text: string) {
+        this.onStream(TerminalMsg.append(id, text))
+    }
+    
+    replace(id: string, text: string) {
+        this.onStream(TerminalMsg.append(id, text))
+    }
+
+    remove(id: string) {
+        this.onStream(TerminalMsg.remove(id))
     }
 
     inputResponse(text: string) {
-        this.onStream(new TerminalMsg(INPUT, text))
+        this.onStream(TerminalMsg.input(this.generateId(), text))
     }
 
     input(text: string) {
@@ -177,7 +205,12 @@ type CommandStatus = ExitStatus | void
 type CommandReturn = Promise<CommandStatus> | CommandStatus
 
 export type CommandCallback<Inputs extends CommandInputDefinition = {}> = (
-    output: OutputDevice, 
+    output: Pick<OutputDevice, (
+        "append" | "info" | "error"
+        | "log" | "input" | "warn"
+        | "preappend" | "replace"
+        | "previousId" | "remove"
+    )>, 
     args: CommandArgs<Inputs>
 ) => CommandReturn
 
@@ -199,10 +232,21 @@ type Command = {
     inputs: InputDefinitionTokens
 }
 
+type TerminalCommandsReference = ReadonlyArray<
+Readonly<{
+    name: string, 
+    source: string
+    inputs: ReadonlyArray<
+        Readonly<InputDefinitionTokens[number]>
+    >
+}>
+>
+
 type CommandArgs<Inputs extends CommandInputDefinition> = {
     rawInput: string
     completeCommand: string
-    terminal: Readonly<TerminalEngine>
+    allCommands: TerminalCommandsReference
+    exitCodes: typeof statusCodes
     parsedInputs: InputDefinitionsToInputs<Inputs>
     undefinedInputs: Map<string, string>
     command: Readonly<Command>
@@ -223,11 +267,12 @@ export type CommandsList = ReadonlyArray<
     Readonly<{name: string, source: string}>
 >
 
-export const isValidInputDefinition = (input: any) => {
+export const isValidInputDefinition = (input: unknown) => {
     if (type(input) !== "object") {
         return false
     }
-    const keys = Object.keys(input)
+    const definition = input as Record<string, unknown>
+    const keys = Object.keys(definition)
     if (keys.length < 1) {
         return true
     }
@@ -240,7 +285,7 @@ export const isValidInputDefinition = (input: any) => {
         ) {
             return false
         }
-        const type = input[keyName]
+        const type = definition[keyName]
         if (typeof type !== "string") {
             return false
         }
@@ -287,9 +332,10 @@ const containCommand = async <T extends CommandInputDefinition>(
 
 const getDocs: CommandCallback = async (output, {command}) => {
     output.info(`searching for "${command.name}" docs...`)
-    const milliseconds = 200
+    const milliseconds = 500
+    const targetMsgId = output.previousId()
     const listenerId = setInterval(() => {
-        output.continuePrevious(".")
+        output.append(targetMsgId, ".")
     }, milliseconds)
     const docs = await command.documentation()
     clearInterval(listenerId)
@@ -546,6 +592,7 @@ export const initCommand = <Input extends CommandInputDefinition>({
 } as const)
 
 const DOCUMENTATION_COMMAND = "help"
+const DOCUMENTATION_COMMAND_BOOL = "help=true"
 
 export class TerminalEngine {
     static readonly EXIT_CODES = statusCodes
@@ -583,15 +630,7 @@ export class TerminalEngine {
     }
 
     getAllCommands() {
-        return this.commandsList as ReadonlyArray<
-            Readonly<{
-                name: string, 
-                source: string
-                inputs: ReadonlyArray<
-                    Readonly<InputDefinitionTokens[number]>
-                >
-            }>
-        >
+        return this.commandsList as TerminalCommandsReference
     }
 
     statusCodes() {
@@ -683,12 +722,15 @@ export class TerminalEngine {
         const index = this.commandsIndex.get(cmdName)!
         const command = this.commandsList[index]
         const raw = trimmed.slice(firstSpace + 1)
-        const terminal = this
-        if (raw === DOCUMENTATION_COMMAND) {
+        if (
+            raw === DOCUMENTATION_COMMAND
+            || raw === DOCUMENTATION_COMMAND_BOOL
+        ) {
             return this.runCommandSafely(getDocs, {
                 rawInput: raw,
                 completeCommand: trimmed,
-                terminal,
+                allCommands: this.commandsList,
+                exitCodes: statusCodes,
                 parsedInputs: {},
                 undefinedInputs: new Map(),
                 command
@@ -704,7 +746,8 @@ export class TerminalEngine {
         return await this.runCommandSafely(fn, {
             rawInput: raw,
             completeCommand: trimmed,
-            terminal,
+            allCommands: this.commandsList,
+            exitCodes: statusCodes,
             parsedInputs: state,
             undefinedInputs,
             command

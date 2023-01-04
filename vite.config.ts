@@ -9,7 +9,7 @@ const allowSharedArrayBuffer = () => ({
     server.middlewares.use((_, res, next) => {
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp")
       res.setHeader("Cross-Origin-Opener-Policy", "same-origin")
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin")
+      res.setHeader("X-Frame-Options", "deny")
       next()
     })
   }
@@ -41,7 +41,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.join(path.resolve(__dirname), "src"),
-      "~": path.resolve(__dirname),
     }
   }
 })

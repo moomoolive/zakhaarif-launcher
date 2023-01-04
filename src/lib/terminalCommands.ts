@@ -44,20 +44,19 @@ export const createCommands = (deps: TerminalDependencies) => {
 
     const list = initCommand({
         name: "list",
-        fn: (out, {terminal}) => {
-            const allCommands = terminal.getAllCommands()
+        fn: (output, {allCommands}) => {
             const cmdsHtml = allCommands.reduce((total, {name}) => {
               return total + `<div style="margin-right: 1rem;">${name}</div>`
             }, "")
-            out.info(`<div style="width: 100%;display: flex;flex-wrap: wrap;color: pink;">${cmdsHtml}</div>`)
+            output.info(`<div style="width: 100%;display: flex;flex-wrap: wrap;color: pink;">${cmdsHtml}</div>`)
         },
         source
     })
 
     const exit = initCommand({
         name: "exit",
-        fn: (out) => {
-            out.info("goodbye")
+        fn: (output) => {
+            output.info("goodbye")
             setTimeout(() => setShowTerminal(false), 400)
         },
         source
@@ -65,17 +64,17 @@ export const createCommands = (deps: TerminalDependencies) => {
 
     const manyArg = initCommand({
         name: "server",
-        fn: (out, {parsedInputs}) => {
+        fn: (output, {parsedInputs}) => {
             const {
                 cors, disallow_cookies,
                 port, host
             } = parsedInputs
-            out.info(`starting server @${host || "http://localhost"}:${port || 8080}`)
+            output.info(`starting server @${host || "http://localhost"}:${port || 8080}`)
             if (cors) {
-                out.info("cors enabled!")
+                output.info("cors enabled!")
             }
             if (disallow_cookies) {
-                out.warn("cookies are disabled")
+                output.warn("cookies are disabled")
             }
         },
         inputs: {

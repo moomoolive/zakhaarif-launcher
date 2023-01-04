@@ -312,6 +312,7 @@
     const rootDocFallback = rootDocumentFallBackUrl(origin);
     return async (event) => {
       const { request } = event;
+      log(`incoming request (mode=${request.mode}) from: ${request.referrer}`);
       const strippedQuery = request.url.split("?")[0];
       const isRootDocument = strippedQuery === rootDoc;
       if (isRootDocument) {

@@ -22,7 +22,7 @@ describe("terminal can run synchronous like commands", () => {
         expect(code).toBe(statusCodes.ok)
         expect(!!lastestCommand).toBe(true)
         expect(lastestCommand?.text).toBe(`hello world`)
-        expect(lastestCommand?.type).toBe(TerminalMsg.TYPES.INFO)
+        expect(lastestCommand?.type).toBe(TerminalMsg.TYPES.info)
     })
 
     it("command should always be echoed back to host before execute command", async () => {
@@ -44,7 +44,7 @@ describe("terminal can run synchronous like commands", () => {
         expect(code).toBe(statusCodes.ok)
         expect(!!echoedCommand).toBe(true)
         expect(echoedCommand?.text).toBe(completeCommand)
-        expect(echoedCommand?.type).toBe(TerminalMsg.TYPES.COMMAND)
+        expect(echoedCommand?.type).toBe(TerminalMsg.TYPES.command)
     })
 
     it("terminal should return error code if command not found", async () => {
@@ -205,9 +205,9 @@ describe("terminal can run synchronous like commands", () => {
         const code = await commandPromise
         expect(code).toBe(statusCodes.ok)
         expect(inputResponseFromCommand).toBe(inputResponse)
-        expect(state.history.at(-1)?.type).toBe(TerminalMsg.TYPES.INFO)
+        expect(state.history.at(-1)?.type).toBe(TerminalMsg.TYPES.info)
         expect(state.history.at(-1)?.text).toBe(messageAfterInput)
-        expect(state.history.at(-2)?.type).toBe(TerminalMsg.TYPES.INPUT)
+        expect(state.history.at(-2)?.type).toBe(TerminalMsg.TYPES.input)
         expect(state.history.at(-2)?.text).toBe(inputResponse)
     })
 
@@ -732,7 +732,7 @@ describe("passing inputs to terminal", () => {
         })
         await terminal.execute(`cmd arg1="my string" num=10`)
         expect(
-            state.history.some((entry) => entry.type === TerminalMsg.TYPES.ERROR)
+            state.history.some((entry) => entry.type === TerminalMsg.TYPES.error)
         ).toBe(
             false
         )
@@ -767,7 +767,7 @@ describe("passing inputs to terminal", () => {
         expect(
             state.history.at(-1)?.type
         ).toBe(
-            TerminalEngine.OUTPUT_TYPES.ERROR
+            TerminalEngine.OUTPUT_TYPES.error
         )
         expect(
             state.history.some((entry) => entry.text === commandOutput)
@@ -795,6 +795,25 @@ describe("standard commands", () => {
         expect(state.history.at(-1)?.text).toBe(mydocs)
     })
 
+    it("typing 'help=true' after a command should stream documentation to host", async () => {
+        const state = {
+            history: [] as TerminalMsg[]
+        }
+        const terminal = new TerminalEngine({
+            onStreamOutput: (msg) => state.history.push(msg)
+        })
+        const mydocs = "my cool docs"
+        const cmdName = "cmd"
+        terminal.addCommand({
+            name: cmdName, 
+            fn: () => {}, 
+            source: "1",
+            documentation: async () => mydocs
+        })
+        await terminal.execute(`cmd help=true`)
+        expect(state.history.at(-1)?.text).toBe(mydocs)
+    })
+
     it("if doc command fails ioerror should be returned", async () => {
         const state = {
             history: [] as TerminalMsg[]
@@ -816,7 +835,7 @@ describe("standard commands", () => {
         const code = await terminal.execute(`cmd help`)
         expect(code).toBe(TerminalEngine.EXIT_CODES.ioError)
         expect(state.history.at(-1)?.type).toBe(
-            TerminalEngine.OUTPUT_TYPES.ERROR
+            TerminalEngine.OUTPUT_TYPES.error
         )
     })
 })
