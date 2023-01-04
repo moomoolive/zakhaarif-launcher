@@ -8,7 +8,8 @@ import {
     ValidInputType
 } from "@/lib/terminalEngine/index"
 import {faTerminal, faGhost, faTimes, faKeyboard, faQuestionCircle} from "@fortawesome/free-solid-svg-icons"
-import {useDebounce} from "@/lib/hooks/index"
+import {useDebounce} from "@/lib/hooks/debounce"
+import terminalLoadingElement from "@/components/loadingElements/terminal"
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 
@@ -141,13 +142,15 @@ const queryForCommand = (query: string, commands: CommandsList) => {
 const TERMINAL_CLIENT_NAME = "shabah"
 const MAX_PREDICTION_HEIGTH = 150
 
-const Terminal = ({
-    engine,
-    onClose
-} : {
+type TerminalCoreProps = {
     engine: TerminalEngine
     onClose: () => void
-}) => {
+}
+
+const TerminalCore = ({
+    engine,
+    onClose
+} : TerminalCoreProps) => {
     const intellisenseDebounce = useDebounce(50)
     
     const [user] = useState("root")
@@ -156,13 +159,11 @@ const Terminal = ({
     const [promptText, setPromptText] = useState("")
     const [terminalOutput, setTerminalOutput] = useState([] as TerminalMsg[])
     const [showCommandPrompt, setShowCommandPrompt] = useState(true)
-
     const [showIntellisense, setShowIntellisense] = useState(false)
     const [predicitionIndex, setPredictionIndex] = useState(0)
     const [intellisensePrediction, setIntellisensePredictions] = useState(
         [] as IntellisensePrediction[]
     )
-
     const {current: terminalCommands} = useRef(
         engine.getAllCommands()
     )
@@ -175,61 +176,31 @@ const Terminal = ({
     const {current: commandHistory} = useRef([] as string[])
     const historyCursorRef = useRef(0)
     const {current: historyCursor} = historyCursorRef
-    
-    const chooseInputPrediction = (index: number) => {
-        if (index < 0 || index >= intellisensePrediction.length) {
-            return
-        }
-        const prediction = intellisensePrediction[index]
-        const text = promptText.split(" ")
-        const predictedText = ((
-            type: typeof prediction.dataType,
-            fieldName: string
-        ) => {
-            switch (type) {
-                case "float":
-                case "float?":
-                case "num":
-                case "num?":
-                case "int":
-                case "int?":
-                    return `${fieldName}=`
-                case "str":
-                case "str?":
-                    return `${fieldName}=""`
-                default:
-                    return fieldName
-            }
-        })(prediction.dataType, prediction.name)
-        text[text.length - 1] = predictedText
-        const resultText = text.join(" ")
-        setPromptText(resultText)
-        setShowIntellisense(false)
-        terminalFocus()
-        // string datatype
-        const element = document.getElementById("terminal-prompt")
-        if (prediction.dataType.startsWith("str") && element) {
-            // set cursor in middle of double quotes
-            // after promptText is set
-            setTimeout(() => {
-                const e = element as HTMLInputElement
-                const middleOfDoubleQuotes = resultText.length - 1
-                e.selectionStart = middleOfDoubleQuotes
-                e.selectionEnd = middleOfDoubleQuotes
-            }, 0)
-        }
-    }
 
-    const chooseCommandPrediction = (index: number) => {
-        if (index < 0 || index >= intellisensePrediction.length) {
-            return
+    useEffect(() => {
+        const fn = async (e: KeyboardEvent) => {
+            switch (e.key.toLowerCase()) {
+                case "enter":
+                    windowHooks.execCommand()
+                    break
+                case "arrowup":
+                    windowHooks.onArrowKey(-1)
+                    break
+                case "arrowdown":
+                    windowHooks.onArrowKey(1)
+                    break
+                case "`":
+                case "escape":
+                    windowHooks.close()
+                    break
+                case "tab":
+                    windowHooks.onIntellisenseInteract()
+                    break
+            }
         }
-        setPromptText(
-            intellisensePrediction[index].name
-        )
-        setShowIntellisense(false)
-        terminalFocus()
-    }
+        window.addEventListener("keyup", fn)
+        return () => window.removeEventListener("keyup", fn)
+    }, [])
 
     useEffect(() => {
         engine.setStreamOutput((msg) => {
@@ -290,6 +261,61 @@ const Terminal = ({
         terminalFocus()
         return () => engine.exit("Closing terminal session. Goodbye.")
     }, [])
+    
+    const chooseInputPrediction = (index: number) => {
+        if (index < 0 || index >= intellisensePrediction.length) {
+            return
+        }
+        const prediction = intellisensePrediction[index]
+        const text = promptText.split(" ")
+        const predictedText = ((
+            type: typeof prediction.dataType,
+            fieldName: string
+        ) => {
+            switch (type) {
+                case "float":
+                case "float?":
+                case "num":
+                case "num?":
+                case "int":
+                case "int?":
+                    return `${fieldName}=`
+                case "str":
+                case "str?":
+                    return `${fieldName}=""`
+                default:
+                    return fieldName
+            }
+        })(prediction.dataType, prediction.name)
+        text[text.length - 1] = predictedText
+        const resultText = text.join(" ")
+        setPromptText(resultText)
+        setShowIntellisense(false)
+        terminalFocus()
+        // string datatype
+        const element = document.getElementById("terminal-prompt")
+        if (prediction.dataType.startsWith("str") && element) {
+            // set cursor in middle of double quotes
+            // after promptText is set
+            setTimeout(() => {
+                const e = element as HTMLInputElement
+                const middleOfDoubleQuotes = resultText.length - 1
+                e.selectionStart = middleOfDoubleQuotes
+                e.selectionEnd = middleOfDoubleQuotes
+            }, 0)
+        }
+    }
+
+    const chooseCommandPrediction = (index: number) => {
+        if (index < 0 || index >= intellisensePrediction.length) {
+            return
+        }
+        setPromptText(
+            intellisensePrediction[index].name
+        )
+        setShowIntellisense(false)
+        terminalFocus()
+    }
 
     windowHooks.execCommand = async () => {
         const cmd = promptText
@@ -415,32 +441,6 @@ const Terminal = ({
             chooseCommandPrediction(predicitionIndex)
         }
     }
-
-    useEffect(() => {
-        const fn = async (e: KeyboardEvent) => {
-            switch (e.key.toLowerCase()) {
-                case "enter":
-                    windowHooks.execCommand()
-                    break
-                case "arrowup":
-                    windowHooks.onArrowKey(-1)
-                    break
-                case "arrowdown":
-                    windowHooks.onArrowKey(1)
-                    break
-                case "`":
-                case "escape":
-                    windowHooks.close()
-                    break
-                case "tab":
-                    windowHooks.onIntellisenseInteract()
-                    break
-            }
-        }
-        window.addEventListener("keyup", fn)
-        return () => window.removeEventListener("keyup", fn)
-    }, [])
-
 
     const makeIntellisensePredicition = (prompt: string) => {
         setIntellisensePredictions([])
@@ -789,4 +789,14 @@ const Terminal = ({
     </>
 }
 
-export default Terminal
+type TerminalProps = (Omit<TerminalCoreProps, "engine"> & {
+    engine: TerminalEngine | null
+})
+
+export const Terminal = (props: TerminalProps) => {
+    const {engine} = props
+    if (!engine) {
+        return terminalLoadingElement
+    }
+    return <TerminalCore {...props} engine={engine}/>
+}

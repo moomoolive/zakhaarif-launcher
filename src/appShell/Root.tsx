@@ -7,12 +7,32 @@ import {
 import {AppLaunch} from "./AppLaunch"
 import NotFound from "./NotFound"
 import {useState, useEffect} from "react"
-import {lazyRoute} from "@/components/dynamic"
+import {
+    lazyComponent, 
+    LazyComponentOptions,
+    LazyComponent
+} from "@/components/lazy"
 import {isIframe} from "@/lib/checks"
 
 if (isIframe()) {
     new Error("app-shell cannot run inside an iframe")
 }
+
+type LazyRoute<T> = () => Promise<{ default: LazyComponent<T> }>
+
+export function lazyRoute<T>(
+    loader: LazyRoute<T>,
+    options: LazyComponentOptions = {}
+) {
+    return lazyComponent(
+        async () => (await loader()).default, 
+        options
+    )
+}
+
+const StartMenu = lazyRoute(() => import("./StartMenu"))
+const GameShell = lazyRoute(() => import("./GameShell"))
+const Addons = lazyRoute(() => import("./Addons"))
 
 const fadeOut = "animate-fade-out"
 const fadeIn = "animate-fade-in"
@@ -42,23 +62,14 @@ const PageDisplay = () => {
         <Routes location={displayLocation}>
             <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<AppLaunch/>}/>
-            <Route 
-                path="/start" 
-                element={lazyRoute(() => import("./StartMenu"))}
-            />
-            <Route 
-                path="/game" 
-                element={lazyRoute(() => import("./GameShell"))}
-            />
-            <Route 
-                path="/add-ons" 
-                element={lazyRoute(() => import("./Addons"))}
-            />
+            <Route path="/start" element={<StartMenu/>}/>
+            <Route path="/game" element={<GameShell/>}/>
+            <Route path="/add-ons" element={<Addons/>}/>
         </Routes>
     </div>
 }
 
-const AppShellRoot = ({id}: {id: string}) => {
+export const AppShellRoot = ({id}: {id: string}) => {
     return <div id={id}>
         <BrowserRouter>
             <div id="viewing-page">
@@ -67,5 +78,3 @@ const AppShellRoot = ({id}: {id: string}) => {
         </BrowserRouter>
     </div>
 }
-
-export default AppShellRoot

@@ -42,7 +42,9 @@ const GameShell = () => {
         </> : <></>}
 
         <div id="cool-div">
-            
+            <iframe
+                src={`${rootDoc}?mode=game`}
+            />
         </div>
     </div>
 }

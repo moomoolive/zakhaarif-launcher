@@ -30,6 +30,7 @@
     "babylonjs": "^5.38.0",
     "babylonjs-loaders": "^5.38.0",
     "babylonjs-materials": "^5.38.0",
+    "material-ui-confirm": "^3.0.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.5",

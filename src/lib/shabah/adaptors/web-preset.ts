@@ -2,7 +2,7 @@ import {webBackgroundFetchDownloadManager} from "./downloadManager/backgroundFet
 import {webCacheFileCache} from "./fileCache/webCache"
 import {webFetch} from "./networkRequest/webFetch"
 
-export const adaptors = (cacheName: string) => {
+export const webAdaptors = (cacheName: string) => {
     return {
         fileCache: webCacheFileCache(cacheName),
         networkRequest: webFetch(),

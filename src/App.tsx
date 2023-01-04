@@ -1,19 +1,24 @@
-import {useState, useEffect, lazy, Suspense} from 'react'
+import {useState, useEffect, useRef} from 'react'
 import {
   createTheme,
   ThemeProvider,
 } from "@mui/material"
 import {LauncherRoot} from "./launcher/Root"
-import {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
+import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
 import {isIframe} from "./lib/checks/index"
 import type {
   OutboundMessage as ServiceWorkerMessage
 } from "@/lib/types/serviceWorkers"
 import {featureCheck} from "@/lib/checks/features"
+import {ConfirmProvider} from "material-ui-confirm"
+import {lazyComponent} from "@/components/lazy"
+import terminalLoadingElement from "@/components/loadingElements/terminal"
 
-const AppShellRoot = lazy(() => import("./appShell/Root"))
-const GameRoot = lazy(() => import("./game/Root"))
-const Terminal = lazy(() => import("./components/terminal"))
+const AppShellRoot = lazyComponent(async () => (await import("./appShell/Root")).AppShellRoot)
+const GameRoot = lazyComponent(async () => (await import("./game/Root")).GameRoot)
+const Terminal = lazyComponent(async () => (await import("./components/terminal")).Terminal, {
+  loadingElement: terminalLoadingElement
+})
 
 const terminalState = {
   onBackTick: () => {}
@@ -72,7 +77,8 @@ const  App = () => {
     }
     return true
   })())
-  const [terminalEngine] = useState(new TerminalEngine())
+  const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
+  const importedTerminalComponents = useRef(false)
 
   terminalState.onBackTick = () => {
     if (!showTerminal) {
@@ -81,28 +87,42 @@ const  App = () => {
   }
 
   useEffect(() => {
-    const callBack = (event: KeyboardEvent) => {
-      if (event.key === "`") {
-        terminalState.onBackTick()
-      }
+    if (
+      !showTerminal 
+      || importedTerminalComponents.current
+    ) {
+      return
     }
-    window.addEventListener("keyup", callBack)
-    
-    {
     (async () => {
-      const {createCommands} = await import("./lib/terminalCommands")
+      const [commandsStandardLibrary, terminalLibrary] = await Promise.all([
+        import("./lib/terminalCommands"),
+        import("./lib/terminalEngine/index")
+      ] as const)
+      const {TerminalEngine} = terminalLibrary
+      const engine = new TerminalEngine()
+      setTerminalEngine(engine)
+      const {createCommands} = commandsStandardLibrary 
       const commands = createCommands({
         setShowTerminal, 
         setShowLauncher,
         source: "std"
       })
       for (let i = 0; i < commands.length; i++) {
-        terminalEngine.addCommand(
+        engine.addCommand(
           commands[i] as CommandDefinition
         )
       }
+      importedTerminalComponents.current = true
     })()
+  }, [showTerminal])
+
+  useEffect(() => {
+    const callBack = (event: KeyboardEvent) => {
+      if (event.key === "`") {
+        terminalState.onBackTick()
+      }
     }
+    window.addEventListener("keyup", callBack)
     return () => window.removeEventListener("keyup", callBack)
   }, [])
 
@@ -141,26 +161,22 @@ const  App = () => {
     <div>
       <main className="bg-neutral-800">
         <ThemeProvider theme={launcherTheme}>
+          <ConfirmProvider>
             {showTerminal ? <>
-              <Suspense>
-                <Terminal
-                  engine={terminalEngine}
-                  onClose={() => setShowTerminal(false)}
-                />
-              </Suspense>
+              <Terminal
+                engine={terminalEngine}
+                onClose={() => setShowTerminal(false)}
+              />
             </> : <></>}
 
             {isIframe() ? <>
               
-              {((q: typeof firstQuery) => {
-                const mode = q.mode || "default"
-                switch (mode) {
+              {((query: typeof firstQuery) => {
+                switch (query.mode || "default") {
                   case "game":
-                    return <Suspense>
-                      <GameRoot id={"game-root"}/>
-                    </Suspense>
+                    return <GameRoot id={"game-root"}/>
                   default:
-                    return <></>
+                    return <div/>
                 }
               })(firstQuery)}
 
@@ -172,12 +188,11 @@ const  App = () => {
                   globalState={globalState}
                 />
               </>: <>
-                <Suspense>
-                  <AppShellRoot id={"app-shell-root"}/>
-                </Suspense>
+                <AppShellRoot id={"app-shell-root"}/>
               </>}
 
             </>}
+            </ConfirmProvider>
         </ThemeProvider>
       </main>
     </div>

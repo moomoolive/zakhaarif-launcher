@@ -512,7 +512,7 @@ export class Shabah {
         )
     }
 
-    async cacheRootDocumentFallback(extraHeaders: Record<string, string> = {}) {
+    async cacheRootDocumentFallback() {
         const {networkRequest, origin, fileCache} = this
         const rootUrl = origin + "/"
         const fallbackUrl = rootDocumentFallBackUrl(origin)
@@ -532,21 +532,23 @@ export class Shabah {
                 `root document caching failed, expected mime "text/html", ${mimeType ? `got ${mimeType}` : "couldn't find header 'Content-Type'"}`
             )
         }
-        const rootText = await rootDocRequest.data.text()
+        const {data: rootDoc} = rootDocRequest
+        const rootText = await rootDoc.text()
         await fileCache.putFile(
             fallbackUrl,
             new Response(rootText, {
                 status: 200,
                 statusText: "OK",
-                headers: {
-                    ...headers("text/html", stringBytes(rootText)),
-                    ...extraHeaders
-                }
+                headers: {...rootDoc.headers}
             })
         )
         return io.ok(
             Shabah.STATUS.cached, 
             //"cached root document"
         )
+    }
+
+    uninstallAllAssets() {
+        return this.fileCache.deleteAllFiles()
     }
 }

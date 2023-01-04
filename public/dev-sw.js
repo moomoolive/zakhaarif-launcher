@@ -486,33 +486,37 @@
     type: "fail"
   });
   sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event));
-  var swAction = {
-    "config:silent_logs": () => {
-      config.log = false;
-    },
-    "config:verbose_logs": () => {
-      config.log = true;
-    },
-    "list:connected_clients": async (id) => {
-      const clients = await sw.clients.matchAll();
-      console.info(
-        `connected clients (${clients.length}): ${clients.map((c) => {
-          return `(id=${c.id || "unknown"}, url=${c.url}, type=${c.type})
-`;
-        }).join(",")}`
-      );
-    },
-    "list:config": (id) => {
-      console.info("config:", config);
-    }
+  var unreachable = (_) => {
+    throw new Error("code path should never branch to here");
   };
   sw.onmessage = (event) => event.waitUntil((async () => {
     const data = event.data;
-    const id = event.source.id;
-    if (!swAction[data?.action]) {
-      return console.warn(`received incorrectly encoded message ${data} from client ${id}`);
+    if (typeof data.action !== "string") {
+      return;
     }
-    await swAction[data.action](id);
+    const { action } = data;
+    switch (action) {
+      case "config:verbose_logs":
+        config.log = true;
+        break;
+      case "config:silent_logs":
+        {
+        }
+        config.log = false;
+        break;
+      case "list:connected_clients": {
+        const clients = await sw.clients.matchAll();
+        const info = clients.map((c) => `(id=${c.id || "unknown"}, url=${c.url}, type=${c.type})
+`);
+        console.info(`connected clients: ${info.join(",")}`);
+        break;
+      }
+      case "list:config":
+        console.info("config:", config);
+        break;
+      default:
+        return unreachable(action);
+    }
     if (data.action.startsWith("config:")) {
       persistConfig();
       console.info(`config changed, new config:`, config);

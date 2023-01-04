@@ -12,15 +12,16 @@ import {isIframe} from "@/lib/checks/index"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
   faTimes, faCheck, faBox, faCodeBranch,
-  faLink, faTerminal
+  faLink, faTerminal, faFolderMinus
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import {BYTES_PER_GB} from "@/lib/consts/storage"
 import {Shabah} from "@/lib/shabah/wrapper"
 import {roundDecimal} from "@/lib/math/rounding"
 import {APP_CACHE} from "@/config"
-import {adaptors} from "@/lib/shabah/adaptors/web-preset"
+import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 import {featureCheck} from "@/lib/checks/features"
+import {useGlobalConfirm} from "@/lib/hooks/globalConfirm"
 
 if (isIframe()) {
   new Error("launcher cannot run inside of an iframe")
@@ -128,17 +129,6 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
 
-const createDownloadClient = () => {
-  const {fileCache, networkRequest, downloadManager} = adaptors(APP_CACHE)
-  const origin = location.origin
-  return new Shabah({
-    fileCache, 
-    downloadManager, 
-    origin,
-    networkRequest
-  })
-}
-
 export const LauncherRoot = ({
   id,
   globalState
@@ -149,13 +139,17 @@ export const LauncherRoot = ({
     setTerminalVisibility: (visible: boolean) => void
   }>
 }) => {
+  const confirm = useGlobalConfirm()
   const {launchApp, setTerminalVisibility} = globalState
 
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState<ReactNode>("")
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [supportedFeatures] = useState(featureCheck())
-  const [downloadClient] = useState(createDownloadClient())
+  const [downloadClient] = useState(new Shabah({
+    origin: location.origin,
+    ...webAdaptors(APP_CACHE)
+  }))
   const [downloadError, setDownloadError] = useState("")
   const [previousUpdateFailed, setPreviousUpdateFailed] = useState(false)
   const [buttonElement, setButtonElement] = useState(<>
@@ -277,10 +271,7 @@ export const LauncherRoot = ({
       launchApp()
       return
     }
-    await downloadClient.cacheRootDocumentFallback({
-      "Cross-Origin-Embedder-Policy": "require-corp",
-      "Cross-Origin-Opener-Policy": "same-origin"
-    })
+    await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueRes = await downloadClient.executeUpdates(
       res,
@@ -404,6 +395,25 @@ export const LauncherRoot = ({
                           />
                       </span>
                       Create Desktop Link
+                    </div>
+                  </MenuItem>
+
+                  <MenuItem 
+                    onClick={async () => {
+                        if (!(await confirm({title: "Are you sure you want to uninstall all files?"}))) {
+                          return
+                        }
+                        await downloadClient.uninstallAllAssets()
+                        location.reload()
+                    }}
+                  >
+                    <div className="text-sm hover:text-yellow-500 w-full">
+                      <span className="mr-2 text-xs">
+                          <FontAwesomeIcon
+                            icon={faFolderMinus}
+                          />
+                      </span>
+                      Uninstall App
                     </div>
                   </MenuItem>
               </Menu>

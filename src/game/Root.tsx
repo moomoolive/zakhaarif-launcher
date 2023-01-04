@@ -6,12 +6,13 @@ if (!isIframe()) {
     throw new Error("game component must run in an iframe")
 }
 
+console.log("😭 game loaded...")
 const gameCanvas = document.createElement("canvas")
 gameCanvas.setAttribute("id", "game-frame-canvas")
 
 let inited = false
 
-const GameRoot = ({id}: {id: string}) => {
+export const GameRoot = ({id}: {id: string}) => {
     
     useEffect(() => {
         if (inited) {
@@ -31,5 +32,3 @@ const GameRoot = ({id}: {id: string}) => {
         </div>
     </>
 }
-
-export default GameRoot
