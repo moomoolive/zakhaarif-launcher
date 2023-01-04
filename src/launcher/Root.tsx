@@ -8,41 +8,60 @@ import {
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
 import LoadingIcon from "@mui/icons-material/Loop"
-import {isIframe} from "@/lib/checks/index"
+import {isIframe} from "@/lib/utils/isIframe"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
   faTimes, faCheck, faBox, faCodeBranch,
   faLink, faTerminal, faFolderMinus
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import {BYTES_PER_GB} from "@/lib/consts/storage"
+import {BYTES_PER_GB} from "@/lib/utils/consts/storage"
 import {Shabah} from "@/lib/shabah/wrapper"
 import {roundDecimal} from "@/lib/math/rounding"
 import {APP_CACHE} from "@/config"
 import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
-import {featureCheck} from "@/lib/checks/features"
+import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "@/lib/hooks/globalConfirm"
+import {sleep} from "@/lib/utils/sleep"
 
 if (isIframe()) {
   new Error("launcher cannot run inside of an iframe")
 }
 
-const sleep = (milliseconds: number) => new Promise((r) => setTimeout(r, milliseconds))
-
 const UnsupportedFeatures = ({features}: {
-  features: {name: string, supported: boolean}[]
+  features: {name: string, supported: boolean, hardwareRelated?: boolean}[]
 }) => {
   const [showFeatureDetails, setShowFeatureDetails] = useState(false)
 
+  const hardwareRequirementNotMet = features.some((feature) => {
+    return feature.hardwareRelated && !feature.supported
+  })
+
+  const softwareRequirementsNotMet = features.some((feature) => {
+    return !feature.hardwareRelated && !feature.supported
+  })
+
+  let requirementText = ""
+
+  if (hardwareRequirementNotMet && softwareRequirementsNotMet) {
+    requirementText = "device & browser"
+  } else if (hardwareRequirementNotMet) {
+    requirementText = "device"
+  } else if (softwareRequirementsNotMet) {
+    requirementText = "browser"
+  }
+
   return <>
     <div className="text-sm text-yellow-500 mb-3 mt-6">
-      {"Your browser doesn't support all required features."}<br/>
-      {"Try using the latest version of Chrome"}
-      <span className="ml-2">
-        <FontAwesomeIcon 
-          icon={faChrome}
-        />
-      </span>
+      {`Your ${requirementText} ${softwareRequirementsNotMet && hardwareRequirementNotMet ? "don't" : "doesn't"} support all required features.`}<br/>
+      {softwareRequirementsNotMet ? <>
+        {"Try using the latest version of Chrome"}
+        <span className="ml-2">
+          <FontAwesomeIcon 
+            icon={faChrome}
+          />
+        </span>
+      </> : ""}
     </div>
 
     <div>
@@ -57,18 +76,20 @@ const UnsupportedFeatures = ({features}: {
 
     <Collapse in={showFeatureDetails}>
       <div className="max-w-sm mx-auto text-left">
-          {features.map((f, i) => {
+          {features.filter(({supported}) => !supported).map((feature, i) => {
+            const hardwareRelated = feature.hardwareRelated || false
             return <div
               key={`feature-check-${i}`}
               className="text-sm mb-1"
             >
               <span className="mr-2">
-                {f.name
+                {`${hardwareRelated ? "💻" : "🌍"} `}
+                {feature.name
                   .split("-")
                   .map((str) => str[0].toUpperCase() + str.slice(1))
                   .join(" ")}
               </span>
-              {f.supported ? <span 
+              {feature.supported ? <span 
                 className="text-green-500"
               >
                 <FontAwesomeIcon 
@@ -81,6 +102,9 @@ const UnsupportedFeatures = ({features}: {
                   icon={faTimes}
                 />  
               </span>}
+              <span className="ml-2 text-xs text-gray-500">
+                {hardwareRelated ? "(hardware)" : "(browser)"}
+              </span>
             </div>
           })}
       </div>
@@ -403,7 +427,17 @@ export const LauncherRoot = ({
                         if (!(await confirm({title: "Are you sure you want to uninstall all files?"}))) {
                           return
                         }
-                        await downloadClient.uninstallAllAssets()
+                        setShowProgress(true)
+                        setButtonElement(
+                          <span className='animate-spin'>
+                            <LoadingIcon/>
+                          </span>
+                        )
+                        document.title = `Uninstalling...`
+                        await Promise.all([
+                          sleep(3_000),
+                          downloadClient.uninstallAllAssets()
+                        ])
                         location.reload()
                     }}
                   >

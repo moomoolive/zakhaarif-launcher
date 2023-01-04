@@ -12,7 +12,7 @@ import {
     LazyComponentOptions,
     LazyComponent
 } from "@/components/lazy"
-import {isIframe} from "@/lib/checks"
+import {isIframe} from "@/lib/utils/isIframe"
 
 if (isIframe()) {
     new Error("app-shell cannot run inside an iframe")

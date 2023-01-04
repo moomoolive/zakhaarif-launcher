@@ -1,6 +1,6 @@
 import {main} from "./index"
 import {useEffect} from "react"
-import {isIframe} from "@/lib/checks/index"
+import {isIframe} from "@/lib/utils/isIframe"
 
 if (!isIframe()) {
     throw new Error("game component must run in an iframe")

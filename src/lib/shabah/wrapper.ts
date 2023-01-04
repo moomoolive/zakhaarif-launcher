@@ -23,10 +23,8 @@ import {
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
 } from "./backend"
-import {BYTES_PER_MB, BYTES_PER_GB, BYTES_PER_KB} from "@/lib/consts/storage"
+import {BYTES_PER_MB, BYTES_PER_GB, BYTES_PER_KB} from "@/lib/utils/consts/storage"
 import {roundDecimal} from "@/lib/math/rounding"
-import {MILLISECONDS_PER_HOUR} from "@/lib/consts/time"
-import type {Mime} from "@/lib/miniMime/index"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 

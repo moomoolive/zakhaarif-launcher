@@ -1,4 +1,4 @@
-import {type} from "@/lib/betterTypeof/index"
+import {type} from "@/lib/utils/betterTypeof"
 import {Result} from "@/lib/monads/result"
 
 const messageTypes = {

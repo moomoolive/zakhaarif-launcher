@@ -12,7 +12,7 @@ import {
     RepoType,
     ValidDefaultStrategies
 } from "./consts"
-import {type} from "@/lib/betterTypeof/index"
+import {type} from "@/lib/utils/betterTypeof"
 
 type CodeManifestUnsafe = (Partial<CodeManifest> & Partial<{
     authors: Array<Partial<{

@@ -13,9 +13,7 @@
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.js",
     "cargo-cli": "node ./src/lib/cargo/cli.mjs",
     "check-types": "tsc",
-    "compile-embedder-script": "esbuild ./src/lib/embedIframe/static/index.mjs --bundle --minify --outfile=./src/lib/embedIframe/index.compiled.js",
-    "embedder-build": "npm run compile-embedder-script",
-    "embedder-dev": "node ./src/lib/embedIframe/staticServer.mjs"
+    "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",

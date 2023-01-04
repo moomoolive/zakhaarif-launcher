@@ -5,11 +5,11 @@ import {
 } from "@mui/material"
 import {LauncherRoot} from "./launcher/Root"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import {isIframe} from "./lib/checks/index"
+import {isIframe} from "@/lib/utils/isIframe"
 import type {
   OutboundMessage as ServiceWorkerMessage
 } from "@/lib/types/serviceWorkers"
-import {featureCheck} from "@/lib/checks/features"
+import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "@/components/lazy"
 import terminalLoadingElement from "@/components/loadingElements/terminal"
@@ -95,7 +95,7 @@ const  App = () => {
     }
     (async () => {
       const [commandsStandardLibrary, terminalLibrary] = await Promise.all([
-        import("./lib/terminalCommands"),
+        import("./lib/utils/terminalStandardLibrary"),
         import("./lib/terminalEngine/index")
       ] as const)
       const {TerminalEngine} = terminalLibrary
