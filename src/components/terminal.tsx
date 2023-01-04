@@ -8,7 +8,7 @@ import {
     ValidInputType
 } from "@/lib/terminalEngine/index"
 import {faTerminal, faGhost, faTimes, faKeyboard, faQuestionCircle} from "@fortawesome/free-solid-svg-icons"
-import {useDebounce} from "@/lib/hooks/debounce"
+import {useDebounce} from "@/hooks/debounce"
 import terminalLoadingElement from "@/components/loadingElements/terminal"
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
@@ -319,18 +319,6 @@ const TerminalCore = ({
 
     windowHooks.execCommand = async () => {
         const cmd = promptText
-        if (
-            showIntellisense 
-            && intellisensePrediction.length > 0
-        ) {
-            if (intellisensePrediction[0].category === "option") {
-                chooseInputPrediction(predicitionIndex)
-            } else {
-                chooseCommandPrediction(predicitionIndex)
-            }
-            return
-        }
-        
         const prevCommand = commandHistory.at(-1)
         if (prevCommand !== cmd) {
             commandHistory.push(cmd)
@@ -704,7 +692,7 @@ const TerminalCore = ({
                                                                         {terminalCommands[commandIndex]
                                                                             .inputs
                                                                             .filter((input) => input.type !== "bool" && !input.type.endsWith("?"))
-                                                                            .length} args
+                                                                            .length} required args
                                                                     </span>
                                                                 </> : <></>}
                                                             </> : <></>}

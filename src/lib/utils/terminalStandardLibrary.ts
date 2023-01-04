@@ -16,9 +16,14 @@ export const createCommands = (deps: TerminalDependencies) => {
 
     const toggleLauncher = initCommand({
         name: "toggle_launcher",
-        fn: async (output) => {
+        fn: async (output, {parsedInputs}) => {
             const launcherElement = document.getElementById("app-shell-launcher")
             const launcherIsOpen = !!launcherElement
+            const {force} = parsedInputs
+            if (force) {
+                output.info("forcing launcher toggle...")
+                return setShowLauncher((current) => !current)
+            }
             if (launcherIsOpen) {
                 output.info("Would you like to launch app shell?")
             } else {
@@ -34,12 +39,12 @@ export const createCommands = (deps: TerminalDependencies) => {
             setShowLauncher((current) => !current)
         },
         documentation: async () => {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 5_000)
-            })
-            return "no docs found..."
+            return `use the "force" option to avoid confirmation dialog`
         },
-        source
+        source,
+        inputs: {
+            force: "bool"
+        }
     })
 
     const list = initCommand({

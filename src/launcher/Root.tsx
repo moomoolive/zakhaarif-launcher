@@ -7,7 +7,7 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import LoadingIcon from "@mui/icons-material/Loop"
+import LoadingIconGlobal from "@/components/loadingElements/loadingIcon"
 import {isIframe} from "@/lib/utils/isIframe"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -21,12 +21,16 @@ import {roundDecimal} from "@/lib/math/rounding"
 import {APP_CACHE} from "@/config"
 import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
-import {useGlobalConfirm} from "@/lib/hooks/globalConfirm"
+import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {sleep} from "@/lib/utils/sleep"
 
 if (isIframe()) {
   new Error("launcher cannot run inside of an iframe")
 }
+
+const LoadingIcon = () => <span className="text-lg animate-spin">
+  <LoadingIconGlobal/>
+</span>
 
 const UnsupportedFeatures = ({features}: {
   features: {name: string, supported: boolean, hardwareRelated?: boolean}[]
@@ -433,7 +437,10 @@ export const LauncherRoot = ({
                             <LoadingIcon/>
                           </span>
                         )
-                        document.title = `Uninstalling...`
+                        const message = "Uninstalling..."
+                        document.title = message
+                        setProgressMsg(message)
+                        closeSettings()
                         await Promise.all([
                           sleep(3_000),
                           downloadClient.uninstallAllAssets()

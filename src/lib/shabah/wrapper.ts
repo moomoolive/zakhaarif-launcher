@@ -219,7 +219,7 @@ export class Shabah {
         return cargos
     }
 
-    private async getCargoIndices() {
+    async getCargoIndices() {
         if (this.cargoIndicesCache) {
             return this.cargoIndicesCache
         }

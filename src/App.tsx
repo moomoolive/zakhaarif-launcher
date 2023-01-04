@@ -13,6 +13,7 @@ import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "@/components/lazy"
 import terminalLoadingElement from "@/components/loadingElements/terminal"
+import {useEffectAsync} from "./hooks/effectAsync"
 
 const AppShellRoot = lazyComponent(async () => (await import("./appShell/Root")).AppShellRoot)
 const GameRoot = lazyComponent(async () => (await import("./game/Root")).GameRoot)
@@ -78,7 +79,11 @@ const  App = () => {
     return true
   })())
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
-  const importedTerminalComponents = useRef(false)
+  const terminalReady = useRef(false)
+  const {current: globalState} = useRef({
+    launchApp: () => setShowLauncher(false),
+    setTerminalVisibility: setShowTerminal
+  } as const)
 
   terminalState.onBackTick = () => {
     if (!showTerminal) {
@@ -86,34 +91,29 @@ const  App = () => {
     }
   }
 
-  useEffect(() => {
-    if (
-      !showTerminal 
-      || importedTerminalComponents.current
-    ) {
+  useEffectAsync(async () => {
+    if (!showTerminal || terminalReady.current) {
       return
     }
-    (async () => {
-      const [commandsStandardLibrary, terminalLibrary] = await Promise.all([
-        import("./lib/utils/terminalStandardLibrary"),
-        import("./lib/terminalEngine/index")
-      ] as const)
-      const {TerminalEngine} = terminalLibrary
-      const engine = new TerminalEngine()
-      setTerminalEngine(engine)
-      const {createCommands} = commandsStandardLibrary 
-      const commands = createCommands({
-        setShowTerminal, 
-        setShowLauncher,
-        source: "std"
-      })
-      for (let i = 0; i < commands.length; i++) {
-        engine.addCommand(
-          commands[i] as CommandDefinition
-        )
-      }
-      importedTerminalComponents.current = true
-    })()
+    const [commandsStandardLibrary, terminalLibrary] = await Promise.all([
+      import("./lib/utils/terminalStandardLibrary"),
+      import("./lib/terminalEngine/index")
+    ] as const)
+    const {TerminalEngine} = terminalLibrary
+    const engine = new TerminalEngine()
+    setTerminalEngine(engine)
+    const {createCommands} = commandsStandardLibrary 
+    const commands = createCommands({
+      setShowTerminal, 
+      setShowLauncher,
+      source: "std"
+    })
+    for (let i = 0; i < commands.length; i++) {
+      engine.addCommand(
+        commands[i] as CommandDefinition
+      )
+    }
+    terminalReady.current = true
   }, [showTerminal])
 
   useEffect(() => {
@@ -152,14 +152,9 @@ const  App = () => {
     serviceWorkerInitialized = true
   }, [])
 
-  const globalState = {
-    launchApp: () => setShowLauncher(false),
-    setTerminalVisibility: setShowTerminal
-  } as const
-
   return (
     <div>
-      <main className="bg-neutral-800">
+      <main className="bg-neutral-800 leading-snug relative z-0">
         <ThemeProvider theme={launcherTheme}>
           <ConfirmProvider>
             {showTerminal ? <>
