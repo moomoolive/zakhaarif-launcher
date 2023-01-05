@@ -243,7 +243,10 @@ const TerminalCore = ({
                         return copy
                     }
                     default: {
-                        const copy = [...allMsgs, msg]
+                        const entry = msg.text === "\n"
+                            ? {...msg, text: "<div style='margin-bottom: 1rem;'></div>"}
+                            : msg
+                        const copy = [...allMsgs, entry]
                         if (copy.length > 19) {
                             copy.shift()
                         }
@@ -327,6 +330,9 @@ const TerminalCore = ({
         const text = promptText
         setPromptText("")
         setShowCommandPrompt(false)
+        if (showIntellisense) {
+            setShowIntellisense(false)
+        }
         await engine.execute(text)
         setShowCommandPrompt(true)
     }

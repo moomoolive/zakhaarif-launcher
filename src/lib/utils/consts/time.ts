@@ -2,6 +2,7 @@ export const MILLISECONDS_PER_SECOND = 1_000
 export const SECONDS_PER_MINUTE = 60 
 export const MINUTES_PER_HOUR = 60 
 export const HOURS_PER_DAY = 24
+export const DAYS_PER_YEAR = 365
 export const MILLISECONDS_PER_MINUTE = (
     MILLISECONDS_PER_SECOND
     * SECONDS_PER_MINUTE
@@ -13,4 +14,8 @@ export const MILLISECONDS_PER_HOUR = (
 export const MILLISECONDS_PER_DAY = (
     MILLISECONDS_PER_HOUR
     * HOURS_PER_DAY
-) 
+)
+export const MILLISECONDS_PER_YEAR = (
+    MILLISECONDS_PER_DAY
+    * DAYS_PER_YEAR
+)

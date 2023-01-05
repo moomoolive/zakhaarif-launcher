@@ -23,8 +23,8 @@ import {
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
 } from "./backend"
-import {BYTES_PER_MB, BYTES_PER_GB, BYTES_PER_KB} from "@/lib/utils/consts/storage"
-import {roundDecimal} from "@/lib/math/rounding"
+import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
+import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
@@ -142,15 +142,6 @@ export class Shabah {
         const bytesNeededToDownload = Math.max(
             0, (diskWithCargo - disk.total) * DISK_CLEAR_MULTIPLIER
         )
-        const byteMultiplier = ((b: number) => {
-            if (b > BYTES_PER_GB) {
-                return {factor: BYTES_PER_GB, metric: "gb"}
-            } else if (b > BYTES_PER_MB) {
-                return {factor: BYTES_PER_MB, metric: "mb"}
-            } else {
-                return {factor: BYTES_PER_KB, metric: "kb"}
-            }
-        })(bytesNeededToDownload)
         const previousVersion = (
             response.previousCargo?.version 
             || Shabah.NO_PREVIOUS_INSTALLATION
@@ -159,6 +150,7 @@ export class Shabah {
              response.newCargo?.parsed.version
             || Shabah.NO_PREVIOUS_INSTALLATION
         )
+        const friendlyBytes = readableByteCount(bytesNeededToDownload)
         return {
             updateCheckResponse: response,
             versions: {new: newVersion, old: previousVersion},
@@ -169,13 +161,7 @@ export class Shabah {
                 ...disk,
                 usageAfterDownload: diskWithCargo,
                 bytesNeededToDownload,
-                bytesNeededToDownloadFriendly: (
-                    Math.max(
-                        0.01,
-                        roundDecimal(bytesNeededToDownload / byteMultiplier.factor, 2)
-                    ).toString()
-                    + byteMultiplier.metric
-                ),
+                bytesNeededToDownloadFriendly: `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`,
             },
             ...cargo,
         }  
@@ -548,5 +534,10 @@ export class Shabah {
 
     uninstallAllAssets() {
         return this.fileCache.deleteAllFiles()
+    }
+
+    async getStorageUsage() {
+        const {quota, usage} = await this.fileCache.queryUsage()
+        return {used: usage, total: quota}
     }
 }

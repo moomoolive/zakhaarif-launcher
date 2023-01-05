@@ -494,13 +494,14 @@ export const LauncherRoot = ({
                 </div>
             </Collapse>
 
+           
             <div className="fixed z-10 text-xs bottom-2 left-2 text-gray-500">
               <span className={`mr-1.5 ${previousUpdateFailed ? "text-yellow-400" : "text-blue-400"}`}>
                   <FontAwesomeIcon 
                     icon={faCodeBranch}
                   />
               </span>
-              {currentAppVersion}
+              {currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION ? "not installed" : "v" + currentAppVersion}
               {appUpdateInProgress && !previousUpdateFailed ? <>
                 <span className="ml-1 text-blue-500">
                   {"=>"}
@@ -510,6 +511,7 @@ export const LauncherRoot = ({
                 </span> 
               </> : <></>}
             </div>
+            
             
         </div>
     </div>

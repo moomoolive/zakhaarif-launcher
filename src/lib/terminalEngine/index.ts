@@ -16,10 +16,6 @@ const messageTypes = {
 
 type MsgType = typeof messageTypes[keyof typeof messageTypes]
 
-const defaultDocumentation = async () => {
-    return "no documentation found 😭"
-}
-
 export class TerminalMsg {
     static readonly TYPES = messageTypes
 
@@ -183,7 +179,7 @@ type InputDefinitionsToInputs<
     readonly [key in keyof Definition]: CommandInputType<Definition[key]> 
 }
 
-type CommandInputDefinition = {
+export type CommandInputDefinition = {
     readonly [key: string]: ValidInputType
 }
 
@@ -218,7 +214,7 @@ export type CommandDefinition<Inputs extends CommandInputDefinition = {}> = {
     name: string
     fn: CommandCallback<Inputs>
     source?: string
-    documentation?: () => Promise<string>
+    documentation?: (() => Promise<string>) | null
     inputs?: Inputs
 }
 
@@ -228,7 +224,7 @@ type Command = {
     fn: CommandCallback,
     source: string
     name: string
-    documentation: () => Promise<string>
+    documentation: (() => Promise<string>) | null
     inputs: InputDefinitionTokens
 }
 
@@ -337,9 +333,15 @@ const getDocs: CommandCallback = async (output, {command}) => {
     const listenerId = setInterval(() => {
         output.append(targetMsgId, ".")
     }, milliseconds)
-    const docs = await command.documentation()
+    let docsText = "no documentation found 😭"
+    if (command.documentation) {
+        docsText = await command.documentation()
+    }
+    output.info("\n")
+    output.info("----- [DOCS] -----")
+    output.info("\n")
+    output.info(docsText)
     clearInterval(listenerId)
-    output.info(docs)
 }
 
 export const parseInput = (
@@ -581,16 +583,6 @@ export const parseInput = (
     return parserResponse("", state, undefinedInputs)
 }
 
-export const initCommand = <Input extends CommandInputDefinition>({
-    name,
-    fn,
-    source = "unknown",
-    documentation = defaultDocumentation,
-    inputs = {} as Input
-}: CommandDefinition<Input>) => ({
-    name, fn, source, documentation, inputs
-} as const)
-
 const DOCUMENTATION_COMMAND = "help"
 const DOCUMENTATION_COMMAND_BOOL = "help=true"
 
@@ -641,7 +633,7 @@ export class TerminalEngine {
         name,
         fn,
         source = "unknown",
-        documentation = defaultDocumentation,
+        documentation = null,
         inputs = {} as Input
     }: CommandDefinition<Input>) {
         if (
