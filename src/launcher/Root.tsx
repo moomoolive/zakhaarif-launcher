@@ -105,7 +105,7 @@ const UnsupportedFeatures = ({features}: {
                   icon={faTimes}
                 />  
               </span>}
-              <span className="ml-2 text-xs text-gray-500">
+              <span className="ml-2 text-xs text-neutral-500">
                 {hardwareRelated ? "(hardware)" : "(browser)"}
               </span>
             </div>
@@ -130,7 +130,7 @@ const toPercent = (fraction: number, decimals: number) => {
 const progressIndicator = (downloaded: number, total: number) => {
   return <div>
     <div>Updating App...</div>
-      <div className="mt-1.5 flex items-center justify-center text-xs text-gray-400">
+      <div className="mt-1.5 flex items-center justify-center text-xs text-neutral-400">
         <div className="mr-2 text-blue-500 animate-bounce">
           <FontAwesomeIcon
             icon={faBox}
@@ -449,7 +449,7 @@ export const LauncherRoot = ({
                             icon={faFolderMinus}
                           />
                       </span>
-                      Uninstall App
+                      Uninstall
                     </div>
                   </MenuItem>
               </Menu>
@@ -497,7 +497,7 @@ export const LauncherRoot = ({
                 : `Release Notes`
             }
            >
-              <div className="fixed z-10 text-xs bottom-0 left-0 text-gray-500 rounded">
+              <div className="fixed z-10 text-xs bottom-0 left-0 text-neutral-500 rounded">
                 <button
                   className="hover:bg-neutral-900 p-2"
                 >

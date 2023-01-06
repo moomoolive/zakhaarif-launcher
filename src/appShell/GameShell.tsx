@@ -21,10 +21,10 @@ const GameShellPage = () => {
                     </div>
 
                     <div className="mb-3">
-                        <div className="text-xl text-gray-100 mb-2">
+                        <div className="text-xl text-neutral-100 mb-2">
                             {"An error occurred..."}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-neutral-500">
                             Check dev tools for more info
                         </div>
                     </div>

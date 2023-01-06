@@ -5,7 +5,7 @@ export default <div
     background: "rgba(64, 64, 64, 0.7)"
     }}
 >
-    <div className="text-gray-500 animate-pulse">
+    <div className="text-neutral-500 animate-pulse">
         Loading...
     </div>
 </div>

@@ -86,6 +86,10 @@ body {
   background-clip: padding-box;  
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background-color: #525252;
+}
+
 body {
   scrollbar-width: thin;          
   scrollbar-color: #404040 transparent; 

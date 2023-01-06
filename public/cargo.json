@@ -1,7 +1,7 @@
 {
     "uuid": "5-NZCQxgVj7Iv_Xqa3MK4RQmmMKWnN297VP",
     "crateVersion": "0.1.0",
-    "name": "app-launcher",
+    "name": "std",
     "version": "0.1.0-alpha.0",
     "entry": "bg-fetch-test/entry.js",
     "files": [

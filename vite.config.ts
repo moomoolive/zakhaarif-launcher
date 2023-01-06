@@ -27,7 +27,7 @@ const logServerRequests = ({silent = false, withHeaders = true} = {}) => ({
           const val = req.headers[next]
           return total + `${next}: ${Array.isArray(val) ? val.join(",") : val}\n`
         }, "")
-        console.log(message)
+        console.info(message)
       }
       next()
     })
@@ -39,7 +39,7 @@ export default defineConfig({
   plugins: [
     react(),
     allowSharedArrayBuffer(),
-    logServerRequests({silent: true})
+    logServerRequests({silent: true, withHeaders: false})
   ],
   build: {
     manifest: "build-manifest.json",

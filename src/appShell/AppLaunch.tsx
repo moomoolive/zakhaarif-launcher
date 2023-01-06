@@ -21,7 +21,7 @@ const AppLaunchPage = () => {
             className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
         >
             <div className="w-full">
-                <div className="text-center text-gray-400 text-xl mb-5">
+                <div className="text-center text-neutral-400 text-xl mb-5">
                     Made with
                 </div>
 

@@ -2,7 +2,7 @@ import {
     checkForUpdates,
     createResourceMap,
 } from "./client"
-import {io} from "@/lib/monads/result"
+import {io, Result} from "@/lib/monads/result"
 import {
     CargoIndexWithoutMeta,
     CargoIndices,
@@ -25,6 +25,8 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
+import {MANIFEST_NAME} from "@/lib/cargo/consts"
+import {validateManifest} from "@/lib/cargo/index"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
@@ -545,5 +547,35 @@ export class Shabah {
     async getStorageUsage() {
         const {quota, usage} = await this.fileCache.queryUsage()
         return {used: usage, total: quota}
+    }
+
+    async getCargoAtUrl(storageRootUrl: string) {
+        const cleanedRootUrl = storageRootUrl.endsWith("/")
+            ? storageRootUrl
+            : storageRootUrl + "/"
+        const cargoUrl = `${cleanedRootUrl}${MANIFEST_NAME}`
+        const cargoFile = await this.fileCache.getFile(cargoUrl)
+        if (!cargoFile) {
+            return io.err("not found")
+        }
+        const cargoFileText = await io.wrap(cargoFile.text())
+        if (!cargoFileText.ok) {
+            return io.err("no text found in cargo response")
+        }
+        const cargoFileJson = Result.wrap(
+            () => JSON.parse(cargoFileText.data)
+        )
+        if (!cargoFileJson.ok) {
+            return io.err("cargo not json encoded")
+        }
+        const cargoValidated = validateManifest(cargoFileJson.data)
+        if (cargoValidated.errors.length > 0) {
+            return io.err(`cargo is not encoded correct: ${cargoValidated.errors.join(",")}`)
+        }
+        return io.ok({
+            name: MANIFEST_NAME,
+            pkg: cargoValidated.pkg,
+            bytes: stringBytes(cargoFileText.data)
+        })
     }
 }

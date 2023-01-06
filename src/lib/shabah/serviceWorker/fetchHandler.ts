@@ -50,7 +50,6 @@ export const makeFetchHandler = (options: FetchOptions) => {
     const rootDocFallback = rootDocumentFallBackUrl(origin)
     return async (event: FetchHandlerEvent) => {
         const {request} = event
-        log(`incoming request (mode=${request.mode}) from: ${request.referrer}`)
 
         const strippedQuery = request.url.split("?")[0]
         const isRootDocument = strippedQuery === rootDoc

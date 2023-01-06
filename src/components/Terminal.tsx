@@ -258,7 +258,7 @@ const TerminalCore = ({
         setTerminalOutput([
             TerminalMsg.info(
                 "start-msg",
-                "<div class='mb-4'>😀 Welcome! Press <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>`</span> to toggle terminal or intellisense. For documentation type <span class='bg-gray-600 text-gray-200 shadow rounded px-1 py-0.5'>help</span> directly after a command.</div>"
+                "<div class='mb-4'>😀 Welcome! Press <span class='bg-gray-600 text-neutral-200 shadow rounded px-1 py-0.5'>`</span> to toggle terminal or intellisense. For documentation type <span class='bg-gray-600 text-neutral-200 shadow rounded px-1 py-0.5'>help</span> directly after a command.</div>"
             )
         ])
         terminalFocus()
@@ -684,10 +684,10 @@ const TerminalCore = ({
                                                             </span>
                                                             {name}
                                                             {i === predicitionIndex ? <>
-                                                                <span className="ml-3 text-xs text-gray-400">
+                                                                <span className="ml-3 text-xs text-neutral-400">
                                                                 {"[command]"}
                                                                 </span>
-                                                                <span className="ml-2 text-xs text-gray-400">
+                                                                <span className="ml-2 text-xs text-neutral-400">
                                                                     {`from`}
                                                                     <span className="text-blue-500">
                                                                         {" " + source}
@@ -728,13 +728,13 @@ const TerminalCore = ({
                                                             </>} 
                                                             {name}
                                                             {i === predicitionIndex ? <>
-                                                                <span className="ml-3 text-xs text-gray-400">
+                                                                <span className="ml-3 text-xs text-neutral-400">
                                                                 {"[argument]"}
                                                                 </span>
-                                                                <span className="ml-2 text-xs text-gray-400">
+                                                                <span className="ml-2 text-xs text-neutral-400">
                                                                 {`${name === "help" ? "std" : terminalCommands[commandIndex].name}.${name}${dataType.endsWith("?") ? "?" : ""}:`}
                                                                 </span>
-                                                                <span className="ml-2 text-xs text-gray-400">
+                                                                <span className="ml-2 text-xs text-neutral-400">
                                                                     {((type: typeof dataType) => {
                                                                         switch (type) {
                                                                             case "int?":
