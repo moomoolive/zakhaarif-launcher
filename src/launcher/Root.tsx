@@ -7,7 +7,7 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import LoadingIconGlobal from "@/components/loadingElements/loadingIcon"
+import LoadingIconGlobal from "@/components/LoadingIcon"
 import {isIframe} from "@/lib/utils/isIframe"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -18,11 +18,10 @@ import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import {BYTES_PER_GB} from "@/lib/utils/consts/storage"
 import {Shabah} from "@/lib/shabah/wrapper"
 import {roundDecimal} from "@/lib/math/rounding"
-import {APP_CACHE} from "@/config"
-import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {sleep} from "@/lib/utils/sleep"
+import type {TopLevelAppProps} from "@/lib/types/globalState"
 
 if (isIframe()) {
   new Error("launcher cannot run inside of an iframe")
@@ -162,22 +161,18 @@ export const LauncherRoot = ({
   globalState
 }: {
   id: string
-  globalState: Readonly<{
-    launchApp: () => void
-    setTerminalVisibility: (visible: boolean) => void
-  }>
+  globalState: TopLevelAppProps
 }) => {
   const confirm = useGlobalConfirm()
-  const {launchApp, setTerminalVisibility} = globalState
+  const {
+    showLauncher, setTerminalVisibility, downloadClient
+  } = globalState
+  const launchApp = () => showLauncher(false)
 
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState<ReactNode>("")
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [supportedFeatures] = useState(featureCheck())
-  const [downloadClient] = useState(new Shabah({
-    origin: location.origin,
-    ...webAdaptors(APP_CACHE)
-  }))
   const [downloadError, setDownloadError] = useState("")
   const [previousUpdateFailed, setPreviousUpdateFailed] = useState(false)
   const [buttonElement, setButtonElement] = useState(<>
@@ -325,7 +320,7 @@ export const LauncherRoot = ({
   useEffect(() => {
     (async () => {
       const currentAppPkg = await downloadClient.getCargoMeta(appPackageId)
-      if (!currentAppPkg || currentAppPkg.state === "deleted") {
+      if (!currentAppPkg || currentAppPkg.state === "archived") {
         return
       }
       const {state} = currentAppPkg
@@ -369,7 +364,7 @@ export const LauncherRoot = ({
   return (
     <div 
       id={id}
-      className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
+      className="relative text-center animate-fade-in z-0 w-screen h-screen flex justify-center items-center"
     >
         <div className="relative z-0">
             <div id="launcher-menu" className="fixed top-2 left-0">
@@ -494,23 +489,35 @@ export const LauncherRoot = ({
                 </div>
             </Collapse>
 
-           
-            <div className="fixed z-10 text-xs bottom-2 left-2 text-gray-500">
-              <span className={`mr-1.5 ${previousUpdateFailed ? "text-yellow-400" : "text-blue-400"}`}>
-                  <FontAwesomeIcon 
-                    icon={faCodeBranch}
-                  />
-              </span>
-              {currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION ? "not installed" : "v" + currentAppVersion}
-              {appUpdateInProgress && !previousUpdateFailed ? <>
-                <span className="ml-1 text-blue-500">
-                  {"=>"}
-                </span>
-                <span className="ml-1 text-green-700 animate-pulse">
-                  {nextUpdateVersion}
-                </span> 
-              </> : <></>}
-            </div>
+           <Tooltip
+            placement="top"
+            title={
+              currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION 
+                ? "Not installed yet"
+                : `Release Notes`
+            }
+           >
+              <div className="fixed z-10 text-xs bottom-0 left-0 text-gray-500 rounded">
+                <button
+                  className="hover:bg-neutral-900 p-2"
+                >
+                  <span className={`mr-1.5 ${previousUpdateFailed ? "text-yellow-400" : "text-blue-400"}`}>
+                      <FontAwesomeIcon 
+                        icon={faCodeBranch}
+                      />
+                  </span>
+                  {currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION ? "not installed" : "v" + currentAppVersion}
+                  {appUpdateInProgress && !previousUpdateFailed ? <>
+                    <span className="ml-1 text-blue-500">
+                      {"=>"}
+                    </span>
+                    <span className="ml-1 text-green-700 animate-pulse">
+                      {nextUpdateVersion}
+                    </span> 
+                  </> : <></>}
+                </button>
+              </div>
+            </Tooltip>
             
             
         </div>

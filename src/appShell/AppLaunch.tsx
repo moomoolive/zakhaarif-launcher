@@ -8,7 +8,7 @@ import {
 import {useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 
-export const AppLaunch = () => {
+const AppLaunchPage = () => {
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -52,3 +52,5 @@ export const AppLaunch = () => {
         </div>
     </>
 }
+
+export default AppLaunchPage

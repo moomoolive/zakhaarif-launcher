@@ -1,5 +1,5 @@
 import {useState, useEffect} from "react"
-import LoadingIcon from "@/components/loadingElements/loadingIcon"
+import LoadingIcon from "@/components/LoadingIcon"
 import type {ReactNode} from "react"
 
 type FullScreenLoadingOverlayProps = {

@@ -71,3 +71,22 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #404040;    
+  border: 2px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;  
+}
+
+body {
+  scrollbar-width: thin;          
+  scrollbar-color: #404040 transparent; 
+}

@@ -6,7 +6,9 @@
     "entry": "bg-fetch-test/entry.js",
     "files": [
         {"name": "bg-fetch-test/entry.js", "bytes": 17},
-        {"name": "bg-fetch-test/asset.svg", "bytes": 1565}
+        {"name": "bg-fetch-test/asset.svg", "bytes": 1565},
+        {"name": "large-assets/terrain-16bit.json", "bytes": 11961629},
+        {"name": "bg-fetch-test/random_style.css", "bytes": 25}
     ],
     "invalidation": "url-diff"
 }

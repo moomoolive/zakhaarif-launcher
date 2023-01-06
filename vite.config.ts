@@ -15,12 +15,19 @@ const allowSharedArrayBuffer = () => ({
   }
 } as const) as PluginOption
 
-const logServerRequests = ({silent = false} = {}) => ({
+const logServerRequests = ({silent = false, withHeaders = true} = {}) => ({
   name: "log server-requests",
   configureServer: (server) => {
     server.middlewares.use((req, _, next) => {
       if (!silent) {
         console.info(`[${req.method}] ${req.originalUrl}`)
+      }
+      if (!silent && withHeaders) {
+        const message = Object.keys(req.headers).reduce((total, next) => {
+          const val = req.headers[next]
+          return total + `${next}: ${Array.isArray(val) ? val.join(",") : val}\n`
+        }, "")
+        console.log(message)
       }
       next()
     })

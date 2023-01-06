@@ -30,13 +30,6 @@ const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
 const DISK_CLEAR_MULTIPLIER = 3
 
-type ShabahOptions = {
-    origin: string,
-    fileCache: FileCache
-    networkRequest: FetchFunction
-    downloadManager: DownloadManager
-}
-
 type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
 
 type ProgressIndicator = DownloadState & {
@@ -58,6 +51,15 @@ const defaultDownloadState = (id: string) => ({
     installing: false,
     ready: false
 } as const)
+
+type ShabahProps = {
+    origin: string,
+    adaptors: {
+        fileCache: FileCache
+        networkRequest: FetchFunction
+        downloadManager: DownloadManager
+    }
+}
 
 export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = "none"
@@ -90,12 +92,12 @@ export class Shabah {
     }>
     private progressListenerTimeoutId: string | number | NodeJS.Timeout
 
-    constructor({
-        networkRequest,
-        fileCache,
-        downloadManager,
-        origin
-    }: ShabahOptions) {
+    constructor({adaptors, origin}: ShabahProps) {
+        const {
+            networkRequest, 
+            fileCache, 
+            downloadManager
+        } = adaptors
         this.networkRequest = networkRequest
         this.fileCache = fileCache
         this.downloadManager = downloadManager
@@ -441,7 +443,7 @@ export class Shabah {
             )
         }
         const {state} = cargoMeta
-        if (state === "deleted") {
+        if (state === "archived") {
             return io.ok(
                 Shabah.STATUS.cargoNotInErrorState,
                 //"cargo has been deleted"
@@ -517,13 +519,17 @@ export class Shabah {
             )
         }
         const {data: rootDoc} = rootDocRequest
+        const headersCopy = {} as Record<string, string>
+        for (const [key, value] of rootDoc.headers.entries()) {
+            headersCopy[key] = value
+        }
         const rootText = await rootDoc.text()
         await fileCache.putFile(
             fallbackUrl,
             new Response(rootText, {
                 status: 200,
                 statusText: "OK",
-                headers: {...rootDoc.headers}
+                headers: headersCopy
             })
         )
         return io.ok(

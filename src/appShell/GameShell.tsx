@@ -8,7 +8,7 @@ const rootDoc = import.meta.env.DEV
     ? location.origin + "/"
     : location.origin + "/offline.html"
 
-const GameShell = () => {
+const GameShellPage = () => {
     const navigate = useNavigate()
 
     const [error, setError] = useState(false)
@@ -49,4 +49,4 @@ const GameShell = () => {
     </div>
 }
 
-export default GameShell
+export default GameShellPage

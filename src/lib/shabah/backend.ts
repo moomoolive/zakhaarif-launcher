@@ -215,6 +215,11 @@ export const saveDownloadIndices = async (
     return operationCodes.saved 
 }
 
+export type CargoState = (
+    "updating" | "cached" | "archived" 
+    | "update-failed" | "update-aborted"
+)
+
 export type CargoIndex = {
     name: string
     id: string
@@ -223,10 +228,7 @@ export type CargoIndex = {
     bytes: number
     entry: string
     version: string
-    state: (
-        "updating" | "cached" | "deleted" 
-        | "update-failed" | "update-aborted"
-    )
+    state: CargoState
     createdAt: number
     updatedAt: number
 }

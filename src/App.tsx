@@ -11,13 +11,17 @@ import type {
 } from "@/lib/types/serviceWorkers"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
-import {lazyComponent} from "@/components/lazy"
+import {lazyComponent} from "@/components/Lazy"
 import terminalLoadingElement from "@/components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
+import type {TopLevelAppProps} from "@/lib/types/globalState"
+import {Shabah} from "@/lib/shabah/wrapper"
+import {APP_CACHE} from "./config"
+import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 
 const AppShellRoot = lazyComponent(async () => (await import("./appShell/Root")).AppShellRoot)
 const GameRoot = lazyComponent(async () => (await import("./game/Root")).GameRoot)
-const Terminal = lazyComponent(async () => (await import("./components/terminal")).Terminal, {
+const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })
 
@@ -80,10 +84,14 @@ const  App = () => {
   })())
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
-  const {current: globalState} = useRef({
-    launchApp: () => setShowLauncher(false),
-    setTerminalVisibility: setShowTerminal
-  } as const)
+  const {current: globalState} = useRef<TopLevelAppProps>({
+    showLauncher: setShowLauncher,
+    setTerminalVisibility: setShowTerminal,
+    downloadClient: new Shabah({
+      origin: location.origin,
+      adaptors: webAdaptors(APP_CACHE)
+    })
+  })
 
   terminalState.onBackTick = () => {
     if (!showTerminal) {
@@ -183,7 +191,10 @@ const  App = () => {
                   globalState={globalState}
                 />
               </>: <>
-                <AppShellRoot id={"app-shell-root"}/>
+                <AppShellRoot
+                  id={"app-shell-root"}
+                  globalState={globalState}
+                />
               </>}
 
             </>}
