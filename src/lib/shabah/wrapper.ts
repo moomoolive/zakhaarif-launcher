@@ -578,4 +578,8 @@ export class Shabah {
             bytes: stringBytes(cargoFileText.data)
         })
     }
+
+    getCachedFile(url: string) {
+        return this.fileCache.getFile(url)
+    }
 }

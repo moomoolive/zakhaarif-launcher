@@ -28,17 +28,21 @@ import {
     faAngleRight,
     faFile,
     faImage,
+    faFolderTree,
+    faDownload,
+    faCircleExclamation
 } from "@fortawesome/free-solid-svg-icons"
 import {
     faJs, 
-    faCss3, 
-    faHtml5,
+    faCss3,
 } from "@fortawesome/free-brands-svg-icons"
 import {readableByteCount, toGigabytesString} from "@/lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "@/lib/utils/dates"
 import {
     Divider, 
-    LinearProgress
+    LinearProgress,
+    Collapse,
+    IconButton
 } from "@mui/material"
 import {useAppShellContext} from "./store"
 import {io} from "@/lib/monads/result"
@@ -47,7 +51,8 @@ import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {CodeManifestSafe} from "@/lib/cargo/index"
-import {urlToMime} from "@/lib/miniMime/index"
+import {urlToMime, Mime} from "@/lib/miniMime/index"
+import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 
 const filterOptions = [
     "updatedAt", "bytes", "state", "addon-type", "name"
@@ -162,6 +167,152 @@ const calculateDirectorySize = (directory: CargoDirectory) => {
     directory.contentBytes = sizeOfFilesInDirectory + sizeOfFoldersInDirectory
 }
 
+const mimeToIcon = (mime: Mime, classes: string) => {
+    if (mime.startsWith("image/")) {
+        return <span className={`${classes} text-indigo-500`}>
+            <FontAwesomeIcon 
+                icon={faImage}
+            />
+        </span>
+    }
+    switch (mime) {
+        case "application/json":
+            return <span className={`${classes} text-yellow-500`}>
+                {"{ }"}
+            </span>
+        case "text/javascript":
+            return <span className={`${classes} text-yellow-500`}>
+                <FontAwesomeIcon 
+                    icon={faJs}
+                />
+            </span>
+        case "text/css":
+            return <span className={`${classes} text-blue-600`}>
+                <FontAwesomeIcon 
+                    icon={faCss3}
+                />
+            </span>
+        default:
+            return <span className={`${classes}`}>
+                <FontAwesomeIcon 
+                    icon={faFile}
+                />
+            </span>
+    }
+}
+
+type FileOverlayProps = {
+    name: string
+    mime: Mime
+    url: string
+    fileResponse: Response,
+    bytes: number
+    onClose: () => void
+}
+
+const FileOverlay = ({
+    name, 
+    mime, 
+    fileResponse, 
+    url, 
+    onClose,
+    bytes
+}: FileOverlayProps) => {
+    const [fileText, setFileText] = useState("")
+    const consumedResponse = useRef(false)
+    console.log(mime, url)
+
+    useEffectAsync(async () => {
+        if (
+            consumedResponse.current
+            || mime.startsWith("image/")
+            || mime.startsWith("video/")
+        ) {
+            return
+        }
+        const textResponse = await io.wrap(fileResponse.text())
+        consumedResponse.current = true
+        if (!textResponse.ok) {
+            return
+        }
+        setFileText(textResponse.data)
+    }, [])
+    
+    return <>
+        <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
+            <div className="absolute z-30 top-1 left-1 w-full flex">
+                <div className="w-1/2">
+                    <Tooltip title="Back">
+                        <IconButton
+                            onClick={onClose}
+                        >
+                            <span className="text-xl">
+                                <FontAwesomeIcon 
+                                    icon={faArrowLeft}
+                                />
+                            </span>
+                        </IconButton>
+                    </Tooltip>
+
+                    <span className="ml-3">
+                        {mimeToIcon(mime, "mr-3")}
+                        {name}
+                    </span>
+                </div>
+                <div className="w-1/2 text-right text-sm">
+                    <span className="mr-3">
+                        <Tooltip title="Download">
+                            <IconButton 
+                                size="small"
+                                className="hover:text-green-500"
+                                onClick={() => {
+                                    const download = document.createElement("a")
+                                    download.setAttribute("href", url)
+                                    download.setAttribute("download", name)
+                                    download.click()
+                                }}
+                            >
+                                <FontAwesomeIcon 
+                                    icon={faDownload}
+                                />
+                            </IconButton>
+                        </Tooltip>
+                    </span>
+                </div>
+            </div>
+
+            <div className="w-5/6 max-w-screen-sm">
+                {((mimeType: typeof mime, url: string) => {
+                    if (mimeType.startsWith("image/")) {
+                        return <img 
+                            src={url}
+                            className="w-full"
+                        />
+                    } else if (bytes < BYTES_PER_MB * 3) {
+                        return <div 
+                            className="p-4 w-full overflow-scroll bg-neutral-800 rounded whitespace-pre-wrap"
+                            style={{maxHeight: "96rem"}}
+                        >
+                            {fileText}
+                        </div>
+                    } else {
+                        return <div
+                            className="p-4 w-full text-center"
+                        >
+                            <span className="mr-2 text-yellow-500">
+                                <FontAwesomeIcon
+                                    icon={faCircleExclamation}
+                                />
+                            </span>
+                            File is too large. Download to view.
+                        </div>
+                    }
+                })(mime, url)}
+            </div>
+        </div>
+    </>
+}
+
 const ROOT_DIRECTORY_PATH = "#"
 
 const AddOns = () => {
@@ -190,6 +341,14 @@ const AddOns = () => {
     const [directoryPath, setDirectoryPath] = useState(
         [] as CargoDirectory[]
     )
+    const [showFileOverlay, setShowFileOverlay] = useState(false)
+    const [fileDetails, setFileDetails] = useState({
+        name: "",
+        mime: "text/javascript" as Mime,
+        url: "",
+        fileResponse: new Response("", {status: 200}),
+        bytes: 0
+    })
     const cargoDirectoryRef = useRef<CargoDirectory>({
         path: ROOT_DIRECTORY_PATH,
         contentBytes: 0,
@@ -199,9 +358,6 @@ const AddOns = () => {
     
     const cargoDirectory = cargoDirectoryRef.current
     const isViewingCargo = viewingCargo !== "none"
-    const viewingDirectory = directoryPath.length < 1 
-        ? cargoDirectory
-        : directoryPath[directoryPath.length - 1]
 
     useEffectAsync(async () => {
         if (!isViewingCargo) {
@@ -237,10 +393,7 @@ const AddOns = () => {
             name: cargo.data.name,
             bytes: cargo.data.bytes
         })
-        for (let i = 0; i < rootDirectory.directories.length; i++) {
-            const directory = rootDirectory.directories[i]
-            calculateDirectorySize(directory)
-        }
+        calculateDirectorySize(rootDirectory)
         cargoDirectoryRef.current = rootDirectory
         setDirectoryPath([rootDirectory])
         setViewingCargoIndex(index)
@@ -342,6 +495,13 @@ const AddOns = () => {
         }
     }, [filter, order, cargoIndex, searchText, searchParams])
 
+    const filteredDirectory = useMemo(() => {
+        const viewingDirectory = directoryPath.length < 1 
+            ? cargoDirectory
+            : directoryPath[directoryPath.length - 1]
+        return viewingDirectory
+    }, [filter, order, searchText, targetCargo, directoryPath])
+
     const toggleFilter = (filterName: typeof filter) => {
         if (filter !== filterName) {
             setFilter(filterName)
@@ -374,19 +534,28 @@ const AddOns = () => {
             </Link>
         </ErrorOverlay> : <>
             <div className="fixed z-0 w-screen h-screen overflow-clip">
+                {showFileOverlay ? <>
+                    <FileOverlay 
+                        onClose={() => setShowFileOverlay(false)}
+                        {...fileDetails}
+                    />
+                </> : <></>}
+
                 <div className="w-full h-1/12 flex items-center justify-center">
                     <div className="w-1/5">
-                        <Tooltip title="Back">
-                            <Link to="/start">
-                                <Button size="large">
-                                    <span className="text-xl">
-                                        <FontAwesomeIcon 
-                                            icon={faArrowLeft}
-                                        />
-                                    </span>
-                                </Button>
-                            </Link>
-                        </Tooltip>
+                        <div className="ml-2">
+                            <Tooltip title="Back">
+                                <Link to="/start">
+                                    <IconButton size="large">
+                                        <span className="text-xl">
+                                            <FontAwesomeIcon 
+                                                icon={faArrowLeft}
+                                            />
+                                        </span>
+                                    </IconButton>
+                                </Link>
+                            </Tooltip>
+                        </div>
                     </div>
                     <div className="w-4/5">
                         <div className="w-3/5 ml-10">
@@ -432,7 +601,10 @@ const AddOns = () => {
 
                         <div className="p-4">
                             <Tooltip title="Add a New Package">
-                                <Fab variant="extended">
+                                <Fab 
+                                    variant="extended" 
+                                    sx={{zIndex: "10"}}
+                                >
                                     <div className="flex items-center justify-center">
                                         <div className="mr-2">
                                             <span className="text-lg">
@@ -654,52 +826,84 @@ const AddOns = () => {
                         
                         <div className="w-11/12 h-full">
 
-                            <div className="px-4 py-2 flex justify-center items-center text-sm text-neutral-300">
-                                <div className="w-1/3">
-                                    <button
-                                        className="hover:bg-gray-900 rounded px-2 py-1"
-                                        onClick={() => toggleFilter("name")}
-                                    >
-                                        Name
-                                        {filterChevron(filter, "name", order)}
-                                    </button>
-                                </div>
-                                <div className={`w-1/6 ${isViewingCargo && cargoFound ? "invisible" : ""}`}>
-                                    <button
-                                        className="hover:bg-gray-900 rounded px-2 py-1"
-                                        onClick={() => toggleFilter("state")}
-                                    >
-                                        Status
-                                        {filterChevron(filter, "state", order)}
-                                    </button>
-                                </div>
-                                <div className="w-1/6">
-                                    <button
-                                        className="hover:bg-gray-900 rounded px-2 py-1"
-                                        onClick={() => toggleFilter("addon-type")}
-                                    >
-                                        Type
-                                        {filterChevron(filter, "addon-type", order)}
-                                    </button>
-                                </div>
-                                <div className="w-1/6">
-                                    <button
-                                        className="hover:bg-gray-900 rounded px-2 py-1"
-                                        onClick={() => toggleFilter("updatedAt")}
-                                    >
-                                        Modified
-                                        {filterChevron(filter, "updatedAt", order)}
-                                    </button>
-                                </div>
-                                <div className="w-1/6">
-                                    <button
-                                        className="hover:bg-gray-900 rounded px-2 py-1"
-                                        onClick={() => toggleFilter("bytes")}
-                                    >
-                                        Size
-                                        {filterChevron(filter, "bytes", order)}
-                                    </button>
-                                </div>
+                            <div className="px-4 py-2 flex justify-center items-center text-sm text-neutral-300 mr-3">
+                                {isViewingCargo && cargoFound ? <>
+                                    <div className="w-1/2">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("name")}
+                                        >
+                                            Name
+                                            {filterChevron(filter, "name", order)}
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button disabled className="rounded px-2 py-1">
+                                            Type
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button disabled className="rounded px-2 py-1">
+                                            Modified
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("bytes")}
+                                        >
+                                            Size
+                                            {filterChevron(filter, "bytes", order)}
+                                        </button>
+                                    </div>
+                                </> : <>
+                                    <div className="w-1/3">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("name")}
+                                        >
+                                            Name
+                                            {filterChevron(filter, "name", order)}
+                                        </button>
+                                    </div>
+                                    <div className={`w-1/6 text-center`}>
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("state")}
+                                        >
+                                            Status
+                                            {filterChevron(filter, "state", order)}
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("addon-type")}
+                                        >
+                                            Type
+                                            {filterChevron(filter, "addon-type", order)}
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("updatedAt")}
+                                        >
+                                            Modified
+                                            {filterChevron(filter, "updatedAt", order)}
+                                        </button>
+                                    </div>
+                                    <div className="w-1/6 text-center">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("bytes")}
+                                        >
+                                            Size
+                                            {filterChevron(filter, "bytes", order)}
+                                        </button>
+                                    </div>
+                                </>}
+                                
                             </div>
 
                             <Divider className="bg-neutral-200"/>
@@ -744,7 +948,76 @@ const AddOns = () => {
                                                     </Button>
                                                 </div>
                                             </> : <>
-                                                {viewingDirectory.directories.map((directory, index) => {
+                                            {directoryPath.length === 1 ? <>
+                                                    <Tooltip title="Back To Add-ons" placement="top">
+                                                        <button
+                                                            className="p-4 w-full text-left flex justify-center items-center hover:bg-neutral-900"
+                                                            onClick={() => setViewingCargo("none")}
+                                                        >
+                                                            <div className="w-1/2">
+                                                                <div className="relative z-0 w-1/2">
+                                                                    <span className={"mr-3 text-amber-300"}>
+                                                                        <FontAwesomeIcon 
+                                                                            icon={faFolderTree}
+                                                                        />
+                                                                    </span>
+                                                                    {"My Add-ons"}
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {"parent folder"}
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {reactiveDate(new Date(cargoIndex.updatedAt))}
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {(() => {
+                                                                    const friendlyBytes = readableByteCount(storageUsage.used)
+                                                                    return `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`
+                                                                })()}
+                                                            </div>
+                                                        </button>
+                                                    </Tooltip>
+                                                </> : <></>}
+
+                                                {directoryPath.length > 1 ? <>
+                                                    <Tooltip title="Back To Parent Folder" placement="top">
+                                                        <button
+                                                            className="p-4 w-full text-left flex justify-center items-center hover:bg-neutral-900"
+                                                            onClick={() => setDirectoryPath(directoryPath.slice(0, -1))}
+                                                        >
+                                                            <div className="w-1/2">
+                                                                <div className="relative z-0 w-1/2">
+                                                                    <span className={"mr-3 text-amber-300"}>
+                                                                        <FontAwesomeIcon 
+                                                                            icon={faFolderTree}
+                                                                        />
+                                                                    </span>
+                                                                    {directoryPath[directoryPath.length - 2].path === ROOT_DIRECTORY_PATH 
+                                                                        ? targetCargo.name
+                                                                        : directoryPath[directoryPath.length - 2].path
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {"parent folder"}
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {reactiveDate(
+                                                                    new Date(cargoIndex.cargos[viewingCargoIndex].updatedAt
+                                                                ))}
+                                                            </div>
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {(() => {
+                                                                    const friendlyBytes = readableByteCount(directoryPath[directoryPath.length - 2].contentBytes)
+                                                                    return `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`
+                                                                })()}
+                                                            </div>
+                                                        </button>
+                                                    </Tooltip>
+                                                </> : <></>}
+
+                                                {filteredDirectory.directories.map((directory, index) => {
                                                     const targetIndex = cargoIndex.cargos[viewingCargoIndex]
                                                     const friendlyBytes = readableByteCount(directory.contentBytes)
                                                     return <button
@@ -764,80 +1037,69 @@ const AddOns = () => {
                                                             </span>
                                                             {directory.path}
                                                         </div>
-                                                        <div className="w-1/6 text-xs text-neutral-400">
-                                                            {"folder"}
-                                                        </div>
-                                                        <div className="w-1/6 text-xs text-neutral-400">
+                                                        <Tooltip title="folder">
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
+                                                                {"folder"}
+                                                            </div>
+                                                        </Tooltip>
+                                                        <div className="w-1/6 text-xs text-center text-neutral-400">
                                                             {reactiveDate(new Date(targetIndex.updatedAt))}
                                                         </div>
-                                                        <div className="w-1/6 text-xs text-neutral-400">
+                                                        <div className="w-1/6 text-xs text-center text-neutral-400">
                                                             {friendlyBytes.count} {friendlyBytes.metric.toUpperCase()}
                                                         </div>
                                                     </button>
                                                 })}
-                                                {viewingDirectory.files.map((file, index) => {
+                                                {filteredDirectory.files.map((file, index) => {
                                                     const targetIndex = cargoIndex.cargos[viewingCargoIndex]
                                                     const friendlyBytes = readableByteCount(file.bytes)
-                                                    const mime = urlToMime(file.name)
+                                                    const mime = urlToMime(file.name) || "text/plain"
                                                     return <button
                                                         key={`cargo-directory-${index}`}
                                                         className="p-4 w-full text-left flex justify-center items-center hover:bg-neutral-900"
-                                                        onClick={() => {console.log('herro')}}
+                                                        onClick={async () => {
+                                                            const basePath = cargoIndex.cargos[viewingCargoIndex].storageRootUrl
+                                                            const path = directoryPath
+                                                                .slice(1)
+                                                                .reduce((total, next) => `${total}/${next.path}`, "")
+                                                            const cleanedBase = basePath.endsWith("/") 
+                                                                ? basePath.slice(0, -1) 
+                                                                : basePath
+                                                            const cleanedPathEnd = path.endsWith("/")
+                                                                ? path.slice(0, -1) 
+                                                                : path
+                                                            const cleanedPath = cleanedPathEnd.startsWith("/")
+                                                                ? path.slice(1)
+                                                                : cleanedPathEnd
+                                                            const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
+                                                            const fileResponse = await downloadClient.getCachedFile(fullPath)
+                                                            if (fileResponse) {
+                                                                setFileDetails({
+                                                                    name: file.name,
+                                                                    mime,
+                                                                    url: fullPath,
+                                                                    fileResponse,
+                                                                    bytes: file.bytes,
+                                                                })
+                                                                setShowFileOverlay(true)
+                                                            }
+                                                        }}
                                                     >
                                                         <div className="relative z-0 w-1/2">
-                                                            {((mimeText: typeof mime) => {
-                                                                switch (mimeText) {
-                                                                    case "application/json":
-                                                                        return <span className="mr-3 text-yellow-500">
-                                                                            {"{ }"}
-                                                                        </span>
-                                                                    case "image/webp":
-                                                                    case "image/vnd.microsoft.icon":
-                                                                    case "image/png":
-                                                                    case "image/jpeg":
-                                                                    case "image/gif":
-                                                                    case "image/bmp":
-                                                                    case "image/tiff":
-                                                                    case "image/svg+xml":
-                                                                    case "image/avif":
-                                                                        return <span className="mr-3 text-indigo-500">
-                                                                            <FontAwesomeIcon 
-                                                                                icon={faImage}
-                                                                            />
-                                                                        </span>
-                                                                    case "text/javascript":
-                                                                        return <span className="mr-3 text-yellow-500">
-                                                                            <FontAwesomeIcon 
-                                                                                icon={faJs}
-                                                                            />
-                                                                        </span>
-                                                                    case "text/css":
-                                                                        return <span className="mr-3 text-blue-600">
-                                                                            <FontAwesomeIcon 
-                                                                                icon={faCss3}
-                                                                            />
-                                                                        </span>
-                                                                    default:
-                                                                        return <span className="mr-3">
-                                                                            <FontAwesomeIcon 
-                                                                                icon={faFile}
-                                                                            />
-                                                                        </span>
-                                                                }
-                                                            })(mime)}
+                                                            {mimeToIcon(mime, "mr-3")}
                                                             {file.name}
                                                         </div>
 
                                                         <Tooltip title={mime}>
-                                                            <div className="w-1/6 text-xs text-neutral-400">
+                                                            <div className="w-1/6 text-xs text-center text-neutral-400">
                                                                 {mime}
                                                             </div>
                                                         </Tooltip>
                                                         
-                                                        <div className="w-1/6 text-xs text-neutral-400">
+                                                        <div className="w-1/6 text-xs text-center text-neutral-400">
                                                             {reactiveDate(new Date(targetIndex.updatedAt))}
                                                         </div>
-                                                        <div className="w-1/6 text-xs text-neutral-400">
+                                                        <div className="w-1/6 text-xs text-center text-neutral-400">
                                                             {friendlyBytes.count} {friendlyBytes.metric.toUpperCase()}
                                                         </div>
                                                     </button>
@@ -915,7 +1177,7 @@ const AddOns = () => {
                                                     })(state, isMod)}
                                                 </div>
 
-                                                <div className="w-1/6 text-xs text-neutral-400">
+                                                <div className="w-1/6 text-center text-xs text-neutral-400">
                                                     <span>
                                                         {((addonState: typeof state) => {
                                                             switch (addonState) {
@@ -933,15 +1195,15 @@ const AddOns = () => {
                                                     </span>
                                                 </div>
                                                 
-                                                <div className={`w-1/6 text-xs ${isMod ? "text-indigo-500" : "text-green-500"}`}>
+                                                <div className={` w-1/6 text-xs text-center ${isMod ? "text-indigo-500" : "text-green-500"}`}>
                                                     {isMod ? "mod" : "extension"}
                                                 </div>
 
-                                                <div className="w-1/6 text-xs text-neutral-400">
+                                                <div className="w-1/6 text-xs text-center text-neutral-400">
                                                     {reactiveDate(new Date(updatedAt))}
                                                 </div>
 
-                                                <div className="w-1/6 text-xs text-neutral-400">
+                                                <div className="w-1/6 text-xs text-center text-neutral-400">
                                                     {friendlyBytes.count} {friendlyBytes.metric.toUpperCase()}
                                                 </div>
                                             </button>
