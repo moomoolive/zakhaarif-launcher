@@ -7,6 +7,7 @@ import {
     saveCargoIndices,
     FileCache,
     headers,
+    appendShabahHeaders,
     removeSlashAtEnd,
     DownloadIndex,
     saveErrorDownloadIndex,
@@ -116,14 +117,9 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                         errorDownloadIndex.bytes += bytes
                         return
                     }
-                    const text = await response.text()
                     return fileCache.putFile(
-                        storageUrl,
-                        new Response(text, {
-                            status: 200,
-                            statusText: "OK",
-                            headers: headers(mime, bytes)
-                        })
+                        resource.request.url,
+                        response
                     )
                 })())
             }

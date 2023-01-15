@@ -1,6 +1,5 @@
 import {APP_CACHE} from "../src/config"
 import type {
-    InboundMessageAction, 
     InboundMessage,
     BackgroundFetchEventHandlerSetters
 } from "../src/lib/types/serviceWorkers"

@@ -3,12 +3,10 @@ export const config = {
     generateMiniCargo: true,
     buildDir: "dist",
     ignore: [
-        "test-app", 
-        "test-game",
         "bg-fetch-test",
         "large-assets",
-        "dev-sw.js",
-        "sw.js",
+        "dev-sw.compiled.js",
+        "sw.compiled.js",
         "build-manifest.json"
     ],
 }

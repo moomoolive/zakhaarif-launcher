@@ -228,14 +228,65 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
-    it("should return error if cargo.file is missing required files", () => {
+    it("should not return error if cargo.file is an array of strings", () => {
         const m = manifest.clone()
-        const fileCopy = {...m.files[0]}
+        {((m.files as any) = m.files.map((file) => file.name))}
+        expect(validateManifest(m).errors.length).toBe(0)
+    })
+
+    it("should return error if cargo.file is an array of primitives other than strings", () => {
+        const injectPrimitive = <T>(primitive: T) => {
+            const m = manifest.clone()
+            {((m.files as any) = [primitive])}
+            return m
+        }
+        expect(validateManifest(injectPrimitive(Symbol())).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive([])).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(null)).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(0)).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(1)).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(true)).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(false)).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(injectPrimitive(1n)).errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return error if cargo.file is an object is missing required name field and is not a string", () => {
+        const m = manifest.clone()
         delete ((m.files[0] as any).name)
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return no error is file.bytes is not a number, and place a 0 in it's place instead", () => {
+        const m = manifest.clone()
+        const fileCopy = {...m.files[0]}
         m.files[0] = {...fileCopy}
         delete ((m.files[0] as any).bytes)
-        expect(validateManifest(m).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = null}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = "hi"}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = true}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = {}}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = []}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
+        m.files[0] = {...fileCopy}
+        {((m.files[0] as any).bytes) = Symbol()}
+        expect(validateManifest(m).errors.length).toBe(0)
+        expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
     })
 
     it("should return error if cargo.entry is not the name of one of files, unless there are zero files in listed", () => {

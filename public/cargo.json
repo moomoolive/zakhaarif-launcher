@@ -5,10 +5,22 @@
     "version": "0.1.0-alpha.0",
     "entry": "bg-fetch-test/entry.js",
     "files": [
-        {"name": "bg-fetch-test/entry.js", "bytes": 17},
-        {"name": "bg-fetch-test/asset.svg", "bytes": 1565},
-        {"name": "large-assets/terrain-16bit.json", "bytes": 11961629},
-        {"name": "bg-fetch-test/random_style.css", "bytes": 25}
+        "bg-fetch-test/entry.js",
+        "bg-fetch-test/asset.svg",
+        "bg-fetch-test/yeah.html",
+        "bg-fetch-test/random-style.css",
+        "bg-fetch-test/cool.png",
+        "bg-fetch-test/bird-svgrepo.svg",
+        "bg-fetch-test/random.jpg"
     ],
-    "invalidation": "url-diff"
+    "invalidation": "url-diff",
+    "authors": [
+        {"name": "Mostafa Elbannan"}
+    ],
+    "description": "all core primitives for game",
+    "license": "GPL-3",
+    "keywords": ["core"],
+    "homepageUrl": "https://github.com",
+    "repo": {"type": "git", "url": "https://github.com"},
+    "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg"
 }

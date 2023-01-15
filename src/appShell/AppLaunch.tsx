@@ -41,7 +41,7 @@ const AppLaunchPage = () => {
                     })}
                     <div>
                         <img 
-                            src="babylon_logo_color.png"
+                            src="logos/babylon_logo_color.png"
                             width={64}
                             height={64}
                             className="mb-3 animate-swing"

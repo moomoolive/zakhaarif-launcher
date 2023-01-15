@@ -2,7 +2,7 @@ import {
     checkForUpdates,
     createResourceMap,
 } from "./client"
-import {io, Result} from "@/lib/monads/result"
+import {io} from "@/lib/monads/result"
 import {
     CargoIndexWithoutMeta,
     CargoIndices,
@@ -25,12 +25,10 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
-import {MANIFEST_NAME} from "@/lib/cargo/consts"
-import {validateManifest} from "@/lib/cargo/index"
+import {CodeManifestSafe, MANIFEST_NAME} from "@/lib/cargo/consts"
+import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
-
-const DISK_CLEAR_MULTIPLIER = 3
 
 type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
 
@@ -79,6 +77,8 @@ export class Shabah {
         errorIndexNotFound: 8,
         cacheIsFresh: 9,
         cached: 10,
+        deleted: 11,
+        archived: 12
     } as const
 
     networkRequest: FetchFunction
@@ -129,22 +129,23 @@ export class Shabah {
     async checkForCargoUpdates(cargo: {
         storageUrl: string
         requestUrl: string
-        name: string
         id: string
     }) {
         const {networkRequest, fileCache} = this
         const response = await checkForUpdates({
             requestRootUrl: cargo.requestUrl,
             storageRootUrl: cargo.storageUrl,
-            name: cargo.name
+            name: cargo.id
         }, networkRequest, fileCache)
         const disk = await this.diskInfo()
-        const diskWithCargo = disk.used + response.bytesToDownload
+        const diskWithCargo = (
+            disk.used + response.bytesToDownload
+        )
         const enoughSpaceForPackage = disk.total < 1
             ? false
             : diskWithCargo < disk.total
         const bytesNeededToDownload = Math.max(
-            0, (diskWithCargo - disk.total) * DISK_CLEAR_MULTIPLIER
+            0, (diskWithCargo - disk.total)
         )
         const previousVersion = (
             response.previousCargo?.version 
@@ -283,19 +284,19 @@ export class Shabah {
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
             fileCache.putFile(
-                newCargo.storageUrl, 
-                new Response(newCargo.text, {
+                newCargo.requestUrl, 
+                new Response(JSON.stringify(newCargo.parsed), {
                     status: 200,
                     statusText: "OK",
                     headers: headers(
-                        "application/json", 
+                        "application/json",
                         stringBytes(newCargo.text)
                     )
                 })
             ),
             this.putCargoIndex(
                 {
-                    name: details.name,
+                    name: newCargo.parsed.name,
                     id: details.id,
                     state: "updating",
                     version: details.versions.new,
@@ -520,20 +521,7 @@ export class Shabah {
                 `root document caching failed, expected mime "text/html", ${mimeType ? `got ${mimeType}` : "couldn't find header 'Content-Type'"}`
             )
         }
-        const {data: rootDoc} = rootDocRequest
-        const headersCopy = {} as Record<string, string>
-        for (const [key, value] of rootDoc.headers.entries()) {
-            headersCopy[key] = value
-        }
-        const rootText = await rootDoc.text()
-        await fileCache.putFile(
-            fallbackUrl,
-            new Response(rootText, {
-                status: 200,
-                statusText: "OK",
-                headers: headersCopy
-            })
-        )
+        await fileCache.putFile(fallbackUrl, rootDocRequest.data)
         return io.ok(
             Shabah.STATUS.cached, 
             //"cached root document"
@@ -542,11 +530,6 @@ export class Shabah {
 
     uninstallAllAssets() {
         return this.fileCache.deleteAllFiles()
-    }
-
-    async getStorageUsage() {
-        const {quota, usage} = await this.fileCache.queryUsage()
-        return {used: usage, total: quota}
     }
 
     async getCargoAtUrl(storageRootUrl: string) {
@@ -562,24 +545,74 @@ export class Shabah {
         if (!cargoFileText.ok) {
             return io.err("no text found in cargo response")
         }
-        const cargoFileJson = Result.wrap(
-            () => JSON.parse(cargoFileText.data)
-        )
+        const cargoFileJson = resultJsonParse(cargoFileText.data)
         if (!cargoFileJson.ok) {
             return io.err("cargo not json encoded")
         }
-        const cargoValidated = validateManifest(cargoFileJson.data)
-        if (cargoValidated.errors.length > 0) {
-            return io.err(`cargo is not encoded correct: ${cargoValidated.errors.join(",")}`)
-        }
         return io.ok({
             name: MANIFEST_NAME,
-            pkg: cargoValidated.pkg,
+            pkg: cargoFileJson.data as CodeManifestSafe,
             bytes: stringBytes(cargoFileText.data)
         })
     }
 
     getCachedFile(url: string) {
         return this.fileCache.getFile(url)
+    }
+
+    private async deleteAllCargoFiles(storageRootUrl: string) {
+        const fullCargo = await this.getCargoAtUrl(
+            storageRootUrl
+        )
+        if (!fullCargo.ok) {
+            return io.err(`cargo does not exist in hard drive`)
+        }
+        const {pkg} = fullCargo.data
+        pkg.files.push({
+            name: MANIFEST_NAME, 
+            bytes: 0, 
+            invalidation: "default"
+        })
+        const fileCache = this.fileCache
+        const deleteResponses = await Promise.all(pkg.files.map((file) => {
+            const url = `${storageRootUrl}${file.name}`
+            return fileCache.deleteFile(url)
+        }))
+        return deleteResponses.reduce(
+            (total, next) => total && next, true
+        )
+    }
+
+    async deleteCargo(id: string) {
+        const cargoIndex = await this.getCargoIndices()
+        const index = cargoIndex.cargos.findIndex((cargo) => cargo.id === id)
+        if (index < 0) {
+            return io.err(`package with id "${id}" does not exist`)
+        }
+        const targetCargo = cargoIndex.cargos[index]
+        await this.deleteAllCargoFiles(
+            targetCargo.storageRootUrl
+        )
+        cargoIndex.cargos.splice(index, 1)
+        await this.persistCargoIndices(cargoIndex)
+        return io.ok(Shabah.STATUS.deleted)
+    }
+
+    async archiveCargo(id: string) {
+        const cargoIndex = await this.getCargoIndices()
+        const index = cargoIndex.cargos.findIndex((cargo) => cargo.id === id)
+        if (index < 0) {
+            return io.err(`package with id "${id}" does not exist`)
+        }
+        const targetCargo = cargoIndex.cargos[index]
+        await this.deleteAllCargoFiles(
+            targetCargo.storageRootUrl
+        )
+        cargoIndex.cargos.splice(index, 1, {
+            ...targetCargo,
+            state: "archived"
+        })
+        await this.persistCargoIndices(cargoIndex)
+        return io.ok(Shabah.STATUS.archived)
     }
 }

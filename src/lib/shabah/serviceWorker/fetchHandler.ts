@@ -120,12 +120,13 @@ export const makeFetchHandler = (options: FetchOptions) => {
             case CACHE_FIRST_POLICY:
             default: {
                 const cached = await fileCache.getFile(request.url)
-                log(`incoming request (cache-first): url=${request.url}, cache_hit=${!!cached}, status=${cached?.status || "none"}`)
+                log(`incoming request (cache-first): url=${request.url}, cache_hit=${!!cached}, status=${cached?.status || "none"} destination=${request.destination}`)
                 if (cached && cached.ok) {
                     cached.headers.append(CACHE_HIT_HEADER, CACHE_HIT_VALUE)
                     return cached
                 }
-                return fetchFile(event.request)
+                const res = await fetchFile(event.request)
+                return res
             }
         }
     }

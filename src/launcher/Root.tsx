@@ -22,6 +22,7 @@ import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {sleep} from "@/lib/utils/sleep"
 import type {TopLevelAppProps} from "@/lib/types/globalState"
+import {APP_CARGO_ID} from "@/config"
 
 if (isIframe()) {
   new Error("launcher cannot run inside of an iframe")
@@ -115,12 +116,10 @@ const UnsupportedFeatures = ({features}: {
   </>
 }
 
-const appPackageId = "std-pkg"
-
 const toGigabytes = (number: number) => {
   const decimal = number / BYTES_PER_GB
-  const rounded = roundDecimal(decimal, 1)
-  return Math.max(rounded, 0.1)
+  const rounded = roundDecimal(decimal, 2)
+  return Math.max(rounded, 0.01)
 }
 
 const toPercent = (fraction: number, decimals: number) => {
@@ -175,9 +174,7 @@ export const LauncherRoot = ({
   const [supportedFeatures] = useState(featureCheck())
   const [downloadError, setDownloadError] = useState("")
   const [previousUpdateFailed, setPreviousUpdateFailed] = useState(false)
-  const [buttonElement, setButtonElement] = useState(<>
-    {"start"}
-  </>)
+  const [buttonElement, setButtonElement] = useState(<>{"start"}</>)
   const [
     afterUpdateCheckAction, 
     setAfterUpdateCheckAction
@@ -194,7 +191,7 @@ export const LauncherRoot = ({
   const closeSettings = () => setSettingsMenuElement(null)
 
   const addProgressListener = () => {
-    downloadClient.addProgressListener(appPackageId, async (progress) => {
+    downloadClient.addProgressListener(APP_CARGO_ID, async (progress) => {
       const {finished, installing, total, downloaded, failed} = progress
       if (failed) {
         setShowProgress(false)
@@ -203,7 +200,7 @@ export const LauncherRoot = ({
         setDownloadError("Update Failed...")
         setButtonElement(<>{"Retry"}</>)
         document.title = APP_TITLE
-        const meta = await downloadClient.getCargoMeta(appPackageId)
+        const meta = await downloadClient.getCargoMeta(APP_CARGO_ID)
         setCurrentAppVersion(meta?.version || Shabah.NO_PREVIOUS_INSTALLATION)
       } else if (finished) {
         setProgressMsg("Installing...")
@@ -243,13 +240,12 @@ export const LauncherRoot = ({
       downloadClient.checkForCargoUpdates({
         requestUrl: root,
         storageUrl: root,
-        name: "std",
-        id: appPackageId
+        id: APP_CARGO_ID
       }),
       // should take at least 500ms
       sleep(500),
     ] as const)
-    
+    console.log(res)
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
     
     setCheckedForUpdates(true)
@@ -286,7 +282,7 @@ export const LauncherRoot = ({
       document.title = "Updating..."
       setAppUpdateInProgress(true)
       addProgressListener()
-      await downloadClient.retryFailedDownload(appPackageId)
+      await downloadClient.retryFailedDownload(APP_CARGO_ID)
       return
     }
 
@@ -319,8 +315,9 @@ export const LauncherRoot = ({
 
   useEffect(() => {
     (async () => {
-      const currentAppPkg = await downloadClient.getCargoMeta(appPackageId)
+      const currentAppPkg = await downloadClient.getCargoMeta(APP_CARGO_ID)
       if (!currentAppPkg || currentAppPkg.state === "archived") {
+        setButtonElement(<>{"install"}</>)
         return
       }
       const {state} = currentAppPkg
@@ -340,7 +337,7 @@ export const LauncherRoot = ({
         }
         return
       }
-      const updateInfo = await downloadClient.getDownloadState(appPackageId)
+      const updateInfo = await downloadClient.getDownloadState(APP_CARGO_ID)
       if (!updateInfo) {
         return
       }
@@ -358,7 +355,7 @@ export const LauncherRoot = ({
       setNextUpdateVersion(version)
       addProgressListener()
     })()
-    return downloadClient.removeProgressListener(appPackageId)
+    return downloadClient.removeProgressListener(APP_CARGO_ID)
   }, [])
 
   return (
@@ -395,8 +392,9 @@ export const LauncherRoot = ({
                         setTerminalVisibility(true)
                         closeSettings()
                     }}
+                    className="hover:text-green-500"
                   >
-                    <div className="text-sm hover:text-green-500">
+                    <div className="text-sm">
                       <span className="mr-2 text-xs">
                           <FontAwesomeIcon
                             icon={faTerminal}
@@ -410,8 +408,9 @@ export const LauncherRoot = ({
                     onClick={() => {
                         console.log("bookmark", pwaInstallPrompt)
                     }}
+                    className="hover:text-green-500"
                   >
-                    <div className="text-sm hover:text-green-500">
+                    <div className="text-sm">
                       <span className="mr-2 text-xs">
                           <FontAwesomeIcon
                             icon={faLink}
@@ -422,7 +421,13 @@ export const LauncherRoot = ({
                   </MenuItem>
 
                   <MenuItem 
+                    className="hover:text-yellow-500"
                     onClick={async () => {
+                        if (currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION) {
+                          confirm({title: "App is not installed"})
+                          closeSettings()
+                          return
+                        }
                         if (!(await confirm({title: "Are you sure you want to uninstall all files?"}))) {
                           return
                         }
@@ -443,7 +448,7 @@ export const LauncherRoot = ({
                         location.reload()
                     }}
                   >
-                    <div className="text-sm hover:text-yellow-500 w-full">
+                    <div className="text-sm w-full">
                       <span className="mr-2 text-xs">
                           <FontAwesomeIcon
                             icon={faFolderMinus}

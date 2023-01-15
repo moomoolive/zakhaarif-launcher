@@ -9,7 +9,7 @@ const allowSharedArrayBuffer = () => ({
     server.middlewares.use((_, res, next) => {
       res.setHeader("Cross-Origin-Embedder-Policy", "require-corp")
       res.setHeader("Cross-Origin-Opener-Policy", "same-origin")
-      //res.setHeader("X-Frame-Options", "deny")
+      res.setHeader("X-Frame-Options", "deny")
       next()
     })
   }

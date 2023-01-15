@@ -1,14 +1,15 @@
 import {describe, it, expect} from "vitest"
 import {checkForUpdates} from "./client"
-import {FetchFunction} from "./backend"
+import {FetchFunction, FileCache} from "./backend"
 import {ResultType, io} from "../monads/result"
 import {CodeManifestSafe} from "../cargo/index"
 import {LATEST_CRATE_VERSION} from "../cargo/consts"
 import {nanoid} from "nanoid"
 
 type FileRecord = Record<string, () => ResultType<Response>>
-const requester = (files: FileRecord) => {
-    const fileFetcher: FetchFunction = async (input) => {
+
+const fetchFnAndFileCache = (files: FileRecord) => {
+    const fetchFn: FetchFunction = async (input) => {
         const url = ((i: typeof input) => {
             return i instanceof URL 
                 ? i.href
@@ -34,7 +35,18 @@ const requester = (files: FileRecord) => {
             statusText: "NOT FOUND"
         })
     }
-    return fileFetcher
+
+    const fileCache: FileCache = {
+        getFile: (url) => fetchFn(url, {}),
+        putFile: async () => true,
+        queryUsage: async () => ({usage: 0, quota: 0}),
+        deleteFile: async () => true,
+        deleteAllFiles: async () => true,
+        listFiles: async () => [],
+        isPersisted: async () => true,
+        requestPersistence: async () => true
+    }
+    return [fetchFn, fileCache] as const
 }
 
 const cargoPkg = new CodeManifestSafe({
@@ -48,34 +60,23 @@ const cargoPkg = new CodeManifestSafe({
 
 describe("diff cargos function", () => {
     it("if storage url request encounters fatal error no update urls are returned", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 throw new Error("old cargo network error")
             }
         })
-        const res = await checkForUpdates(
-            {
-                requestRootUrl: "https://mywebsite.com/pkg", 
-                storageRootUrl: "https://local.com/store", 
-                name: "pkg"
-            }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        const res = await checkForUpdates({
+            requestRootUrl: "https://mywebsite.com/pkg", 
+            storageRootUrl: "https://local.com/store", 
+            name: "pkg"
+        }, ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
     })
 
     it("if cargo has not been downloaded before and new cargo cannot be fetched due to network error no download urls should be returned", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 throw new Error("new cargo network error")
             }
@@ -86,23 +87,14 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
     })
 
     it("if cargo has not been downloaded before and new cargo cannot be fetched because http error occurred no download urls should be returned", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response("", {
                     status: 404,
@@ -116,23 +108,14 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
     })
 
     it("if cargo has not been downloaded before and new cargo is found but is not json-encoded no download urls should be returned", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const invalidJson = "{"
                 return io.ok(new Response(invalidJson, {
@@ -147,23 +130,14 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
     })
 
     it("if cargo has not been downloaded before and new cargo is found but is not a valid cargo.json no download urls should be returned", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const invalidCargo = `{"random-key": 2}`
                 return io.ok(new Response(invalidCargo, {
@@ -178,30 +152,35 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
     })
 
-    it("if cargo has not been downloaded before and new cargo is found new cargo file urls should be returned", async () => {
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls return an error http code, an error should be returned", async () => {
         const manifest = cargoPkg.clone()
         const cargoString = JSON.stringify(manifest)
         
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
-                    statusText: "OK"
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 404,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "text/javascript"
+                    }
                 }))
             }
         })
@@ -211,16 +190,109 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls return a network error, an error should be returned", async () => {
+        const manifest = cargoPkg.clone()
+        const cargoString = JSON.stringify(manifest)
+        
+        const adaptors = fetchFnAndFileCache({
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                throw new Error("network error")
+            }
         })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls returns a valid http response with the 'content-length' header, an error should be returned", async () => {
+        const manifest = cargoPkg.clone()
+        const cargoString = JSON.stringify(manifest)
+        
+        const adaptors = fetchFnAndFileCache({
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        //"Content-Length": "1",
+                        "Content-Type": "text/javascript"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls should be returned", async () => {
+        const manifest = cargoPkg.clone()
+        const cargoString = JSON.stringify(manifest)
+        
+        const adaptors = fetchFnAndFileCache({
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "text/javascript"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
         expect(res.resoucesToDelete.length).toBe(0)
@@ -232,8 +304,56 @@ describe("diff cargos function", () => {
         expect(res.previousVersionExists).toBe(false)
     })
 
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls should be returned, with files of cargo corresponding to their 'content-length' header", async () => {
+        const manifest = cargoPkg.clone()
+        const cargoString = JSON.stringify(manifest)
+
+        const contentLength = ["10"] as const
+        const adaptors = fetchFnAndFileCache({
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": contentLength[0],
+                        "Content-Type": "text/javascript"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.downloadableResources.length).toBe(manifest.files.length)
+        expect(res.errors.length).toBe(0)
+        expect(res.resoucesToDelete.length).toBe(0)
+        expect(res.bytesToDownload).toBe(parseInt(contentLength[0], 10))
+        expect(res.newCargo?.parsed.files || []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: "index.js", 
+                    bytes: parseInt(contentLength[0], 10),
+                })
+            ])
+        )
+    })
+
     it("if previous cargo responds with error http that is not 404 should return no update urls", async () => {
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 return io.ok(new Response("", {
                     status: 403,
@@ -247,16 +367,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(false)
@@ -271,7 +382,7 @@ describe("diff cargos function", () => {
             newCargoMini: 0,
             newCargo: 0
         }
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -302,16 +413,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBe(0)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
@@ -328,7 +430,7 @@ describe("diff cargos function", () => {
             newCargoMini: 0,
             newCargo: 0
         }
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -360,16 +462,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(true)
@@ -384,7 +477,7 @@ describe("diff cargos function", () => {
             newCargoMini: 0,
             newCargo: 0
         }
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -414,16 +507,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
         expect(requestRecord.newCargo).toBeGreaterThan(0)
         expect(res.previousVersionExists).toBe(true)
@@ -434,7 +518,7 @@ describe("diff cargos function", () => {
         oldCargo.version = "2.1.2"
         const newCargo = cargoPkg.clone()
         newCargo.version = "0.1.0"
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -457,16 +541,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -477,7 +552,7 @@ describe("diff cargos function", () => {
         oldCargo.version = "2.1.2"
         const newCargo = cargoPkg.clone()
         newCargo.version = "0.1.0"
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -499,16 +574,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -519,7 +585,7 @@ describe("diff cargos function", () => {
         oldCargo.version = "2.1.2"
         const newCargo = cargoPkg.clone()
         newCargo.version = "0.1.0"
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -542,16 +608,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -562,7 +619,7 @@ describe("diff cargos function", () => {
         oldCargo.version = "2.1.2"
         const newCargo = cargoPkg.clone()
         newCargo.version = "0.1.0"
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -584,16 +641,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)
@@ -604,7 +652,7 @@ describe("diff cargos function", () => {
         oldCargo.version = "2.1.2"
         const newCargo = cargoPkg.clone()
         newCargo.version = "0.1.0"
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -626,18 +674,252 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(0)
+        expect(res.previousVersionExists).toBe(true)
+    })
+
+    it("if previous cargo is found and new cargo version is greater, and new download links return with a network error, an error should be returned", async () => {
+        const oldCargo = cargoPkg.clone()
+        oldCargo.version = "0.1.2"
+        const expiredResources = [
+            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+        ] as const
+        oldCargo.files.push(...expiredResources)
+        const newCargo = cargoPkg.clone()
+        newCargo.version = "0.1.3"
+        const newResources = [
+            {name: "rand.5.js", bytes: 600, invalidation: "default"},
+            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+        ] as const
+        newCargo.files.push(...newResources)
+        const adaptors = fetchFnAndFileCache({
+            "https://local.com/store/cargo.json": () => {
+                const pkg = JSON.stringify(oldCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/rand.5.js": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/styles.6.css": () => {
+                throw new Error("network error")
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if previous cargo is found and new cargo version is greater, and new download links return with an error http-code, an error should be returned", async () => {
+        const oldCargo = cargoPkg.clone()
+        oldCargo.version = "0.1.2"
+        const expiredResources = [
+            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+        ] as const
+        oldCargo.files.push(...expiredResources)
+        const newCargo = cargoPkg.clone()
+        newCargo.version = "0.1.3"
+        const newResources = [
+            {name: "rand.5.js", bytes: 600, invalidation: "default"},
+            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+        ] as const
+        newCargo.files.push(...newResources)
+        const adaptors = fetchFnAndFileCache({
+            "https://local.com/store/cargo.json": () => {
+                const pkg = JSON.stringify(oldCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/rand.5.js": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/styles.6.css": () => {
+                return io.ok(new Response("", {
+                    status: 404,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/css"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if previous cargo is found and new cargo version is greater, and new download links return without the 'content-length' header, an error should be returned", async () => {
+        const oldCargo = cargoPkg.clone()
+        oldCargo.version = "0.1.2"
+        const expiredResources = [
+            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+        ] as const
+        oldCargo.files.push(...expiredResources)
+        const newCargo = cargoPkg.clone()
+        newCargo.version = "0.1.3"
+        const newResources = [
+            {name: "rand.5.js", bytes: 600, invalidation: "default"},
+            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+        ] as const
+        newCargo.files.push(...newResources)
+        const adaptors = fetchFnAndFileCache({
+            "https://local.com/store/cargo.json": () => {
+                const pkg = JSON.stringify(oldCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/rand.5.js": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/styles.6.css": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        //"content-length": "1",
+                        "content-type": "text/css"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if previous cargo is found and new cargo version is greater, download links not found in previous cargo, download links that are expired, and no errors should be returned", async () => {
+        const oldCargo = cargoPkg.clone()
+        oldCargo.version = "0.1.2"
+        const expiredResources = [
+            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+        ] as const
+        oldCargo.files.push(...expiredResources)
+        const newCargo = cargoPkg.clone()
+        newCargo.version = "0.1.3"
+        const newResources = [
+            {name: "rand.5.js", bytes: 600, invalidation: "default"},
+            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+        ] as const
+        newCargo.files.push(...newResources)
+        const adaptors = fetchFnAndFileCache({
+            "https://local.com/store/cargo.json": () => {
+                const pkg = JSON.stringify(oldCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            "https://mywebsite.com/pkg/rand.5.js": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/styles.6.css": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": "1",
+                        "content-type": "text/css"
+                    }
+                }))
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                requestRootUrl: "https://mywebsite.com/pkg", 
+                storageRootUrl: "https://local.com/store", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBe(0)
+        expect(res.downloadableResources.length).toBe(
+            newResources.length
+        )
+        expect(res.resoucesToDelete.length).toBe(
+            expiredResources.length
+        )
+        const cargoString = JSON.stringify(newCargo)
+        expect(res.newCargo?.storageUrl).toBe("https://local.com/store/cargo.json")
+        expect(res.newCargo?.text).toBe(cargoString)
         expect(res.previousVersionExists).toBe(true)
     })
 
@@ -655,7 +937,11 @@ describe("diff cargos function", () => {
             {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
         ] as const
         newCargo.files.push(...newResources)
-        const fileFetcher = requester({
+
+        const contentLengths = [
+            "20", "100"
+        ] as const
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -670,6 +956,26 @@ describe("diff cargos function", () => {
                     statusText: "OK"
                 }))
             },
+            "https://mywebsite.com/pkg/rand.5.js": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": contentLengths[0],
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/styles.6.css": () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": contentLengths[1],
+                        "content-type": "text/css"
+                    }
+                }))
+            }
         })
         const res = await checkForUpdates(
             {
@@ -677,16 +983,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(
             newResources.length
@@ -694,10 +991,27 @@ describe("diff cargos function", () => {
         expect(res.resoucesToDelete.length).toBe(
             expiredResources.length
         )
-        const cargoString = JSON.stringify(newCargo)
-        expect(res.newCargo?.storageUrl).toBe("https://local.com/store/cargo.json")
-        expect(res.newCargo?.text).toBe(cargoString)
-        expect(res.previousVersionExists).toBe(true)
+        expect(res.newCargo?.parsed.files || []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: "rand.5.js",
+                    bytes: parseInt(contentLengths[0], 10)
+                }),
+                expect.objectContaining({
+                    name: "styles.6.css",
+                    bytes: parseInt(contentLengths[1], 10)
+                }),
+                expect.objectContaining({
+                    name: "index.js",
+                    bytes: 1000
+                })
+            ])
+        )
+        expect(res.bytesToDownload).toBe(
+            contentLengths
+                .map((length) => parseInt(length, 10))
+                .reduce((total, next) => total + next, 0)
+        )
     })
 
     it("if previous cargo is found and new cargo uuid mismatches old cargo's, no download links and errors should return", async () => {
@@ -715,7 +1029,7 @@ describe("diff cargos function", () => {
             {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
         ] as const
         newCargo.files.push(...newResources)
-        const fileFetcher = requester({
+        const adaptors = fetchFnAndFileCache({
             "https://local.com/store/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
@@ -737,16 +1051,7 @@ describe("diff cargos function", () => {
                 storageRootUrl: "https://local.com/store", 
                 name: "pkg"
             }
-        , fileFetcher, {
-            getFile: (url) => fileFetcher(url, {}),
-            putFile: async () => true,
-            queryUsage: async () => ({usage: 0, quota: 0}),
-            deleteFile: async () => true,
-            deleteAllFiles: async () => true,
-            listFiles: async () => [],
-            isPersisted: async () => true,
-            requestPersistence: async () => true
-        })
+        , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.previousVersionExists).toBe(true)

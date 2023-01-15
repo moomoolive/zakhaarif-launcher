@@ -1,4 +1,8 @@
-const oneTwelth = (1 / 12) * 100
+const oneTwelth = (1 / 12)
+
+const toPercent = (fraction = 0) => {
+  return `${(fraction * 100)}%`
+}
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -9,17 +13,17 @@ module.exports = {
   theme: {
     extend: {
       height: {
-        "1/12": (oneTwelth * 1).toString() + "%",
-        "2/12": (oneTwelth * 2).toString() + "%",
-        "3/12": (oneTwelth * 3).toString() + "%",
-        "4/12": (oneTwelth * 4).toString() + "%",
-        "5/12": (oneTwelth * 5).toString() + "%",
-        "6/12": (oneTwelth * 6).toString() + "%",
-        "7/12": (oneTwelth * 7).toString() + "%",
-        "8/12": (oneTwelth * 8).toString() + "%",
-        "9/12": (oneTwelth * 9).toString() + "%",
-        "10/12": (oneTwelth * 10).toString() + "%",
-        "11/12": (oneTwelth * 11).toString() + "%",
+        "1/12": toPercent(oneTwelth * 1),
+        "2/12": toPercent(oneTwelth * 2),
+        "3/12": toPercent(oneTwelth * 3),
+        "4/12": toPercent(oneTwelth * 4),
+        "5/12": toPercent(oneTwelth * 5),
+        "6/12": toPercent(oneTwelth * 6),
+        "7/12": toPercent(oneTwelth * 7),
+        "8/12": toPercent(oneTwelth * 8),
+        "9/12": toPercent(oneTwelth * 9),
+        "10/12": toPercent(oneTwelth * 10),
+        "11/12": toPercent(oneTwelth * 11),
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',

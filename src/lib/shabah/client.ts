@@ -7,6 +7,7 @@ import {
     diffManifestFiles,
     CodeManifestSafe
 } from "@/lib/cargo/index"
+import {SemVer} from "@/lib/smallSemver/index"
 import {urlToMime} from "@/lib/miniMime/index"
 import {
     FileCache, 
@@ -14,7 +15,7 @@ import {
     stringBytes,
     serviceWorkerPolicies,
 } from "./backend"
-
+import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
 
 type RequestableResource = {
     requestUrl: string
@@ -45,7 +46,9 @@ type DownloadResponse = {
     errors: string[]
     bytesToDownload: number
     newCargo: {
-        storageUrl: string 
+        storageUrl: string
+        requestUrl: string
+        response: Response
         text: string
         parsed: CodeManifestSafe
     } | null
@@ -90,6 +93,12 @@ const downloadError = (
 
 const versionUpToDate = () => downloadResponse({})
 
+const cargoHeaders = {
+    ...serviceWorkerPolicies.networkOnly,
+    pragma: "no-cache",
+    "cache-control": "no-cache"
+} as const
+
 const fetchCargo = async (
     fullUrl: string,
     name: string,
@@ -98,7 +107,7 @@ const fetchCargo = async (
     const newCargoFetch = await io.retry(
         () => fetchFn(fullUrl, {
             method: "GET",
-            headers: serviceWorkerPolicies.networkOnly
+            headers: cargoHeaders
         }),
         3
     )
@@ -106,7 +115,8 @@ const fetchCargo = async (
         return {
             error: `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
             cargo: null,
-            text: ""
+            text: "",
+            response: null
         }
     }
     const newCargoRes = newCargoFetch.data
@@ -114,25 +124,27 @@ const fetchCargo = async (
         return {
             error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
             cargo: null,
-            text: ""
+            text: "",
+            response: null
         }
     }
+    const newCargoResponseCopy = newCargoRes.clone()
     const newCargoText = await io.wrap(newCargoRes.text())
     if (!newCargoText.ok) {
         return {
             error: `new cargo for "${name}" found no text. Error: ${newCargoText.msg}`,
             cargo: null,
-            text: ""
+            text: "",
+            response: null
         }
     }
-    const newCargoJson = Result.wrap(
-        () => JSON.parse(newCargoText.data)
-    )
+    const newCargoJson = resultJsonParse(newCargoText.data)
     if (!newCargoJson.ok) {
         return {
             error: `new cargo for "${name}" was not json encoded. Error: ${newCargoJson.msg}`,
             cargo: null,
-            text: ""
+            text: "",
+            response: null
         }
     }
     const newCargoPkg = validateManifest(newCargoJson.data)
@@ -140,10 +152,51 @@ const fetchCargo = async (
         return {
             error: `new cargo for "${name}" is not a valid ${MANIFEST_NAME}. Errors: ${newCargoPkg.errors.join(",")}`,
             cargo: null,
-            text: ""
+            text: "",
+            response: null
         }
     }
-    return {error: "", cargo: newCargoPkg, text: newCargoText.data}
+    return {
+        error: "", 
+        cargo: newCargoPkg, 
+        text: newCargoText.data,
+        response: newCargoResponseCopy
+    }
+}
+
+const verifyAllRequestableFiles = async (
+    fileUrls: string[], 
+    fetchFn: FetchFunction
+) => {
+    const filesWithBytes: Map<string, number> = new Map()
+    const preFlightResponses = await Promise.all(fileUrls.map(async (url) => {
+        for (let i = 0; i < 3; i++) {
+            const response = await io.wrap(fetchFn(url, {method: "HEAD"}))
+            if (!response.ok) {
+                continue
+            }
+            if (response.data.status === 404) {
+                return url
+            }
+            if (!response.data.ok) {
+                continue
+            }
+            const contentLength = response.data.headers.get("content-length")
+            const mime = response.data.headers.get("content-type")
+            if (contentLength === null || mime === null) {
+                return url
+            }
+            const bytes = parseInt(contentLength, 10)
+            if (isNaN(bytes)) {
+                return url 
+            }
+            filesWithBytes.set(url, bytes)
+            return ""
+        }
+        return url
+    }))
+    const errorUrls = preFlightResponses.filter((url) => url.length > 0)
+    return {errorUrls, filesWithBytes}
 }
 
 export const checkForUpdates = async (
@@ -171,10 +224,10 @@ export const checkForUpdates = async (
     const notFound = !storedCargoRes
     const newCargoUrl = requestFileBase + MANIFEST_NAME
     if (notFound || storedCargoRes.status === 404) {
-        const {error, cargo: newCargoPkg, text} = await fetchCargo(
+        const {error, cargo: newCargoPkg, text, response} = await fetchCargo(
             newCargoUrl, name, fetchFn
         )
-        if (!newCargoPkg || error.length > 0) {
+        if (!newCargoPkg || !response || error.length > 0) {
             return downloadError(error, false)
         }
         const filesToDownload = newCargoPkg.pkg.files.map((f) => {
@@ -185,6 +238,25 @@ export const checkForUpdates = async (
                 bytes: f.bytes
             } as RequestableResource
         })
+        const filePreflightResponses = await verifyAllRequestableFiles(
+            filesToDownload.map((file) => file.requestUrl),
+            fetchFn
+        )
+        if (filePreflightResponses.errorUrls.length > 0) {
+            return downloadError(
+                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+                false
+            )
+        }
+        newCargoPkg.pkg.files.forEach((file) => {
+            const target = requestFileBase + file.name
+            const bytes = filePreflightResponses.filesWithBytes.get(target) || 0
+            file.bytes = bytes
+        })
+        filesToDownload.forEach((file) => {
+            const bytes = filePreflightResponses.filesWithBytes.get(file.requestUrl) || 0
+            file.bytes = bytes
+        })
         const bytesToDownload = filesToDownload.reduce((total, file) => {
             return total + file.bytes
         }, 0)
@@ -192,9 +264,11 @@ export const checkForUpdates = async (
             bytesToDownload,
             downloadableResources: filesToDownload,
             newCargo: {
-                storageUrl: cargoUrl, 
+                storageUrl: cargoUrl,
+                response,
                 text, 
-                parsed: newCargoPkg.pkg
+                parsed: newCargoPkg.pkg,
+                requestUrl: newCargoUrl
             },
             totalBytes: bytesToDownload,
             cargoManifestBytes: stringBytes(text),
@@ -204,13 +278,19 @@ export const checkForUpdates = async (
 
     // if cargo has been saved before assume that it's
     // encoded correctly
-    const oldCargo = validateManifest(await storedCargoRes.json())
+    const oldCargoPkg = await storedCargoRes.json() as CodeManifestSafe
+    const oldCargoSemanticVersion = SemVer.fromString(oldCargoPkg.version)!
+    const oldCargo = {
+        pkg: oldCargoPkg,
+        semanticVersion: oldCargoSemanticVersion
+    }
+    //const oldCargo = validateManifest(await storedCargoRes.json())
 
     const newMiniCargoUrl = requestFileBase + MANIFEST_MINI_NAME
     const newMiniCargoRes = await io.retry(
         () => fetchFn(newMiniCargoUrl, {
             method: "GET",
-            headers: serviceWorkerPolicies.networkOnly
+            headers: cargoHeaders
         }),
         3
     )
@@ -226,11 +306,11 @@ export const checkForUpdates = async (
         return versionUpToDate()
     }
 
-    const {error, cargo: newCargoPkg, text} = await fetchCargo(
+    const {error, cargo: newCargoPkg, text, response} = await fetchCargo(
         newCargoUrl, name, fetchFn
     )
 
-    if (!newCargoPkg || error.length > 0) {
+    if (!newCargoPkg || !response || error.length > 0) {
         return downloadError(error)
     }
 
@@ -254,6 +334,34 @@ export const checkForUpdates = async (
         storageUrl: storageFileBase + stripRelativePath(file.name),
         bytes: file.bytes
     }))
+    const filePreflightResponses = await verifyAllRequestableFiles(
+        filesToDownload.map((file) => file.requestUrl),
+        fetchFn
+    )
+    if (filePreflightResponses.errorUrls.length > 0) {
+        return downloadError(
+            `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+            false
+        )
+    }
+    oldCargo.pkg.files.forEach((file) => {
+        // get old file sizes, put them into sizes map
+        filePreflightResponses.filesWithBytes.set(
+            requestFileBase + file.name, file.bytes
+        )
+    })
+    newCargoPkg.pkg.files.forEach((file) => {
+        const target = requestFileBase + file.name
+        const bytes = filePreflightResponses.filesWithBytes.get(target) || 0
+        file.bytes = bytes
+    })
+    filesToDownload.forEach((file) => {
+        const bytes = (
+            filePreflightResponses.filesWithBytes.get(file.requestUrl)
+            || 0
+        )
+        file.bytes = bytes
+    })
     const bytesToDownload = filesToDownload.reduce((total, f) => {
         return total + f.bytes
     }, 0)
@@ -278,9 +386,11 @@ export const checkForUpdates = async (
         totalBytes: totalBytesOfCargo,
         resoucesToDelete: filesToDelete,
         newCargo: {
-            storageUrl: cargoUrl, 
-            text: text, 
-            parsed: newCargoPkg.pkg
+            storageUrl: cargoUrl,
+            response, 
+            text: text,
+            parsed: newCargoPkg.pkg,
+            requestUrl: newCargoUrl
         },
         previousCargo: oldCargo.pkg
     })

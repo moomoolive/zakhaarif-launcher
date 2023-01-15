@@ -14,17 +14,19 @@ import {
 } from "./consts"
 import {type} from "@/lib/utils/betterTypeof"
 
+type CargoFileOptional = Partial<{
+    name: string, 
+    bytes: number,
+    invalidation: InvalidationStrategy
+}>
+
 type CodeManifestUnsafe = (Partial<CodeManifest> & Partial<{
     authors: Array<Partial<{
         name: string, 
         email: string, 
         url: string
     }>>
-    files: Array<Partial<{
-        name: string, 
-        bytes: number,
-        invalidation: InvalidationStrategy
-    }>>
+    files: Array<CargoFileOptional> | Array<string>
     repo: Partial<{type: RepoType, url: string}>
 }>)
 
@@ -79,7 +81,7 @@ export class CodeManifestSafe {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
-            url: repo?.type || ""
+            url: repo?.url || NULL_FIELD
         }
         this.license = license
         this.keywords = keywords
@@ -93,9 +95,13 @@ export class CodeManifestSafe {
         }))
         this.description = description
         this.invalidation = invalidation
-        this.files = files.map(({name = "", bytes = 0, invalidation = "default"}) => ({
-            name, bytes, invalidation
-        }))
+        this.files = files
+            .map((file) => typeof file === "string" ? {name: file} as CargoFileOptional : file)
+            .map(({
+                name = "", bytes = 0, invalidation = "default"
+            }) => ({
+                name, bytes, invalidation
+            }))
         this.entry = entry
         this.version = version
         this.name = name
@@ -239,13 +245,20 @@ export const validateManifest = <T>(cargo: T) => {
     const fileRecord: Record<string, boolean> = {}
     const f = !fIsArray ? [] : c.files
     for (let i = 0; i < f.length; i++) {
+        const preFile = f[i]
+        if (typeof preFile === "string") {
+            f[i] = {name: preFile, bytes: 0}
+        }
         const fi = f[i]
+        if (type(fi) !== "object") {
+            errors.push(`file ${i} is not an object. Expected an object with a "name" field, got ${type(fi)}`)
+            break
+        }
         if (
             typeof fi?.name !== "string" 
-            || typeof fi?.bytes !== "number"
             || typeof (fi?.invalidation || "") !== "string" 
         ) {
-            errors.push(`file ${i} is not a valid file format, file.name and file.invalidation must be a string, while file.bytes must be a number`)
+            errors.push(`file ${i} is not a valid file format, file.name and file.invalidation must be a string`)
             break
         }
         const stdName = stripRelativePath(fi.name)
@@ -254,13 +267,17 @@ export const validateManifest = <T>(cargo: T) => {
             stdName.startsWith("https://")
             || stdName.startsWith("http://")
             // ignore duplicate files
-            || fileRecord[stdName]) {
+            || fileRecord[stdName]
+        ) {
             break
         }
         fileRecord[stdName] = true
         pkg.files.push({
             name: stdName,
-            bytes: Math.max(fi.bytes, 0),
+            bytes: Math.max(
+                typeof fi.bytes === "number" ? fi.bytes : 0, 
+                0
+            ),
             invalidation: toInvalidation(
                 fi?.invalidation || "default"
             )
@@ -282,7 +299,7 @@ export const validateManifest = <T>(cargo: T) => {
         .map(({name, email, url}) => ({
             name,  email: orNull(email), url: orNull(url)
         }))
-    pkg.crateLogoUrl = orNull(c.crateLogoUrl)
+    pkg.crateLogoUrl = stripRelativePath(orNull(c.crateLogoUrl))
     pkg.keywords = (c.keywords || [])
         .filter(w => typeof w === "string")
     pkg.license = orNull(c.license)

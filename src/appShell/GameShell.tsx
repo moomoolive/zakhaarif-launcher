@@ -4,9 +4,7 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button} from "@mui/material"
 
-const rootDoc = import.meta.env.DEV
-    ? location.origin + "/"
-    : location.origin + "/offline.html"
+const sanboxUrl = import.meta.env.VITE_APP_SANDBOX_ORIGIN
 
 const GameShellPage = () => {
     const navigate = useNavigate()
@@ -43,7 +41,10 @@ const GameShellPage = () => {
 
         <div id="cool-div">
             <iframe
-                src={`${rootDoc}?mode=game`}
+                allow=""
+                name="game-frame"
+                src={`${sanboxUrl}/`}
+                sandbox="allow-scripts allow-same-origin"
             />
         </div>
     </div>

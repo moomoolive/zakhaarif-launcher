@@ -5,7 +5,6 @@ import {
 } from "@mui/material"
 import {LauncherRoot} from "./launcher/Root"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import {isIframe} from "@/lib/utils/isIframe"
 import type {
   OutboundMessage as ServiceWorkerMessage
 } from "@/lib/types/serviceWorkers"
@@ -20,7 +19,6 @@ import {APP_CACHE} from "./config"
 import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 
 const AppShellRoot = lazyComponent(async () => (await import("./appShell/Root")).AppShellRoot)
-const GameRoot = lazyComponent(async () => (await import("./game/Root")).GameRoot)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })
@@ -30,31 +28,6 @@ const terminalState = {
 }
 
 const ALL_APIS_SUPPORTED = featureCheck().every((feature) => feature.supported)
-
-const parseQuery = (query: string) => {
-  const record = {} as Record<string, string>
-  const withoutQuestionMark = query.split("?")
-  if (withoutQuestionMark.length < 2) {
-    return record
-  }
-  const base = withoutQuestionMark[1]
-  const parts = base.split("&").filter(s => s.length > 0)
-  if (parts.length < 1) {
-    return record
-  }
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]
-    const parsedTerm = part.split("=")
-    if (parsedTerm.length === 1) {
-      record[parsedTerm[0]] = "true"
-    } else if (parsedTerm.length > 1) {
-      record[parsedTerm[0]] = parsedTerm[1]
-    }
-  }
-  return record
-}
-
-const firstQuery = parseQuery(location.search)
 
 let serviceWorkerInitialized = false
 
@@ -73,11 +46,7 @@ const  App = () => {
   
   const [showTerminal, setShowTerminal] = useState(false)
   const [showLauncher, setShowLauncher] = useState((() => {
-    if (
-      isIframe()
-      || firstQuery.mode === "game"
-      || (import.meta.env.DEV && location.pathname !== "/")
-    ) {
+    if (import.meta.env.DEV && location.pathname !== "/") {
       return false
     }
     return true
@@ -135,12 +104,12 @@ const  App = () => {
   }, [])
 
   useEffect(() => {
-    if (isIframe() || !ALL_APIS_SUPPORTED || serviceWorkerInitialized) {
+    if (!ALL_APIS_SUPPORTED || serviceWorkerInitialized) {
       return
     }
     const swUrl = import.meta.env.DEV
-      ? "dev-sw.js"
-      : "sw.js"
+      ? "dev-sw.compiled.js"
+      : "sw.compiled.js"
     navigator.serviceWorker.register(swUrl)
     const prefix = "[👷 service-worker]: "
     navigator.serviceWorker.onmessage = (msg) => {
@@ -172,32 +141,18 @@ const  App = () => {
               />
             </> : <></>}
 
-            {isIframe() ? <>
-              
-              {((query: typeof firstQuery) => {
-                switch (query.mode || "default") {
-                  case "game":
-                    return <GameRoot id={"game-root"}/>
-                  default:
-                    return <div/>
-                }
-              })(firstQuery)}
-
-            </> : <>
-              
-              {showLauncher ? <>
-                <LauncherRoot 
-                  id={"launcher-root"}
-                  globalState={globalState}
-                />
-              </>: <>
-                <AppShellRoot
-                  id={"app-shell-root"}
-                  globalState={globalState}
-                />
-              </>}
-
+            {showLauncher ? <>
+              <LauncherRoot 
+                id={"launcher-root"}
+                globalState={globalState}
+              />
+            </>: <>
+              <AppShellRoot
+                id={"app-shell-root"}
+                globalState={globalState}
+              />
             </>}
+
             </ConfirmProvider>
         </ThemeProvider>
       </main>
