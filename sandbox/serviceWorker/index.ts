@@ -1,4 +1,4 @@
-import {Rpc, MessagableEntity} from "../../src/lib/workerChannel/simpleShared"
+import {Rpc, MessagableEntity} from "../../src/lib/workerChannel/simpleServiceWorker"
 import {serviceWorkerFunctions, clientFunctions} from "../../src/lib/utils/workerCommunication/mirrorSw"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
@@ -14,7 +14,7 @@ sw.onactivate = (event) => event.waitUntil((async () => {
 const rpc = Rpc.create({
     functions: serviceWorkerFunctions,
     recipentFunctions: clientFunctions,
-    recipentWorker: sw
+    globalScope: sw
 })
 
 sw.onfetch = (event) => {

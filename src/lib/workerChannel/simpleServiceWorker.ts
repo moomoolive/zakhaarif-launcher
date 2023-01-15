@@ -1,19 +1,14 @@
-import {TransferableReturn, transferData, isTransferable} from "./shared"
-
-type RpcAction = (data?: any) => any
-
-type TerminalActions = {
-    readonly [key: string]: RpcAction
-}
-
-type TransferableFunctionReturn<T> = T extends TransferableReturn<infer ValueType>
-    ? ValueType
-    : T
-
-type RpcReturn<T> = T extends Promise<any>
-    ? TransferableFunctionReturn<T>
-    : Promise<TransferableFunctionReturn<T>>
-
+import {
+    TransferableReturn, 
+    transferData, 
+    isTransferable,
+    RpcAction,
+    TerminalActions,
+    RpcReturn,
+    MessageContainer,
+    OUTBOUND_MESSAGE,
+    RESPONSE_HANDLE
+} from "./shared"
 
 export type MessagableEntity = {
     postMessage: (data: any, transferables: Transferable[]) => any
@@ -29,29 +24,23 @@ type RecipentRpc<RecipentActions extends TerminalActions> = {
         ) => RpcReturn<ReturnType<RecipentActions[key]>>
 }
 
-type MessageContainer = {
-    handle: number
-    id: number
-    respondingTo: number
-    data: any
-}
-
-const OUTBOUND_MESSAGE = -1
-const RESPONSE_HANDLE = 1_000_000
-
-type IncomingMessageCatcher = {
+type ServiceWorkerScope = {
     addEventListener: (
         event: "message", 
-        handler: (event: {data: any, source: MessagableEntity}) => any
+        handler: (event: {
+            data: any, 
+            source: MessagableEntity, 
+            waitUntil: (promise: Promise<any>) => any
+        }) => any
     ) => any
 }
 
 type RpcArguments<
     Actions extends TerminalActions,
     RecipentActions extends TerminalActions,
-    Recipent extends IncomingMessageCatcher
+    Scope extends ServiceWorkerScope
 > = {
-    recipentWorker: Recipent
+    globalScope: Scope
     recipentFunctions: RecipentActions
     functions: Actions
 }
@@ -61,14 +50,14 @@ const emptyTransferArray = [] as Transferable[]
 export class Rpc<
     Actions extends TerminalActions,
     RecipentActions extends TerminalActions,
-    Recipent extends IncomingMessageCatcher
+    Scope extends ServiceWorkerScope
 > {
     static transfer = transferData
     static create = <
         Actions extends TerminalActions,
         RecipentActions extends TerminalActions,
-        Recipent extends IncomingMessageCatcher
-    >(options: RpcArguments<Actions, RecipentActions, Recipent>) => new Rpc(options).call
+        Scope extends ServiceWorkerScope
+    >(options: RpcArguments<Actions, RecipentActions, Scope>) => new Rpc(options).call
 
     readonly call: RecipentRpc<RecipentActions>
     
@@ -79,17 +68,19 @@ export class Rpc<
     }>
     private actionsIndex: ReadonlyArray<RpcAction>
     private messageContainer: MessageContainer
-    private recipentWorker: Recipent
+    private globalScope: Scope
 
     private constructor({
         functions,
         recipentFunctions,
-        recipentWorker
-    }: RpcArguments<Actions, RecipentActions, Recipent>) {
-        this.recipentWorker = recipentWorker
+        globalScope
+    }: RpcArguments<Actions, RecipentActions, Scope>) {
+        this.globalScope = globalScope
         const self = this
-        this.recipentWorker.addEventListener("message", (event) => {
-            self.consumeMessage(event.source, event.data)
+        this.globalScope.addEventListener("message", (event) => {
+            event.waitUntil(
+                self.consumeMessage(event.data, event.source)
+            )
         })
         this.idCount = 0
         this.queue = []
@@ -115,7 +106,12 @@ export class Rpc<
             const targetHandle = i
             Object.defineProperty(sendActions, key, {
                 value: (target: MessagableEntity, data: any, transferables?: Transferable[]) => {
-                    return self.outboundMessage(target, targetHandle, data, transferables)
+                    return self.outboundMessage(
+                        target, 
+                        targetHandle, 
+                        typeof data === "undefined" ? null : data, 
+                        transferables
+                    )
                 },
                 configurable: false,
                 writable: false,
@@ -173,8 +169,8 @@ export class Rpc<
     }
 
     private async consumeMessage(
+        message: MessageContainer,
         source: MessagableEntity,
-        message: MessageContainer
     ) {
         if (message.handle === RESPONSE_HANDLE) {
             const {queue} = this

@@ -1,18 +1,14 @@
-import {TransferableReturn, transferData, isTransferable} from "./shared"
-
-type RpcAction = (data?: any) => any
-
-type TerminalActions = {
-    readonly [key: string]: RpcAction
-}
-
-type TransferableFunctionReturn<T> = T extends TransferableReturn<infer ValueType>
-    ? ValueType
-    : T
-
-type RpcReturn<T> = T extends Promise<any>
-    ? TransferableFunctionReturn<T>
-    : Promise<TransferableFunctionReturn<T>>
+import {
+    TransferableReturn, 
+    transferData, 
+    isTransferable,
+    RpcAction,
+    TerminalActions,
+    RpcReturn,
+    MessageContainer,
+    OUTBOUND_MESSAGE,
+    RESPONSE_HANDLE
+} from "./shared"
 
 type RecipentRpc<RecipentActions extends TerminalActions> = {
     [key in keyof RecipentActions]: Parameters<RecipentActions[key]>[0] extends undefined 
@@ -22,16 +18,6 @@ type RecipentRpc<RecipentActions extends TerminalActions> = {
             transferables?: Transferable[]
         ) => RpcReturn<ReturnType<RecipentActions[key]>>
 }
-
-type MessageContainer = {
-    handle: number
-    id: number
-    respondingTo: number
-    data: any
-}
-
-const OUTBOUND_MESSAGE = -1
-const RESPONSE_HANDLE = 1_000_000
 
 export type MessagableEntity = {
     postMessage: (data: any, transferables: Transferable[]) => any
@@ -107,7 +93,11 @@ export class Rpc<
             const targetHandle = i
             Object.defineProperty(sendActions, key, {
                 value: (data: any, transferables?: Transferable[]) => {
-                    return self.outboundMessage(targetHandle, data, transferables)
+                    return self.outboundMessage(
+                        targetHandle, 
+                        typeof data === "undefined" ? null : data, 
+                        transferables
+                    )
                 },
                 configurable: false,
                 writable: false,
