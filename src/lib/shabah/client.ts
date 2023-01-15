@@ -1,4 +1,4 @@
-import {ResultType, io, Result} from "@/lib/monads/result"
+import {ResultType, io} from "@/lib/monads/result"
 import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "@/lib/cargo/consts"
 import {
     validateManifest, 

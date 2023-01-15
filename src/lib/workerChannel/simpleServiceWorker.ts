@@ -7,7 +7,8 @@ import {
     RpcReturn,
     MessageContainer,
     OUTBOUND_MESSAGE,
-    RESPONSE_HANDLE
+    RESPONSE_HANDLE,
+    ERROR_RESPONSE_HANDLE
 } from "./shared"
 
 export type MessagableEntity = {
@@ -65,6 +66,7 @@ export class Rpc<
     private queue: Array<{
         id: number
         resolve: (data: any) => void
+        reject: (reason: any) => void
     }>
     private actionsIndex: ReadonlyArray<RpcAction>
     private messageContainer: MessageContainer
@@ -128,9 +130,10 @@ export class Rpc<
         transferables?: Transferable[]
     ) {
         const self = this
-        return new Promise((resolve) => {
-            const id = self.transferMessage(target, handle, OUTBOUND_MESSAGE, data, transferables)
-            self.queue.push({id, resolve})
+        return new Promise((resolve, reject) => {
+            const id = this.idCount
+            self.queue.push({id, resolve, reject})
+            self.transferMessage(target, handle, OUTBOUND_MESSAGE, data, transferables)
         })
     }
 
@@ -145,6 +148,14 @@ export class Rpc<
         } else {
             this.transferMessage(source, RESPONSE_HANDLE, respondingTo, data)
         }
+    }
+
+    private errorResponseMessage(
+        source: MessagableEntity,
+        respondingTo: number, 
+        data: string
+    ) {
+        this.transferMessage(source, ERROR_RESPONSE_HANDLE, respondingTo, data)
     }
 
     private transferMessage(
@@ -172,12 +183,19 @@ export class Rpc<
         message: MessageContainer,
         source: MessagableEntity,
     ) {
-        if (message.handle === RESPONSE_HANDLE) {
+        if (
+            message.handle === RESPONSE_HANDLE
+            || message.handle === ERROR_RESPONSE_HANDLE
+        ) {
             const {queue} = this
             for (let index = 0; index < queue.length; index++) {
                 const element = queue[index]
                 if (message.respondingTo === element.id) {
-                    element.resolve(message.data)
+                    if (message.handle === ERROR_RESPONSE_HANDLE) {
+                        element.reject(message.data)
+                    } else {
+                        element.resolve(message.data)
+                    }
                     queue.splice(index, 1)
                     return
                 }
@@ -192,9 +210,19 @@ export class Rpc<
         }
         if (message.respondingTo === OUTBOUND_MESSAGE) {
             const handler = this.actionsIndex[message.handle]
-            this.responseMessage(
-                source, message.id, await handler(message.data)
-            )
+            try {
+                this.responseMessage(
+                    source, 
+                    message.id, 
+                    await handler(message.data) ?? null
+                )
+            } catch (err) {
+                this.errorResponseMessage(
+                    source,
+                    message.id,
+                    `rpc function "${handler.name}" encountered an exception. ${err} ${(err as Error)?.stack || "no-stack"}`
+                )
+            }
             return
         }
         console.warn("incoming message is neither a response to a previous message or a request to perform an action. ignoring message", message)

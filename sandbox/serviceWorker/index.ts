@@ -1,5 +1,7 @@
 import {Rpc, MessagableEntity} from "../../src/lib/workerChannel/simpleServiceWorker"
 import {serviceWorkerFunctions, clientFunctions} from "../../src/lib/utils/workerCommunication/mirrorSw"
+import {createFetchHandler} from "./fetchHandler"
+import {APP_CACHE} from "../config"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
 
@@ -11,30 +13,27 @@ sw.onactivate = (event) => event.waitUntil((async () => {
     console.info("[🔥 activate] new sandbox sevice worker in control")
 })())
 
-const rpc = Rpc.create({
+const _rpc = Rpc.create({
     functions: serviceWorkerFunctions,
     recipentFunctions: clientFunctions,
     globalScope: sw
 })
 
+const fetchHandler = createFetchHandler({
+    networkFetch: fetch,
+    origin: sw.location.origin,
+    fileCache: {
+        getLocalFile: async (url) => {
+            const cache = await caches.open(APP_CACHE)
+            return await cache.match(url)
+        },
+        getClientFile: async (clientId, url) => {
+            return new Response("")
+        },
+    }
+})
+
 sw.onfetch = (event) => {
     console.log("incoming request", event.request.url, event.request)
-    event.respondWith((async () => {
-        const {request} = event
-        if (request.url === `${sw.location.origin}/`) {
-            return fetch(request)
-        }
-        const {clientId, resultingClientId} = event
-        const id = clientId || resultingClientId
-        const client = await sw.clients.get(id)
-        console.log("client", client)
-        if (client) {
-            const file = await rpc.getFile(
-                client as MessagableEntity, 
-                request.url
-            )
-            console.log("response from worker", file)
-        }
-        return fetch(request)
-    })())
+    event.respondWith(fetchHandler(event))
 }

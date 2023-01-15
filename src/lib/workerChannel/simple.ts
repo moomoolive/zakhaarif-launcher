@@ -7,7 +7,8 @@ import {
     RpcReturn,
     MessageContainer,
     OUTBOUND_MESSAGE,
-    RESPONSE_HANDLE
+    RESPONSE_HANDLE,
+    ERROR_RESPONSE_HANDLE
 } from "./shared"
 
 type RecipentRpc<RecipentActions extends TerminalActions> = {
@@ -54,6 +55,7 @@ export class Rpc<
     private queue: Array<{
         id: number
         resolve: (data: any) => void
+        reject: (reason: any) => void
     }>
     private actionsIndex: ReadonlyArray<RpcAction>
     private messageContainer: MessageContainer
@@ -62,7 +64,7 @@ export class Rpc<
     private constructor({
         functions,
         recipentFunctions,
-        recipentWorker
+        recipentWorker,
     }: RpcArguments<Actions, RecipentActions, Recipent>) {
         this.recipentWorker = recipentWorker
         const self = this
@@ -72,7 +74,7 @@ export class Rpc<
         this.idCount = 0
         this.queue = []
         this.messageContainer = {
-            handle: 0,
+            handle: -1,
             id: -1,
             respondingTo: OUTBOUND_MESSAGE,
             data: null
@@ -95,7 +97,7 @@ export class Rpc<
                 value: (data: any, transferables?: Transferable[]) => {
                     return self.outboundMessage(
                         targetHandle, 
-                        typeof data === "undefined" ? null : data, 
+                        data, 
                         transferables
                     )
                 },
@@ -113,9 +115,10 @@ export class Rpc<
         transferables?: Transferable[]
     ) {
         const self = this
-        return new Promise((resolve) => {
-            const id = self.transferMessage(handle, OUTBOUND_MESSAGE, data, transferables)
-            self.queue.push({id, resolve})
+        return new Promise((resolve, reject) => {
+            const id = this.idCount
+            self.queue.push({id, resolve, reject})
+            self.transferMessage(handle, OUTBOUND_MESSAGE, data, transferables)
         })
     }
 
@@ -131,6 +134,10 @@ export class Rpc<
         }
     }
 
+    private errorResponseMessage(respondingTo: number, errorMessage: string) {
+        this.transferMessage(ERROR_RESPONSE_HANDLE, respondingTo, errorMessage)
+    }
+
     private transferMessage(
         handle: number,
         respondingTo: number, 
@@ -141,7 +148,7 @@ export class Rpc<
         const id = this.idCount++
         messageContainer.handle = handle
         messageContainer.respondingTo = respondingTo
-        messageContainer.data = data
+        messageContainer.data = data ?? null
         messageContainer.id = id
         this.recipentWorker.postMessage(
             messageContainer, 
@@ -152,12 +159,19 @@ export class Rpc<
     }
 
     private async consumeMessage(message: MessageContainer) {
-        if (message.handle === RESPONSE_HANDLE) {
+        if (
+            message.handle === RESPONSE_HANDLE
+            || message.handle === ERROR_RESPONSE_HANDLE
+        ) {
             const {queue} = this
             for (let index = 0; index < queue.length; index++) {
                 const element = queue[index]
                 if (message.respondingTo === element.id) {
-                    element.resolve(message.data)
+                    if (message.handle === ERROR_RESPONSE_HANDLE) {
+                        element.reject(message.data)
+                    } else {
+                        element.resolve(message.data)
+                    }
                     queue.splice(index, 1)
                     return
                 }
@@ -172,9 +186,15 @@ export class Rpc<
         }
         if (message.respondingTo === OUTBOUND_MESSAGE) {
             const handler = this.actionsIndex[message.handle]
-            this.responseMessage(
-                message.id, await handler(message.data)
-            )
+            try {
+                const data = await handler(message.data) ?? null
+                this.responseMessage(message.id, data)
+            } catch (err) {
+                this.errorResponseMessage(
+                    message.id,
+                    `rpc function "${handler.name}" encountered an exception. ${err} ${(err as Error)?.stack || "no-stack"}`
+                )
+            }
             return
         }
         console.warn("incoming message is neither a response to a previous message or a request to perform an action. ignoring message", message)

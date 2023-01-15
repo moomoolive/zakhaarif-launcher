@@ -1,5 +1,7 @@
 import {expect, describe, it} from "vitest"
-import {Result, resultifySync, resultifyAsync} from "./result"
+import {Result} from "./result"
+import {resultifySync} from "./resultify/sync"
+import {resultifyAsync} from "./resultify/async"
 
 describe("sync error containment functions", () => {
     it("wrap should be able to catch synchronous errors", () => {

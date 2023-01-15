@@ -1,5 +1,6 @@
 //import {Rpc} from "../src/lib/workerChannel/simple"
 //import {serviceWorkerFunctions, clientFunctions} from "../src/lib/utils/workerCommunication/mirrorSw"
+import {APP_CACHE} from "./config"
 
 const main = async () => {
     console.info("sandbox loaded...")
@@ -31,20 +32,22 @@ const main = async () => {
     //    }
     //})
     const rootDocument = `<!DOCTYPE html>${document.documentElement.outerHTML}`
-    const CACHE_NAME = "cache-v1"
-    const targetCache = await caches.open(CACHE_NAME)
-    await targetCache.put(
-        `${location.origin}/offline.html`,
-        new Response(rootDocument, {
-            status: 200,
-            statusText: "OK",
-            headers: {
-                "content-type": "text/html",
-                "content-length": (new TextEncoder().encode(rootDocument)).length.toString()
-            }
-        })
-    )
-    console.info("cached root document for offline use! Document is ready!")
-    top?.postMessage({msg: "finished"}, "*")
+    const targetCache = await caches.open(APP_CACHE)
+    await Promise.all([
+        targetCache.add("secure.mjs"),
+        await targetCache.put(
+            `${location.origin}/offline.html`,
+            new Response(rootDocument, {
+                status: 200,
+                statusText: "OK",
+                headers: {
+                    "content-type": "text/html",
+                    "content-length": (new TextEncoder().encode(rootDocument)).length.toString()
+                }
+            })
+        )
+    ])
+    console.info("cached root document!")
+    top?.postMessage({finished: true}, "*")
 }
 main()

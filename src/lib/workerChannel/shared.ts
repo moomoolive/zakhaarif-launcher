@@ -33,5 +33,6 @@ export type MessageContainer = {
 }
 
 export const OUTBOUND_MESSAGE = -1
+export const ERROR_RESPONSE_HANDLE = 1_000_001
 export const RESPONSE_HANDLE = 1_000_000
     

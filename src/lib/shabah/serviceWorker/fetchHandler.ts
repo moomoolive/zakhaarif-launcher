@@ -22,11 +22,12 @@ const CACHE_HIT_HEADER = serviceWorkerCacheHitHeader.key
 const CACHE_HIT_VALUE = serviceWorkerCacheHitHeader.value
 const CACHE_FIRST = serviceWorkerPolicies.cacheFirst["Sw-Policy"]
 
-const errorResponse = (err: unknown) => new Response("", {
+const errorResponse = (err: unknown) => new Response(
+    String(err), {
     status: 500,
     statusText: "Internal Server Error",
     headers: {
-        [serviceWorkerErrorCatchHeader]: String(err) || "1"
+        [serviceWorkerErrorCatchHeader]: "1"
     }
 })
 

@@ -154,4 +154,44 @@ describe("terminal communication", () => {
         const res = await t2.doCoolStuff(buffer, [buffer])
         expect(res).toBeInstanceOf(ArrayBuffer)
     })
+
+    it("if rpc encounters exception, exception should be returned to caller, contained where rpc took place, and prevent hanging between rpcs", async () => {
+        const terminalOneActions = {
+            ping: () => {
+                throw new Error("err")
+                return 2
+            }
+        } as const
+        
+        const terminalTwoActions = {
+            ping: () => {
+                throw new Error("random error")
+                return 3
+            }
+        } as const
+
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const terminal1 = Rpc.create({
+            functions: terminalOneActions,
+            recipentFunctions: terminalTwoActions,
+            recipentWorker: t2Worker,
+        })
+
+        const terminal2 = Rpc.create({
+            functions: terminalTwoActions,
+            recipentFunctions: terminalOneActions,
+            recipentWorker: t1Worker,
+        })
+
+        expect(
+            async () => await terminal1.ping()
+        ).rejects.toThrow()
+        expect(
+            async () => await terminal2.ping()
+        ).rejects.toThrow()
+    })
 })

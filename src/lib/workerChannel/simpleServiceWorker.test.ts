@@ -158,6 +158,41 @@ describe("terminal communication", () => {
         const res =  await sw2.transferStuff(serviceWorker1Scope, buffer, [buffer])
         expect(res).toBeInstanceOf(ArrayBuffer)
     })
+
+    it("if rpc throws an error, error should be returned to the caller and rpc should not hang", async () => {
+        const sw1Actions = {ping: () => {
+            throw new Error("err")
+            return 2
+        }} as const
+        const sw2Actions = {ping: () => {
+            throw new Error("err")
+            return 3
+        }} as const
+
+        const serviceWorker2Scope = mockSource()
+        const serviceWorker1Scope = mockSource()
+        serviceWorker1Scope._adjacentSource = serviceWorker2Scope
+        serviceWorker2Scope._adjacentSource = serviceWorker1Scope
+
+        const sw1 = Rpc.create({
+            functions: sw1Actions,
+            recipentFunctions: sw2Actions,
+            globalScope: serviceWorker1Scope
+        })
+
+        const sw2 = Rpc.create({
+            functions: sw2Actions,
+            recipentFunctions: sw1Actions,
+            globalScope: serviceWorker2Scope
+        })
+
+        expect(
+            async () => await sw1.ping(serviceWorker2Scope)
+        ).rejects.toThrow()
+        expect(
+            async () => await sw2.ping(serviceWorker1Scope)
+        ).rejects.toThrow()
+    })
 })
 
 describe("integrating with other rpc terminals", () => {
