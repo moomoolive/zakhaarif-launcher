@@ -27,7 +27,7 @@ const fetchHandler = createFetchHandler({
             const cache = await caches.open(APP_CACHE)
             return await cache.match(url)
         },
-        getClientFile: async (clientId, url) => {
+        getFile: async (url, clientId) => {
             const client = await sw.clients.get(clientId)
             if (!client) {
                 return
@@ -40,6 +40,5 @@ const fetchHandler = createFetchHandler({
 })
 
 sw.onfetch = (event) => {
-    console.log("incoming request", event.request.url, event.request)
     event.respondWith(fetchHandler(event))
 }

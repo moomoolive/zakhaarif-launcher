@@ -25,3 +25,37 @@ export const serviceWorkerPolicies = {
     cacheFirst: {"Sw-Policy": CACHE_FIRST_POLICY.toString()},
     cacheOnly: {"Sw-Policy": CACHE_ONLY_POLICY.toString()},
 } as const
+
+export const cacheHit = (response: Response) => {
+    response.headers.append(
+        serviceWorkerCacheHitHeader.key, 
+        serviceWorkerCacheHitHeader.value
+    )
+    return response
+}
+
+export const NOT_FOUND_RESPONSE = new Response("not found", {
+    status: 404, 
+    statusText: "NOT FOUND"
+})
+
+export const errorResponse = (err: unknown) => new Response(
+    String(err), {
+    status: 500,
+    statusText: "INTERNAL SERVER ERROR",
+    headers: {[serviceWorkerErrorCatchHeader]: "1"}
+})
+
+export type LogFn = (...msgs: any[]) => void
+
+export const logRequest = (
+    tag: string,
+    request: Request,
+    logFn: LogFn,
+    shouldLog: boolean,
+    cached: Response | null
+) => {
+    if (shouldLog) {
+        logFn(`incoming request (${tag}): url=${request.url}, cache_hit=${!!cached}, cache_status=${cached?.status || "none"}, mode=${request.mode}, destination=${request.destination}`)
+    }
+}

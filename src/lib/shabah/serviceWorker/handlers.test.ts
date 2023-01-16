@@ -98,6 +98,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -140,6 +141,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -185,6 +187,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -230,6 +233,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -275,6 +279,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -320,6 +325,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -361,6 +367,7 @@ describe("fetch handler", () => {
         const cache = new CacheEngine({})
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -384,171 +391,13 @@ describe("fetch handler", () => {
         expect(res.headers.get(swCache.key)).toBe(null)
     })
 
-    it("root fallback document should be requested only from cache and return if found", async () => {
-        const origin = "https://coolio.site"
-        const fallback = rootDocumentFallBackUrl(origin)
-        const networkText = "network"
-        const responses = new CacheEngine({
-            [fallback]: () => new Response(networkText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const cacheText = "cache"
-        const cache = new CacheEngine({
-            [fallback]: () => new Response(cacheText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const handler = makeFetchHandler({
-            fileCache: cache,
-            fetchFile: async (request) => {
-                const url = requestInfoToUrl(request)
-                const response = await responses.getFile(url)
-                if (response) {
-                    return response
-                }
-                return new Response("", {status: 404})
-            },
-            origin,
-            log: () => {}
-        })
-        const {event} = fetchEvent(fallback)
-        const res = await handler(event)
-        const fetchFired = responses.accessLog.find((log) => log.url === fallback)
-        expect(!!fetchFired).toBe(false)
-        const cacheAccessed = cache.accessLog.find((log) => log.url === fallback)
-        expect(!!cacheAccessed).toBe(true)
-        expect(res.status).toBe(200)
-        expect(await res.text()).toBe(cacheText)
-        expect(res.headers.get(swCache.key)).toBe(swCache.value)
-    })
-
-    it("root fallback document should be requested only from cache and return if found, even if query is present in request url", async () => {
-        const origin = "https://coolio.site"
-        const fallback = rootDocumentFallBackUrl(origin)
-        const requestUrl = fallback + "?my_query=1"
-        const networkText = "network"
-        const responses = new CacheEngine({
-            [fallback]: () => new Response(networkText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const cacheText = "cache"
-        const cache = new CacheEngine({
-            [fallback]: () => new Response(cacheText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const handler = makeFetchHandler({
-            fileCache: cache,
-            fetchFile: async (request) => {
-                const url = requestInfoToUrl(request)
-                const response = await responses.getFile(url)
-                if (response) {
-                    return response
-                }
-                return new Response("", {status: 404})
-            },
-            origin,
-            log: () => {}
-        })
-        const {event} = fetchEvent(requestUrl)
-        const res = await handler(event)
-        const fetchFired = responses.accessLog.find((log) => log.url === requestUrl)
-        expect(!!fetchFired).toBe(false)
-        const cacheAccessed = cache.accessLog.find((log) => log.url === fallback)
-        expect(!!cacheAccessed).toBe(true)
-        expect(res.status).toBe(200)
-        expect(await res.text()).toBe(cacheText)
-        expect(res.headers.get(swCache.key)).toBe(swCache.value)
-    })
-
-    it("root fallback document should be requested only from cache and return if found", async () => {
-        const origin = "https://coolio.site"
-        const fallback = rootDocumentFallBackUrl(origin)
-        const networkText = "network"
-        const responses = new CacheEngine({
-            [fallback]: () => new Response(networkText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const cacheText = "cache"
-        const cache = new CacheEngine({
-            [fallback]: () => new Response(cacheText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const handler = makeFetchHandler({
-            fileCache: cache,
-            fetchFile: async (request) => {
-                const url = requestInfoToUrl(request)
-                const response = await responses.getFile(url)
-                if (response) {
-                    return response
-                }
-                return new Response("", {status: 404})
-            },
-            origin,
-            log: () => {}
-        })
-        const {event} = fetchEvent(fallback)
-        const res = await handler(event)
-        const fetchFired = responses.accessLog.find((log) => log.url === fallback)
-        expect(!!fetchFired).toBe(false)
-        const cacheAccessed = cache.accessLog.find((log) => log.url === fallback)
-        expect(!!cacheAccessed).toBe(true)
-        expect(res.status).toBe(200)
-        expect(await res.text()).toBe(cacheText)
-        expect(res.headers.get(swCache.key)).toBe(swCache.value)
-    })
-
-    it("root fallback document should be requested only from cache, and if not found should return 404", async () => {
-        const origin = "https://coolio.site"
-        const fallback = rootDocumentFallBackUrl(origin)
-        const networkText = "network"
-        const responses = new CacheEngine({
-            [fallback]: () => new Response(networkText, {
-                status: 200,
-                statusText: "OK"
-            })
-        })
-        const cacheText = "cache"
-        const cache = new CacheEngine({})
-        const handler = makeFetchHandler({
-            fileCache: cache,
-            fetchFile: async (request) => {
-                const url = requestInfoToUrl(request)
-                const response = await responses.getFile(url)
-                if (response) {
-                    return response
-                }
-                return new Response("", {status: 500})
-            },
-            origin,
-            log: () => {}
-        })
-        const {event} = fetchEvent(fallback)
-        const res = await handler(event)
-        const fetchFired = responses.accessLog.find((log) => log.url === fallback)
-        expect(!!fetchFired).toBe(false)
-        const cacheAccessed = cache.accessLog.find((log) => log.url === fallback)
-        expect(!!cacheAccessed).toBe(true)
-        expect(res.status).toBe(404)
-        expect(res.headers.get(swCache.key)).toBe(null)
-    })
-
     it("if response is not in cache and doesn't have a network-first policy an network attempt should be made", async () => {
         const rootDoc = "https://coolio.site/"
         const responses = new CacheEngine({})
         const cache = new CacheEngine({})
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -579,6 +428,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -611,6 +461,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -648,6 +499,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -687,6 +539,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -728,6 +581,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -770,6 +624,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -813,6 +668,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -859,6 +715,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -905,6 +762,7 @@ describe("fetch handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -945,6 +803,7 @@ describe("fetch handler", () => {
         const cache = new CacheEngine({})
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -1284,6 +1143,7 @@ describe("background fetch success handler", () => {
         })
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)
@@ -1308,6 +1168,50 @@ describe("background fetch success handler", () => {
         expect(res.headers.get(swCache.key)).toBe(swCache.value)
     })
 
+    it("if request has cache-only header it should be requested from cache and return if found, even if http code is not ok", async () => {
+        const origin = "https://hi.com"
+        const requestUrl = `${origin}/my-doc.html`
+        const networkText = "network"
+        const responses = new CacheEngine({
+            [requestUrl]: () => new Response(networkText, {
+                status: 200,
+                statusText: "OK"
+            })
+        })
+        const cacheText = "cache"
+        const cache = new CacheEngine({
+            [requestUrl]: () => new Response(cacheText, {
+                status: 401,
+                statusText: "OK"
+            })
+        })
+        const handler = makeFetchHandler({
+            fileCache: cache,
+            config: {log: true},
+            fetchFile: async (request) => {
+                const url = requestInfoToUrl(request)
+                const response = await responses.getFile(url)
+                if (response) {
+                    return response
+                }
+                return new Response("", {status: 404})
+            },
+            origin,
+            log: () => {}
+        })
+        const {event} = fetchEvent(
+            requestUrl, serviceWorkerPolicies.cacheOnly
+        )
+        const res = await handler(event)
+        const fetchFired = responses.accessLog.find((log) => log.url === requestUrl)
+        expect(!!fetchFired).toBe(false)
+        const cacheAccessed = cache.accessLog.find((log) => log.url === requestUrl)
+        expect(!!cacheAccessed).toBe(true)
+        expect(res.status).toBe(401)
+        expect(await res.text()).toBe(cacheText)
+        expect(res.headers.get(swCache.key)).toBe(swCache.value)
+    })
+
     it("if request has cache-only header it should be requested from cache and if not found should return 404", async () => {
         const origin = "https://hi.com"
         const requestUrl = `${origin}/my-doc.html`
@@ -1322,6 +1226,7 @@ describe("background fetch success handler", () => {
         const cache = new CacheEngine({})
         const handler = makeFetchHandler({
             fileCache: cache,
+            config: {log: true},
             fetchFile: async (request) => {
                 const url = requestInfoToUrl(request)
                 const response = await responses.getFile(url)

@@ -6,12 +6,8 @@ import type {
 import { 
     makeBackgroundFetchHandler
 } from "../src/lib/shabah/serviceWorker/backgroundFetchHandler"
-import {
-    makeFetchHandler, 
-} from "../src/lib/shabah/serviceWorker/fetchHandler"
-import {
-    webCacheFileCache
-} from "../src/lib/shabah/adaptors/fileCache/webCache"
+import {makeFetchHandler} from "../src/lib/shabah/serviceWorker/fetchHandler"
+import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
 
 const sw = globalThis.self as unknown as (
     ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
@@ -57,20 +53,21 @@ sw.onactivate = (event) => {
 
 const fileCache = webCacheFileCache(APP_CACHE)
 
+const fetchHandler = makeFetchHandler({
+    fileCache, 
+    origin: sw.location.origin,
+    fetchFile: fetch,
+    log: console.info,
+    config
+})
+
+sw.onfetch = (event) => event.respondWith(fetchHandler(event))
+
 const logger = (...msgs: any[]) => {
     if (config.log) {
         console.info(...msgs)
     }
 }
-
-const fetchHandler = makeFetchHandler({
-    fileCache, 
-    origin: sw.location.origin,
-    fetchFile: fetch,
-    log: logger
-})
-
-sw.onfetch = (event) => event.respondWith(fetchHandler(event))
 
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,

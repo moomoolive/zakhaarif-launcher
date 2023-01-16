@@ -40,7 +40,7 @@ export default defineConfig({
   plugins: [
     react(),
     allowSharedArrayBuffer(),
-    logServerRequests({silent: false, withHeaders: false})
+    logServerRequests({silent: true, withHeaders: false})
   ],
   build: {
     manifest: "build-manifest.json",

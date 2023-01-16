@@ -2,7 +2,8 @@ import {expect, it, describe} from "vitest"
 import {createFetchHandler, FileCache, FetchHandlerEvent} from "./fetchHandler"
 import {
     serviceWorkerCacheHitHeader as cacheHitHeader,
-    serviceWorkerErrorCatchHeader as ErrorHeader
+    serviceWorkerErrorCatchHeader as ErrorHeader,
+    serviceWorkerPolicies as policies
 } from "../../src/lib/shabah/serviceWorkerMeta"
 
 const requestInfoToUrl = (request: RequestInfo | URL) => {
@@ -51,7 +52,7 @@ const createFileCache = ({
     const clientCache = new MockCache(clientFileHandlers)
     const networkCache = new MockCache(networkFileHandlers)
     const fileCache: FileCache = {
-        getClientFile(_, url) {
+        getFile(url, _) {
             return clientCache.getFile(url)
         },
         getLocalFile(url) {
@@ -83,7 +84,9 @@ const fetchEvent = (url: string, headers: Record<string, string> = {}) => {
             res: null,
             respondWith: (res) => { output.response = res },
             request: new Request(url, {headers}),
-            waitUntil: () => {}
+            waitUntil: () => {},
+            clientId: "",
+            resultingClientId: "",
         } as FetchHandlerEvent
     } as const
 }
@@ -641,5 +644,421 @@ describe("fetch handler behaviour with other resources on origin", () => {
         expect(networkCache.accessLog.length).toBe(0)
         expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
         expect(clientCache.accessLog.length).toBe(0)
+    })
+})
+
+describe("fetch event behaviour with all other origins", () => {
+    it("network only requests should only go through network", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => new Response("", {status: 200})
+            },
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const handler = createFetchHandler({origin, ...adaptors})
+        const {event} = fetchEvent(requestUrl, policies.networkOnly)
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.length).toBe(0)
+    })
+
+    it("network only requests should only go through network even if network response is not ok", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => new Response("", {status: 403})
+            },
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const handler = createFetchHandler({origin, ...adaptors})
+        const {event} = fetchEvent(requestUrl, policies.networkOnly)
+        const res = await handler(event)
+        expect(res.status).toBe(403)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.length).toBe(0)
+    })
+
+    it("network only requests should return 500 if network error occurs, and not search any caches", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 403})
+                }
+            },
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkOnly)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(500)
+        expect(res.headers.has(ErrorHeader)).toBe(true)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.length).toBe(0)
+    })
+
+    it("network first should request from network first and return if response recieved", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.length).toBe(0)
+    })
+
+    it("network first should request from network first and return if response recieved, even if returned code is not ok", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 403})
+                }
+            },
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(403)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.length).toBe(0)
+    })
+
+    it("network first should request from network first and if network error occurs, return client cached file", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 403})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("network first should request from network first and if network error occurs, return client cached file", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 403})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("network first should request from network first and if network error occurs, then request from client cache, and if resource is not found return 500", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 403})
+                }
+            },
+            clientFileHandlers: {
+                //[requestUrl]: () => {
+                //    return new Response("", {status: 200})
+                //}
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(500)
+        expect(res.headers.has(ErrorHeader)).toBe(true)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("network first should request from network first and if network error occurs, then request from client cache, and if resource is cached but has error http code return 500", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 403})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 403})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.networkFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(500)
+        expect(res.headers.has(ErrorHeader)).toBe(true)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-only requests should return file from client cache", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheOnly)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
+        expect(networkCache.accessLog.length).toBe(0)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-only requests should request file from client cache first, and if not found return 404", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                //[requestUrl]: () => {
+                //    return new Response("", {status: 200})
+                //}
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheOnly)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(404)
+        expect(networkCache.accessLog.length).toBe(0)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-only requests should request file from client cache first, and if found with error http code, return response", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 401})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheOnly)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(401)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
+        expect(networkCache.accessLog.length).toBe(0)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-first requests should request file from client cache first, and if found return response", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
+        expect(networkCache.accessLog.length).toBe(0)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-first requests should request file from client cache first, and if found but response has error http code, return network response", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 401})
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.has(cacheHitHeader.key)).toBe(false)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-first requests should request file from client cache first, and if not found, return network response", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                //[requestUrl]: () => {
+                //    return new Response("", {status: 401})
+                //}
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(200)
+        expect(res.headers.has(cacheHitHeader.key)).toBe(false)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-first requests should request file from client cache first, and if not found, return network response, even if response is not ok", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    return new Response("", {status: 403})
+                }
+            },
+            clientFileHandlers: {
+                //[requestUrl]: () => {
+                //    return new Response("", {status: 401})
+                //}
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(403)
+        expect(res.headers.has(cacheHitHeader.key)).toBe(false)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+    })
+
+    it("cache-first requests should request file from client cache first, and if not found, return network response, and if network error occurs, return 500", async () => {
+        const origin = "https://donuts.com"
+        const requestUrl = "https://cookies.com/index,js"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [requestUrl]: () => {
+                    throw new Error("network error")
+                    return new Response("", {status: 200})
+                }
+            },
+            clientFileHandlers: {
+                //[requestUrl]: () => {
+                //    return new Response("", {status: 401})
+                //}
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const {event} = fetchEvent(requestUrl, policies.cacheFirst)
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(event)
+        expect(res.status).toBe(500)
+        expect(res.headers.has(ErrorHeader)).toBe(true)
+        expect(networkCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
+        expect(localCache.accessLog.length).toBe(0)
+        expect(clientCache.accessLog.some((log) => log.url === requestUrl)).toBe(true)
     })
 })
