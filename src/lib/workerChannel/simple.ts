@@ -26,28 +26,20 @@ export type MessagableEntity = {
 }
 
 type RpcArguments<
-    Actions extends TerminalActions,
-    RecipentActions extends TerminalActions,
-    Recipent extends MessagableEntity
+    RecipentActions extends TerminalActions
 > = {
-    recipentWorker: Recipent
+    recipentWorker: MessagableEntity
     recipentFunctions: RecipentActions
-    functions: Actions
+    functions: TerminalActions
 }
 
 const emptyTransferArray = [] as Transferable[]
 
-export class Rpc<
-    Actions extends TerminalActions,
-    RecipentActions extends TerminalActions,
-    Recipent extends MessagableEntity
-> {
+export class Rpc<RecipentActions extends TerminalActions> {
     static transfer = transferData
     static create = <
-        Actions extends TerminalActions,
         RecipentActions extends TerminalActions,
-        Recipent extends MessagableEntity
-    >(options: RpcArguments<Actions, RecipentActions, Recipent>) => new Rpc(options).call
+    >(options: RpcArguments<RecipentActions>) => new Rpc(options).call
 
     readonly call: RecipentRpc<RecipentActions>
     
@@ -59,13 +51,13 @@ export class Rpc<
     }>
     private actionsIndex: ReadonlyArray<RpcAction>
     private messageContainer: MessageContainer
-    private recipentWorker: Recipent
+    private recipentWorker: MessagableEntity
 
     private constructor({
         functions,
         recipentFunctions,
         recipentWorker,
-    }: RpcArguments<Actions, RecipentActions, Recipent>) {
+    }: RpcArguments<RecipentActions>) {
         this.recipentWorker = recipentWorker
         const self = this
         this.recipentWorker.addEventListener("message", (event) => {

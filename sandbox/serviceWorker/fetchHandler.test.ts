@@ -312,171 +312,7 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
         ).toBe(false)
     })
 
-    it("should return 500 if request url has 'csp' and 'entry' parameters but root document not cached and cannot be reached by network", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                //[`${origin}/`]: () => {
-                //    return new Response(rootText, {
-                //        status: 200
-                //    })
-                //},
-            },
-            localFileHandlers: {
-                //[`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.headers.has(ErrorHeader)).toBe(true)
-        expect(res.status).toBe(500)
-        expect(
-            networkCache.accessLog.some((log) => log.url === `${origin}/`)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("should return 500 if request url has 'csp' and 'entry' parameters but root document not cached and network error thrown when requesting root document", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    throw new Error("network error")
-                    return new Response(rootText, {
-                        status: 200
-                    })
-                },
-            },
-            localFileHandlers: {
-                //[`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.headers.has(ErrorHeader)).toBe(true)
-        expect(res.status).toBe(500)
-        expect(
-            networkCache.accessLog.some((log) => log.url === `${origin}/`)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("should return 500 if request url has 'csp' and 'entry' parameters but root document not cached and network request to root document returns error http code", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    return new Response(rootText, {
-                        status: 403
-                    })
-                },
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.headers.has(ErrorHeader)).toBe(true)
-        expect(res.status).toBe(500)
-        expect(
-            networkCache.accessLog.some((log) => log.url === `${origin}/`)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("should return 200 if request url has 'csp' and 'entry' parameters and root document is not cached but reachable by network", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    return new Response(rootText, {
-                        status: 200
-                    })
-                },
-            },
-            localFileHandlers: {
-                //[`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.status).toBe(200)
-        expect(
-            networkCache.accessLog.some((log) => log.url === `${origin}/`)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("should return 200 if request url has 'csp' and 'entry' parameters and root document is cached with error http code but reachable by network", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    return new Response(rootText, {
-                        status: 200
-                    })
-                },
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.status).toBe(200)
-        expect(
-            networkCache.accessLog.some((log) => log.url === `${origin}/`)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("should return 200 if request url has 'csp' and 'entry' parameters root document is cached", async () => {
+    it("should return 200 if request url has 'csp' and 'entry' parameters", async () => {
         const origin = "https://donuts.com"
         const rootText = "root text"
         const cacheText = "cache text"
@@ -511,47 +347,7 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
         ).toBe(false)
         expect(
             localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(false)
-    })
-
-    it("should return exact same headers as cached root document", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    return new Response(rootText, {
-                        status: 200
-                    })
-                },
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => {
-                    return new Response(cacheText, {status: 200})
-                }
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/runProgram?csp=true&entry=index.js`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.status).toBe(200)
-
-        const cachedDoc = (await localCache.getFile(`${origin}/offline.html`))!
-        cachedDoc.headers.forEach((value, key) => {
-            expect(res.headers.get(key)).toBe(value)
-        })
-
-        expect(
-            networkCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
         expect(
             clientCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(false)
@@ -596,7 +392,7 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
         ).toBe(false)
         expect(
             localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
+        ).toBe(false)
         expect(
             clientCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(false)
@@ -620,7 +416,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 [`${origin}/offline.html`]: () => {
                     return new Response(cacheText, {status: 200})
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response("console.log(0)", {
                         status: 200,
                         headers: {
@@ -640,6 +436,42 @@ describe("fetch handler behaviour with other resources on origin", () => {
         expect(clientCache.accessLog.length).toBe(0)
     })
 
+    it("should not return 404 if test.mjs is requested", async () => {
+        const origin = "https://donuts.com"
+        const rootText = "root text"
+        const cacheText = "cache text"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [`${origin}/`]: () => {
+                    return new Response(rootText, {
+                        status: 200
+                    })
+                },
+                [`${origin}/test.mjs`]: () => {
+                    return new Response("", {status: 200})
+                }
+            },
+            localFileHandlers: {
+                [`${origin}/offline.html`]: () => {
+                    return new Response(cacheText, {status: 200})
+                },
+                [`${origin}/secure.compiled.js`]: () => {
+                    return new Response("console.log(0)", {
+                        status: 200,
+                        headers: {
+                            "content-type": "text/javascript"
+                        }
+                    })
+                }
+            }
+        })
+        const {networkCache, localCache, clientCache} = caches
+        const handler = createFetchHandler({origin, ...adaptors})
+        const res = await handler(fetchEvent(`${origin}/test.mjs`).event)
+        expect(res.status).toBe(200)
+        expect(networkCache.accessLog.length).toBeGreaterThan(0)
+    })
+
     it("should return cached document if same origin request is to 'secure.mjs'", async () => {
         const origin = "https://donuts.com"
         const rootText = "root text"
@@ -657,7 +489,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 [`${origin}/offline.html`]: () => {
                     return new Response(cacheText, {status: 200})
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 200,
                         headers: {
@@ -669,7 +501,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
         })
         const {networkCache, localCache, clientCache} = caches
         const handler = createFetchHandler({origin, ...adaptors})
-        const secureScript = `${origin}/secure.mjs`
+        const secureScript = `${origin}/secure.compiled.js`
         const res = await handler(fetchEvent(secureScript).event)
         expect(res.status).toBe(200)
         expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
@@ -691,7 +523,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                         status: 200
                     })
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 200,
                         headers: {
@@ -704,7 +536,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 [`${origin}/offline.html`]: () => {
                     return new Response(cacheText, {status: 200})
                 },
-                //[`${origin}/secure.mjs`]: () => {
+                //[`${origin}/secure.compiled.js`]: () => {
                 //    return new Response(secureText, {
                 //        status: 200,
                 //        headers: {
@@ -716,7 +548,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
         })
         const {networkCache, localCache, clientCache} = caches
         const handler = createFetchHandler({origin, ...adaptors})
-        const secureScript = `${origin}/secure.mjs`
+        const secureScript = `${origin}/secure.compiled.js`
         const res = await handler(fetchEvent(secureScript).event)
         expect(res.status).toBe(200)
         expect(await res.text()).toBe(secureText)
@@ -737,7 +569,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                         status: 200
                     })
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 200,
                         headers: {
@@ -750,7 +582,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 [`${origin}/offline.html`]: () => {
                     return new Response(cacheText, {status: 200})
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 403,
                         headers: {
@@ -762,7 +594,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
         })
         const {networkCache, localCache, clientCache} = caches
         const handler = createFetchHandler({origin, ...adaptors})
-        const secureScript = `${origin}/secure.mjs`
+        const secureScript = `${origin}/secure.compiled.js`
         const res = await handler(fetchEvent(secureScript).event)
         expect(res.status).toBe(200)
         expect(await res.text()).toBe(secureText)
@@ -788,7 +620,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 [`${origin}/offline.html`]: () => {
                     return new Response(cacheText, {status: 200})
                 },
-                [`${origin}/secure.mjs`]: () => {
+                [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 200,
                         headers: {
@@ -800,7 +632,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
         })
         const {networkCache, localCache, clientCache} = caches
         const handler = createFetchHandler({origin, ...adaptors})
-        const secureScript = `${origin}/secure.mjs`
+        const secureScript = `${origin}/secure.compiled.js`
         const withQuery = secureScript + "?q=true"
         const res = await handler(fetchEvent(withQuery).event)
         expect(res.status).toBe(200)

@@ -1,4 +1,4 @@
-import {Rpc, MessagableEntity} from "../../src/lib/workerChannel/simpleServiceWorker"
+import {Rpc} from "../../src/lib/workerChannel/simpleServiceWorker"
 import {serviceWorkerFunctions, clientFunctions} from "../../src/lib/utils/workerCommunication/mirrorSw"
 import {createFetchHandler} from "./fetchHandler"
 import {APP_CACHE} from "../config"
@@ -13,7 +13,7 @@ sw.onactivate = (event) => event.waitUntil((async () => {
     console.info("[🔥 activate] new sandbox sevice worker in control")
 })())
 
-const _rpc = Rpc.create({
+const rpc = Rpc.create({
     functions: serviceWorkerFunctions,
     recipentFunctions: clientFunctions,
     globalScope: sw
@@ -28,6 +28,12 @@ const fetchHandler = createFetchHandler({
             return await cache.match(url)
         },
         getClientFile: async (clientId, url) => {
+            const client = await sw.clients.get(clientId)
+            if (!client) {
+                return
+            }
+            const file = await rpc.getFile(client, url)
+            console.log("from worker", file)
             return new Response("")
         },
     }

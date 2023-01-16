@@ -13,8 +13,7 @@ export const generateTemplate = ({
     <meta http-equiv="Content-Security-Policy" content="${securityPolicy}"/>
 </head>
 <body>
-    <div id="root"></div>
-    <script entry="${importSource}" id="root-script" src="secure.mjs" type="module" defer> </script>
+    <script entry="${importSource}" id="root-script" src="./secure.compiled.js" type="module" defer> </script>
 </body>
 </html>`.trim()
 }

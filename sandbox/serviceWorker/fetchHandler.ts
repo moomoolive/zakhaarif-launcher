@@ -1,4 +1,4 @@
-import {generateTemplate} from "../templatingEngine/generateTemplateBase"
+import {generateTemplate} from "./generateTemplateBase"
 import {
     serviceWorkerCacheHitHeader as cacheHitHeader,
     serviceWorkerErrorCatchHeader as ErrorHeader
@@ -46,7 +46,8 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
     const rootDoc = `${origin}/`
     const offlineFallback = `${origin}/offline.html`
     const templateEndpoint = `${origin}/runProgram`
-    const entryScript = `${origin}/secure.mjs`
+    const entryScript = `${origin}/secure.compiled.js`
+    const testScript = `${origin}/test.mjs`
     return async (event: FetchHandlerEvent) => {
         const {request} = event
         if (request.url === rootDoc) {
@@ -70,21 +71,19 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
             if (!params.has("csp") || !params.has("entry")) {
                 return errorResponse("template endpoint have both an 'csp' and 'entry' query")
             }
-            const cachedHtml = await fileCache.getLocalFile(offlineFallback)
-            const baseHtml = cachedHtml && cachedHtml.ok
-                ? cachedHtml
-                : await containIo(networkFetch(rootDoc))
-            if (!baseHtml || !baseHtml.ok) {
-                return errorResponse("template endpoint can only be used after caching root document")
-            }
-            const {headers} = baseHtml
             const securityPolicy = decodeURIComponent(params.get("csp") || "")
             const importSource = decodeURIComponent(params.get("entry") || "")
             const templateText = generateTemplate({securityPolicy, importSource})
             return new Response(templateText, {
                 status: 200,
                 statusText: "OK",
-                headers
+                headers: {
+                    "content-type": "text/html",
+                    "content-length": new TextEncoder().encode(templateText).length.toString(),
+                    "Cross-Origin-Embedder-Policy": "require-corp",
+                    "Cross-Origin-Opener-Policy": "same-origin",
+                    "Cross-Origin-Resource-Policy": "cross-origin",
+                }
             })
         }
 
@@ -93,6 +92,10 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
             if (cached && cached.ok) {
                 return cacheHit(cached)
             }
+            return networkFetch(request)
+        }
+
+        if (request.url.startsWith(testScript)) {
             return networkFetch(request)
         }
 

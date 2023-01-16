@@ -36,29 +36,19 @@ type ServiceWorkerScope = {
     ) => any
 }
 
-type RpcArguments<
-    Actions extends TerminalActions,
-    RecipentActions extends TerminalActions,
-    Scope extends ServiceWorkerScope
-> = {
-    globalScope: Scope
+type RpcArguments<RecipentActions extends TerminalActions> = {
+    globalScope: ServiceWorkerScope
     recipentFunctions: RecipentActions
-    functions: Actions
+    functions: TerminalActions
 }
 
 const emptyTransferArray = [] as Transferable[]
 
-export class Rpc<
-    Actions extends TerminalActions,
-    RecipentActions extends TerminalActions,
-    Scope extends ServiceWorkerScope
-> {
+export class Rpc<RecipentActions extends TerminalActions> {
     static transfer = transferData
     static create = <
-        Actions extends TerminalActions,
         RecipentActions extends TerminalActions,
-        Scope extends ServiceWorkerScope
-    >(options: RpcArguments<Actions, RecipentActions, Scope>) => new Rpc(options).call
+    >(options: RpcArguments<RecipentActions>) => new Rpc(options).call
 
     readonly call: RecipentRpc<RecipentActions>
     
@@ -70,13 +60,13 @@ export class Rpc<
     }>
     private actionsIndex: ReadonlyArray<RpcAction>
     private messageContainer: MessageContainer
-    private globalScope: Scope
+    private globalScope: ServiceWorkerScope
 
     private constructor({
         functions,
         recipentFunctions,
         globalScope
-    }: RpcArguments<Actions, RecipentActions, Scope>) {
+    }: RpcArguments<RecipentActions>) {
         this.globalScope = globalScope
         const self = this
         this.globalScope.addEventListener("message", (event) => {

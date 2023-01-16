@@ -9,7 +9,7 @@
     "type-check": "tsc",
     "build": "npm run type-check && npm run build-main",
     "build-main": "npm run sw && vite build",
-    "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/sw.compiled.js",
+    "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/sw.compiled.js && esbuild ./sandbox/secure.ts --bundle --minify --format=esm --outfile=./sandbox/src/secure.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
     "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox",

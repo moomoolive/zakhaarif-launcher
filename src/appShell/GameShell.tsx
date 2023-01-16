@@ -3,8 +3,10 @@ import {useEffect, useState} from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button} from "@mui/material"
+import startGameUrl from "@/game/main?url"
 
 const sanboxUrl = import.meta.env.VITE_APP_SANDBOX_ORIGIN
+const gameEntry = `${location.origin}${startGameUrl}`
 
 const GameShellPage = () => {
     const navigate = useNavigate()
@@ -43,7 +45,7 @@ const GameShellPage = () => {
             <iframe
                 allow=""
                 name="game-frame"
-                src={`${sanboxUrl}/`}
+                src={`${sanboxUrl}/runProgram?entry=${encodeURIComponent(gameEntry)}&csp=${encodeURIComponent(`default-src 'self' ${location.origin};`)}`}
                 sandbox="allow-scripts allow-same-origin"
             />
         </div>

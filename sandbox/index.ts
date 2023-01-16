@@ -34,7 +34,7 @@ const main = async () => {
     const rootDocument = `<!DOCTYPE html>${document.documentElement.outerHTML}`
     const targetCache = await caches.open(APP_CACHE)
     await Promise.all([
-        targetCache.add("secure.mjs"),
+        targetCache.add("secure.compiled.js"),
         await targetCache.put(
             `${location.origin}/offline.html`,
             new Response(rootDocument, {
