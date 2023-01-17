@@ -1,7 +1,6 @@
 import {wRpc} from "../../src/lib/wRpc/simple"
-import {sandboxToServiceWorkerRpc} from "../../src/lib/utils/workerCommunication/mirrorSw"
 import {createFetchHandler} from "./fetchHandler"
-import {serviceWorkerToSandboxRpc} from "../../src/lib/utils/workerCommunication/sandbox"
+import {CallableFunctions as SandboxFunctions} from "../sandboxFunctions"
 import {APP_CACHE} from "../config"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
@@ -14,14 +13,29 @@ sw.onactivate = (event) => event.waitUntil((async () => {
     console.info("[🔥 activate] new sandbox sevice worker in control")
 })())
 
-const rpc = new wRpc({
+const sandboxToServiceWorkerRpc = {} as const
+
+export type CallableFunctions = typeof sandboxToServiceWorkerRpc
+
+const rpc = new wRpc<SandboxFunctions>({
     responses: sandboxToServiceWorkerRpc,
-    callableFunctions: serviceWorkerToSandboxRpc,
     messageTarget: {postMessage: () => {}},
-    messageInterceptor: sw
+    messageInterceptor: {
+        addEventListener: (_, handler) => {
+            sw.addEventListener("message", (event) => {
+                event.waitUntil(handler(event))
+            })
+        }
+    }
 })
 
 const config = {log: true}
+
+const DEV_MODE = sw.location.origin.startsWith("http://locahost")
+
+const accessHeaders = DEV_MODE 
+    ? {"Access-Control-Allow-Origin": "http://localhost:5173"} as const
+    : {"Access-Control-Allow-Origin": "*"} as const
 
 const fetchHandler = createFetchHandler({
     networkFetch: fetch,
@@ -36,17 +50,26 @@ const fetchHandler = createFetchHandler({
             if (!client) {
                 return null
             }
-            const file = await rpc.executeWithSource(
-                "getFile", client, url
-            )
-            console.log("from worker", file)
-            return new Response("")
+            const file = await rpc.executeWithSource("getFile", client, url)
+            if (!file) {
+                return null
+            }
+            return new Response(file.body, {
+                status: 200,
+                statusText: "OK",
+                headers: {
+                    "content-type": file.type,
+                    "content-length": file.length
+                }
+            })
         },
     },
     templateHeaders: {
         "Cross-Origin-Embedder-Policy": "require-corp",
         "Cross-Origin-Opener-Policy": "same-origin",
         "Cross-Origin-Resource-Policy": "cross-origin",
+        "Vary": "origin",
+        ...accessHeaders,
     },
     log: console.info,
     config,

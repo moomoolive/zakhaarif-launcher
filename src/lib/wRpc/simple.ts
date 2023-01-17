@@ -1,11 +1,17 @@
 // a random number
 const TDATA = 1_432_234
 
+export interface TransferValue<T> {
+    value: T
+    transferables: Transferable[]
+    __x_tdata__: typeof TDATA
+}
+
 const transferData = <T>(value: T, transferables: Transferable[]) => ({
     value, 
     transferables,
     __x_tdata__: TDATA
-} as {value: T, transferables: Transferable[]})
+} as TransferValue<T>)
 
 type TransferableReturn<T> = ReturnType<typeof transferData<T>>
 
@@ -22,12 +28,18 @@ export type TerminalActions = {
     readonly [key: string]: RpcAction
 }
 
+export type TActions<T extends TerminalActions> = {
+    [key in keyof T]: T[key] extends (arg: infer Arg) => infer Return
+        ? (arg: Arg) => Return
+        : never
+}
+
 type TransferableFunctionReturn<T> = T extends TransferableReturn<infer ValueType>
     ? ValueType
     : T
 
-export type RpcReturn<T> = T extends Promise<any>
-    ? TransferableFunctionReturn<T>
+export type RpcReturn<T> = T extends Promise<infer PromiseResolve>
+    ? Promise<TransferableFunctionReturn<PromiseResolve>>
     : Promise<TransferableFunctionReturn<T>>
 
 export type MessageContainer = {
@@ -52,7 +64,6 @@ type RecipentRpc<RecipentActions extends TerminalActions> = {
 
 export type MessagableEntity = {
     postMessage: (data: any, transferables: Transferable[]) => any
-    //addEventListener: (event: "message", handler: (event: {data: any}) => any) => any
 }
 
 type MessageInterceptor = {
@@ -65,11 +76,8 @@ type MessageInterceptor = {
     ) => any
 }
 
-type RpcArguments<
-    RecipentActions extends TerminalActions
-> = {
+type RpcArguments = {
     messageTarget: MessagableEntity
-    callableFunctions?: RecipentActions
     responses: TerminalActions,
     messageInterceptor: MessageInterceptor
 }
@@ -78,12 +86,7 @@ const emptyTransferArray = [] as Transferable[]
 
 export class wRpc<RecipentActions extends TerminalActions = {}> {
     static transfer = transferData
-    static create = <
-        RecipentActions extends TerminalActions,
-    >(options: RpcArguments<RecipentActions>) => new wRpc(options).proxy
 
-    readonly proxy: RecipentRpc<RecipentActions>
-    
     private idCount: number
     private queue: Array<{
         id: number
@@ -97,10 +100,9 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
 
     constructor({
         responses,
-        callableFunctions = {} as RecipentActions,
         messageTarget,
         messageInterceptor,
-    }: RpcArguments<RecipentActions>) {
+    }: RpcArguments) {
         this.messageInterceptor = messageInterceptor
         this.messageTarget = messageTarget
         this.messageInterceptor.addEventListener("message", (event) => {
@@ -125,29 +127,6 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
             const element = actionKeys[index]
             this.actionsIndex.set(element, responses[element])
         }
-        
-        const sendActions = {}
-        const recipentKeys = Object.keys(callableFunctions)
-        for (let i = 0; i < recipentKeys.length; i++) {
-            const key = recipentKeys[i]
-            Object.defineProperty(sendActions, key, {
-                value: (
-                    data: unknown = null, 
-                    transferables: Transferable[] = emptyTransferArray
-                ) => {
-                    return self.outboundMessage(
-                        self.messageTarget,
-                        key, 
-                        data, 
-                        transferables
-                    )
-                },
-                configurable: false,
-                writable: false,
-                enumerable: true
-            })
-        }
-        this.proxy = sendActions as unknown as RecipentRpc<RecipentActions>
     }
 
     async executeWithSource<T extends keyof RecipentActions>(
@@ -156,17 +135,19 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0], 
         transferables?: Transferable[]
     ) {
-        return  await this.outboundMessage(
+        return await this.outboundMessage(
             source, name, data, transferables
         ) as RpcReturn<ReturnType<RecipentActions[T]>>
     }
 
+    async execute<T extends keyof RecipentActions>(name: T & string): Promise<RpcReturn<ReturnType<RecipentActions[T]>>>
+    async execute<T extends keyof RecipentActions>(name: T & string, data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0], transferables?: Transferable[]): Promise<RpcReturn<ReturnType<RecipentActions[T]>>>
     async execute<T extends keyof RecipentActions>(
         name: T & string, 
-        data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0], 
-        transferables?: Transferable[]
+        data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0] = null, 
+        transferables: Transferable[] = emptyTransferArray
     ) {
-        return  await this.outboundMessage(
+        return await this.outboundMessage(
             this.messageTarget, name, data, transferables
         ) as RpcReturn<ReturnType<RecipentActions[T]>>
     }
@@ -266,10 +247,11 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         }
 
         if (!this.actionsIndex.has(message.handle)) {
+            console.log("found actions", this.actionsIndex, "context", self)
             this.errorResponseMessage(
                 source,
                 message.id,
-                `attempted to call no-existent handler "${message.handle}"`
+                `attempted to call non-existent handler "${message.handle}"`
             )
             return
         }
