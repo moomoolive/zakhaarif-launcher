@@ -1,5 +1,5 @@
 import {expect, describe, it} from "vitest"
-import {Rpc} from "./simple"
+import {wRpc} from "./simple"
 
 describe("creating terminal", () => {
     it("recipent actions created successfully", () => {
@@ -10,13 +10,17 @@ describe("creating terminal", () => {
             }
         }
 
-        const terminal = Rpc.create({
-            functions: {},
-            recipentFunctions,
-            recipentWorker: {
+        const terminal = wRpc.create<typeof recipentFunctions>({
+            responses: {},
+            callableFunctions: recipentFunctions,
+            messageTarget: {
                 postMessage: () => {},
-                addEventListener: () => {},
             },
+            messageInterceptor: {
+                addEventListener() {
+
+                }
+            }
         })
         const recipentActionKeys = Object.keys(recipentFunctions)
         for (const key of recipentActionKeys) {
@@ -54,23 +58,25 @@ describe("terminal communication", () => {
         t1Worker._adjacentWorker = t2Worker
         t2Worker._adjacentWorker = t1Worker
 
-        const terminal1 = Rpc.create({
-            functions: terminalOneActions,
-            recipentFunctions: terminalTwoActions,
-            recipentWorker: t2Worker
+        const terminal1 = wRpc.create({
+            responses: terminalOneActions,
+            callableFunctions: terminalTwoActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
         })
 
-        const terminal2 = Rpc.create({
-            functions: terminalTwoActions,
-            recipentFunctions: terminalOneActions,
-            recipentWorker: t1Worker
+        const terminal2 = wRpc.create({
+            responses: terminalTwoActions,
+            callableFunctions: terminalOneActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker
         })
 
         expect(await terminal1.ping()).toBe(3)
         expect(await terminal2.ping()).toBe(2)
     })
 
-    it("complex functions work", async () => {
+    it("complex responses work", async () => {
         const terminalOneActions = {
             doCoolStuff: (input: {data: number}) => {
                 expect(input).toStrictEqual({
@@ -95,16 +101,18 @@ describe("terminal communication", () => {
         t1Worker._adjacentWorker = t2Worker
         t2Worker._adjacentWorker = t1Worker
 
-        const t1 = Rpc.create({
-            functions: terminalOneActions,
-            recipentFunctions: terminalTwoActions,
-            recipentWorker: t2Worker
+        const t1 = wRpc.create<typeof terminalTwoActions>({
+            responses: terminalOneActions,
+            callableFunctions: terminalTwoActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
         })
 
-        const t2 = Rpc.create({
-            functions: terminalTwoActions,
-            recipentFunctions: terminalOneActions,
-            recipentWorker: t1Worker
+        const t2 = wRpc.create<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            callableFunctions: terminalOneActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker,
         })
 
         expect(await t1.complexAction(["meapo"])).toBeInstanceOf(Map)
@@ -120,7 +128,7 @@ describe("terminal communication", () => {
                 expect(args.length).toBe(1)
                 const [data] = args
                 expect(data).toBeInstanceOf(ArrayBuffer)
-                return Rpc.transfer(data, [data])
+                return wRpc.transfer(data, [data])
             }
         } as const
         
@@ -136,16 +144,18 @@ describe("terminal communication", () => {
         t1Worker._adjacentWorker = t2Worker
         t2Worker._adjacentWorker = t1Worker
 
-        const t1 = Rpc.create({
-            functions: terminalOneActions,
-            recipentFunctions: terminalTwoActions,
-            recipentWorker: t2Worker
+        const t1 = wRpc.create<typeof terminalTwoActions>({
+            responses: terminalOneActions,
+            callableFunctions: terminalTwoActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
         })
 
-        const t2 = Rpc.create({
-            functions: terminalTwoActions,
-            recipentFunctions: terminalOneActions,
-            recipentWorker: t1Worker
+        const t2 = wRpc.create<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            callableFunctions: terminalOneActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker
         })
 
         expect(await t1.complexAction(["meapo"])).toBeInstanceOf(Map)
@@ -154,7 +164,9 @@ describe("terminal communication", () => {
         const res = await t2.doCoolStuff(buffer, [buffer])
         expect(res).toBeInstanceOf(ArrayBuffer)
     })
+})
 
+describe("error handline", () => {
     it("if rpc encounters exception, exception should be returned to caller, contained where rpc took place, and prevent hanging between rpcs", async () => {
         const terminalOneActions = {
             ping: () => {
@@ -175,16 +187,18 @@ describe("terminal communication", () => {
         t1Worker._adjacentWorker = t2Worker
         t2Worker._adjacentWorker = t1Worker
 
-        const terminal1 = Rpc.create({
-            functions: terminalOneActions,
-            recipentFunctions: terminalTwoActions,
-            recipentWorker: t2Worker,
+        const terminal1 = wRpc.create<typeof terminalTwoActions>({
+            responses: terminalOneActions,
+            callableFunctions: terminalTwoActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
         })
 
-        const terminal2 = Rpc.create({
-            functions: terminalTwoActions,
-            recipentFunctions: terminalOneActions,
-            recipentWorker: t1Worker,
+        const terminal2 = wRpc.create<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            callableFunctions: terminalOneActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker,
         })
 
         expect(
@@ -192,6 +206,48 @@ describe("terminal communication", () => {
         ).rejects.toThrow()
         expect(
             async () => await terminal2.ping()
+        ).rejects.toThrow()
+    })
+
+    it("if non-existent handler is called, an exception should be returned", async () => {
+        const terminalOneActions = {
+            ping: () => {
+                throw new Error("err")
+                return 2
+            }
+        } as const
+        
+        const terminalTwoActions = {
+            ping: () => {
+                throw new Error("random error")
+                return 3
+            }
+        } as const
+
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const terminal1 = new wRpc<typeof terminalTwoActions>({
+            responses: terminalOneActions,
+            callableFunctions: terminalTwoActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
+        })
+
+        const terminal2 = new wRpc<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            callableFunctions: terminalOneActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker,
+        })
+
+        expect(
+            async () => await terminal1.execute("ping", null)
+        ).rejects.toThrow()
+        expect(
+            async () => await terminal2.execute("ping", null)
         ).rejects.toThrow()
     })
 })

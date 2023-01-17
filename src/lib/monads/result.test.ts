@@ -3,7 +3,7 @@ import {Result} from "./result"
 import {resultifySync} from "./resultify/sync"
 import {resultifyAsync} from "./resultify/async"
 
-describe("sync error containment functions", () => {
+describe("sync error containment responses", () => {
     it("wrap should be able to catch synchronous errors", () => {
         const msg = "[my custom err msg]"
         const errFn = () => {throw new TypeError("[my custom err msg]")}
@@ -24,7 +24,7 @@ describe("sync error containment functions", () => {
     })
 })
 
-describe("async error containment functions", () => {
+describe("async error containment responses", () => {
     it("wrapAsync should be able to catch async errors", async () => {
         const msg = "[my custom err msg]"
         const errFn = async () => {

@@ -52,8 +52,8 @@ const createFileCache = ({
     const clientCache = new MockCache(clientFileHandlers)
     const networkCache = new MockCache(networkFileHandlers)
     const fileCache: FileCache = {
-        getFile(url, _) {
-            return clientCache.getFile(url)
+        async getClientFile(url, _) {
+            return (await clientCache.getFile(url)) || null
         },
         getLocalFile(url) {
             return localCache.getFile(url)
@@ -67,7 +67,12 @@ const createFileCache = ({
         }
         return new Response("", {status: 404})
     }
-    return [{fileCache, networkFetch}, {
+    return [{
+        fileCache, 
+        networkFetch, 
+        config: {log: false}, 
+        log: () => {}
+    }, {
         localCache,
         clientCache,
         networkCache
@@ -381,6 +386,106 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
         const requestUrl = `${origin}/runProgram?csp=${encodeURIComponent(csp)}&entry=${encodeURIComponent(entry)}`
         const res = await handler(fetchEvent(requestUrl).event)
         expect(res.status).toBe(200)
+
+        const htmlDoc = await res.text()
+        expect(
+            htmlDoc.includes(`<meta http-equiv="Content-Security-Policy" content="${csp}"/>`)
+        ).toBe(true)
+        expect(
+            htmlDoc.includes(`<script entry="${entry}" id="root-script"`)
+        ).toBe(true)
+
+        expect(
+            networkCache.accessLog.some((log) => log.url === requestUrl)
+        ).toBe(false)
+        expect(
+            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
+        ).toBe(false)
+        expect(
+            clientCache.accessLog.some((log) => log.url === requestUrl)
+        ).toBe(false)
+    })
+
+    it("should return html document with inputted template headers (if applicable)", async () => {
+        const origin = "https://donuts.com"
+        const rootText = "root text"
+        const cacheText = "cache text"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [`${origin}/`]: () => {
+                    return new Response(rootText, {
+                        status: 200
+                    })
+                },
+            },
+            localFileHandlers: {
+                [`${origin}/offline.html`]: () => {
+                    return new Response(cacheText, {status: 200})
+                }
+            }
+        })
+        const csp = `default-src 'self'; script-src 'unsafe-inline'; child-src 'none'; worker-src 'self';`
+        const entry = `https://pizza.com/index.js`
+        const {networkCache, localCache, clientCache} = caches
+        const handler = createFetchHandler({
+            origin, ...adaptors,
+            templateHeaders: {
+                "cool-header": "3"
+            }
+        })
+        const requestUrl = `${origin}/runProgram?csp=${encodeURIComponent(csp)}&entry=${encodeURIComponent(entry)}`
+        const res = await handler(fetchEvent(requestUrl).event)
+        expect(res.status).toBe(200)
+        expect(res.headers.get("cool-header")).toBe("3")
+
+        const htmlDoc = await res.text()
+        expect(
+            htmlDoc.includes(`<meta http-equiv="Content-Security-Policy" content="${csp}"/>`)
+        ).toBe(true)
+        expect(
+            htmlDoc.includes(`<script entry="${entry}" id="root-script"`)
+        ).toBe(true)
+
+        expect(
+            networkCache.accessLog.some((log) => log.url === requestUrl)
+        ).toBe(false)
+        expect(
+            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
+        ).toBe(false)
+        expect(
+            clientCache.accessLog.some((log) => log.url === requestUrl)
+        ).toBe(false)
+    })
+
+    it("should return html document with inputted with 'content-length' and 'content-type' headers, even if not specified", async () => {
+        const origin = "https://donuts.com"
+        const rootText = "root text"
+        const cacheText = "cache text"
+        const [adaptors, caches] = createFileCache({
+            networkFileHandlers: {
+                [`${origin}/`]: () => {
+                    return new Response(rootText, {
+                        status: 200
+                    })
+                },
+            },
+            localFileHandlers: {
+                [`${origin}/offline.html`]: () => {
+                    return new Response(cacheText, {status: 200})
+                }
+            }
+        })
+        const csp = `default-src 'self'; script-src 'unsafe-inline'; child-src 'none'; worker-src 'self';`
+        const entry = `https://pizza.com/index.js`
+        const {networkCache, localCache, clientCache} = caches
+        const handler = createFetchHandler({
+            origin, ...adaptors,
+        })
+        const requestUrl = `${origin}/runProgram?csp=${encodeURIComponent(csp)}&entry=${encodeURIComponent(entry)}`
+        const res = await handler(fetchEvent(requestUrl).event)
+        expect(res.status).toBe(200)
+        expect(res.headers.has("content-length")).toBe(true)
+        expect(res.headers.has("content-type")).toBe(true)
 
         const htmlDoc = await res.text()
         expect(

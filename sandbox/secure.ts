@@ -1,5 +1,6 @@
-import {Rpc} from "../src/lib/workerChannel/simple"
-import {serviceWorkerFunctions, clientFunctions} from "../src/lib/utils/workerCommunication/mirrorSw"
+import {wRpc} from "../src/lib/wRpc/simple"
+import {sandboxToServiceWorkerRpc} from "../src/lib/utils/workerCommunication/mirrorSw"
+import {serviceWorkerToSandboxRpc} from "../src/lib/utils/workerCommunication/sandbox"
 import type {ProgramModule} from "../src/lib/types/programs"
 
 if (window.top !== window.parent) {
@@ -21,13 +22,15 @@ try {
     document.body.appendChild(rootElement)
     const registration = await navigator.serviceWorker.ready
     const {active: sw} = registration
-    const _rpc = Rpc.create({
-        functions: clientFunctions,
-        recipentFunctions: serviceWorkerFunctions,
-        recipentWorker: {
+    const _rpc = wRpc.create({
+        responses: serviceWorkerToSandboxRpc,
+        callableFunctions: sandboxToServiceWorkerRpc,
+        messageTarget: {
             postMessage(data, transferables) {
                 sw?.postMessage(data, transferables)
             },
+        },
+        messageInterceptor: {
             addEventListener(_, handler) {
                 navigator.serviceWorker.addEventListener("message", handler)
             },

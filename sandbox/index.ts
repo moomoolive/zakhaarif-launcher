@@ -1,4 +1,4 @@
-//import {Rpc} from "../src/lib/workerChannel/simple"
+//import {wRpc} from "../src/lib/workerChannel/simple"
 //import {serviceWorkerFunctions, clientFunctions} from "../src/lib/utils/workerCommunication/mirrorSw"
 import {APP_CACHE} from "./config"
 
@@ -19,10 +19,10 @@ const main = async () => {
         console.warn(`service worker controller not found`)
         return
     }
-    //const sw = Rpc.create({
-    //    functions: clientFunctions,
+    //const sw = wRpc.create({
+    //    responses: clientFunctions,
     //    recipentFunctions: serviceWorkerFunctions,
-    //    recipentWorker: {
+    //    messageTarget: {
     //        postMessage(data, transferables) {
     //            registration.active?.postMessage(data, transferables)
     //        },

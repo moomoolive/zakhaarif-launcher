@@ -1,6 +1,7 @@
-import {Rpc} from "../../src/lib/workerChannel/simpleServiceWorker"
-import {serviceWorkerFunctions, clientFunctions} from "../../src/lib/utils/workerCommunication/mirrorSw"
+import {wRpc} from "../../src/lib/wRpc/simple"
+import {sandboxToServiceWorkerRpc} from "../../src/lib/utils/workerCommunication/mirrorSw"
 import {createFetchHandler} from "./fetchHandler"
+import {serviceWorkerToSandboxRpc} from "../../src/lib/utils/workerCommunication/sandbox"
 import {APP_CACHE} from "../config"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
@@ -13,11 +14,14 @@ sw.onactivate = (event) => event.waitUntil((async () => {
     console.info("[🔥 activate] new sandbox sevice worker in control")
 })())
 
-const rpc = Rpc.create({
-    functions: serviceWorkerFunctions,
-    recipentFunctions: clientFunctions,
-    globalScope: sw
+const rpc = new wRpc({
+    responses: sandboxToServiceWorkerRpc,
+    callableFunctions: serviceWorkerToSandboxRpc,
+    messageTarget: {postMessage: () => {}},
+    messageInterceptor: sw
 })
+
+const config = {log: true}
 
 const fetchHandler = createFetchHandler({
     networkFetch: fetch,
@@ -27,16 +31,25 @@ const fetchHandler = createFetchHandler({
             const cache = await caches.open(APP_CACHE)
             return await cache.match(url)
         },
-        getFile: async (url, clientId) => {
+        getClientFile: async (url, clientId) => {
             const client = await sw.clients.get(clientId)
             if (!client) {
-                return
+                return null
             }
-            const file = await rpc.getFile(client, url)
+            const file = await rpc.executeWithSource(
+                "getFile", client, url
+            )
             console.log("from worker", file)
             return new Response("")
         },
-    }
+    },
+    templateHeaders: {
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+    },
+    log: console.info,
+    config,
 })
 
 sw.onfetch = (event) => {

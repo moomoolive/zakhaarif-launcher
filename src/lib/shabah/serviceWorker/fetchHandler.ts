@@ -4,17 +4,12 @@ import {
 } from "../backend"
 import {
     serviceWorkerPolicies,
-    serviceWorkerPolicyHeader,
-    NETWORK_FIRST_POLICY,
-    NETWORK_ONLY_POLICY,
-    CACHE_ONLY_POLICY,
-    ServiceWorkerPolicy,
     cacheHit, 
-    errorResponse, 
-    NOT_FOUND_RESPONSE,
+    errorResponse,
     LogFn,
     logRequest
 } from "../serviceWorkerMeta"
+import {fetchCore} from "./fetchCore"
 
 export type FetchHandlerEvent = {
     respondWith: (r: Response | PromiseLike<Response>) => void
@@ -36,8 +31,6 @@ export type FetchOptions = {
     config: Readonly<ConfigReference>
 }
 
-const cachefirstTag = "cache-first"
-const cacheonlyTag = "cache-only"
 const networkfirstTag = "network-first"
 
 export const makeFetchHandler = (options: FetchOptions) => {
@@ -46,7 +39,6 @@ export const makeFetchHandler = (options: FetchOptions) => {
     const rootDocFallback = rootDocumentFallBackUrl(origin)
     return async (event: FetchHandlerEvent) => {
         const {request} = event
-
         const strippedQuery = request.url.split("?")[0]
         const isRootDocument = strippedQuery === rootDoc
 
@@ -77,77 +69,13 @@ export const makeFetchHandler = (options: FetchOptions) => {
             }
         }
 
-        const policyHeader = (
-            request.headers.get(serviceWorkerPolicyHeader)
-            || CACHE_FIRST
+        return fetchCore(
+            request,
+            fetchFile,
+            fileCache,
+            "",
+            log,
+            config.log
         )
-        const policy = parseInt(policyHeader, 10) as ServiceWorkerPolicy
-
-        switch (policy) {
-            case NETWORK_ONLY_POLICY: {
-                logRequest(
-                    networkfirstTag, 
-                    request, 
-                    log, 
-                    config.log,
-                    null
-                )
-                return fetchFile(request)
-            }
-            case NETWORK_FIRST_POLICY: {
-                try {
-                    const res = await fetchFile(request)
-                    logRequest(
-                        networkfirstTag, 
-                        request, 
-                        log, 
-                        config.log,
-                        null
-                    )
-                    return res
-                } catch (err) {
-                    const cached = await fileCache.getFile(request.url)
-                    logRequest(
-                        networkfirstTag, 
-                        request, 
-                        log, 
-                        config.log,
-                        cached
-                    )
-                    if (cached && cached.ok) {
-                        return cacheHit(cached)
-                    }
-                    return errorResponse(err)
-                }
-            }
-            case CACHE_ONLY_POLICY: {
-                const cached = await fileCache.getFile(request.url)
-                logRequest(
-                    cacheonlyTag, 
-                    request, 
-                    log, 
-                    config.log,
-                    cached
-                )
-                if (cached) {
-                    return cacheHit(cached)
-                }
-                return NOT_FOUND_RESPONSE
-            }
-            default: {
-                const cached = await fileCache.getFile(request.url)
-                logRequest(
-                    cachefirstTag, 
-                    request,
-                    log, 
-                    config.log,
-                    cached
-                )
-                if (cached && cached.ok) {
-                    return cacheHit(cached)
-                }
-                return await fetchFile(event.request)
-            }
-        }
     }
 }

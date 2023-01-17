@@ -1,20 +1,9 @@
 import {generateTemplate} from "./generateTemplateBase"
-import {
-    serviceWorkerPolicyHeader as policyHeader,
-    serviceWorkerPolicies as policies,
-    ServiceWorkerPolicy,
-    NETWORK_FIRST_POLICY,
-    NETWORK_ONLY_POLICY,
-    CACHE_ONLY_POLICY,
-    cacheHit,
-    NOT_FOUND_RESPONSE,
-    errorResponse
-} from "../../src/lib/shabah/serviceWorkerMeta"
-
-const CACHE_FIRST = policies.cacheFirst["Sw-Policy"]
+import {cacheHit, NOT_FOUND_RESPONSE, errorResponse, LogFn} from "../../src/lib/shabah/serviceWorkerMeta"
+import {fetchCore} from "../../src/lib/shabah/serviceWorker/fetchCore"
 
 export type FileCache = {
-    getFile: (url: string, clientId: string) => Promise<Response | undefined>
+    getClientFile: (url: string, clientId: string) => Promise<Response | null>
     getLocalFile: (url: string) => Promise<Response | undefined>
 }
 
@@ -26,27 +15,34 @@ export type FetchHandlerEvent = {
     resultingClientId: string
 }
 
-const safeRequest = async (request: Promise<Response>) => {
-    try {
-        return await request
-    } catch (err) {
-        return errorResponse(err)
-    }
+type ConfigReference = {
+    log: boolean
 }
 
 type FetchHandlerOptions = {
     origin: string,
     fileCache: FileCache
     networkFetch: typeof fetch
+    templateHeaders?: Readonly<{[key: string]: string}>
+    log: LogFn
+    config: Readonly<ConfigReference>
 }
 
 export const createFetchHandler = (options: FetchHandlerOptions) => {
-    const {origin, fileCache, networkFetch} = options
+    const {
+        origin, 
+        fileCache, 
+        networkFetch, 
+        templateHeaders = {},
+        log,
+        config,
+    } = options
     const rootDoc = `${origin}/`
     const offlineFallback = `${origin}/offline.html`
     const templateEndpoint = `${origin}/runProgram`
     const entryScript = `${origin}/secure.compiled.js`
     const testScript = `${origin}/test.mjs`
+    const clientCache = {getFile: fileCache.getClientFile} as const
     return async (event: FetchHandlerEvent) => {
         const {request} = event
         if (request.url.startsWith(origin)) {
@@ -80,9 +76,7 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
                     headers: {
                         "content-type": "text/html",
                         "content-length": new TextEncoder().encode(templateText).length.toString(),
-                        "Cross-Origin-Embedder-Policy": "require-corp",
-                        "Cross-Origin-Opener-Policy": "same-origin",
-                        "Cross-Origin-Resource-Policy": "cross-origin",
+                        ...templateHeaders,
                     }
                 })
             }
@@ -101,43 +95,13 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
             return NOT_FOUND_RESPONSE
         }
 
-        const policyString = (
-            request.headers.get(policyHeader)
-            || CACHE_FIRST
+        return fetchCore(
+            request,
+            networkFetch,
+            clientCache,
+            event.clientId || event.resultingClientId,
+            log,
+            config.log,
         )
-        const policy = parseInt(policyString, 10) as ServiceWorkerPolicy
-        const targetClientId = event.clientId || event.resultingClientId
-
-        switch (policy) {
-            case NETWORK_ONLY_POLICY: {
-                return await safeRequest(networkFetch(request))
-            }
-            case NETWORK_FIRST_POLICY: {
-                try {
-                    const res = await networkFetch(request)
-                    return res
-                } catch (err) {
-                    const cached = await fileCache.getFile(request.url, targetClientId)
-                    if (cached && cached.ok) {
-                        return cacheHit(cached)
-                    }
-                    return errorResponse(err)
-                }
-            }
-            case CACHE_ONLY_POLICY: {
-                const cached = await fileCache.getFile(request.url, targetClientId)
-                if (cached) {
-                    return cacheHit(cached)
-                }
-                return NOT_FOUND_RESPONSE
-            }
-            default: {
-                const cached = await fileCache.getFile(request.url, targetClientId)
-                if (cached && cached.ok) {
-                    return cacheHit(cached)
-                }
-                return await safeRequest(networkFetch(event.request))
-            }
-        }
     }
 }
