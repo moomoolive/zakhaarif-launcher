@@ -16,10 +16,7 @@ const NotFoundPage = () => {
             </div>
             <div className="mt-6 text-center">
                 <Link to="/start">
-                    <Button
-                        variant="contained"
-                        size="large"
-                    >
+                    <Button size="large">
                         Back to Home
                     </Button>
                 </Link>

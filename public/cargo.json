@@ -19,7 +19,7 @@
     ],
     "description": "all core primitives for game",
     "license": "GPL-3",
-    "keywords": ["core"],
+    "keywords": ["launcher"],
     "homepageUrl": "https://github.com",
     "repo": {"type": "git", "url": "https://github.com"},
     "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg"

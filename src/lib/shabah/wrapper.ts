@@ -28,6 +28,8 @@ import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
 import {CodeManifestSafe, MANIFEST_NAME} from "@/lib/cargo/consts"
 import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
 
+export type {CargoIndex} from "./backend"
+
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
 type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
@@ -303,7 +305,8 @@ export class Shabah {
                     entry: newCargo.parsed.entry,
                     bytes: details.updateCheckResponse.totalBytes,
                     storageRootUrl: details.storageUrl,
-                    requestRootUrl: details.requestUrl
+                    requestRootUrl: details.requestUrl,
+                    logoUrl: newCargo.parsed.crateLogoUrl
                 },
                 {persistChanges: true}
             ),

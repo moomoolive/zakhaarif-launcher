@@ -245,7 +245,6 @@ export const LauncherRoot = ({
       // should take at least 500ms
       sleep(500),
     ] as const)
-    console.log(res)
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
     
     setCheckedForUpdates(true)

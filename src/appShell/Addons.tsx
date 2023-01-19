@@ -37,7 +37,6 @@ import {
     faTrash,
     faBars,
     faInfoCircle,
-    faBoxOpen,
     faScaleBalanced,
     faLink,
     faCodeCommit,
@@ -71,15 +70,23 @@ import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {CodeManifestSafe} from "@/lib/cargo/index"
 import {urlToMime, Mime} from "@/lib/miniMime/index"
 import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
-import {APP_CARGO_ID} from "@/config"
 import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/consts"
+import {
+    MOD_CARGO_ID_PREFIX, 
+    EXTENSION_CARGO_ID_PREFIX,
+    APP_CARGO_ID,
+    GAME_EXTENSION_ID,
+} from "../config"
+import {CargoIcon} from "../components/cargo/Icon"
+
+const isStandardCargo = (id: string) => (
+    id === APP_CARGO_ID
+    || id === GAME_EXTENSION_ID
+)
 
 const filterOptions = [
     "updatedAt", "bytes", "state", "addon-type", "name"
 ] as const
-
-const MOD_CARGO_ID_PREFIX = "mod-"
-const EXTENSION_CARGO_ID_PREFIX = "ext-"
 
 const isAMod = (id: string) => id.startsWith(MOD_CARGO_ID_PREFIX)
 
@@ -515,48 +522,18 @@ const AddonListItem = ({
     </button>
 }
 
-type CargoIconProps = {
-    importUrl: string
-    pixels: number
-    crateLogoUrl: string
-    className?: string
-}
-
-const CargoIcon = ({crateLogoUrl, importUrl, pixels, className = ""}: CargoIconProps) => {
-    const cssPixels = `${pixels}px`
-    return crateLogoUrl === "" || crateLogoUrl === CARGO_NULL_FIELD
-        ?   <div 
-                className={"flex items-center justify-center rounded-2xl bg-neutral-900 shadow-lg " + className}
-                style={{minWidth: cssPixels, height: cssPixels}}
-            >
-                <div 
-                    className="text-blue-500" 
-                    style={{fontSize: `${Math.trunc(pixels / 2)}px`}}
-                >
-                    <FontAwesomeIcon
-                        icon={faBoxOpen}
-                    />
-                </div>
-            </div>
-        :   <div className={className}>
-                <img 
-                    src={`${importUrl}${crateLogoUrl}`}
-                    className="rounded-2xl bg-neutral-900 shadow-lg"
-                    style={{minWidth: cssPixels, height: cssPixels}}
-                />
-            </div>
-}
-
 type CargoInfoProps = {
     onClose: () => void
     cargo: CodeManifestSafe
     importUrl: string
+    id: string
 }
 
 const CargoInfo = ({
     importUrl,
     cargo,
-    onClose
+    onClose,
+    id,
 }: CargoInfoProps) => {
     const {
         name, 
@@ -585,7 +562,10 @@ const CargoInfo = ({
             setCopiedId("none")
         }, 1_000)
     }
-    console.log(crateLogoUrl)
+
+    const keywordList = isStandardCargo(id)
+        ? ["core", ...keywords.slice(0, 5)]
+        : keywords.slice(0, 6).filter((word) => word !== "core")
 
     return <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
         <ClickAwayListener onClickAway={onClose}>
@@ -741,12 +721,12 @@ const CargoInfo = ({
             </div>
 
             <div className="pt-3">
-                {keywords.length > 0 ? <>
+                {keywordList.length > 0 ? <>
                     <div className="flex w-full px-3 items-center justify-start flex-wrap">
-                        {keywords.map((keyword, index) => {
+                        {keywordList.map((keyword, index) => {
                             return <div
                                 key={`keyword-${index}`}
-                                className="mr-2 mb-2 text-xs rounded-full bg-neutral-700 py-1 px-2 hover:bg-neutral-600"
+                                className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 ${keyword === "core" ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700 hover:bg-neutral-600"}`}
                             >
                                 {keyword}
                             </div>
@@ -916,6 +896,7 @@ const AddOns = () => {
         const first = data.cargos.length < 1 
             ? {name: "string",
                 id: "string",
+                logoUrl: CARGO_NULL_FIELD,
                 storageRootUrl: "string",
                 requestRootUrl: "string",
                 bytes: 0,
@@ -947,6 +928,7 @@ const AddOns = () => {
                 : EXTENSION_CARGO_ID_PREFIX
             cargos.push({   
                 ...copy, 
+                logoUrl: CARGO_NULL_FIELD,
                 id: `${idPrefix}${~~(Math.random() * 1_000_000)}`,
                 name: `${idPrefix}${~~(Math.random() * 1_000_000)}`,
                 updatedAt: copy.updatedAt - ~~(Math.random() * 1_000_000_000),
@@ -1111,6 +1093,11 @@ const AddOns = () => {
                             viewingCargoIndex > (cargoIndex.cargos.length - 1) || viewingCargoIndex < 0
                                 ? ""
                                 : cargoIndex.cargos[viewingCargoIndex].requestRootUrl
+                        }
+                        id={
+                            viewingCargoIndex > (cargoIndex.cargos.length - 1) || viewingCargoIndex < 0
+                                ? ""
+                                : cargoIndex.cargos[viewingCargoIndex].id
                         }
                     />
                 </> : <></>}
@@ -1558,8 +1545,8 @@ const AddOns = () => {
                                                 className="hover:text-yellow-500"
                                                 onClick={async () => {
                                                     const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (target.id === APP_CARGO_ID) {
-                                                        confirm({title: `${target.name} cannot be archived!`})
+                                                    if (isStandardCargo(target.id)) {
+                                                        confirm({title: `"${target.name}" is a core package and cannot be archived!`})
                                                         return 
                                                     }
                                                     if (!await confirm({title: `Are you sure you want to archive ${target.name} add-on?`})) {
@@ -1589,8 +1576,8 @@ const AddOns = () => {
                                                 className="hover:text-red-500"
                                                 onClick={async () => {
                                                     const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (target.id === APP_CARGO_ID) {
-                                                        confirm({title: `${target.name} cannot be deleted!`})
+                                                    if (isStandardCargo(target.id)) {
+                                                        confirm({title: `"${target.name}" is a standard package and cannot be deleted!`})
                                                         return 
                                                     }
                                                     if (!await confirm({title: `Are you sure you want to delete "${target.name}" add-on?`})) {

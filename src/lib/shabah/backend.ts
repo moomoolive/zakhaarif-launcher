@@ -210,6 +210,7 @@ export type CargoState = (
 export type CargoIndex = {
     name: string
     id: string
+    logoUrl: string
     storageRootUrl: string
     requestRootUrl: string
     bytes: number

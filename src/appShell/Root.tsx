@@ -33,9 +33,10 @@ export function lazyRoute<T>(
 }
 
 const StartMenu = lazyRoute(() => import("./StartMenu"))
-const GameShell = lazyRoute(() => import("./GameShell"))
+const ExtensionShell = lazyRoute(() => import("./ExtensionShell"))
 const Addons = lazyRoute(() => import("./Addons"))
 const Settings = lazyRoute(() => import("./Settings"))
+const ExtensionList = lazyRoute(() => import("./ExtensionsList"))
 
 const fadeOut = 2
 const fadeIn = 1
@@ -69,7 +70,8 @@ const PageDisplay = () => {
             <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<AppLaunch/>}/>
             <Route path="/start" element={<StartMenu/>}/>
-            <Route path="/game" element={<GameShell/>}/>
+            <Route path="/extension" element={<ExtensionShell/>}/>
+            <Route path="/extensions-list" element={<ExtensionList/>}/>
             <Route path="/add-ons" element={<Addons/>}/>
             <Route path="/settings" element={<Settings/>}/>
         </Routes>

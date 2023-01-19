@@ -2,6 +2,7 @@ import {Button} from "@mui/material"
 import {Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
+import {GAME_EXTENSION_ID} from "../config"
 
 const StartMenuPage = () => {
     const {showLauncher} = useAppShellContext()
@@ -16,8 +17,9 @@ const StartMenuPage = () => {
             >
                 <div className="w-full">
                     {([
-                        {text: "Start Game", route: "/game", color: "success"},
+                        {text: "Start Game", route: `/extension?id=${GAME_EXTENSION_ID}`, color: "success"},
                         {text: "Add-ons", route: "/add-ons", color: "info"},
+                        {text: "Extensions", route: "/extensions-list", color: "info"},
                         {text: "Settings", route: "/settings", color: "info"},
                     ] as const).map((item, index) => {
                         const {route, text, color} = item

@@ -1256,6 +1256,7 @@ describe("reading and writing to cargo indices", () => {
             index,
             {
                 id: "pkg",
+                logoUrl: "",
                 name: "pkg",
                 state: "updating",
                 version: "0.1.0",
@@ -1274,6 +1275,7 @@ describe("reading and writing to cargo indices", () => {
         const first = {
             id: "pkg",
             name: "pkg",
+            logoUrl: "",
             state: "updating",
             version: "0.1.0",
             bytes: 0,
@@ -1286,6 +1288,7 @@ describe("reading and writing to cargo indices", () => {
         const second = {
             id: "pkg",
             name: "pkg",
+            logoUrl: "",
             state: "cached",
             version: "0.2.0",
             bytes: 0,
@@ -1306,6 +1309,7 @@ describe("reading and writing to cargo indices", () => {
         const first = {
             id: "pkg",
             name: "pkg",
+            logoUrl: "",
             state: "updating",
             version: "0.1.0",
             bytes: 0,
@@ -1318,6 +1322,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg-2",
             name: "pkg",
             state: "cached",
+            logoUrl: "",
             version: "0.2.0",
             bytes: 0,
             entry: "store/index.js",
@@ -1342,6 +1347,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg",
             name: "pkg",
             state: "updating",
+            logoUrl: "",
             version: "0.1.0",
             bytes: 0,
             entry: "store/index.js",
@@ -1354,6 +1360,7 @@ describe("reading and writing to cargo indices", () => {
             name: "pkg",
             state: "cached",
             version: "0.2.0",
+            logoUrl: "",
             bytes: 0,
             entry: "store/index.js",
             storageRootUrl: "store/",
