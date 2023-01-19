@@ -78,6 +78,7 @@ import {
     GAME_EXTENSION_ID,
 } from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
+import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 
 const isStandardCargo = (id: string) => (
     id === APP_CARGO_ID
@@ -103,8 +104,6 @@ const cargoStateToNumber = (state: CargoState) => {
             return 0
     }
 }
-
-type FilterOrder = "ascending" | "descending"
 
 const filterChevron = (
     currentFilter: string, 
@@ -468,6 +467,7 @@ type AddonListItemProps = {
     byteCount: number
     typeTooltip?: boolean
     status?: JSX.Element | null
+    showModifiedOnSmallScreen?: boolean
 }
 
 const AddonListItem = ({
@@ -478,7 +478,8 @@ const AddonListItem = ({
     updatedAt,
     byteCount,
     typeTooltip = false,
-    status = null
+    status = null,
+    showModifiedOnSmallScreen = false
 }: AddonListItemProps) => {
     const friendlyBytes = readableByteCount(byteCount)
     const showStatus = !!status
@@ -502,17 +503,17 @@ const AddonListItem = ({
 
         {typeTooltip ? <>
             <Tooltip title={type}>
-                <div className="w-1/4 md:w-1/6 text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip">
+                <div className={`${showModifiedOnSmallScreen ? "w-1/6 hidden md:block" : "w-1/4 md:w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
                     {type}
                 </div>
             </Tooltip>
         </> : <>
-            <div className="w-1/4 md:w-1/6 text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip">
+            <div className={`${showModifiedOnSmallScreen ? "w-1/6 hidden md:block" : "w-1/4 md:w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
                 {type}
             </div>
         </>}
         
-        <div className="hidden md:block w-1/6 text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip">
+        <div className={`${showModifiedOnSmallScreen ? "w-1/4 md:w-1/6" : "hidden md:block w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
             {reactiveDate(new Date(updatedAt))}
         </div>
         
@@ -1198,7 +1199,7 @@ const AddOns = () => {
                                 id="add-ons-search-bar"
                                 name="search-bar"
                                 className="rounded"
-                                placeholder={`Search for ${isViewingCargo && cargoFound ? "file, folders" : "add-on"}...`}
+                                placeholder={`${isViewingCargo && cargoFound ? "File, folders" : "Add-on"}...`}
                                 value={searchText}
                                 onChange={(event) => setSearchText(event.target.value)}
                                 InputProps={{
@@ -1618,7 +1619,12 @@ const AddOns = () => {
                                             onClick={() => toggleFilter("name")}
                                         >
                                             Name
-                                            {filterChevron(filter, "name", order)}
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="name"
+                                                order={order}
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                     <div className="w-1/4 md:w-1/6 text-center">
@@ -1637,7 +1643,12 @@ const AddOns = () => {
                                             onClick={() => toggleFilter("bytes")}
                                         >
                                             Size
-                                            {filterChevron(filter, "bytes", order)}
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="bytes"
+                                                order={order} 
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                 </> : <>
@@ -1647,7 +1658,12 @@ const AddOns = () => {
                                             onClick={() => toggleFilter("name")}
                                         >
                                             Name
-                                            {filterChevron(filter, "name", order)}
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="name"
+                                                order={order}
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                     <div className={`hidden lg:block w-1/6 text-center`}>
@@ -1656,25 +1672,47 @@ const AddOns = () => {
                                             onClick={() => toggleFilter("state")}
                                         >
                                             Status
-                                            {filterChevron(filter, "state", order)}
-                                        </button>
-                                    </div>
-                                    <div className="w-1/4 md:w-1/6 text-center">
-                                        <button
-                                            className="hover:bg-gray-900 rounded px-2 py-1"
-                                            onClick={() => toggleFilter("addon-type")}
-                                        >
-                                            Type
-                                            {filterChevron(filter, "addon-type", order)}
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="state"
+                                                order={order} 
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                     <div className="hidden md:block w-1/6 text-center">
                                         <button
                                             className="hover:bg-gray-900 rounded px-2 py-1"
+                                            onClick={() => toggleFilter("addon-type")}
+                                        >
+                                            Type
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="addon-type"
+                                                order={order} 
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
+                                        </button>
+                                    </div>
+                                    <div className="w-1/4 md:w-1/6 text-center">
+                                        <button
+                                            className="hover:bg-gray-900 rounded px-2 py-1"
                                             onClick={() => toggleFilter("updatedAt")}
                                         >
-                                            Modified
-                                            {filterChevron(filter, "updatedAt", order)}
+                                            <span className="hidden sm:inline">
+                                                Modified
+                                            </span>
+
+                                            <span className="sm:hidden">
+                                                Date
+                                            </span>
+                                            
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="updatedAt"
+                                                order={order} 
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                     <div className="w-1/4 md:w-1/6 text-center">
@@ -1683,7 +1721,12 @@ const AddOns = () => {
                                             onClick={() => toggleFilter("bytes")}
                                         >
                                             Size
-                                            {filterChevron(filter, "bytes", order)}
+                                            <FilterChevron 
+                                                currentFilter={filter}
+                                                targetFilter="bytes"
+                                                order={order} 
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
                                         </button>
                                     </div>
                                 </>}
@@ -1732,26 +1775,6 @@ const AddOns = () => {
                                                     </Button>
                                                 </div>
                                             </> : <>
-                                            {false ? <>
-                                                    <Tooltip title="Back To Add-ons" placement="top">
-                                                        <div>
-                                                            <AddonListItem 
-                                                                onClick={() => setViewingCargo("none")}
-                                                                icon={<span className={"mr-3 text-amber-300"}>
-                                                                <FontAwesomeIcon 
-                                                                        icon={faFolderTree}
-                                                                    />
-                                                                </span>
-                                                                }
-                                                                name="My Add-ons"
-                                                                type="parent folder"
-                                                                updatedAt={cargoIndex.updatedAt}
-                                                                byteCount={storageUsage.used}
-                                                            />
-                                                        </div>
-                                                    </Tooltip>
-                                                </> : <></>}
-
                                                 {directoryPath.length > 0 ? <>
                                                     <Tooltip title="Back To Parent Folder" placement="top">
                                                         <div>
@@ -1936,8 +1959,10 @@ const AddOns = () => {
                                             type={isMod ? "mod" : "extension"}
                                             updatedAt={updatedAt}
                                             byteCount={bytes}
+                                            showModifiedOnSmallScreen
                                         />
                                     })}
+                                    <div className="sm:hidden h-8" />
                                 </div>
                             </>}
                         </div>

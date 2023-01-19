@@ -35,6 +35,7 @@ export const CargoIcon = ({
         :   <div className={className}>
                 <img 
                     src={`${importUrl}${crateLogoUrl}`}
+                    crossOrigin=""
                     className="rounded-2xl bg-neutral-900 shadow-lg"
                     style={{minWidth: cssPixels, height: cssPixels}}
                 />
