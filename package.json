@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "main-server": "vite",
-    "dev": "npm run sw && npm run main-server",
+    "dev": "npm run generate-cargo-meta && npm run sw && npm run main-server",
     "type-check": "tsc",
     "build": "npm run type-check && npm run build-main",
     "generate-cargo-meta": "node ./src/cli/getStandardCargosMeta.mjs",

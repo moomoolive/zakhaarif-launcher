@@ -12,6 +12,6 @@ const main = async () => {
         console.warn(`service worker controller not found`)
     }
     await Promise.all((await caches.keys()).map(key => caches.delete(key)))
-    top?.postMessage({finished: true}, "*")
+    top?.postMessage("finished", "*")
 }
 main()

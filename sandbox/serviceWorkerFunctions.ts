@@ -1,3 +1,3 @@
 const sandboxToServiceWorkerRpc = {} as const
 
-export type CallableFunctions = typeof sandboxToServiceWorkerRpc
+export type ServiceWorkerFunctions = typeof sandboxToServiceWorkerRpc

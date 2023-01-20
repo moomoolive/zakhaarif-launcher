@@ -1,7 +1,7 @@
 import {wRpc} from "../src/lib/wRpc/simple"
-import type {CallableFunctions as SandboxToServiceWorkerRpc} from "./serviceWorkerFunctions"
-import {serviceWorkerToSandboxRpc} from "./sandboxFunctions"
-import type {ProgramModule} from "../src/lib/types/programs"
+import type {ServiceWorkerFunctions} from "./serviceWorkerFunctions"
+import {serviceWorkerToSandboxRpc, controllerRpc} from "./sandboxFunctions"
+import type {ExtensionModule, MessageAppShell} from "../src/lib/types/extensions"
 
 if (window.top !== window.parent) {
     throw new Error("second-level embedding is disallowed")
@@ -17,9 +17,9 @@ try {
     const [registration] = await Promise.all([
         navigator.serviceWorker.ready,
         navigator.serviceWorker.register("sw.compiled.js")
-    ])
+    ] as const)
     const {active: sw} = registration
-    const _rpc = new wRpc<SandboxToServiceWorkerRpc>({
+    const rpc = new wRpc<ServiceWorkerFunctions>({
         responses: serviceWorkerToSandboxRpc,
         messageTarget: {
             postMessage(data, transferables) {
@@ -34,11 +34,12 @@ try {
             }
         }
     })
+    await controllerRpc.execute("contextEstablished")
     // all security stuff should be done before this point
     const root = document.getElementById("root-script")
     const importSource = root?.getAttribute("entry") || "none"
     console.info("importing", importSource)
-    const script = await import(importSource) as ProgramModule
+    const script = await import(importSource) as ExtensionModule
     if (!("main" in script)) {
         throw new Error("no main function exported from module")
     }
@@ -46,7 +47,12 @@ try {
     rootElement.setAttribute("id", "root")
     document.body.appendChild(rootElement)
     const {main} = script
-    main({rootElement})
+    main({
+        rootElement,
+        messageAppShell: ((name, data = null, transferables = []) => {
+            return controllerRpc.execute(name, data, transferables)
+        }) 
+    })
 } catch (err) {
     console.error("error when loading module", err)
 }

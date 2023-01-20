@@ -1,5 +1,5 @@
 import {wRpc, MessagableEntity} from "../src/lib/wRpc/simple"
-import type {ControllerFunctions} from "../src/lib/utils/workerCommunication/controllerFrame"
+import type {ExtensionShellFunctions} from "../src/appShell/ExtensionShell"
 
 type WindowMessageEvent = {
     source: MessagableEntity
@@ -15,7 +15,7 @@ const window = self as unknown as {
 }
 const {parent} = window
 
-const controllerRpc = new wRpc<ControllerFunctions>({
+export const controllerRpc = new wRpc<ExtensionShellFunctions>({
     responses: {},
     messageTarget: {
         postMessage: (data, transferables) => {

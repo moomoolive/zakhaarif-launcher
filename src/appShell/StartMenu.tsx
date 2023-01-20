@@ -1,13 +1,8 @@
 import {Button} from "@mui/material"
 import {Link} from "react-router-dom"
-import {useAppShellContext} from "./store"
-import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {GAME_EXTENSION_ID} from "../config"
 
 const StartMenuPage = () => {
-    const {showLauncher} = useAppShellContext()
-    const confirm = useGlobalConfirm()
-
     return <div 
         className="fixed z-0 w-screen h-screen flex overflow-clip"
     >   
@@ -17,10 +12,11 @@ const StartMenuPage = () => {
             >
                 <div className="w-full">
                     {([
-                        {text: "Start Game", route: `/extension?id=${GAME_EXTENSION_ID}`, color: "success"},
+                        {text: "Continue", route: `/extension?id=${GAME_EXTENSION_ID}`, color: "success"},
                         {text: "Add-ons", route: "/add-ons", color: "info"},
                         {text: "Extensions", route: "/extensions-list", color: "info"},
                         {text: "Settings", route: "/settings", color: "info"},
+                        {text: "Launcher", route: "/launcher", color: "warning"},
                     ] as const).map((item, index) => {
                         const {route, text, color} = item
                         return <div
@@ -37,22 +33,6 @@ const StartMenuPage = () => {
                             </Link>
                         </div>
                     })}
-
-                    <div>
-                        <Button 
-                            color="warning" 
-                            fullWidth 
-                            size="large"
-                            onClick={() => {
-                                showLauncher(true)
-                                setTimeout(() => {
-                                    history.pushState(null, "Back to Launcher", "/")
-                                }, 0)
-                            }}
-                        >
-                            {"Launcher"}
-                        </Button>
-                    </div>
                 </div>
             </div>
         </div>

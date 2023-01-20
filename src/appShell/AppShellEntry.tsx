@@ -15,7 +15,7 @@ import {
 import {isIframe} from "@/lib/utils/isIframe"
 import type {TopLevelAppProps} from "@/lib/types/globalState"
 import {AppShellContext} from "./store"
-import {type} from "../lib/utils/betterTypeof"
+import ToLauncherPage from "./toLauncher"
 
 if (isIframe()) {
     new Error("app-shell cannot run inside an iframe")
@@ -67,6 +67,7 @@ const PageDisplay = () => {
         <Routes location={displayLocation}>
             <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<AppLaunch/>}/>
+            <Route path="/launcher" element={<ToLauncherPage/>}/>
             <Route path="/start" element={<StartMenu/>}/>
             <Route path="/extension" element={<ExtensionShell/>}/>
             <Route path="/extensions-list" element={<ExtensionList/>}/>
@@ -103,7 +104,7 @@ export const AppShellRoot = ({
             sandbox.setAttribute("sandbox", "allow-scripts allow-same-origin")
             const handler = (event: MessageEvent) => {
                 const {data} = event
-                if (type(data) !== "object" || !("finished" in data) || !data.finished) {
+                if (typeof data !== "string" || data !== "finished") {
                     console.warn("iframe message is incorrectly encoded")
                     return
                 }
