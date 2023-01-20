@@ -24,42 +24,20 @@ import {
     faBoxArchive,
     faGear,
     faMagnifyingGlass,
-    faChevronDown,
-    faChevronUp,
     faBoxesStacked,
     faAngleRight,
-    faFile,
-    faImage,
     faFolderTree,
-    faDownload,
-    faCircleExclamation,
-    faFilm,
     faTrash,
     faBars,
     faInfoCircle,
-    faScaleBalanced,
-    faLink,
-    faCodeCommit,
-    faCopy,
-    faEnvelope,
-    faBarcode,
-    faGlobe,
-    faHeading,
-    faXmark
 } from "@fortawesome/free-solid-svg-icons"
-import {
-    faJs, 
-    faCss3,
-    faHtml5,
-} from "@fortawesome/free-brands-svg-icons"
 import {readableByteCount, toGigabytesString} from "@/lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "@/lib/utils/dates"
 import {
     Divider, 
     LinearProgress,
     Collapse,
-    IconButton,
-    ClickAwayListener,
+    IconButton
 } from "@mui/material"
 import {useAppShellContext} from "./store"
 import {io} from "@/lib/monads/result"
@@ -67,29 +45,38 @@ import {emptyCargoIndices, CargoState} from "@/lib/shabah/backend"
 import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
-import {CodeManifestSafe} from "@/lib/cargo/index"
+import {Cargo} from "@/lib/cargo/index"
 import {urlToMime, Mime} from "@/lib/miniMime/index"
-import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/consts"
-import {
-    MOD_CARGO_ID_PREFIX, 
-    EXTENSION_CARGO_ID_PREFIX,
-    APP_CARGO_ID,
-    GAME_EXTENSION_ID,
-} from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
+import {MimeIcon} from "../components/cargo/FileOverlay"
+import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
+import {lazyComponent} from "../components/Lazy"
+import {isStandardCargo, isMod, isEmbeddedStandardCargo} from "../lib/utils/cargos"
+import {
+    addStandardCargosToCargoIndexes,
+    ADDONS_CARGO,
+    GAME_CARGO,
+} from "../standardCargos"
+import {
+    ADDONS_EXENSTION_ID,
+    GAME_EXTENSION_ID,
+} from "../config"
+import {MANIFEST_NAME} from "../lib/cargo/consts"
+import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
 
-const isStandardCargo = (id: string) => (
-    id === APP_CARGO_ID
-    || id === GAME_EXTENSION_ID
+const FileOverlay = lazyComponent(
+    async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
+    {loadingElement: FullScreenOverlayLoading}
 )
 
-const filterOptions = [
-    "updatedAt", "bytes", "state", "addon-type", "name"
-] as const
+const CargoInfo = lazyComponent(
+    async () => (await import("../components/cargo/CargoInfo")).CargoInfo,
+    {loadingElement: FullScreenOverlayLoading}
+)
 
-const isAMod = (id: string) => id.startsWith(MOD_CARGO_ID_PREFIX)
+const filterOptions = ["updatedAt", "bytes", "state", "addon-type", "name"] as const
 
 const cargoStateToNumber = (state: CargoState) => {
     switch (state) {
@@ -102,28 +89,6 @@ const cargoStateToNumber = (state: CargoState) => {
             return 1
         default:
             return 0
-    }
-}
-
-const filterChevron = (
-    currentFilter: string, 
-    targetFilter: string,
-    order: FilterOrder
-) => {
-    if (currentFilter !== targetFilter) {
-        return <></>
-    } else if (order === "descending") {
-        return <span className={`ml-1 lg:ml-2 text-blue-500`}>
-            <FontAwesomeIcon 
-                icon={faChevronUp}
-            />
-        </span>
-    } else {
-        return <span className={`ml-1 lg:ml-2 text-blue-500`}>
-            <FontAwesomeIcon 
-                icon={faChevronDown}
-            />
-        </span>
     }
 }
 
@@ -192,272 +157,6 @@ const calculateDirectorySize = (directory: CargoDirectory) => {
     directory.contentBytes = sizeOfFilesInDirectory + sizeOfFoldersInDirectory
 }
 
-const mimeToIcon = (mime: Mime, classes: string) => {
-    if (mime.startsWith("image/")) {
-        return <span className={`${classes} text-indigo-500`}>
-            <FontAwesomeIcon 
-                icon={faImage}
-            />
-        </span>
-    }
-    if (mime.startsWith("video/")) {
-        return <span className={`${classes} text-red-500`}>
-            <FontAwesomeIcon 
-                icon={faFilm}
-            />
-        </span>
-    }
-    switch (mime) {
-        case "application/wasm":
-            return <span className={`${classes}`}>
-                <img
-                    src="logos/webassembly.svg"
-                    width="16px"
-                    height="16px"
-                    className="inline-block"
-                />
-            </span>
-        case "text/html":
-            return <span className={`${classes} text-orange-500`}>
-                <FontAwesomeIcon 
-                    icon={faHtml5}
-                />
-            </span>
-        case "application/json":
-            return <span className={`${classes} text-yellow-500`}>
-                {"{ }"}
-            </span>
-        case "text/javascript":
-            return <span className={`${classes} text-yellow-500`}>
-                <FontAwesomeIcon 
-                    icon={faJs}
-                />
-            </span>
-        case "text/css":
-            return <span className={`${classes} text-blue-600`}>
-                <FontAwesomeIcon 
-                    icon={faCss3}
-                />
-            </span>
-        default:
-            return <span className={`${classes}`}>
-                <FontAwesomeIcon 
-                    icon={faFile}
-                />
-            </span>
-    }
-}
-
-type FileOverlayProps = {
-    name: string
-    mime: Mime
-    url: string
-    fileResponse: Response,
-    bytes: number
-    onClose: () => void
-}
-
-const FileOverlay = ({
-    name, 
-    mime, 
-    fileResponse, 
-    url, 
-    onClose,
-    bytes
-}: FileOverlayProps) => {
-    const [fileText, setFileText] = useState("")
-    const [showHeaders, setShowHeaders] = useState(false)
-    const consumedResponse = useRef(false)
-
-    const contentType = showHeaders
-        ? "headers"
-        : mime
-
-    useEffectAsync(async () => {
-        if (
-            consumedResponse.current
-            || mime.startsWith("image/")
-            || mime.startsWith("video/")
-        ) {
-            return
-        }
-        const textResponse = await io.wrap(fileResponse.text())
-        consumedResponse.current = true
-        if (!textResponse.ok) {
-            return
-        }
-        setFileText(textResponse.data)
-    }, [])
-    
-    return <>
-        <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
-            <div className="absolute z-30 top-1 left-1 w-full flex">
-                <div className="w-1/2 overflow-x-clip text-ellipsis whitespace-nowrap">
-                    <Tooltip title="Back">
-                        <IconButton
-                            onClick={onClose}
-                        >
-                            <span className="text-xl">
-                                <FontAwesomeIcon 
-                                    icon={faArrowLeft}
-                                />
-                            </span>
-                        </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title={name}>
-                        <span className="ml-3">
-                            {mimeToIcon(mime, "mr-3")}
-                            {name}
-                        </span>
-                    </Tooltip>
-                </div>
-                <div className="w-1/2 text-right text-sm">
-                    <span className="mr-3">
-                        <Tooltip title="Response Headers">
-                            <IconButton 
-                                size="small"
-                                className="hover:text-green-500"
-                                onClick={() => setShowHeaders(true)}
-                            >
-                                <FontAwesomeIcon 
-                                    icon={faHeading}
-                                />
-                            </IconButton>
-                        </Tooltip>
-                    </span>
-
-                    <span className="mr-3">
-                        <Tooltip title="Download">
-                            <a download={name} href={url}>
-                                <IconButton 
-                                    size="small"
-                                    className="hover:text-green-500"
-                                >
-                                    <FontAwesomeIcon 
-                                        icon={faDownload}
-                                    />
-                                </IconButton>
-                            </a>
-                        </Tooltip>
-                    </span>
-                </div>
-            </div>
-
-            <div className="w-5/6 max-w-xl">
-                {((content: typeof contentType, url: string) => {
-                    if (content === "headers") {
-                        return <div
-                            className="px-4 pb-4 pt-2 w-full bg-neutral-800 rounded"
-                        >
-                            <div className="text-right pb-2">
-                                <Tooltip title="Close">
-                                    <IconButton 
-                                        size="small"
-                                        className="hover:text-red-500"
-                                        onClick={() => setShowHeaders(false)}
-                                    >
-                                        <FontAwesomeIcon
-                                            icon={faXmark}
-                                        />
-                                    </IconButton>
-                                </Tooltip>
-                            </div>
-
-                            <div
-                                className="overflow-y-scroll overflow-x-clip break-words"
-                                style={{maxHeight: "230px"}}
-                            >
-                                <div className={`text-sm ${fileResponse.status > 399 ? "text-red-500" : "text-green-500"} mb-1`}>
-                                    <span className="text-neutral-400">
-                                        {"request url:"}
-                                    </span>
-                                    
-                                    <span className="ml-1">
-                                        {url}
-                                    </span>
-                                </div>
-                                
-                                <div className={`text-sm ${fileResponse.status > 399 ? "text-red-500" : "text-green-500"} mb-1`}>
-                                    <span className="text-neutral-400">
-                                        {"status:"}
-                                    </span>
-                                    
-                                    <span className="ml-1">
-                                        {fileResponse.status}
-                                    </span>
-                                    <span className="ml-1">
-                                        {`(${fileResponse.statusText})`}
-                                    </span>
-                                </div>
-
-                                <div className="my-2">
-                                    <Divider/>
-                                </div>
-
-                                {((headers: Headers) => {
-                                    const values = [] as {key: string, value: string}[]
-                                    for (const [key, value] of headers.entries()) {
-                                        values.push({key, value})
-                                    }
-                                    return values
-                                })(fileResponse.headers).map((header, index) => {
-                                    const {key, value} = header
-                                    return <div
-                                        key={`file-header-${index}`}
-                                        className="text-sm mb-1"
-                                    >
-                                        <span className="text-neutral-400">
-                                            {`${key}: `}
-                                        </span>
-                                        <span className="text-neutral-100">
-                                            {value}
-                                        </span>
-                                    </div>
-                                })}
-                            </div>
-                            
-                        </div>
-                    } else if (content.startsWith("image/")) {
-                        return <img 
-                            src={url}
-                            className="w-full"
-                            crossOrigin=""
-                        />
-                    } else if (content.startsWith("video/")) {
-                        return <video
-                            controls
-                            crossOrigin=""
-                            src={url}
-                            className="w-full"
-                        />
-                    } else if (bytes < BYTES_PER_MB * 3) {
-                        return <div 
-                            className="p-4 w-full overflow-scroll bg-neutral-800 rounded whitespace-pre-wrap flex"
-                            style={{maxHeight: "96rem"}}
-                        >
-                            <div>
-                                {fileText}
-                            </div>
-                        </div>
-                    } else {
-                        return <div
-                            className="p-4 w-full text-center"
-                        >
-                            <span className="mr-2 text-yellow-500">
-                                <FontAwesomeIcon
-                                    icon={faCircleExclamation}
-                                />
-                            </span>
-                            File is too large. Download to view.
-                        </div>
-                    }
-                })(contentType, url)}
-            </div>
-        </div>
-    </>
-}
-
 type AddonListItemProps = {
     onClick: () => void | Promise<void>
     icon: JSX.Element
@@ -523,255 +222,6 @@ const AddonListItem = ({
     </button>
 }
 
-type CargoInfoProps = {
-    onClose: () => void
-    cargo: CodeManifestSafe
-    importUrl: string
-    id: string
-}
-
-const CargoInfo = ({
-    importUrl,
-    cargo,
-    onClose,
-    id,
-}: CargoInfoProps) => {
-    const {
-        name, 
-        keywords, 
-        version, 
-        license, 
-        description,
-        files,
-        crateVersion,
-        homepageUrl,
-        repo,
-        uuid,
-        authors,
-        crateLogoUrl
-    } = cargo
-
-    const noLicense = license === CARGO_NULL_FIELD
-    const fileCount = files.length
-
-    const [copiedId, setCopiedId] = useState("none")
-
-    const textToClipboard = (text: string, sectionId: string) => {
-        navigator.clipboard.writeText(text)
-        setCopiedId(sectionId)
-        window.setTimeout(() => {
-            setCopiedId("none")
-        }, 1_000)
-    }
-
-    const keywordList = isStandardCargo(id)
-        ? ["core", ...keywords.slice(0, 5)]
-        : keywords.slice(0, 6).filter((word) => word !== "core")
-
-    return <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
-        <ClickAwayListener onClickAway={onClose}>
-        <div className="w-5/6 max-w-xl py-3 rounded bg-neutral-800">
-            <div className="w-full pl-3">
-                <div className="flex justify-start pb-3">
-                    <CargoIcon 
-                        importUrl={importUrl}
-                        crateLogoUrl={crateLogoUrl}
-                        pixels={80}
-                        className="mr-4 animate-fade-in"
-                    />
-
-                    <div className="mt-1 w-3/4">
-                        <Tooltip title={name}>
-                            <div className="text-xl overflow-x-clip whitespace-nowrap text-ellipsis">
-                                {name}
-                            </div>
-                        </Tooltip>
-                        <div className="text-xs mb-0.5 text-neutral-400">
-                            {`v${version}`}
-                        </div>
-                        <div className="text-xs mb-0.5 text-neutral-400">
-                            <span className={`mr-1 ${noLicense ? "" : "text-green-500"}`}>
-                                <FontAwesomeIcon icon={faScaleBalanced}/>
-                            </span>
-                            {noLicense ? "no license" : license}
-                        </div>
-                        <div className="text-xs text-neutral-400">
-                            
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-y-scroll py-2 h-48 md:h-60 lg:h-72 w-full">
-                    <div>
-                        {description}
-                    </div>
-                    <div className="my-3">
-                        <Divider className=" bg-neutral-700"/>
-                    </div>
-                    <div className="text-neutral-300">
-                        {authors.length > 0 ? <>
-                            <div className="mb-2">
-                                <div className="text-xs text-neutral-500">
-                                    {`Author${authors.length > 1 ? "s" : ""}:`}
-                                </div>
-                                {authors.map((author, index) => {
-                                    const {name, email, url} = author
-                                    return <div
-                                        key={`cargo-author-${index}`}
-                                        className="text-sm"
-                                    >
-                                        {email !== CARGO_NULL_FIELD ? <a
-                                            href={`mailto:${email}`}
-                                            className="hover:text-green-500 text-neutral-400 cursor-pointer"
-                                        >
-                                            <span
-                                                className="mr-2"
-                                            >
-                                                <FontAwesomeIcon icon={faEnvelope} />
-                                            </span>
-                                        </a> : <></>}
-                                        {url !== CARGO_NULL_FIELD ? <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener"
-                                            className="hover:text-green-500 cursor-pointer text-neutral-400"
-                                        >
-                                            <span
-                                                className="mr-2"
-                                            >
-                                                <FontAwesomeIcon icon={faLink} />
-                                            </span>
-                                        </a> : <></>}
-                                        <span>
-                                            {name}
-                                        </span>
-                                    </div>
-                                })}
-                            </div>
-                        </> : <></>}
-
-                        <div className="mb-2">
-                            <div className="text-neutral-500 text-xs">
-                                {`Permissions:`}
-                            </div>
-                            <div className="text-sm">
-                                none
-                            </div>
-                        </div>
-
-                        <div className="text-xs mb-2">
-                            <div className="text-neutral-500 text-xs">
-                                {`Metadata:`}
-                            </div>
-                            <div className="text-sm">
-                                <span className="mr-1">
-                                    {fileCount}
-                                </span>
-                                <span>
-                                    files
-                                </span>
-                                <span className="ml-3">
-                                    {`crate v${crateVersion}`}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="text-sm text-neutral-400 mt-4">
-                            <div className="mb-2">
-                                <a 
-                                    className="hover:text-green-500 mr-4 cursor-pointer"
-                                    onClick={() => textToClipboard(uuid, "cargo-id")}
-                                >
-                                    {copiedId === "cargo-id" ? <>
-                                        <span className="mr-2">
-                                            <FontAwesomeIcon icon={faCopy}/>
-                                        </span>
-                                        {"Copied!"}
-                                    </> : <>
-                                        <span className="mr-2">
-                                            <FontAwesomeIcon icon={faBarcode}/>
-                                        </span>
-                                        {"Copy Add-on Id"}
-                                    </>}
-                                </a>
-                            </div>
-                            
-                            <div>
-                                <a 
-                                    className="hover:text-green-500 mr-4 cursor-pointer"
-                                    onClick={() => textToClipboard(importUrl, "import-url")}
-                                >
-                                    {copiedId === "import-url" ? <>
-                                        <span className="mr-2">
-                                            <FontAwesomeIcon icon={faCopy}/>
-                                        </span>
-                                        {"Copied!"}
-                                    </> : <>
-                                        <span className="mr-1">
-                                            <FontAwesomeIcon icon={faLink}/>
-                                        </span>
-                                        {"Copy Import Url"}
-                                    </>}
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    
-                </div>
-            </div>
-
-            <div className="pt-3">
-                {keywordList.length > 0 ? <>
-                    <div className="flex w-full px-3 items-center justify-start flex-wrap">
-                        {keywordList.map((keyword, index) => {
-                            return <div
-                                key={`keyword-${index}`}
-                                className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 ${keyword === "core" ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700 hover:bg-neutral-600"}`}
-                            >
-                                {keyword}
-                            </div>
-                        })}
-                    </div>
-                </> : <></>}
-
-                {homepageUrl !== CARGO_NULL_FIELD || repo.url !== CARGO_NULL_FIELD ? <>
-                    <div className="text-sm py-1 px-3">
-                        {homepageUrl !== CARGO_NULL_FIELD ? <>
-                            <a 
-                                href={homepageUrl} 
-                                target="_blank" 
-                                rel="noopener"
-                                className="hover:text-green-500 mr-4"
-                            >
-                                <span className="mr-1">
-                                    <FontAwesomeIcon icon={faGlobe}/>
-                                </span>
-                                website
-                            </a>
-                        </> : <></>}
-
-                        {repo.url !== CARGO_NULL_FIELD ? <>
-                            <a 
-                                href={homepageUrl} 
-                                target="_blank" 
-                                rel="noopener"
-                                className="hover:text-green-500 mr-4"
-                            >
-                                <span className="mr-1">
-                                    <FontAwesomeIcon icon={faCodeCommit}/>
-                                </span>
-                                repo
-                            </a>
-                        </> : <></>}
-                    </div>
-                </> : <></>}
-            </div>
-        </div>
-        </ClickAwayListener>
-    </div>
-}
-
 const ROOT_DIRECTORY_PATH = "#"
 
 const AddOns = () => {
@@ -796,7 +246,7 @@ const AddOns = () => {
     const [order, setOrder] = useState<FilterOrder>("descending")
     const [viewingCargo, setViewingCargo] = useState("none")
     const [targetCargo, setTargetCargo] = useState(
-        new CodeManifestSafe()
+        new Cargo()
     )
     const [cargoFound, setCargoFound] = useState(false)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
@@ -851,9 +301,24 @@ const AddOns = () => {
             return
         }
         const targetCargoIndex = cargoIndex.cargos[index]
-        const cargo = await downloadClient.getCargoAtUrl(
-            targetCargoIndex.storageRootUrl
-        )
+        const cargo = await (async (rootUrl: string, id: string) => {
+            switch (id) {
+                case ADDONS_EXENSTION_ID:
+                    return io.ok({
+                        pkg: ADDONS_CARGO,
+                        name: MANIFEST_NAME,
+                        bytes: JSON.stringify(ADDONS_CARGO).length
+                    })
+                case GAME_EXTENSION_ID:
+                    return io.ok({
+                        pkg: GAME_CARGO,
+                        name: MANIFEST_NAME,
+                        bytes: JSON.stringify(GAME_CARGO).length
+                    })
+                default:
+                    return await downloadClient.getCargoAtUrl(rootUrl)
+            }
+        })(targetCargoIndex.storageRootUrl, viewingCargo)
         if (!cargo.ok) {
             setCargoFound(false)
             return
@@ -877,7 +342,7 @@ const AddOns = () => {
         cargoDirectoryRef.current = rootDirectory
         setDirectoryPath([rootDirectory])
         setViewingCargoIndex(index)
-        setTargetCargo(new CodeManifestSafe(cargoTarget))
+        setTargetCargo(new Cargo(cargoTarget))
         setCargoFound(true)
         setFilter("name")
         setOrder("descending")
@@ -893,50 +358,9 @@ const AddOns = () => {
             setIsInErrorState(true)
             return
         }
-        const data = cargoIndexRes.data 
-        const first = data.cargos.length < 1 
-            ? {name: "string",
-                id: "string",
-                logoUrl: CARGO_NULL_FIELD,
-                storageRootUrl: "string",
-                requestRootUrl: "string",
-                bytes: 0,
-                entry: "string",
-                version: "string",
-                state: "cached",
-                createdAt: 0,
-                updatedAt: 0,} as const
-            : data.cargos[0]
-        const copy = {...first}
-        const cargos = [
-            copy,
-            {   
-                ...copy, 
-                id: `${MOD_CARGO_ID_PREFIX}-${~~(Math.random() * 1_000_000)}`,
-                name: `std-${~~(Math.random() * 1_000_000)}`,
-                state: "updating" as const
-            },
-            {   
-                ...copy, 
-                id: `${EXTENSION_CARGO_ID_PREFIX}${~~(Math.random() * 1_000_000)}`,
-                name: `std${~~(Math.random() * 1_000_000)}`,
-                state: "update-aborted" as const
-            },
-        ]
-        for (let i = 0; i < 100; i++) {
-            const idPrefix = (i % 2 === 0) 
-                ? MOD_CARGO_ID_PREFIX 
-                : EXTENSION_CARGO_ID_PREFIX
-            cargos.push({   
-                ...copy, 
-                logoUrl: CARGO_NULL_FIELD,
-                id: `${idPrefix}${~~(Math.random() * 1_000_000)}`,
-                name: `${idPrefix}${~~(Math.random() * 1_000_000)}`,
-                updatedAt: copy.updatedAt - ~~(Math.random() * 1_000_000_000),
-                bytes: ~~(Math.random() * 100_000_000),
-                state: i % 7 === 0 ? "archived" : "cached"
-            })
-        }
+        const cargos = addStandardCargosToCargoIndexes(
+            cargoIndexRes.data.cargos
+        )
         setCargoIndex({...cargoIndexRes.data, cargos})
         setStorageUsage(clientStorageRes.data)
     }, [])
@@ -979,7 +403,7 @@ const AddOns = () => {
                 })
             case "addon-type":
                 return copy.sort((a, b) => {
-                    const order = isAMod(a.id) && !isAMod(b.id)
+                    const order = isMod(a.id) && !isMod(b.id)
                         ? 1
                         : -1
                     return order * orderFactor
@@ -1504,7 +928,7 @@ const AddOns = () => {
                                                             importUrl={cargoIndex.cargos[viewingCargoIndex].requestRootUrl}
                                                             crateLogoUrl={targetCargo.crateLogoUrl}
                                                             pixels={17}
-                                                            className="animate-fade-in"
+                                                            className="animate-fade-in-left"
                                                         />
                                                     </div> : <></>}
                                                     <div>
@@ -1737,7 +1161,7 @@ const AddOns = () => {
 
 
                             {isViewingCargo ? <>
-                                <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in">
+                                <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
                                     {!cargoFound ? <>
                                         <div className="text-yellow-500 mt-16 mb-3">
                                             <span className="mr-2">
@@ -1756,7 +1180,7 @@ const AddOns = () => {
                                             </Button>
                                         </div>
                                     </> : <>
-                                        <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in">
+                                        <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
                                             {cargoDirectory.files.length < 1 && cargoDirectory.directories.length < 1 ? <>
                                                 <div className="text-yellow-500 mt-16 mb-3">
                                                     <span className="mr-2">
@@ -1843,7 +1267,7 @@ const AddOns = () => {
                                                     return <AddonListItem
                                                         key={`cargo-file-${index}`}
                                                         onClick={async () => {
-                                                            const basePath = cargoIndex.cargos[viewingCargoIndex].storageRootUrl
+                                                            const basePath = targetIndex.storageRootUrl
                                                             const path = directoryPath
                                                                 .slice(1)
                                                                 .reduce((total, next) => `${total}/${next.path}`, "")
@@ -1857,7 +1281,27 @@ const AddOns = () => {
                                                                 ? path.slice(1)
                                                                 : cleanedPathEnd
                                                             const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                                                            const fileResponse = await downloadClient.getCachedFile(fullPath)
+                                                            //const fileResponse = await downloadClient.getCachedFile(fullPath)
+                                                            const {id} = targetIndex
+                                                            const fileResponse = await (async (cargoId: string, url: string) => {
+                                                                if (
+                                                                    !url.includes(MANIFEST_NAME)
+                                                                    || !isEmbeddedStandardCargo(cargoId)
+                                                                ) {
+                                                                    return await downloadClient.getCachedFile(url)
+                                                                }
+                                                                return new Response(
+                                                                    JSON.stringify(targetCargo), {
+                                                                        status: 200,
+                                                                        statusText: "OK",
+                                                                        headers: {
+                                                                            "content-type": "application/json",
+                                                                            "content-length": file.bytes.toString(),
+                                                                            [VIRTUAL_FILE_HEADER]: "1"
+                                                                        }
+                                                                    }
+                                                                )
+                                                            })(id, fullPath)
                                                             if (fileResponse) {
                                                                 setFileDetails({
                                                                     name: file.name,
@@ -1869,7 +1313,7 @@ const AddOns = () => {
                                                                 setShowFileOverlay(true)
                                                             }
                                                         }}
-                                                        icon={mimeToIcon(mime, "mr-3")}
+                                                        icon={<MimeIcon mime={mime} className="mr-3"/>}
                                                         name={file.name}
                                                         type={mime}
                                                         updatedAt={targetIndex.updatedAt}
@@ -1883,11 +1327,11 @@ const AddOns = () => {
                                     </>}
                                 </div>
                             </> : <>
-                                <div className="w-full h-5/6 overflow-y-scroll animate-fade-in">
+                                <div className="w-full h-5/6 overflow-y-scroll animate-fade-in-left">
                                     {filteredCargos.map((cargo, index) => {
                                         const {name, bytes, updatedAt, id, state} = cargo
                                         
-                                        const isMod = isAMod(id)
+                                        const isAMod = isMod(id)
                                         return <AddonListItem
                                             key={`cargo-index-${index}`}
                                             onClick={() => {
@@ -1941,7 +1385,7 @@ const AddOns = () => {
                                                             </span>
                                                         </>
                                                 }
-                                            })(state, isMod)}
+                                            })(state, isAMod)}
                                             name={name}
                                             status={((addonState: typeof state) => {
                                                 switch (addonState) {
@@ -1956,7 +1400,7 @@ const AddOns = () => {
                                                         return <span>{"Saved"}</span>
                                                 }
                                             })(state)}
-                                            type={isMod ? "mod" : "extension"}
+                                            type={isAMod ? "mod" : "extension"}
                                             updatedAt={updatedAt}
                                             byteCount={bytes}
                                             showModifiedOnSmallScreen

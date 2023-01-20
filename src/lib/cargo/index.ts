@@ -1,10 +1,10 @@
 import {SemVer} from "@/lib/smallSemver/index"
 import {
-    NULL_FIELD,  
-    UUID_LENGTH,
-    CodeManifest,
+    NULL_FIELD,
+    CargoManifest,
     ALL_CRATE_VERSIONS,
-    LATEST_CRATE_VERSION
+    LATEST_CRATE_VERSION,
+    MiniCodeManifest
 } from "./consts"
 import {
     InvalidationStrategy, 
@@ -13,29 +13,28 @@ import {
     ValidDefaultStrategies
 } from "./consts"
 import {type} from "@/lib/utils/betterTypeof"
+import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
 type CargoFileOptional = Partial<{
-    name: string, 
+    name: string,   
     bytes: number,
     invalidation: InvalidationStrategy
 }>
 
-type CodeManifestUnsafe = (Partial<CodeManifest> & Partial<{
+type CargoOptions = (Partial<CargoManifest> & Partial<{
     authors: Array<Partial<{
         name: string, 
         email: string, 
         url: string
     }>>
     files: Array<CargoFileOptional> | Array<string>
-    repo: Partial<{type: RepoType, url: string}>
+    repo: Partial<{ type: RepoType, url: string }>
 }>)
 
 export const NULL_MANIFEST_VERSION = "0.0.0"
 
-export class CodeManifestSafe {
-    static readonly UUID_LENGTH = UUID_LENGTH
-
-    uuid: string
+export class Cargo {
+    // required fields
     crateVersion: CrateVersion
     name: string
     version: string
@@ -49,11 +48,7 @@ export class CodeManifestSafe {
     // optional fields in Code Manifest
     invalidation: InvalidationStrategy
     description: string
-    authors: Array<{
-        name: string, 
-        email: string, 
-        url: string
-    }>
+    authors: Array<{ name: string, email: string, url: string }>
     crateLogoUrl: string
     keywords: string[]
     license: string
@@ -61,7 +56,6 @@ export class CodeManifestSafe {
     homepageUrl: string
 
     constructor({
-        uuid = "", 
         crateVersion = "0.1.0",
         name = "unspecified-name",
         version = NULL_MANIFEST_VERSION,
@@ -77,7 +71,7 @@ export class CodeManifestSafe {
         license = NULL_FIELD,
         repo = {type: NULL_FIELD, url: NULL_FIELD},
         homepageUrl = NULL_FIELD
-    }: CodeManifestUnsafe = {}) {
+    }: CargoOptions = {}) {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
@@ -85,7 +79,7 @@ export class CodeManifestSafe {
         }
         this.license = license
         this.keywords = keywords
-        this.crateLogoUrl = crateLogoUrl
+        this.crateLogoUrl = stripRelativePath(crateLogoUrl)
         this.authors = authors.map(({
             name = NULL_FIELD, 
             email = NULL_FIELD, 
@@ -100,29 +94,29 @@ export class CodeManifestSafe {
             .map(({
                 name = "", bytes = 0, invalidation = "default"
             }) => ({
-                name, bytes, invalidation
+                name: stripRelativePath(name), 
+                bytes, 
+                invalidation
             }))
-        this.entry = entry
+        this.entry = stripRelativePath(entry)
         this.version = version
         this.name = name
         this.crateVersion = crateVersion
-        this.uuid = uuid
-    }
-
-    clone() {
-        const copy = new CodeManifestSafe({...this})
-        copy.files = copy.files.map(el => ({...el}))
-        copy.authors = copy.authors.map(el => ({...el}))
-        copy.keywords = [...copy.keywords]
-        copy.repo = {...copy.repo}
-        return copy
-    }
-
-    toMini() {
-        const {version} = this
-        return {version}
     }
 }
+
+export const cloneCargo = (cargo: Cargo) => {
+    const copy = new Cargo({...cargo})
+    copy.files = copy.files.map(el => ({...el}))
+    copy.authors = copy.authors.map(el => ({...el}))
+    copy.keywords = [...copy.keywords]
+    copy.repo = {...copy.repo}
+    return copy
+}
+
+export const toMiniCargo = ({version}: Cargo) => ({
+    version
+} as MiniCodeManifest) 
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
 
@@ -141,22 +135,12 @@ const typevalid = <T extends Record<string, unknown>>(
 }
 
 export const dummyManifest = () => ({
-    pkg: new CodeManifestSafe(), 
+    pkg: new Cargo(), 
     errors: [] as string[], 
     semanticVersion: SemVer.null()
 })
 
 export type ValidatedCodeManfiest = ReturnType<typeof dummyManifest>
-
-const stripRelativePath = (url: string) => {
-    if (url.startsWith("/")) {
-        return url.slice(1)
-    } else if (url.startsWith("./")) {
-        return url.slice(2)
-    } else {
-        return url
-    }
-}
 
 const toInvalidation = (invalidation: string) => {
     switch (invalidation) {
@@ -174,7 +158,7 @@ export const validateMiniCargo = <T>(miniCargo: T) => {
         errors: [] as string[],
         semanticVersion: SemVer.null()
     }
-    const miniC = miniCargo as ReturnType<CodeManifestSafe["toMini"]>
+    const miniC = miniCargo as MiniCodeManifest
     const baseType = type(miniC)
     if (baseType !== "object") {
         out.errors.push(`expected mini cargo to be type "object" got "${baseType}"`)
@@ -200,24 +184,12 @@ export type ValidatedMiniCargo = ReturnType<typeof validateMiniCargo>
 export const validateManifest = <T>(cargo: T) => {
     const out = dummyManifest()
     const {pkg, errors} = out
-    const c = cargo as CodeManifest
+    const c = cargo as CargoManifest
     const baseType = type(c)
     if (baseType !== "object") {
         errors.push(`expected cargo to be type "object" got "${baseType}"`)
         return out
     }
-
-    if (!typevalid(c, "uuid", "string", errors)) {
-
-    } else if (c.uuid.length < UUID_LENGTH) {
-        errors.push(`uuid should be ${UUID_LENGTH} characters got ${c.uuid.length} characters`)
-    } else if (
-        // check if uuid is url-safe
-        encodeURIComponent(decodeURIComponent(c.uuid)) !== c.uuid
-    ) {
-        errors.push("uuid should only contain url safe characters")
-    }
-    pkg.uuid = c.uuid || NULL_FIELD
 
     if (!ALL_CRATE_VERSIONS[c.crateVersion]) {
         errors.push(`crate version is invalid, got "${c.crateVersion}", valid=${Object.keys(ALL_CRATE_VERSIONS).join()}`)
@@ -357,8 +329,8 @@ export class CargoUpdateDetails {
 }
 
 export const diffManifestFiles = (
-    newCargo: CodeManifestSafe, 
-    oldCargo: CodeManifestSafe,
+    newCargo: Cargo, 
+    oldCargo: Cargo,
     defaultInvalidation: ValidDefaultStrategies
 ) => {
     const updates = new CargoUpdateDetails([], [])

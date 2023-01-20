@@ -22,46 +22,16 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {
     APP_CARGO_ID, 
-    GAME_EXTENSION_ID, 
-    ADD_ON_MANAGER_EXTENSION_ID,
+    ADDONS_EXENSTION_ID,
     EXTENSION_CARGO_ID_PREFIX
 } from "../config"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/consts"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
-
-const GAME_CARGO_INDEX: CargoIndex = {
-    id: GAME_EXTENSION_ID,
-    name: "Game",
-    logoUrl: CARGO_NULL_FIELD,
-    storageRootUrl: "",
-    requestRootUrl: "",
-    bytes: 0,
-    entry: "",
-    version: "0.1.0",
-    state: "cached",
-    createdAt: 0,
-    updatedAt: 0
-} as const
-
-const ADD_ON_MANAGER_CARGO_INDEX: CargoIndex = {
-    id: ADD_ON_MANAGER_EXTENSION_ID,
-    name: "Add-ons",
-    logoUrl: CARGO_NULL_FIELD,
-    storageRootUrl: "",
-    requestRootUrl: "",
-    bytes: 0,
-    entry: "",
-    version: "0.1.0",
-    state: "cached",
-    createdAt: 0,
-    updatedAt: 0
-} as const
+import {addStandardCargosToCargoIndexes} from "../standardCargos"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
 
 const FILTERS = ["modified", "name"] as const
-
 
 const ExtensionsListPage = () => {
     const {downloadClient} = useAppShellContext()
@@ -83,22 +53,7 @@ const ExtensionsListPage = () => {
         }
         const {data} = indicesRes
         const extensionCargos = data.cargos.filter((cargo) => cargo.id.startsWith(EXTENSION_CARGO_ID_PREFIX))
-        const appLauncherCargoIndex = data.cargos.findIndex((cargo) => cargo.id === APP_CARGO_ID)
-        let cargos: CargoIndex[]
-        if (appLauncherCargoIndex < 0) {
-            cargos = [
-                ...extensionCargos,
-                {...GAME_CARGO_INDEX},
-                {...ADD_ON_MANAGER_CARGO_INDEX}
-            ]
-        } else {
-            const {updatedAt} = data.cargos[appLauncherCargoIndex]
-            cargos = [
-                ...extensionCargos,
-                {...GAME_CARGO_INDEX, updatedAt},
-                {...ADD_ON_MANAGER_CARGO_INDEX, updatedAt}
-            ]
-        }
+        const cargos = addStandardCargosToCargoIndexes(extensionCargos)
         setCargoIndex({...data, cargos})
         setLoading(false)
     }, [])
@@ -233,7 +188,7 @@ const ExtensionsListPage = () => {
                     >
                         {filteredCargos.map((cargo, index) => {
                             const {logoUrl, requestRootUrl, name, id} = cargo
-                            const isAddonManager = id === ADD_ON_MANAGER_EXTENSION_ID 
+                            const isAddonManager = id === ADDONS_EXENSTION_ID 
                             return <div
                                 key={`extension-${index}`}
                                 className="mr-5 sm:mr-8 mb-1"
@@ -243,7 +198,7 @@ const ExtensionsListPage = () => {
                                         switch (extensionId) {
                                             case APP_CARGO_ID:
                                                 return "/start"
-                                            case ADD_ON_MANAGER_EXTENSION_ID:
+                                            case ADDONS_EXENSTION_ID:
                                                 return "/add-ons"
                                             default:
                                                 return `/extension?id=${id}`

@@ -1,7 +1,6 @@
 import {wRpc} from "../../src/lib/wRpc/simple"
 import {createFetchHandler} from "./fetchHandler"
-import {CallableFunctions as SandboxFunctions} from "../sandboxFunctions"
-import {APP_CACHE} from "../config"
+import type {CallableFunctions as SandboxFunctions} from "../sandboxFunctions"
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope
 
@@ -41,10 +40,6 @@ const fetchHandler = createFetchHandler({
     networkFetch: fetch,
     origin: sw.location.origin,
     fileCache: {
-        getLocalFile: async (url) => {
-            const cache = await caches.open(APP_CACHE)
-            return await cache.match(url)
-        },
         getClientFile: async (url, clientId) => {
             const client = await sw.clients.get(clientId)
             if (!client) {
@@ -64,7 +59,7 @@ const fetchHandler = createFetchHandler({
             })
         },
     },
-    templateHeaders: {
+    inMemoryDocumentHeaders: {
         "Cross-Origin-Embedder-Policy": "require-corp",
         "Cross-Origin-Opener-Policy": "same-origin",
         "Cross-Origin-Resource-Policy": "cross-origin",
@@ -75,6 +70,4 @@ const fetchHandler = createFetchHandler({
     config,
 })
 
-sw.onfetch = (event) => {
-    event.respondWith(fetchHandler(event))
-}
+sw.onfetch = (event) => event.respondWith(fetchHandler(event))

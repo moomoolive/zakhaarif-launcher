@@ -54,9 +54,6 @@ const createFileCache = ({
     const fileCache: FileCache = {
         async getClientFile(url, _) {
             return (await clientCache.getFile(url)) || null
-        },
-        getLocalFile(url) {
-            return localCache.getFile(url)
         }
     }
     const networkFetch: typeof fetch = async (input) => {
@@ -143,7 +140,7 @@ describe("fetch handler root document behaviour", () => {
         expect(clientCache.accessLog.length).toBe(0)
     })
 
-    it("root document should return local cache response (/offline.html) if network error occurs", async () => {
+    it("should return in-memory copy of root document if network error occurs, even if there is a copy in cache", async () => {
         const origin = "https://donuts.com"
         const rootText = "error text"
         const cacheText = "cache text"
@@ -157,7 +154,7 @@ describe("fetch handler root document behaviour", () => {
                 },
             },
             localFileHandlers: {
-                [`${origin}/offline.html`]: () => new Response(cacheText, {status: 200})
+                [`${origin}/`]: () => new Response(cacheText, {status: 200})
             }
         })
         const {networkCache, localCache, clientCache} = caches
@@ -166,81 +163,14 @@ describe("fetch handler root document behaviour", () => {
         const res = await handler(fetchEvent(requestUrl).event)
         expect(res.status).toBe(200)
         expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
-        expect(await res.text()).toBe(cacheText)
+        expect(res.headers.get("content-type")).toBe("text/html")
+        expect(await res.text()).not.toBe(cacheText)
         expect(
             networkCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(true)
         expect(
             localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(false)
-    })
-
-    it("root document should return response with code 500 if network error occurs and local cache file is not found (/offline.html)", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "error text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    throw new Error("network error")
-                    return new Response(rootText, {
-                        status: 403
-                    })
-                },
-            },
-            localFileHandlers: {
-                //[`${origin}/offline.html`]: () => new Response(cacheText, {status: 200})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.status).toBe(500)
-        expect(res.headers.has(ErrorHeader)).toBe(true)
-        expect(
-            networkCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
-        expect(
-            clientCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(false)
-    })
-
-    it("root document should return response with code 500 if network error occurs and local cache file has an error http code (/offline.html)", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "error text"
-        const cacheText = "cache text"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    throw new Error("network error")
-                    return new Response(rootText, {
-                        status: 403
-                    })
-                },
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => new Response(cacheText, {status: 403})
-            }
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const requestUrl = `${origin}/`
-        const res = await handler(fetchEvent(requestUrl).event)
-        expect(res.status).toBe(500)
-        expect(res.headers.has(ErrorHeader)).toBe(true)
-        expect(
-            networkCache.accessLog.some((log) => log.url === requestUrl)
-        ).toBe(true)
-        expect(
-            localCache.accessLog.some((log) => log.url === `${origin}/offline.html`)
-        ).toBe(true)
         expect(
             clientCache.accessLog.some((log) => log.url === requestUrl)
         ).toBe(false)
@@ -429,7 +359,7 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
         const {networkCache, localCache, clientCache} = caches
         const handler = createFetchHandler({
             origin, ...adaptors,
-            templateHeaders: {
+            inMemoryDocumentHeaders: {
                 "cool-header": "3"
             }
         })
@@ -508,7 +438,7 @@ describe("fetch handler behaviour with template endpoint (/runProgram)", () => {
 })
 
 describe("fetch handler behaviour with other resources on origin", () => {
-    it("should 404 if attempt to access any resource other than secure.mjs on same origin", async () => {
+    it("should 404 if attempt to access any resource other than secure.mjs or test.mjs on same origin", async () => {
         const origin = "https://donuts.com"
         const rootText = "root text"
         const cacheText = "cache text"
@@ -580,11 +510,12 @@ describe("fetch handler behaviour with other resources on origin", () => {
         expect(networkCache.accessLog.length).toBeGreaterThan(0)
     })
 
-    it("should return cached document if same origin request is to 'secure.mjs'", async () => {
+    it("should return network document if same origin request is to 'secure.mjs'", async () => {
         const origin = "https://donuts.com"
         const rootText = "root text"
         const cacheText = "cache text"
         const secureText = "console.log(0)"
+        const networkText = "console.log(1)"
         const [adaptors, caches] = createFileCache({
             networkFileHandlers: {
                 [`${origin}/`]: () => {
@@ -592,6 +523,14 @@ describe("fetch handler behaviour with other resources on origin", () => {
                         status: 200
                     })
                 },
+                [`${origin}/secure.compiled.js`]: () => {
+                    return new Response(networkText, {
+                        status: 200,
+                        headers: {
+                            "content-type": "text/javascript"
+                        }
+                    })
+                }
             },
             localFileHandlers: {
                 [`${origin}/offline.html`]: () => {
@@ -612,64 +551,19 @@ describe("fetch handler behaviour with other resources on origin", () => {
         const secureScript = `${origin}/secure.compiled.js`
         const res = await handler(fetchEvent(secureScript).event)
         expect(res.status).toBe(200)
-        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
-        expect(await res.text()).toBe(secureText)
-        expect(networkCache.accessLog.length).toBe(0)
-        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
-        expect(clientCache.accessLog.length).toBe(0)
-    })
-
-    it("should return network document if cached document not found and if same origin request is to 'secure.mjs'", async () => {
-        const origin = "https://donuts.com"
-        const rootText = "root text"
-        const cacheText = "cache text"
-        const secureText = "console.log(0)"
-        const [adaptors, caches] = createFileCache({
-            networkFileHandlers: {
-                [`${origin}/`]: () => {
-                    return new Response(rootText, {
-                        status: 200
-                    })
-                },
-                [`${origin}/secure.compiled.js`]: () => {
-                    return new Response(secureText, {
-                        status: 200,
-                        headers: {
-                            "content-type": "text/javascript"
-                        }
-                    })
-                }
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => {
-                    return new Response(cacheText, {status: 200})
-                },
-                //[`${origin}/secure.compiled.js`]: () => {
-                //    return new Response(secureText, {
-                //        status: 200,
-                //        headers: {
-                //            "content-type": "text/javascript"
-                //        }
-                //    })
-                //}
-            },
-        })
-        const {networkCache, localCache, clientCache} = caches
-        const handler = createFetchHandler({origin, ...adaptors})
-        const secureScript = `${origin}/secure.compiled.js`
-        const res = await handler(fetchEvent(secureScript).event)
-        expect(res.status).toBe(200)
-        expect(await res.text()).toBe(secureText)
+        expect(res.headers.get(cacheHitHeader.key)).toBe(null)
+        expect(await res.text()).toBe(networkText)
         expect(networkCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
-        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
+        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(false)
         expect(clientCache.accessLog.length).toBe(0)
     })
 
-    it("should return network document if cached document is found but has error http code and if same origin request is to 'secure.mjs'", async () => {
+    it("should return in memory copy if network request to secure.mjs fails, even if it is in cache", async () => {
         const origin = "https://donuts.com"
         const rootText = "root text"
         const cacheText = "cache text"
         const secureText = "console.log(0)"
+        const networkText = "console.log(1)"
         const [adaptors, caches] = createFileCache({
             networkFileHandlers: {
                 [`${origin}/`]: () => {
@@ -678,7 +572,8 @@ describe("fetch handler behaviour with other resources on origin", () => {
                     })
                 },
                 [`${origin}/secure.compiled.js`]: () => {
-                    return new Response(secureText, {
+                    throw new Error("network error")
+                    return new Response(networkText, {
                         status: 200,
                         headers: {
                             "content-type": "text/javascript"
@@ -692,7 +587,7 @@ describe("fetch handler behaviour with other resources on origin", () => {
                 },
                 [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
-                        status: 403,
+                        status: 200,
                         headers: {
                             "content-type": "text/javascript"
                         }
@@ -705,9 +600,10 @@ describe("fetch handler behaviour with other resources on origin", () => {
         const secureScript = `${origin}/secure.compiled.js`
         const res = await handler(fetchEvent(secureScript).event)
         expect(res.status).toBe(200)
-        expect(await res.text()).toBe(secureText)
+        expect(res.headers.get("content-type")).toBe("text/javascript")
+        expect(await res.text()).not.toBe(secureText)
         expect(networkCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
-        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
+        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(false)
         expect(clientCache.accessLog.length).toBe(0)
     })
 
@@ -723,11 +619,6 @@ describe("fetch handler behaviour with other resources on origin", () => {
                         status: 200
                     })
                 },
-            },
-            localFileHandlers: {
-                [`${origin}/offline.html`]: () => {
-                    return new Response(cacheText, {status: 200})
-                },
                 [`${origin}/secure.compiled.js`]: () => {
                     return new Response(secureText, {
                         status: 200,
@@ -735,6 +626,11 @@ describe("fetch handler behaviour with other resources on origin", () => {
                             "content-type": "text/javascript"
                         }
                     })
+                }
+            },
+            localFileHandlers: {
+                [`${origin}/offline.html`]: () => {
+                    return new Response(cacheText, {status: 200})
                 }
             }
         })
@@ -744,10 +640,9 @@ describe("fetch handler behaviour with other resources on origin", () => {
         const withQuery = secureScript + "?q=true"
         const res = await handler(fetchEvent(withQuery).event)
         expect(res.status).toBe(200)
-        expect(res.headers.get(cacheHitHeader.key)).toBe(cacheHitHeader.value)
         expect(await res.text()).toBe(secureText)
-        expect(networkCache.accessLog.length).toBe(0)
-        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
+        expect(networkCache.accessLog.some((log) => log.url === secureScript)).toBe(true)
+        expect(localCache.accessLog.some((log) => log.url === secureScript)).toBe(false)
         expect(clientCache.accessLog.length).toBe(0)
     })
 })

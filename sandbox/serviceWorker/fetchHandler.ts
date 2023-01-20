@@ -1,5 +1,8 @@
 import {cacheHit, NOT_FOUND_RESPONSE, errorResponse, LogFn} from "../../src/lib/shabah/serviceWorkerMeta"
 import {fetchCore} from "../../src/lib/shabah/serviceWorker/fetchCore"
+import IndexHtml from "./index-html.inlined.json"
+import SecureMjs from "./secure-compiled-mjs.inlined.json"
+import {INDEX_HTML_LENGTH, SECURE_MJS_LENGTH} from "./inlinedMeta"
 
 const generateTemplate = ({
     importSource, 
@@ -23,7 +26,6 @@ const generateTemplate = ({
 
 export type FileCache = {
     getClientFile: (url: string, clientId: string) => Promise<Response | null>
-    getLocalFile: (url: string) => Promise<Response | undefined>
 }
 
 export type FetchHandlerEvent = {
@@ -42,7 +44,7 @@ type FetchHandlerOptions = {
     origin: string,
     fileCache: FileCache
     networkFetch: typeof fetch
-    templateHeaders?: Readonly<{[key: string]: string}>
+    inMemoryDocumentHeaders?: Readonly<{[key: string]: string}>
     log: LogFn
     config: Readonly<ConfigReference>
 }
@@ -52,12 +54,11 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
         origin, 
         fileCache, 
         networkFetch, 
-        templateHeaders = {},
+        inMemoryDocumentHeaders = {},
         log,
         config,
     } = options
     const rootDoc = `${origin}/`
-    const offlineFallback = `${origin}/offline.html`
     const templateEndpoint = `${origin}/runProgram`
     const entryScript = `${origin}/secure.compiled.js`
     const testScript = `${origin}/test.mjs`
@@ -69,11 +70,16 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
                 try {
                     return await networkFetch(request)
                 } catch (err) {
-                    const offlineDoc = await fileCache.getLocalFile(offlineFallback)
-                    if (offlineDoc && offlineDoc.ok) {
-                        return cacheHit(offlineDoc)
-                    }
-                    return errorResponse(`fallback doc not found. ${err}`)
+                    const inMemoryHtml = new Response(IndexHtml, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "content-type": "text/html",
+                            "content-length": INDEX_HTML_LENGTH.toString(),
+                            ...inMemoryDocumentHeaders
+                        }
+                    })
+                    return cacheHit(inMemoryHtml)
                 }
             }
     
@@ -95,17 +101,26 @@ export const createFetchHandler = (options: FetchHandlerOptions) => {
                     headers: {
                         "content-type": "text/html",
                         "content-length": new TextEncoder().encode(templateText).length.toString(),
-                        ...templateHeaders,
+                        ...inMemoryDocumentHeaders,
                     }
                 })
             }
     
             if (request.url.startsWith(entryScript)) {
-                const cached = await fileCache.getLocalFile(entryScript)
-                if (cached && cached.ok) {
-                    return cacheHit(cached)
+                try {
+                    return await networkFetch(entryScript)
+                } catch {
+                    const inMemorySecureMjs = new Response(SecureMjs, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "content-type": "text/javascript",
+                            "content-length": SECURE_MJS_LENGTH.toString(),
+                            ...inMemoryDocumentHeaders
+                        }
+                    })
+                    return cacheHit(inMemorySecureMjs)
                 }
-                return networkFetch(request)
             }
 
             if (request.url.startsWith(testScript)) {

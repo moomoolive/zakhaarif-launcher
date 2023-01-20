@@ -1,0 +1,1 @@
+export const VIRTUAL_FILE_HEADER = "virtual-file"

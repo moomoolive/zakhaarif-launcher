@@ -1,15 +1,14 @@
 import {describe, it, expect} from "vitest"
 import {
     cargoIsUpdatable, 
-    CodeManifestSafe, 
-    NULL_MANIFEST_VERSION
+    Cargo, 
+    NULL_MANIFEST_VERSION,
+    cloneCargo
 } from "./index"
 import {LATEST_CRATE_VERSION} from "./consts"
-import {nanoid} from "nanoid"
 
 const entry = "index.js"
-const manifest = new CodeManifestSafe({
-    uuid: nanoid(CodeManifestSafe.UUID_LENGTH), 
+const manifest = new Cargo({
     crateVersion: LATEST_CRATE_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 
@@ -21,7 +20,7 @@ describe("cargo update detection function", () => {
     it("should return true if new package is higher version", () => {
         const oldPkg = manifest
         for (let i = 0; i < 3; i++) {
-            const newPkg = manifest.clone()
+            const newPkg = cloneCargo(manifest)
             newPkg.version = `0.1.${i + 1}`
             const res = cargoIsUpdatable(newPkg, oldPkg)
             expect(res.updateAvailable).toBe(true)
@@ -29,9 +28,9 @@ describe("cargo update detection function", () => {
     })
 
     it("should return false if new and old packages have null version (0.0.0)", () => {
-        const newPkg = manifest.clone()
+        const newPkg = cloneCargo(manifest)
         newPkg.version = NULL_MANIFEST_VERSION
-        const oldPkg = manifest.clone()
+        const oldPkg = cloneCargo(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
@@ -39,16 +38,16 @@ describe("cargo update detection function", () => {
 
     it("should return false if new package has null version (0.0.0)", () => {
         const oldPkg = manifest
-        const newPkg = manifest.clone()
+        const newPkg = cloneCargo(manifest)
         newPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
     })
 
     it("should return true if old package has null version (0.0.0) and new package is non-null", () => {
-        const newPkg = manifest.clone()
+        const newPkg = cloneCargo(manifest)
         newPkg.version = "0.1.0"
-        const oldPkg = manifest.clone()
+        const oldPkg = cloneCargo(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(true)
@@ -79,7 +78,7 @@ import {diffManifestFiles} from "./index"
 describe("manifest file diffing function", () => {
     it("should return 0 additions and deletions new and old manifest are identical if ", () => {
         const oldPkg = manifest
-        const newPkg = manifest.clone()
+        const newPkg = cloneCargo(manifest)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
         )
@@ -93,7 +92,7 @@ describe("manifest file diffing function", () => {
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = oldPkg.clone()
+        const newPkg = cloneCargo(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
@@ -106,12 +105,12 @@ describe("manifest file diffing function", () => {
     })
 
     it("should return all new package files as additions and all old package file as deletions if default strategy is 'purge'", () => {
-        const oldPkg = manifest.clone()
+        const oldPkg = cloneCargo(manifest)
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = oldPkg.clone()
+        const newPkg = cloneCargo(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "purge"
@@ -127,13 +126,13 @@ describe("manifest file diffing function", () => {
     })
 
     it("should respect individual file invalidation strategies", () => {
-        const oldPkg = manifest.clone()
+        const oldPkg = cloneCargo(manifest)
         oldPkg.files[0].invalidation = "url-diff"
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = oldPkg.clone()
+        const newPkg = cloneCargo(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "purge"
@@ -153,13 +152,13 @@ describe("manifest file diffing function", () => {
             {name: "delete_asset.js", bytes: 0, invalidation: "default"},
             {name: "delete_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const oldPkg = manifest.clone()
+        const oldPkg = cloneCargo(manifest)
         oldPkg.files.push(...deleteAssets)
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = manifest.clone()
+        const newPkg = cloneCargo(manifest)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
@@ -192,12 +191,11 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if one of required fields is missing", () => {
-        const del = <T extends keyof CodeManifestSafe>(k: T) => {
-            const v = manifest.clone()
+        const del = <T extends keyof Cargo>(k: T) => {
+            const v = cloneCargo(manifest)
             delete v[k]
             return validateManifest(v)
         }
-        expect(del("uuid").errors.length).toBeGreaterThan(0)
         expect(del("crateVersion").errors.length).toBeGreaterThan(0)
         expect(del("name").errors.length).toBeGreaterThan(0)
         expect(del("version").errors.length).toBeGreaterThan(0)
@@ -205,22 +203,14 @@ describe("manifest validation function", () => {
         expect(del("files").errors.length).toBeGreaterThan(0)
     })
 
-    it("should return error is cargo.uuid is not a 35 character url-safe string", () => {
-        const m = manifest.clone()
-        m.uuid = "hello_url"
-        expect(validateManifest(m).errors.length).toBeGreaterThan(0)
-        m.uuid = "pTbhB#tp7NO_n/NJCZN94xl3qJlvRI@9CAD"
-        expect(validateManifest(m).errors.length).toBeGreaterThan(0)
-    })
-
     it("should return error if cargo.crateVersion is not a valid version", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         m.crateVersion = "random_version" as any
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
     it("should return error if cargo.version is not a valid semantic version", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         m.version = "not_a_valid_semver"
         const semverRes = SemVer.fromString(m.version)
         const notValid = semverRes === null
@@ -229,14 +219,14 @@ describe("manifest validation function", () => {
     })
 
     it("should not return error if cargo.file is an array of strings", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         {((m.files as any) = m.files.map((file) => file.name))}
         expect(validateManifest(m).errors.length).toBe(0)
     })
 
     it("should return error if cargo.file is an array of primitives other than strings", () => {
         const injectPrimitive = <T>(primitive: T) => {
-            const m = manifest.clone()
+            const m = cloneCargo(manifest)
             {((m.files as any) = [primitive])}
             return m
         }
@@ -251,13 +241,13 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if cargo.file is an object is missing required name field and is not a string", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         delete ((m.files[0] as any).name)
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
     it("should return no error is file.bytes is not a number, and place a 0 in it's place instead", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         const fileCopy = {...m.files[0]}
         m.files[0] = {...fileCopy}
         delete ((m.files[0] as any).bytes)
@@ -290,10 +280,10 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if cargo.entry is not the name of one of files, unless there are zero files in listed", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         m.entry = "random_file_not_listed.js"
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
-        const empty = manifest.clone()
+        const empty = cloneCargo(manifest)
         empty.files = []
         empty.entry = ""
         expect(validateManifest(empty).errors.length).toBe(0)
@@ -301,7 +291,6 @@ describe("manifest validation function", () => {
 
     it("should return no errors when missing all optional fields", () => {
         expect(validateManifest({
-            uuid: nanoid(CodeManifestSafe.UUID_LENGTH), 
             crateVersion: LATEST_CRATE_VERSION,
             version: "0.1.0", 
             name: "test-pkg", 
@@ -311,8 +300,8 @@ describe("manifest validation function", () => {
     })
 
     it("should return no errors when missing one optional field", () => {
-        const del = <T extends keyof CodeManifestSafe>(k: T) => {
-            const v = manifest.clone()
+        const del = <T extends keyof Cargo>(k: T) => {
+            const v = cloneCargo(manifest)
             delete v[k]
             return validateManifest(v)
         }
@@ -327,14 +316,14 @@ describe("manifest validation function", () => {
     })
 
     it("non-string keywords should be filtered during validation", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         m.keywords = [null, 0, Symbol(), {}, [], true] as any
         const res = validateManifest(m)
         expect(res.pkg.keywords.length).toBe(0)
     })
 
     it("author entries with non string names should be filtered out", () => {
-        const m = manifest.clone()
+        const m = cloneCargo(manifest)
         m.authors = [
             {name: null} as any,
             {name: 0} as any,

@@ -5,7 +5,7 @@ import {
     validateMiniCargo, 
     ValidatedMiniCargo,
     diffManifestFiles,
-    CodeManifestSafe
+    Cargo
 } from "@/lib/cargo/index"
 import {SemVer} from "@/lib/smallSemver/index"
 import {urlToMime} from "@/lib/miniMime/index"
@@ -50,14 +50,14 @@ type DownloadResponse = {
         requestUrl: string
         response: Response
         text: string
-        parsed: CodeManifestSafe
+        parsed: Cargo
     } | null
     resoucesToDelete: RequestableResource[]
     totalBytes: number
     bytesToDelete: number
     cargoManifestBytes: number
     previousVersionExists: boolean
-    previousCargo: null | CodeManifestSafe
+    previousCargo: null | Cargo
 }
 
 const downloadResponse = ({
@@ -278,7 +278,7 @@ export const checkForUpdates = async (
 
     // if cargo has been saved before assume that it's
     // encoded correctly
-    const oldCargoPkg = await storedCargoRes.json() as CodeManifestSafe
+    const oldCargoPkg = await storedCargoRes.json() as Cargo
     const oldCargoSemanticVersion = SemVer.fromString(oldCargoPkg.version)!
     const oldCargo = {
         pkg: oldCargoPkg,
@@ -312,12 +312,6 @@ export const checkForUpdates = async (
 
     if (!newCargoPkg || !response || error.length > 0) {
         return downloadError(error)
-    }
-
-    if (newCargoPkg.pkg.uuid !== oldCargo.pkg.uuid) {
-        return downloadError(
-            `new cargo has different uuid than old: old=${oldCargo.pkg.uuid}, new=${newCargoPkg.pkg.uuid}`
-        )
     }
 
     if (!newCargoPkg.semanticVersion.isGreater(oldCargo.semanticVersion)) {

@@ -3,7 +3,7 @@ import {
   createTheme,
   ThemeProvider,
 } from "@mui/material"
-import {LauncherRoot} from "./launcher/Root"
+import {LauncherRoot} from "./launcher/LauncherEntry"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
 import type {
   OutboundMessage as ServiceWorkerMessage
@@ -18,7 +18,7 @@ import {Shabah} from "@/lib/shabah/wrapper"
 import {APP_CACHE} from "./config"
 import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
 
-const AppShellRoot = lazyComponent(async () => (await import("./appShell/Root")).AppShellRoot)
+const AppShellRoot = lazyComponent(async () => (await import("./appShell/AppShellEntry")).AppShellRoot)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })

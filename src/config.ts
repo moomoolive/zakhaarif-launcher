@@ -5,4 +5,4 @@ export const EXTENSION_CARGO_ID_PREFIX = "ext-"
 
 export const APP_CARGO_ID = "ext-std"
 export const GAME_EXTENSION_ID = "ext-game"
-export const ADD_ON_MANAGER_EXTENSION_ID = "ext-addons"
+export const ADDONS_EXENSTION_ID = "ext-addons"

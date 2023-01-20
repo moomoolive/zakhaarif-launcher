@@ -1,4 +1,4 @@
-import {useSearchParams, Link} from "react-router-dom"
+import {useSearchParams, Link, useNavigate} from "react-router-dom"
 import {useEffect, useRef, useState} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
@@ -8,24 +8,32 @@ import startGameUrl from "@/game/main?url"
 import {wRpc} from "../lib/wRpc/simple"
 import {sandboxToControllerRpc} from "../lib/utils/workerCommunication/controllerFrame"
 import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
-import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
+import {
+    GAME_EXTENSION_ID, 
+    MOD_CARGO_ID_PREFIX,
+    ADDONS_EXENSTION_ID
+} from "../config"
 import {useAppShellContext} from "./store"
 import {CargoIndex} from "../lib/shabah/wrapper"
+import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
+import {Cargo} from "../lib/cargo/index"
 
 const sanboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
-const programFrameId = "program-frame"
+const extensionFrameId = "extension-frame"
 const NO_EXTENSION_ID = ""
 
 const ExtensionShellPage = () => {
     const {downloadClient} = useAppShellContext()
     const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
 
     const [error, setError] = useState(false)
     const [errorMessage, setErrorMessage] = useState("An error occurred...")
     const [loading, setLoading] = useState(true)
+    const [extensionEntry, setExtensionEntry] = useState("")
     type ControllerRpc = wRpc<typeof sandboxToControllerRpc>
     const iframeRpc = useRef<null | ControllerRpc>(null)
-    const [extensionEntry, setExtensionEntry] = useState("")
+    const extensionCargo = useRef(new Cargo())
 
     const extensionListener = useRef<(_: MessageEvent) => any>(() => {})
     const extensionInitialState = useRef("")
@@ -43,9 +51,15 @@ const ExtensionShellPage = () => {
             return
         }
 
+        if (extensionId === ADDONS_EXENSTION_ID) {
+            navigate("/add-ons")
+            return
+        }
+
         if (extensionId === GAME_EXTENSION_ID) {
             setLoading(false)
-            setExtensionEntry(`${location.origin}${startGameUrl}`)
+            setExtensionEntry(GAME_CARGO_INDEX.entry)
+            extensionCargo.current = GAME_CARGO
             return
         }
 
@@ -54,7 +68,17 @@ const ExtensionShellPage = () => {
             extensionId.length > 0 
             && (meta = await downloadClient.getCargoMeta(extensionId))
         ) {
-            setExtensionEntry(meta.entry)
+            const cargoResponse = await downloadClient.getCargoAtUrl(
+                meta.storageRootUrl
+            )
+            if (!cargoResponse.ok) {
+                setError(true)
+                setErrorMessage("Extension Not Found")
+                console.error("extension exists in index, but was not found")
+            } else {
+                extensionCargo.current = cargoResponse.data.pkg
+                setExtensionEntry(meta.entry)
+            }
             setLoading(false)
             return
         }
@@ -77,23 +101,23 @@ const ExtensionShellPage = () => {
             console.error("couldn't find program container")
             return
         }
-        const programElement = document.getElementById(programFrameId)
+        const programElement = document.getElementById(extensionFrameId)
         if (programElement) {
             return
         }
         const entry = extensionEntry
-        const programFrame = document.createElement("iframe")
-        programFrame.allow = ""
-        programFrame.name = "game-frame"
-        programFrame.id = programFrameId
-        programFrame.setAttribute("sandbox", "allow-scripts allow-same-origin")
-        programFrame.width = "100%"
-        programFrame.height = "100%"
+        const extensionFrame = document.createElement("iframe")
+        extensionFrame.allow = ""
+        extensionFrame.name = "extension-frame"
+        extensionFrame.id = extensionFrameId
+        extensionFrame.setAttribute("sandbox", "allow-scripts allow-same-origin")
+        extensionFrame.width = "100%"
+        extensionFrame.height = "100%"
         iframeRpc.current = new wRpc({
             responses: sandboxToControllerRpc,
             messageTarget: {
                 postMessage: (data, transferables) => {
-                    programFrame.contentWindow?.postMessage(
+                    extensionFrame.contentWindow?.postMessage(
                         data, "*", transferables
                     )
                 }
@@ -108,8 +132,8 @@ const ExtensionShellPage = () => {
                 }
             }
         })
-        programFrame.src = `${sanboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(`default-src 'self' ${location.origin};`)}`
-        programContainer.appendChild(programFrame)
+        extensionFrame.src = `${sanboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(`default-src 'self' ${location.origin};`)}`
+        programContainer.appendChild(extensionFrame)
         return /*() => {
             if (import.meta.env.PROD) {
                 window.removeEventListener("message", extensionListener.current)

@@ -25,7 +25,8 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
-import {CodeManifestSafe, MANIFEST_NAME} from "@/lib/cargo/consts"
+import {MANIFEST_NAME} from "@/lib/cargo/consts"
+import {Cargo} from "../cargo/index"
 import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
 
 export type {CargoIndex} from "./backend"
@@ -554,7 +555,7 @@ export class Shabah {
         }
         return io.ok({
             name: MANIFEST_NAME,
-            pkg: cargoFileJson.data as CodeManifestSafe,
+            pkg: cargoFileJson.data as Cargo,
             bytes: stringBytes(cargoFileText.data)
         })
     }

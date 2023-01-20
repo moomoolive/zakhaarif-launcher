@@ -247,7 +247,6 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         }
 
         if (!this.actionsIndex.has(message.handle)) {
-            console.log("found actions", this.actionsIndex, "context", self)
             this.errorResponseMessage(
                 source,
                 message.id,

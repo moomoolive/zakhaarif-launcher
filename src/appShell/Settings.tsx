@@ -158,7 +158,7 @@ const SettingsPage = () => {
                 </div>
             </div>
         </div>
-        <div className="hidden md:block w-2/3 py-5 h-full bg-neutral-700 animate-fade-in">
+        <div className="hidden md:block w-2/3 py-5 h-full bg-neutral-700 animate-fade-in-left">
             <div className="w-full px-2 flex max-w-3xl items-center justify-start">
                 <div className="w-1/2 bg-green-500">
 

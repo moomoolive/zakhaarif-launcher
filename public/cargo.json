@@ -1,7 +1,6 @@
 {
-    "uuid": "5-NZCQxgVj7Iv_Xqa3MK4RQmmMKWnN297VP",
     "crateVersion": "0.1.0",
-    "name": "std",
+    "name": "launcher",
     "version": "0.1.0-alpha.0",
     "entry": "bg-fetch-test/entry.js",
     "files": [
@@ -19,7 +18,7 @@
     ],
     "description": "all core primitives for game",
     "license": "GPL-3",
-    "keywords": ["launcher"],
+    "keywords": ["app"],
     "homepageUrl": "https://github.com",
     "repo": {"type": "git", "url": "https://github.com"},
     "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg"

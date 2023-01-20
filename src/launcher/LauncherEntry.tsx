@@ -360,7 +360,7 @@ export const LauncherRoot = ({
   return (
     <div 
       id={id}
-      className="relative text-center animate-fade-in z-0 w-screen h-screen flex justify-center items-center"
+      className="relative text-center animate-fade-in-left z-0 w-screen h-screen flex justify-center items-center"
     >
         <div className="relative z-0">
             <div id="launcher-menu" className="fixed top-2 left-0">
