@@ -58,10 +58,12 @@ import {
     addStandardCargosToCargoIndexes,
     ADDONS_CARGO,
     GAME_CARGO,
+    STANDARD_MOD_CARGO
 } from "../standardCargos"
 import {
     ADDONS_EXENSTION_ID,
     GAME_EXTENSION_ID,
+    STANDARD_MOD_ID
 } from "../config"
 import {MANIFEST_NAME} from "../lib/cargo/consts"
 import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
@@ -303,18 +305,26 @@ const AddOns = () => {
         const targetCargoIndex = cargoIndex.cargos[index]
         const cargo = await (async (rootUrl: string, id: string) => {
             switch (id) {
-                case ADDONS_EXENSTION_ID:
-                    return io.ok({
-                        pkg: ADDONS_CARGO,
-                        name: MANIFEST_NAME,
-                        bytes: JSON.stringify(ADDONS_CARGO).length
-                    })
+                case STANDARD_MOD_ID:
                 case GAME_EXTENSION_ID:
+                case ADDONS_EXENSTION_ID: {
+                    const targetCargo = ((cargoId: string) => {
+                        switch (cargoId) {
+                            case GAME_EXTENSION_ID:
+                                return GAME_CARGO
+                            case STANDARD_MOD_ID:
+                                return STANDARD_MOD_CARGO
+                            case ADDONS_EXENSTION_ID:
+                            default:
+                                return ADDONS_CARGO
+                        } 
+                    })(id)
                     return io.ok({
-                        pkg: GAME_CARGO,
+                        pkg: targetCargo,
                         name: MANIFEST_NAME,
-                        bytes: JSON.stringify(GAME_CARGO).length
+                        bytes: JSON.stringify(targetCargo).length
                     })
+                }
                 default:
                     return await downloadClient.getCargoAtUrl(rootUrl)
             }
@@ -1281,7 +1291,6 @@ const AddOns = () => {
                                                                 ? path.slice(1)
                                                                 : cleanedPathEnd
                                                             const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                                                            //const fileResponse = await downloadClient.getCachedFile(fullPath)
                                                             const {id} = targetIndex
                                                             const fileResponse = await (async (cargoId: string, url: string) => {
                                                                 if (

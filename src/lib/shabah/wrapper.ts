@@ -337,6 +337,15 @@ export class Shabah {
         return indices.cargos[index]
     }
 
+    async getCargoMetaByEntry(entryUrl: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.entry === entryUrl)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
+    }
+
     addProgressListener(
         id: string, 
         callback: onProgressCallback

@@ -24,10 +24,6 @@ import {sleep} from "@/lib/utils/sleep"
 import type {TopLevelAppProps} from "@/lib/types/globalState"
 import {APP_CARGO_ID} from "@/config"
 
-if (isIframe()) {
-  new Error("launcher cannot run inside of an iframe")
-}
-
 const LoadingIcon = () => <span className="text-lg animate-spin">
   <LoadingIconGlobal/>
 </span>
@@ -154,6 +150,8 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
+
+const LAST_UPDATE_KEY = "last-update"
 
 export const LauncherRoot = ({
   id,
@@ -440,9 +438,12 @@ export const LauncherRoot = ({
                         document.title = message
                         setProgressMsg(message)
                         closeSettings()
+                        localStorage.clear()
+                        sessionStorage.clear()
                         await Promise.all([
+                          import("../lib/database/AppDatabase").then((mod) => new mod.AppDatabase().clear()),
+                          downloadClient.uninstallAllAssets(),
                           sleep(3_000),
-                          downloadClient.uninstallAllAssets()
                         ])
                         location.reload()
                     }}

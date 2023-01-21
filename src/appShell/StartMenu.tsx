@@ -1,8 +1,12 @@
 import {Button} from "@mui/material"
 import {Link} from "react-router-dom"
-import {GAME_EXTENSION_ID} from "../config"
+import {GAME_CARGO_INDEX} from "../standardCargos"
+import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
+import { useRef } from "react"
 
 const StartMenuPage = () => {
+    const gameSaveExists = useRef(Boolean(window.localStorage.getItem(SAVE_EXISTS)))
+
     return <div 
         className="fixed z-0 w-screen h-screen flex overflow-clip"
     >   
@@ -11,8 +15,28 @@ const StartMenuPage = () => {
                 className="w-3/5 mx-auto sm:mx-0 sm:ml-16 h-full sm:w-60 bg-neutral-900/70 flex items-center justify-center"
             >
                 <div className="w-full">
+                    <div>
+                        <Link 
+                            to={`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=latest`}
+                            style={gameSaveExists.current 
+                                ? {}
+                                : {pointerEvents: "none"}
+                            }
+                        >
+                            <Button 
+                                color="success"
+                                fullWidth 
+                                size="large"
+                                disabled={!gameSaveExists.current}
+                            >
+                                {"Continue"}
+                            </Button>
+                        </Link>
+                    </div>
+                    
                     {([
-                        {text: "Continue", route: `/extension?id=${GAME_EXTENSION_ID}`, color: "success"},
+                        {text: "New Game", route: "/new-game", color: "success"},
+                        {text: "Load Game", route: "/load-game", color: "success"},
                         {text: "Add-ons", route: "/add-ons", color: "info"},
                         {text: "Extensions", route: "/extensions-list", color: "info"},
                         {text: "Settings", route: "/settings", color: "info"},

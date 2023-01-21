@@ -2,105 +2,43 @@ import {useSearchParams, Link, useNavigate} from "react-router-dom"
 import {useEffect, useRef, useState} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
-import {faSadTear, faCreditCard, faHandPointDown} from "@fortawesome/free-solid-svg-icons"
+import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
-import {
-    GAME_EXTENSION_ID, 
-    MOD_CARGO_ID_PREFIX,
-    ADDONS_EXENSTION_ID
-} from "../config"
+import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
-import {CargoIndex} from "../lib/shabah/wrapper"
-import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
+import {GAME_CARGO, GAME_CARGO_INDEX, ADDONS_CARGO_INDEX} from "../standardCargos"
 import {Cargo} from "../lib/cargo/index"
 import {APP_CACHE} from "../config"
-import LoadingIcon from "../components/LoadingIcon"
 import {sleep} from "../lib/utils/sleep"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
+import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
+import {nanoid} from "nanoid"
+import type {CargoIndex} from "../lib/shabah/wrapper"
+import type {DeepReadonly} from "../lib/types/utility"
 
-const EXTENSION_LOADING_MESSAGES = [
-    {
-        icon: <div className="text-green-500">
-            <FontAwesomeIcon icon={faHandPointDown}/>
-        </div>,
-        text: "Click the bottom right corner of screen to close extension at any time"
-    },
-    {
-        icon: <div className="text-yellow-500">
-            <FontAwesomeIcon icon={faCreditCard}/>
-        </div>,
-        text: "Never enter sensitive information into extensions (credit cards, passwords, etc.)"
-    },
-] as const
-
-type ExtensionLoadingScreenProps = {
-    onClose: () => Promise<void>
-}
-
-const ExtensionLoadingScreen = ({onClose}: ExtensionLoadingScreenProps) => {
-    const [messageIndex, setMessageIndex] = useState(0)
-
-    useEffect(() => {
-        const milliseconds = 5_000
-        let currentMessageIndex = messageIndex
-        const timerId = window.setInterval(() => {
-            if (currentMessageIndex + 1 < EXTENSION_LOADING_MESSAGES.length) {
-                currentMessageIndex = currentMessageIndex + 1
-            } else {
-                currentMessageIndex = 0
-            }
-            currentMessageIndex = Math.max(0, currentMessageIndex)
-            setMessageIndex(currentMessageIndex)
-        }, milliseconds)
-        return () => window.clearTimeout(timerId)
-    }, [])
-
-    return <div className="fixed z-20 w-screen h-screen top-0 left-0 flex items-center flex-col justify-center">
-        <div className="w-full h-1/2 flex items-end justify-center">
-            <div className="mb-5">
-                <div className="text-6xl text-blue-500 animate-spin">
-                    <LoadingIcon/>
-                </div>
-            </div>
-        </div>
-        
-        <div className="w-full h-1/2 flex items-start justify-center">
-            <div>
-                <div className="mb-2 text-center">
-                    {"Starting extension..."}
-                </div>
-                <div className="w-3/5 max-w-xs mx-auto flex justify-center">
-                    <div className="mr-4 mt-1">
-                        {EXTENSION_LOADING_MESSAGES[messageIndex].icon}
-                    </div>
-                    <div className="text-xs text-neutral-400">
-                        {EXTENSION_LOADING_MESSAGES[messageIndex].text}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <button 
-            className="absolute animate-pulse bottom-0 right-0 rounded-full bg-green-500 w-8 h-8 mr-2 mb-2"
-            onClick={onClose}    
-        />
-    </div>
-}
-
-type RpcStateDependencies = {
+type RpcStateDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
     minimumLoadTime: number
-}
+    queryState: string
+    authToken: string
+    createFatalErrorMessage: (msg: string) => void
+    confirmExtensionExit: () => Promise<void>
+    cargoIndex: {current: CargoIndex}
+    cargo: {current: Cargo}
+}>
 
 const createRpcState = (dependencies: RpcStateDependencies) => {
     const {minimumLoadTime} = dependencies
-    return {
-        ...dependencies,
+    const mutableState = {
         readyForDisplay: false,
         secureContextEstablished: false,
-        minimumLoadTimePromise: sleep(minimumLoadTime)
+        minimumLoadTimePromise: sleep(minimumLoadTime),
+        fatalErrorOccurred: false,
     }
+    type RpcMutableState = typeof mutableState
+    type RpcState = RpcStateDependencies & RpcMutableState
+    return {...dependencies, ...mutableState} as RpcState
 }
 
 const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
@@ -116,12 +54,40 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             const transfer = {type, length, body: file.body} as const
             return wRpc.transfer(transfer, [file.body])
         },
-        contextEstablished: () => {
+        getInitialState: () => {
+            if (state.secureContextEstablished) {
+                return null
+            }
+            const {queryState, authToken, cargoIndex} = state
+            const {requestRootUrl} = cargoIndex.current
+            return {
+                queryState, 
+                authToken, 
+                rootUrl: requestRootUrl
+            }
+        },
+        secureContextEstablished: () => {
             state.secureContextEstablished = true
             return true
         },
+        signalFatalError: (extensionToken: string) => {
+            if (
+                state.secureContextEstablished 
+                && extensionToken !== state.authToken
+            ) {
+                console.warn("application signaled fatal error but provided wrong auth token")
+                return false
+            }
+            state.fatalErrorOccurred = true
+            console.log("extension encountered fatal error")
+            state.createFatalErrorMessage("Extension encountered a fatal error")
+            return true
+        },
         readyForDisplay: () => {
-            if (state.readyForDisplay) {
+            if (
+                state.readyForDisplay 
+                || state.fatalErrorOccurred
+            ) {
                 return false
             }
             console.info("Extension requested to show display")
@@ -130,6 +96,16 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
                 console.info("Opening extension frame")
                 state.displayExtensionFrame()
             })
+            return true
+        },
+        exit: async (extensionToken: string) => {
+            if (
+                state.fatalErrorOccurred 
+                || extensionToken !== state.authToken
+            ) {
+                return false
+            }
+            await state.confirmExtensionExit()
             return true
         }
     } as const
@@ -140,8 +116,13 @@ export type ControllerRpc = wRpc<ExtensionShellFunctions>
 
 const sanboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
 const EXTENSION_IFRAME_ID = "extension-frame"
-const NO_EXTENSION_ID = ""
+const NO_EXTENSION_ENTRY = ""
 const IFRAME_CONTAINER_ID = "extension-iframe"
+const MINIMUM_AUTH_TOKEN_LENGTH = 20
+const AUTH_TOKEN_LENGTH = (() => {
+    const additionalLength = Math.trunc(Math.random() * 20)
+    return MINIMUM_AUTH_TOKEN_LENGTH + additionalLength
+})()
 
 const ExtensionShellPage = () => {
     const {downloadClient} = useAppShellContext()
@@ -150,74 +131,10 @@ const ExtensionShellPage = () => {
     const confirm = useGlobalConfirm()
 
     const [error, setError] = useState(false)
+    const [showRestartExtension, setShowRestartExtension] = useState(true)
     const [errorMessage, setErrorMessage] = useState("An error occurred...")
     const [loading, setLoading] = useState(true)
-    const [extensionEntry, setExtensionEntry] = useState("")
-    
-    const iframeRpc = useRef<null | ControllerRpc>(null)
-    const extensionCargo = useRef(new Cargo())
-    const extensionIframe = useRef<null | HTMLIFrameElement>(null)
-    const extensionListener = useRef<(_: MessageEvent) => any>(() => {})
-    const extensionInitialState = useRef("")
-    const rpcState = useRef(createRpcState({
-        displayExtensionFrame: () => {
-            setLoading(false)
-        },
-        minimumLoadTime: 10_000
-    }))
-
-    useEffectAsync(async () => {
-        const id = searchParams.get("id") || NO_EXTENSION_ID
-        extensionInitialState.current = searchParams.get("state") || ""
-
-        const extensionId = decodeURIComponent(id)
-        if (extensionId.startsWith(MOD_CARGO_ID_PREFIX)) {
-            setLoading(false)
-            setError(true)
-            setErrorMessage("Invalid Extension")
-            console.warn(`Prevented mod "${extensionId}" from running. Mods cannot be run as standalone extensions and only run when embedded in the game extension (id="${GAME_EXTENSION_ID}")`)
-            return
-        }
-
-        if (extensionId === ADDONS_EXENSTION_ID) {
-            navigate("/add-ons")
-            return
-        }
-
-        if (extensionId === GAME_EXTENSION_ID) {
-            setExtensionEntry(GAME_CARGO_INDEX.entry)
-            extensionCargo.current = GAME_CARGO
-            return
-        }
-
-        let meta: CargoIndex | null
-        if (
-            extensionId.length > 0 
-            && (meta = await downloadClient.getCargoMeta(extensionId))
-        ) {
-            const cargoResponse = await downloadClient.getCargoAtUrl(
-                meta.storageRootUrl
-            )
-            if (cargoResponse.ok) {
-                extensionCargo.current = cargoResponse.data.pkg
-                setExtensionEntry(meta.entry)
-                return
-            }
-            setError(true)
-            setErrorMessage("Extension Not Found")
-            console.error("extension exists in index, but was not found")
-            setLoading(false)
-            return
-        }
-        if (extensionId.length > 0) {
-            console.warn(`extension "${extensionId}" doesn't exist.`)
-        } else {
-            console.warn(`a query parameter "id" must be included in url to run an extension.`)
-        }
-        setLoading(false)
-        setError(true)
-        setErrorMessage("Extension Not Found")
-    }, [])
+    const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
 
     const closeExtension = async () => {
         if (!await confirm({title: "Are you sure you want to close this extension?"})) {
@@ -225,9 +142,102 @@ const ExtensionShellPage = () => {
         }
         navigate("/start")
     }
+    
+    const iframeRpc = useRef<null | ControllerRpc>(null)
+    const extensionCargo = useRef(new Cargo())
+    const extensionCargoIndex = useRef(GAME_CARGO_INDEX)
+    const extensionIframe = useRef<null | HTMLIFrameElement>(null)
+    const extensionListener = useRef<(_: MessageEvent) => any>(() => {})
+    const extensionInitialState = useRef("")
+
+    const rpcStateFactory = useRef(() => createRpcState({
+        displayExtensionFrame: () => {
+            setLoading(false)
+        },
+        minimumLoadTime: 10_000,
+        queryState: searchParams.get("state") || "",
+        authToken: nanoid(AUTH_TOKEN_LENGTH),
+        createFatalErrorMessage: (msg) => {
+            setErrorMessage(msg)
+            setShowRestartExtension(true)
+            setError(true)
+        },
+        confirmExtensionExit: closeExtension,
+        cargo: extensionCargo,
+        cargoIndex: extensionCargoIndex
+    }))
+
+    const rpcState = useRef(rpcStateFactory.current())
+    const cleanupExtension = useRef(() => {
+        setShowRestartExtension(false)
+        window.removeEventListener("message", extensionListener.current)
+        iframeRpc.current = null
+        const extensionFrameContainer = document.getElementById(IFRAME_CONTAINER_ID)
+        if (extensionFrameContainer && extensionIframe.current) {
+            extensionFrameContainer.removeChild(extensionIframe.current)
+        }
+        extensionIframe.current = null
+        console.log("All extension resouces cleaned up")
+    })
+
+    useEffectAsync(async () => {
+        const entry = searchParams.get("entry") || NO_EXTENSION_ENTRY
+        extensionInitialState.current = searchParams.get("state") || ""
+        const entryUrl = decodeURIComponent(entry)
+
+        if (entryUrl.length < 1) {
+            console.warn(`a query parameter "entry" must be included in url to run an extension.`)
+            setLoading(false)
+            setError(true)
+            setErrorMessage("Extension Not Found")
+            return
+        }
+
+        if (entryUrl === ADDONS_CARGO_INDEX.entry) {
+            navigate("/add-ons")
+            return
+        }
+
+        if (entryUrl === GAME_CARGO_INDEX.entry) {
+            setExtensionEntry({url: GAME_CARGO_INDEX.entry, retry: 0})
+            extensionCargoIndex.current = GAME_CARGO_INDEX
+            extensionCargo.current = GAME_CARGO
+            return
+        }
+
+        const meta = await downloadClient.getCargoMetaByEntry(entryUrl)
+        if (!meta) {
+            console.warn(`extension "${entryUrl}" doesn't exist.`)
+            setLoading(false)
+            setError(true)
+            setErrorMessage("Extension Not Found")
+            return
+        }
+
+        if (meta.id.startsWith(MOD_CARGO_ID_PREFIX)) {
+            setLoading(false)
+            setError(true)
+            setErrorMessage("Invalid Extension")
+            console.warn(`Prevented mod "${entryUrl}" from running. Mods cannot be run as standalone extensions and only run when embedded in the game extension (id="${GAME_EXTENSION_ID}")`)
+            return
+        }
+
+        const cargoResponse = await downloadClient.getCargoAtUrl(meta.storageRootUrl)
+        if (cargoResponse.ok) {
+            extensionCargo.current = cargoResponse.data.pkg
+            extensionCargoIndex.current = meta
+            setExtensionEntry({url: meta.entry, retry: 0})
+            return
+        }
+
+        setError(true)
+        setErrorMessage("Extension Not Found")
+        console.error("extension exists in index, but was not found")
+        setLoading(false)
+    }, [])
 
     useEffect(() => {
-        if (extensionEntry.length < 1) {
+        if (extensionEntry.url.length < 1) {
             return
         }
         const extensionFrameContainer = document.getElementById(IFRAME_CONTAINER_ID)
@@ -242,7 +252,7 @@ const ExtensionShellPage = () => {
         if (extensionIframeExists) {
             return
         }
-        const entry = extensionEntry
+        const entry = extensionEntry.url
         const extensionFrame = document.createElement("iframe")
         extensionFrame.allow = ""
         extensionFrame.name = "extension-frame"
@@ -272,24 +282,18 @@ const ExtensionShellPage = () => {
         extensionFrame.src = `${sanboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(`default-src 'self' ${location.origin};`)}`
         extensionIframe.current = extensionFrame
         extensionFrameContainer.appendChild(extensionFrame)
-        return () => {
-            window.removeEventListener("message", extensionListener.current)
-            iframeRpc.current = null
-            extensionFrameContainer.removeChild(extensionFrame)
-            extensionIframe.current = null
-            console.log("All extension resouces cleaned up")
-        }
+        return cleanupExtension.current
     }, [extensionEntry])
 
     return <div>
         {error ? <>
-            <div className="relative text-center z-10 w-screen h-screen flex justify-center items-center">
+            <div className="relative animate-fade-in-left text-center z-10 w-screen h-screen flex justify-center items-center">
                 <div className="w-full">
                     <div className="mb-5 text-6xl text-yellow-500">
                         <FontAwesomeIcon icon={faSadTear}/>
                     </div>
 
-                    <div className="mb-3">
+                    <div className="mb-3 w-4/5 mx-auto max-w-md">
                         <div className="text-xl text-neutral-100 mb-2">
                             {errorMessage}
                         </div>
@@ -299,12 +303,31 @@ const ExtensionShellPage = () => {
                     </div>
                     
                     <div>
+                        {showRestartExtension ? <>
+                            <Tooltip title="Restart Extension">
+                                <Button
+                                    onClick={() => {
+                                        cleanupExtension.current()
+                                        rpcState.current = rpcStateFactory.current()
+                                        setError(false)
+                                        setLoading(true)
+                                        setExtensionEntry((old) => ({
+                                            ...old,
+                                            retry: old.retry + 1
+                                        }))
+                                    }}
+                                >
+                                    restart
+                                </Button>
+                            </Tooltip>
+                        </> : <></>}
+
                         <Tooltip title="Back To Start Menu">
-                        <Link to="/start">
-                            <Button>
-                                back
-                            </Button>
-                        </Link>
+                            <Link to="/start">
+                                <Button color="error">
+                                    Close
+                                </Button>
+                            </Link>
                         </Tooltip>
                     </div>
                 </div>
@@ -314,7 +337,7 @@ const ExtensionShellPage = () => {
         
         <div 
             id={IFRAME_CONTAINER_ID}
-            className={`${loading ? "hidden" : ""} z-0 animate-fade-in-left fixed left-0 top-0 w-screen h-screen overflow-clip`}
+            className={`${error || loading ? "hidden" : ""} z-0 animate-fade-in-left fixed left-0 top-0 w-screen h-screen overflow-clip`}
         >
             <button 
                 className="absolute animate-pulse bottom-0 right-0 w-10 h-10"
@@ -322,8 +345,9 @@ const ExtensionShellPage = () => {
             />
         </div>
 
-        {loading ? <ExtensionLoadingScreen 
+        {!error && loading ? <ExtensionLoadingScreen 
             onClose={closeExtension}
+            isRetry={extensionEntry.retry > 0}
         /> : <></>}
         
     </div>

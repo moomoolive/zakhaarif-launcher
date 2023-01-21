@@ -15,7 +15,7 @@ import {
 import {isIframe} from "@/lib/utils/isIframe"
 import type {TopLevelAppProps} from "@/lib/types/globalState"
 import {AppShellContext} from "./store"
-import ToLauncherPage from "./toLauncher"
+import ToLauncherPage from "./ToLauncher"
 
 if (isIframe()) {
     new Error("app-shell cannot run inside an iframe")
@@ -38,6 +38,8 @@ const ExtensionShell = lazyRoute(() => import("./ExtensionShell"))
 const Addons = lazyRoute(() => import("./Addons"))
 const Settings = lazyRoute(() => import("./Settings"))
 const ExtensionList = lazyRoute(() => import("./ExtensionsList"))
+const NewGame = lazyRoute(() => import("./NewGame"))
+const LoadGame = lazyRoute(() => import("./LoadGame"))
 
 const fadeOut = 2
 const fadeIn = 1
@@ -73,6 +75,8 @@ const PageDisplay = () => {
             <Route path="/extensions-list" element={<ExtensionList/>}/>
             <Route path="/add-ons" element={<Addons/>}/>
             <Route path="/settings" element={<Settings/>}/>
+            <Route path="/new-game" element={<NewGame/>}/>
+            <Route path="/load-game" element={<LoadGame/>}/>
         </Routes>
     </div>
 }

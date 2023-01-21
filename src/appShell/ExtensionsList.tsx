@@ -1,7 +1,6 @@
 import {useAppShellContext} from "./store"
 import {emptyCargoIndices} from "../lib/shabah/backend"
-import {CargoIndex} from "../lib/shabah/wrapper"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {io} from "../lib/monads/result"
 import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
@@ -23,11 +22,13 @@ import {
 import {
     APP_CARGO_ID, 
     ADDONS_EXENSTION_ID,
-    EXTENSION_CARGO_ID_PREFIX
+    EXTENSION_CARGO_ID_PREFIX,
+    GAME_EXTENSION_ID
 } from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {addStandardCargosToCargoIndexes} from "../standardCargos"
+import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
 
@@ -44,6 +45,8 @@ const ExtensionsListPage = () => {
     const [filter, setFilter] = useState<FilterTypes>("modified")
     const [order, setOrder] = useState<FilterOrder>("descending")
 
+    const gameSaveExists = useRef(Boolean(window.localStorage.getItem(SAVE_EXISTS)))
+
     useEffectAsync(async () => {
         const indicesRes = await io.wrap(downloadClient.getCargoIndices())
         if (!indicesRes.ok) {
@@ -52,8 +55,8 @@ const ExtensionsListPage = () => {
             return
         }
         const {data} = indicesRes
-        const extensionCargos = data.cargos.filter((cargo) => cargo.id.startsWith(EXTENSION_CARGO_ID_PREFIX))
-        const cargos = addStandardCargosToCargoIndexes(extensionCargos)
+        const allCargos =  addStandardCargosToCargoIndexes(data.cargos)
+        const cargos =  allCargos.filter((cargo) => cargo.id.startsWith(EXTENSION_CARGO_ID_PREFIX))
         setCargoIndex({...data, cargos})
         setLoading(false)
     }, [])
@@ -187,7 +190,7 @@ const ExtensionsListPage = () => {
                         style={{maxHeight: "80%"}}
                     >
                         {filteredCargos.map((cargo, index) => {
-                            const {logoUrl, requestRootUrl, name, id} = cargo
+                            const {logoUrl, requestRootUrl, name, id, entry} = cargo
                             const isAddonManager = id === ADDONS_EXENSTION_ID 
                             return <div
                                 key={`extension-${index}`}
@@ -197,11 +200,16 @@ const ExtensionsListPage = () => {
                                     to={((extensionId: string) => {
                                         switch (extensionId) {
                                             case APP_CARGO_ID:
-                                                return "/start"
+                                                return "/launcher"
                                             case ADDONS_EXENSTION_ID:
                                                 return "/add-ons"
+                                            case GAME_EXTENSION_ID:
+                                                if (!gameSaveExists.current) {
+                                                    return "/new-game"
+                                                }
+                                                return `/extension?entry=${encodeURIComponent(entry)}&state=latest`
                                             default:
-                                                return `/extension?id=${id}`
+                                                return `/extension?entry=${encodeURIComponent(entry)}`
                                         }
                                     })(id)}
                                 >
