@@ -24,8 +24,8 @@ type RequestableResource = {
 }
 
 type CargoReference = {
-    requestRootUrl: string
-    storageRootUrl: string
+    canonicalUrl: string
+    resolvedUrl: string
     name: string
 }
 
@@ -200,12 +200,12 @@ const verifyAllRequestableFiles = async (
 }
 
 export const checkForUpdates = async (
-    {storageRootUrl, requestRootUrl, name}: CargoReference, 
+    {resolvedUrl, canonicalUrl, name}: CargoReference, 
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
-    const storageFileBase = addSlashToEnd(storageRootUrl)
-    const requestFileBase = addSlashToEnd(requestRootUrl)
+    const storageFileBase = addSlashToEnd(resolvedUrl)
+    const requestFileBase = addSlashToEnd(canonicalUrl)
     const cargoUrl = storageFileBase + MANIFEST_NAME
     const storedCargoRes = await fileCache.getFile(cargoUrl)
 

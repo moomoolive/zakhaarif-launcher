@@ -19,6 +19,7 @@ export const STANDARD_MOD_CARGO = new Cargo({
     crateVersion: "0.1.0",
     entry: STANDARD_MOD_RELATIVE_URL,
     version: "0.1.0",
+    license: "GPL-3",
     files: [
         {name: STANDARD_MOD_RELATIVE_URL, bytes: STANDARD_MOD_ESTIMATED_BYTES}
     ]
@@ -27,8 +28,8 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
     id: STANDARD_MOD_ID,
     name: STANDARD_MOD_CARGO.name,
     logoUrl: STANDARD_MOD_CARGO.crateLogoUrl,
-    storageRootUrl: CURRENT_ORIGIN,
-    requestRootUrl: CURRENT_ORIGIN,
+    resolvedUrl: CURRENT_ORIGIN,
+    canonicalUrl: CURRENT_ORIGIN,
     bytes: GAME_ESTIMATED_BYTES,
     entry: CURRENT_ORIGIN + STANDARD_MOD_RELATIVE_URL,
     version: STANDARD_MOD_CARGO.version,
@@ -44,6 +45,7 @@ export const GAME_CARGO = new Cargo({
     crateVersion: "0.1.0",
     entry: GAME_RELATIVE_URL,
     version: "0.1.0",
+    license: "GPL-3",
     files: [
         {name: GAME_RELATIVE_URL, bytes: GAME_ESTIMATED_BYTES}
     ]
@@ -53,8 +55,8 @@ export const GAME_CARGO_INDEX: Readonly<CargoIndex> = {
     id: GAME_EXTENSION_ID,
     name: GAME_CARGO.name,
     logoUrl: GAME_CARGO.crateLogoUrl,
-    storageRootUrl: CURRENT_ORIGIN,
-    requestRootUrl: CURRENT_ORIGIN,
+    resolvedUrl: CURRENT_ORIGIN,
+    canonicalUrl: CURRENT_ORIGIN,
     bytes: GAME_ESTIMATED_BYTES,
     entry: CURRENT_ORIGIN + GAME_RELATIVE_URL,
     version: GAME_CARGO.version,

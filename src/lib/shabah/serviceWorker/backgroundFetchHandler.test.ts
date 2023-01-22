@@ -154,12 +154,12 @@ describe("background fetch success handler", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: origin + "/pkg-store",
+            resolvedUrl: origin + "/pkg-store",
             entry: "index.js",
             logoUrl: "",
             name: "pkg-name",
             bytes: 20,
-            requestRootUrl: "https://remote-origin.site/pkg",
+            canonicalUrl: "https://remote-origin.site/pkg",
             version: "0.1.0",
             state: "cached"
         })
@@ -189,7 +189,7 @@ describe("background fetch success handler", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl: "",
+            resolvedUrl: "",
             map: {},
             bytes: 0
         })
@@ -221,7 +221,7 @@ describe("background fetch success handler", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl: "",
+            resolvedUrl: "",
             map: {},
             bytes: 0
         })
@@ -229,12 +229,12 @@ describe("background fetch success handler", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: origin + "/pkg-store",
+            resolvedUrl: origin + "/pkg-store",
             entry: "index.js",
             logoUrl: "",
             name: "pkg-name",
             bytes: 20,
-            requestRootUrl: remoteOrigin + "/pkg",
+            canonicalUrl: remoteOrigin + "/pkg",
             version: "0.1.0",
             state: "updating"
         })
@@ -275,7 +275,7 @@ describe("background fetch success handler", () => {
     it("successful fetches should cache all assets found in download-index map into file cache", async () => {
         const origin = "https://cool-potatos.com"
         const remoteOrigin = "https://remote-origin.site"
-        const storageRootUrl = origin + "/pkg-store/"
+        const resolvedUrl = origin + "/pkg-store/"
         const remoteRootUrl = remoteOrigin + "/pkg/"
         const cacheFiles = [
             "cargo.json",
@@ -284,7 +284,7 @@ describe("background fetch success handler", () => {
             "icon.png",
         ]
         const cacheFileMeta = cacheFiles.map((name) => ({
-            storageUrl: storageRootUrl + name,
+            storageUrl: resolvedUrl + name,
             bytes: 0,
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain"
@@ -297,7 +297,7 @@ describe("background fetch success handler", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl: "",
+            resolvedUrl: "",
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = {
@@ -315,12 +315,12 @@ describe("background fetch success handler", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: storageRootUrl,
+            resolvedUrl: resolvedUrl,
             entry: "index.js",
             logoUrl: "",
             name: "pkg-name",
             bytes: 20,
-            requestRootUrl: remoteRootUrl,
+            canonicalUrl: remoteRootUrl,
             version: "0.1.0",
             state: "updating"
         })
@@ -361,7 +361,7 @@ describe("background fetch fail handler (abort/fail)", () => {
     it("failed handler should save successfully fetches to cache, and create a record of failed fetches", async () => {
         const origin = "https://cool-potatos.com"
         const remoteOrigin = "https://remote-origin.site"
-        const storageRootUrl = origin + "/pkg-store/"
+        const resolvedUrl = origin + "/pkg-store/"
         const remoteRootUrl = remoteOrigin + "/pkg/"
         const cacheFiles = [
             {name: "cargo.json", status: 200, statusText: "OK", bytes: 0},
@@ -370,7 +370,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             {name: "icon.png", status: 404, statusText: "NOT FOUND", bytes: 0},
         ]
         const cacheFileMeta = cacheFiles.map(({name, status, statusText}) => ({
-            storageUrl: storageRootUrl + name,
+            storageUrl: resolvedUrl + name,
             bytes: 0,
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain",
@@ -385,7 +385,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl,
+            resolvedUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -397,12 +397,12 @@ describe("background fetch fail handler (abort/fail)", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: storageRootUrl,
+            resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
             logoUrl: "",
             bytes: 20,
-            requestRootUrl: remoteRootUrl,
+            canonicalUrl: remoteRootUrl,
             version: "0.1.0",
             state: "updating"
         })
@@ -438,7 +438,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                 .find((cargo) => cargo.id === cargoId)?.state
         ).toBe("update-failed")
         const errorIndex = await getErrorDownloadIndex(
-            storageRootUrl,
+            resolvedUrl,
             fileCache
         )
         expect(errorIndex).not.toBe(null)
@@ -451,7 +451,7 @@ describe("background fetch fail handler (abort/fail)", () => {
     it("failed handler should call update ui function", async () => {
         const origin = "https://cool-potatos.com"
         const remoteOrigin = "https://remote-origin.site"
-        const storageRootUrl = origin + "/pkg-store/"
+        const resolvedUrl = origin + "/pkg-store/"
         const remoteRootUrl = remoteOrigin + "/pkg/"
         const cacheFiles = [
             {name: "cargo.json", status: 200, statusText: "OK", bytes: 0},
@@ -460,7 +460,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             {name: "icon.png", status: 404, statusText: "NOT FOUND", bytes: 0},
         ]
         const cacheFileMeta = cacheFiles.map(({name, status, statusText}) => ({
-            storageUrl: storageRootUrl + name,
+            storageUrl: resolvedUrl + name,
             bytes: 0,
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain",
@@ -475,7 +475,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl,
+            resolvedUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -487,12 +487,12 @@ describe("background fetch fail handler (abort/fail)", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: storageRootUrl,
+            resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
             logoUrl: "",
             bytes: 20,
-            requestRootUrl: remoteRootUrl,
+            canonicalUrl: remoteRootUrl,
             version: "0.1.0",
             state: "updating"
         })
@@ -531,7 +531,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                 .find((cargo) => cargo.id === cargoId)?.state
         ).toBe("update-failed")
         const errorIndex = await getErrorDownloadIndex(
-            storageRootUrl,
+            resolvedUrl,
             fileCache
         )
         expect(errorIndex).not.toBe(null)
@@ -545,7 +545,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         const origin = "https://cool-potatos.com"
         const remoteOrigin = "https://remote-origin.site"
         const storageExtension = "/pkg-store/"
-        const storageRootUrl = origin + storageExtension
+        const resolvedUrl = origin + storageExtension
         const remoteRootUrl = remoteOrigin + "/pkg/"
         const cacheFiles = [
             {name: "cargo.json", status: 200, statusText: "OK", bytes: 0},
@@ -554,7 +554,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             {name: "icon.png", status: 404, statusText: "NOT FOUND", bytes: 0},
         ]
         const cacheFileMeta = cacheFiles.map(({name, status, statusText}) => ({
-            storageUrl: storageRootUrl + name,
+            storageUrl: resolvedUrl + name,
             bytes: 0,
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain",
@@ -569,7 +569,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
-            storageRootUrl: storageExtension,
+            resolvedUrl: storageExtension,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -581,12 +581,12 @@ describe("background fetch fail handler (abort/fail)", () => {
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
             id: cargoId,
-            storageRootUrl: storageRootUrl,
+            resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
             logoUrl: "",
             bytes: 20,
-            requestRootUrl: remoteRootUrl,
+            canonicalUrl: remoteRootUrl,
             version: "0.1.0",
             state: "updating"
         })
@@ -623,7 +623,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                 .find((cargo) => cargo.id === cargoId)?.state
         ).toBe("update-aborted")
         const errorIndex = await getErrorDownloadIndex(
-            storageRootUrl,
+            resolvedUrl,
             fileCache
         )
         expect(errorIndex).not.toBe(null)

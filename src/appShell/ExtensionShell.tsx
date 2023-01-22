@@ -16,6 +16,7 @@ import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import {nanoid} from "nanoid"
 import type {CargoIndex} from "../lib/shabah/wrapper"
 import type {DeepReadonly} from "../lib/types/utility"
+import {AppDatabase} from "../lib/database/AppDatabase"
 
 type RpcStateDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
@@ -35,6 +36,7 @@ const createRpcState = (dependencies: RpcStateDependencies) => {
         secureContextEstablished: false,
         minimumLoadTimePromise: sleep(minimumLoadTime),
         fatalErrorOccurred: false,
+        database: new AppDatabase()
     }
     type RpcMutableState = typeof mutableState
     type RpcState = RpcStateDependencies & RpcMutableState
@@ -59,11 +61,11 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
                 return null
             }
             const {queryState, authToken, cargoIndex} = state
-            const {requestRootUrl} = cargoIndex.current
+            const {resolvedUrl} = cargoIndex.current
             return {
                 queryState, 
                 authToken, 
-                rootUrl: requestRootUrl
+                rootUrl: resolvedUrl
             }
         },
         secureContextEstablished: () => {
@@ -107,6 +109,12 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             }
             await state.confirmExtensionExit()
             return true
+        },
+        async getSaveFile(id: number) {
+            return await state.database.getGameSaveById(id)
+        },
+        async getLatestSave() {
+            return await state.database.getLatestSave()
         }
     } as const
 }
@@ -217,7 +225,7 @@ const ExtensionShellPage = () => {
             return
         }
 
-        const cargoResponse = await downloadClient.getCargoAtUrl(meta.storageRootUrl)
+        const cargoResponse = await downloadClient.getCargoAtUrl(meta.resolvedUrl)
         if (cargoResponse.ok) {
             extensionCargo.current = cargoResponse.data.pkg
             extensionCargoIndex.current = meta

@@ -136,8 +136,8 @@ export class Shabah {
     }) {
         const {networkRequest, fileCache} = this
         const response = await checkForUpdates({
-            requestRootUrl: cargo.requestUrl,
-            storageRootUrl: cargo.storageUrl,
+            canonicalUrl: cargo.requestUrl,
+            resolvedUrl: cargo.storageUrl,
             name: cargo.id
         }, networkRequest, fileCache)
         const disk = await this.diskInfo()
@@ -279,7 +279,7 @@ export class Shabah {
             version: details.versions.new,
             previousVersion: details.versions.old,
             title: updateTitle,
-            storageRootUrl: details.storageUrl
+            resolvedUrl: details.storageUrl
         }
         const {fileCache, downloadManager} = this
         updateDownloadIndex(downloadsIndex, updateIndex)
@@ -305,8 +305,8 @@ export class Shabah {
                     version: details.versions.new,
                     entry: newCargo.parsed.entry,
                     bytes: details.updateCheckResponse.totalBytes,
-                    storageRootUrl: details.storageUrl,
-                    requestRootUrl: details.requestUrl,
+                    resolvedUrl: details.storageUrl,
+                    canonicalUrl: details.requestUrl,
                     logoUrl: newCargo.parsed.crateLogoUrl
                 },
                 {persistChanges: true}
@@ -471,9 +471,9 @@ export class Shabah {
                 //"last cargo update did not fail"
             )
         }
-        const {storageRootUrl} = cargoMeta
+        const {resolvedUrl} = cargoMeta
         const errDownloadIndexRes = await getErrorDownloadIndex(
-            storageRootUrl, this.fileCache
+            resolvedUrl, this.fileCache
         )
         if (!errDownloadIndexRes) {
             return io.ok(
@@ -545,10 +545,10 @@ export class Shabah {
         return this.fileCache.deleteAllFiles()
     }
 
-    async getCargoAtUrl(storageRootUrl: string) {
-        const cleanedRootUrl = storageRootUrl.endsWith("/")
-            ? storageRootUrl
-            : storageRootUrl + "/"
+    async getCargoAtUrl(resolvedUrl: string) {
+        const cleanedRootUrl = resolvedUrl.endsWith("/")
+            ? resolvedUrl
+            : resolvedUrl + "/"
         const cargoUrl = `${cleanedRootUrl}${MANIFEST_NAME}`
         const cargoFile = await this.fileCache.getFile(cargoUrl)
         if (!cargoFile) {
@@ -573,9 +573,9 @@ export class Shabah {
         return this.fileCache.getFile(url)
     }
 
-    private async deleteAllCargoFiles(storageRootUrl: string) {
+    private async deleteAllCargoFiles(resolvedUrl: string) {
         const fullCargo = await this.getCargoAtUrl(
-            storageRootUrl
+            resolvedUrl
         )
         if (!fullCargo.ok) {
             return io.err(`cargo does not exist in hard drive`)
@@ -588,7 +588,7 @@ export class Shabah {
         })
         const fileCache = this.fileCache
         const deleteResponses = await Promise.all(pkg.files.map((file) => {
-            const url = `${storageRootUrl}${file.name}`
+            const url = `${resolvedUrl}${file.name}`
             return fileCache.deleteFile(url)
         }))
         return deleteResponses.reduce(
@@ -604,7 +604,7 @@ export class Shabah {
         }
         const targetCargo = cargoIndex.cargos[index]
         await this.deleteAllCargoFiles(
-            targetCargo.storageRootUrl
+            targetCargo.resolvedUrl
         )
         cargoIndex.cargos.splice(index, 1)
         await this.persistCargoIndices(cargoIndex)
@@ -619,7 +619,7 @@ export class Shabah {
         }
         const targetCargo = cargoIndex.cargos[index]
         await this.deleteAllCargoFiles(
-            targetCargo.storageRootUrl
+            targetCargo.resolvedUrl
         )
         cargoIndex.cargos.splice(index, 1, {
             ...targetCargo,

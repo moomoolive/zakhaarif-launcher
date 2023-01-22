@@ -324,7 +324,7 @@ const AddOns = () => {
                 default:
                     return await downloadClient.getCargoAtUrl(rootUrl)
             }
-        })(targetCargoIndex.storageRootUrl, viewingCargo)
+        })(targetCargoIndex.resolvedUrl, viewingCargo)
         if (!cargo.ok) {
             setCargoFound(false)
             return
@@ -926,7 +926,7 @@ const AddOns = () => {
                                                         className="mr-1"
                                                     >
                                                         <CargoIcon 
-                                                            importUrl={cargoIndex.cargos[viewingCargoIndex].requestRootUrl}
+                                                            importUrl={cargoIndex.cargos[viewingCargoIndex].resolvedUrl}
                                                             crateLogoUrl={targetCargo.crateLogoUrl}
                                                             pixels={17}
                                                             className="animate-fade-in-left"
@@ -1268,7 +1268,7 @@ const AddOns = () => {
                                                     return <AddonListItem
                                                         key={`cargo-file-${index}`}
                                                         onClick={async () => {
-                                                            const basePath = targetIndex.storageRootUrl
+                                                            const basePath = targetIndex.resolvedUrl
                                                             const path = directoryPath
                                                                 .slice(1)
                                                                 .reduce((total, next) => `${total}/${next.path}`, "")

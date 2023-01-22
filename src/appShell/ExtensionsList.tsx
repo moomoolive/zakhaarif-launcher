@@ -189,7 +189,7 @@ const ExtensionsListPage = () => {
                         style={{maxHeight: "80%"}}
                     >
                         {filteredCargos.map((cargo, index) => {
-                            const {logoUrl, requestRootUrl, name, id, entry} = cargo
+                            const {logoUrl, resolvedUrl, name, id, entry} = cargo
                             return <div
                                 key={`extension-${index}`}
                                 className="mr-5 sm:mr-8 mb-1"
@@ -213,7 +213,7 @@ const ExtensionsListPage = () => {
                                         <div className="mb-3">
                                             <CargoIcon 
                                                 pixels={80}
-                                                importUrl={requestRootUrl}
+                                                importUrl={resolvedUrl}
                                                 crateLogoUrl={logoUrl}
                                                 className="hover:shadow-2xl"
                                             />

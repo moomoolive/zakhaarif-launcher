@@ -151,8 +151,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             saveDownloadIndices(downloadIndices, origin, fileCache)
         ] as const)
         if (eventType === "abort" || eventType === "fail") {
-            const {storageRootUrl} = targetDownloadIndex
-            let targetUrl = storageRootUrl
+            const {resolvedUrl} = targetDownloadIndex
+            let targetUrl = resolvedUrl
             if (
                 !targetUrl.startsWith("https://") 
                 && !targetUrl.startsWith("http://")
@@ -170,7 +170,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 targetUrl = `${base}/${extension}`
                 log(
                     eventName,
-                    `detected storage root url as a relative url - full url is required. Adding origin to url original=${storageRootUrl}, new=${targetUrl}`
+                    `detected storage root url as a relative url - full url is required. Adding origin to url original=${resolvedUrl}, new=${targetUrl}`
                 )
             }
             await saveErrorDownloadIndex(

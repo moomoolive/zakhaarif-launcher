@@ -80,7 +80,7 @@ export type DownloadIndex = {
     bytes: number
     version: string
     previousVersion: string
-    storageRootUrl: string
+    resolvedUrl: string
 }
 
 export const operationCodes = {
@@ -91,15 +91,15 @@ export const operationCodes = {
     saved: 4,
 } as const
 
-const errDownloadIndexUrl = (storageRootUrl: string) => `${removeSlashAtEnd(storageRootUrl)}/__err-download-index__.json`
+const errDownloadIndexUrl = (resolvedUrl: string) => `${removeSlashAtEnd(resolvedUrl)}/__err-download-index__.json`
 
 const isRelativeUrl = (url: string) => !url.startsWith("http://") && !url.startsWith("https://")
 
 export const getErrorDownloadIndex = async (
-    storageRootUrl: string,
+    resolvedUrl: string,
     fileCache: FileCache
 ) => {
-    const url = errDownloadIndexUrl(storageRootUrl)
+    const url = errDownloadIndexUrl(resolvedUrl)
     const file = await fileCache.getFile(url)
     if (!file) {
         return null
@@ -109,14 +109,14 @@ export const getErrorDownloadIndex = async (
 }
 
 export const saveErrorDownloadIndex = async (
-    storageRootUrl: string,
+    resolvedUrl: string,
     index: DownloadIndex,
     fileCache: FileCache
 ) => {
-    if (isRelativeUrl(storageRootUrl)) {
-        throw new Error("error download indices storage url must be a full url and not a relative one. Got " + storageRootUrl)
+    if (isRelativeUrl(resolvedUrl)) {
+        throw new Error("error download indices storage url must be a full url and not a relative one. Got " + resolvedUrl)
     }
-    const url = errDownloadIndexUrl(storageRootUrl)
+    const url = errDownloadIndexUrl(resolvedUrl)
     const text = JSON.stringify(index)
     const response = new Response(text, {status: 200, statusText: "OK"})
     await fileCache.putFile(url, response)
@@ -211,8 +211,8 @@ export type CargoIndex = {
     name: string
     id: string
     logoUrl: string
-    storageRootUrl: string
-    requestRootUrl: string
+    resolvedUrl: string
+    canonicalUrl: string
     bytes: number
     entry: string
     version: string

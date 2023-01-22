@@ -30,7 +30,7 @@ export const CargoInfo = ({
     onClose,
     cargoIndex
 }: CargoInfoProps) => {
-    const {id, requestRootUrl: importUrl, updatedAt} = cargoIndex 
+    const {id, resolvedUrl, updatedAt} = cargoIndex 
     const {
         name, 
         keywords, 
@@ -99,7 +99,7 @@ export const CargoInfo = ({
                 <div className="w-full pl-3">
                     <div className="flex justify-start pb-3">
                         <CargoIcon 
-                            importUrl={importUrl}
+                            importUrl={resolvedUrl}
                             crateLogoUrl={crateLogoUrl}
                             pixels={80}
                             className="mr-4 animate-fade-in-left"
@@ -138,7 +138,7 @@ export const CargoInfo = ({
                             <div>
                                 <a 
                                     className="hover:text-green-500 mr-4 cursor-pointer"
-                                    onClick={() => textToClipboard(importUrl, "import-url")}
+                                    onClick={() => textToClipboard(resolvedUrl, "import-url")}
                                 >
                                     {copiedId === "import-url" ? <>
                                         <span className="mr-2">
