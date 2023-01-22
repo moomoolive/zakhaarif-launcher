@@ -56,12 +56,11 @@ import {lazyComponent} from "../components/Lazy"
 import {isStandardCargo, isMod, isEmbeddedStandardCargo} from "../lib/utils/cargos"
 import {
     addStandardCargosToCargoIndexes,
-    ADDONS_CARGO,
+    GAME_CARGO_INDEX,
     GAME_CARGO,
     STANDARD_MOD_CARGO
 } from "../standardCargos"
 import {
-    ADDONS_EXENSTION_ID,
     GAME_EXTENSION_ID,
     STANDARD_MOD_ID
 } from "../config"
@@ -306,17 +305,14 @@ const AddOns = () => {
         const cargo = await (async (rootUrl: string, id: string) => {
             switch (id) {
                 case STANDARD_MOD_ID:
-                case GAME_EXTENSION_ID:
-                case ADDONS_EXENSTION_ID: {
+                case GAME_EXTENSION_ID: {
                     const targetCargo = ((cargoId: string) => {
                         switch (cargoId) {
                             case GAME_EXTENSION_ID:
                                 return GAME_CARGO
                             case STANDARD_MOD_ID:
-                                return STANDARD_MOD_CARGO
-                            case ADDONS_EXENSTION_ID:
                             default:
-                                return ADDONS_CARGO
+                                return STANDARD_MOD_CARGO
                         } 
                     })(id)
                     return io.ok({
@@ -524,15 +520,10 @@ const AddOns = () => {
                     <CargoInfo
                         onClose={() => setShowCargoInfo(false)}
                         cargo={targetCargo}
-                        importUrl={
+                        cargoIndex={
                             viewingCargoIndex > (cargoIndex.cargos.length - 1) || viewingCargoIndex < 0
-                                ? ""
-                                : cargoIndex.cargos[viewingCargoIndex].requestRootUrl
-                        }
-                        id={
-                            viewingCargoIndex > (cargoIndex.cargos.length - 1) || viewingCargoIndex < 0
-                                ? ""
-                                : cargoIndex.cargos[viewingCargoIndex].id
+                                ? GAME_CARGO_INDEX
+                                : cargoIndex.cargos[viewingCargoIndex]
                         }
                     />
                 </> : <></>}

@@ -1,32 +1,26 @@
 import {
     GAME_EXTENSION_ID, 
-    APP_CARGO_ID, 
-    ADDONS_EXENSTION_ID,
+    APP_CARGO_ID,
     STANDARD_MOD_ID,
 } from "./config"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "./lib/cargo/consts"
 import {CargoIndex} from "./lib/shabah/wrapper"
 import {Cargo} from "./lib/cargo/index"
 import startGameUrl from "./game/main?url"
-import addonsUrl from "./appShell/Addons?url"
 import modStdUrl from "./modStd/main?url"
 import {stripRelativePath} from "./lib/utils/urls/stripRelativePath"
-import {
-    ADDONS_ESTIMATED_BYTES, 
-    GAME_ESTIMATED_BYTES,
-    MOD_STD_ESTIMATED_BYTES
-} from "./cargosMeta"
+import {GAME_ESTIMATED_BYTES, STANDARD_MOD_ESTIMATED_BYTES} from "./cargosMeta"
 
 const CURRENT_ORIGIN = window.location.origin + "/"
 
 const STANDARD_MOD_RELATIVE_URL = stripRelativePath(modStdUrl)
 export const STANDARD_MOD_CARGO = new Cargo({
-    name: "mod-std",
+    name: "Std",
+    description: "The one mod to rule them all. No seriously, the game needs this mod to function as it provides all the game's core code.",
     crateVersion: "0.1.0",
     entry: STANDARD_MOD_RELATIVE_URL,
     version: "0.1.0",
     files: [
-        {name: STANDARD_MOD_RELATIVE_URL, bytes: MOD_STD_ESTIMATED_BYTES}
+        {name: STANDARD_MOD_RELATIVE_URL, bytes: STANDARD_MOD_ESTIMATED_BYTES}
     ]
 })
 export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
@@ -46,6 +40,7 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
 const GAME_RELATIVE_URL = stripRelativePath(startGameUrl)
 export const GAME_CARGO = new Cargo({
     name: "Game",
+    description: "Starts game loop and injects any linked mods",
     crateVersion: "0.1.0",
     entry: GAME_RELATIVE_URL,
     version: "0.1.0",
@@ -68,30 +63,6 @@ export const GAME_CARGO_INDEX: Readonly<CargoIndex> = {
     updatedAt: 0
 }
 
-const ADDONS_RELATIVE_URL = stripRelativePath(addonsUrl)
-export const ADDONS_CARGO = new Cargo({
-    name: "Add-ons",
-    crateVersion: "0.1.0",
-    entry: ADDONS_RELATIVE_URL,
-    version: "0.1.0",
-    files: [
-        {name: ADDONS_RELATIVE_URL, bytes: ADDONS_ESTIMATED_BYTES}
-    ]
-})
-export const ADDONS_CARGO_INDEX: Readonly<CargoIndex> = {
-    id: ADDONS_EXENSTION_ID,
-    name: "Add-ons",
-    logoUrl: CARGO_NULL_FIELD,
-    storageRootUrl: CURRENT_ORIGIN,
-    requestRootUrl: CURRENT_ORIGIN,
-    bytes: ADDONS_ESTIMATED_BYTES,
-    entry: CURRENT_ORIGIN + ADDONS_RELATIVE_URL,
-    version: "0.1.0",
-    state: "cached",
-    createdAt: 0,
-    updatedAt: 0
-}
-
 export const addStandardCargosToCargoIndexes = (indexes: CargoIndex[]) => {
     const appCargoIndex = indexes.findIndex((cargo) => cargo.id === APP_CARGO_ID)
     const targetCargo = appCargoIndex < 0 ? null : indexes[appCargoIndex]
@@ -101,7 +72,6 @@ export const addStandardCargosToCargoIndexes = (indexes: CargoIndex[]) => {
     return [
         ...indexes,
         {...GAME_CARGO_INDEX, ...metadata},
-        {...ADDONS_CARGO_INDEX, ...metadata},
         {...STANDARD_MOD_CARGO_INDEX, ...metadata}
     ]
 }

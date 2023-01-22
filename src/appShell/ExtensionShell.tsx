@@ -7,7 +7,7 @@ import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
 import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
-import {GAME_CARGO, GAME_CARGO_INDEX, ADDONS_CARGO_INDEX} from "../standardCargos"
+import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
 import {Cargo} from "../lib/cargo/index"
 import {APP_CACHE} from "../config"
 import {sleep} from "../lib/utils/sleep"
@@ -190,11 +190,6 @@ const ExtensionShellPage = () => {
             setLoading(false)
             setError(true)
             setErrorMessage("Extension Not Found")
-            return
-        }
-
-        if (entryUrl === ADDONS_CARGO_INDEX.entry) {
-            navigate("/add-ons")
             return
         }
 

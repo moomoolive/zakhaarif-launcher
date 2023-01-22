@@ -2,13 +2,11 @@ import {
     APP_CARGO_ID, 
     GAME_EXTENSION_ID, 
     MOD_CARGO_ID_PREFIX,
-    ADDONS_EXENSTION_ID,
     STANDARD_MOD_ID,
 } from "../../config"
 
 export const isStandardCargo = (id: string) => {
     switch (id) {
-        case ADDONS_EXENSTION_ID:
         case GAME_EXTENSION_ID:
         case APP_CARGO_ID:
         case STANDARD_MOD_ID:
@@ -20,7 +18,6 @@ export const isStandardCargo = (id: string) => {
 
 export const isEmbeddedStandardCargo = (id: string) => {
     switch (id) {
-        case ADDONS_EXENSTION_ID:
         case GAME_EXTENSION_ID:
         case STANDARD_MOD_ID:
             return true

@@ -20,8 +20,7 @@ import {
     faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons"
 import {
-    APP_CARGO_ID, 
-    ADDONS_EXENSTION_ID,
+    APP_CARGO_ID,
     EXTENSION_CARGO_ID_PREFIX,
     GAME_EXTENSION_ID
 } from "../config"
@@ -191,7 +190,6 @@ const ExtensionsListPage = () => {
                     >
                         {filteredCargos.map((cargo, index) => {
                             const {logoUrl, requestRootUrl, name, id, entry} = cargo
-                            const isAddonManager = id === ADDONS_EXENSTION_ID 
                             return <div
                                 key={`extension-${index}`}
                                 className="mr-5 sm:mr-8 mb-1"
@@ -201,8 +199,6 @@ const ExtensionsListPage = () => {
                                         switch (extensionId) {
                                             case APP_CARGO_ID:
                                                 return "/launcher"
-                                            case ADDONS_EXENSTION_ID:
-                                                return "/add-ons"
                                             case GAME_EXTENSION_ID:
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
@@ -220,13 +216,6 @@ const ExtensionsListPage = () => {
                                                 importUrl={requestRootUrl}
                                                 crateLogoUrl={logoUrl}
                                                 className="hover:shadow-2xl"
-                                                customIcon={isAddonManager ? <div
-                                                    className="text-green-500 mb-1 ml-1"
-                                                >
-                                                    <FontAwesomeIcon 
-                                                        icon={faPuzzlePiece}
-                                                    />
-                                                </div> : null}
                                             />
                                         </div>
                                         <Tooltip title={`Open ${name}`} placement="top">

@@ -5,9 +5,8 @@ import fs from "fs/promises"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const standardCargos = [
-    {name: "addons", path: "../appShell/Addons.tsx"},
     {name: "game", path: "../game/main.ts"},
-    {name: "mod_std", path: "../modStd/main.ts"},
+    {name: "standard_mod", path: "../modStd/main.ts"},
 ]
 
 const metaStrings = await Promise.all(standardCargos.map(async (info) => {

@@ -1,6 +1,6 @@
 {
     "crateVersion": "0.1.0",
-    "name": "launcher",
+    "name": "Launcher",
     "version": "0.1.0-alpha.0",
     "entry": "bg-fetch-test/entry.js",
     "files": [
@@ -16,7 +16,7 @@
     "authors": [
         {"name": "Mostafa Elbannan"}
     ],
-    "description": "all core primitives for game",
+    "description": "Downloads and installs game code and assets",
     "license": "GPL-3",
     "keywords": ["app"],
     "homepageUrl": "https://github.com",

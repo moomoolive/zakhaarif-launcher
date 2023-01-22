@@ -15,20 +15,22 @@ import {Cargo} from "@/lib/cargo/index"
 import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/consts"
 import {CargoIcon} from "../../components/cargo/Icon"
 import {isStandardCargo} from "../../lib/utils/cargos"
+import {CargoIndex} from "../../lib/shabah/wrapper"
+import {reactiveDate} from "../../lib/utils/dates"
+import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
 
 export type CargoInfoProps = {
     onClose: () => void
     cargo: Cargo
-    importUrl: string
-    id: string
+    cargoIndex: CargoIndex
 }
 
 export const CargoInfo = ({
-    importUrl,
     cargo,
     onClose,
-    id,
+    cargoIndex
 }: CargoInfoProps) => {
+    const {id, requestRootUrl: importUrl, updatedAt} = cargoIndex 
     const {
         name, 
         keywords, 
@@ -40,7 +42,7 @@ export const CargoInfo = ({
         homepageUrl,
         repo,
         authors,
-        crateLogoUrl
+        crateLogoUrl,
     } = cargo
 
     const noLicense = license === CARGO_NULL_FIELD
@@ -67,9 +69,19 @@ export const CargoInfo = ({
         return () => window.removeEventListener("keyup", handler)
     }, [])
 
-    const keywordList = isStandardCargo(id)
-        ? ["core", ...keywords.slice(0, 5)]
-        : keywords.slice(0, 6).filter((word) => word !== "core")
+    const standardKewords = ((cargoId: string) => {
+        const keywords = []
+        if (isStandardCargo(cargoId)) {
+            keywords.push({text: "core", type: "std"})
+        }
+        if (cargoId.startsWith(MOD_CARGO_ID_PREFIX)) {
+            keywords.push({text: "mod", type: "mod"})
+        }
+        if (cargoId.startsWith(EXTENSION_CARGO_ID_PREFIX)) {
+            keywords.push({text: "extension", type: "ext"})
+        }
+        return keywords
+    })(id)
 
     return <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
         <div className="absolute top-0 left-0">
@@ -121,6 +133,28 @@ export const CargoInfo = ({
                         <div className="my-3">
                             <Divider className=" bg-neutral-700"/>
                         </div>
+
+                        <div className="text-sm text-neutral-400 my-4">
+                            <div>
+                                <a 
+                                    className="hover:text-green-500 mr-4 cursor-pointer"
+                                    onClick={() => textToClipboard(importUrl, "import-url")}
+                                >
+                                    {copiedId === "import-url" ? <>
+                                        <span className="mr-2">
+                                            <FontAwesomeIcon icon={faCopy}/>
+                                        </span>
+                                        {"Copied!"}
+                                    </> : <>
+                                        <span className="mr-1">
+                                            <FontAwesomeIcon icon={faLink}/>
+                                        </span>
+                                        {"Copy Import Url"}
+                                    </>}
+                                </a>
+                            </div>
+                        </div>
+
                         <div className="text-neutral-300">
                             {authors.length > 0 ? <>
                                 <div className="mb-2">
@@ -172,11 +206,11 @@ export const CargoInfo = ({
                                 </div>
                             </div>
 
-                            <div className="text-xs mb-2">
+                            <div className="text-xs mb-1">
                                 <div className="text-neutral-500 text-xs">
                                     {`Metadata:`}
                                 </div>
-                                <div className="text-sm">
+                                <div className="text-sm mb-1">
                                     <span className="mr-1">
                                         {fileCount}
                                     </span>
@@ -187,26 +221,8 @@ export const CargoInfo = ({
                                         {`crate v${crateVersion}`}
                                     </span>
                                 </div>
-                            </div>
-
-                            <div className="text-sm text-neutral-400 mt-4">
-                                <div>
-                                    <a 
-                                        className="hover:text-green-500 mr-4 cursor-pointer"
-                                        onClick={() => textToClipboard(importUrl, "import-url")}
-                                    >
-                                        {copiedId === "import-url" ? <>
-                                            <span className="mr-2">
-                                                <FontAwesomeIcon icon={faCopy}/>
-                                            </span>
-                                            {"Copied!"}
-                                        </> : <>
-                                            <span className="mr-1">
-                                                <FontAwesomeIcon icon={faLink}/>
-                                            </span>
-                                            {"Copy Import Url"}
-                                        </>}
-                                    </a>
+                                <div className="text-xs text-neutral-400">
+                                    {"Updated: " + reactiveDate(new Date(updatedAt))}
                                 </div>
                             </div>
                         </div>
@@ -216,12 +232,25 @@ export const CargoInfo = ({
                 </div>
 
                 <div className="pt-3">
-                    {keywordList.length > 0 ? <>
+                    {keywords.length > 0 || standardKewords.length > 0 ? <>
                         <div className="flex w-full px-3 items-center justify-start flex-wrap">
-                            {keywordList.map((keyword, index) => {
+                            {standardKewords.map(({text: keyword, type}, index) => {
                                 return <div
                                     key={`keyword-${index}`}
-                                    className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 ${keyword === "core" ? "bg-blue-500 hover:bg-blue-600" : "bg-neutral-700 hover:bg-neutral-600"}`}
+                                    className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 ${
+                                        type === "std" 
+                                            ? "bg-blue-500 hover:bg-blue-600" 
+                                            : type === "mod" ? "bg-indigo-700 hover:bg-indigo-600" : "bg-green-700 hover:bg-green-600"
+                                    }`}
+                                >
+                                    {keyword}
+                                </div>
+                            })}
+                            
+                            {keywords.slice(0, 5).map((keyword, index) => {
+                                return <div
+                                    key={`keyword-${index}`}
+                                    className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 bg-neutral-700 hover:bg-neutral-600`}
                                 >
                                     {keyword}
                                 </div>
