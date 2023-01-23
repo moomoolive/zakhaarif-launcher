@@ -203,7 +203,7 @@ const ExtensionsListPage = () => {
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
                                                 }
-                                                return `/extension?entry=${encodeURIComponent(entry)}&state=latest`
+                                                return `/extension?entry=${encodeURIComponent(entry)}&state=-1`
                                             default:
                                                 return `/extension?entry=${encodeURIComponent(entry)}`
                                         }

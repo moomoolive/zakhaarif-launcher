@@ -19,7 +19,7 @@ import {useAppShellContext} from "../../appShell/store"
 import {CargoIndices} from "../../lib/shabah/backend"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_MOD_CARGO} from "../../standardCargos"
-import {STANDARD_MOD_ID} from "../../config"
+import {NUMBER_OF_STANDARD_MODS, STANDARD_MOD_ID} from "../../config"
 import type {CargoIndex} from "../../lib/shabah/wrapper"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
 
@@ -247,20 +247,22 @@ export const ModLinker = ({
                             </span>
                             {"No Mods to Link"}
                         </div>
-                        <div>
-                            <Button 
-                                size="small"
-                                fullWidth
-                                onClick={async () => {
-                                    if (!await confirm({title: "Are you sure you want to leave this page?"})) {
-                                        return
-                                    }
-                                    navigate("/add-ons")
-                                }}
-                            >
-                                {"Add Some"}
-                            </Button>
-                        </div>
+                        {linkedMods.length <= NUMBER_OF_STANDARD_MODS ? <>
+                            <div>
+                                <Button 
+                                    size="small"
+                                    fullWidth
+                                    onClick={async () => {
+                                        if (!await confirm({title: "Are you sure you want to leave this page?"})) {
+                                            return
+                                        }
+                                        navigate("/add-ons")
+                                    }}
+                                >
+                                    {"Add Some"}
+                                </Button>
+                            </div>
+                        </> : <></>}
                     </> : <>
                         <div>
                             <Divider className="bg-neutral-600"/>
@@ -277,7 +279,7 @@ export const ModLinker = ({
                                             <Tooltip title="Link">
                                                 <button
                                                     className="text-green-500 pt-1 text-base"
-                                                    onClick={() => {setLinkedMods([...linkedMods, mod])}}
+                                                    onClick={() => setLinkedMods([...linkedMods, mod])}
                                                 >
                                                     <FontAwesomeIcon icon={faPlus}/>
                                                 </button>

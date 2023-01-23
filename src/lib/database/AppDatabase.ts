@@ -7,8 +7,11 @@ type Timestamps = {
 
 type DatabaseEntry<Schema> = { id: number } & Timestamps & Schema
 
+type GameSaveType = "manual" | "auto" | "quick"
+
 type GameSaveV1 = {
     name: string
+    type: GameSaveType
     mods: {
         canonicalUrls: string[]
         entryUrls: string[]
@@ -42,27 +45,52 @@ const updateTimestamps = <O extends Timestamps>(object: O) => {
     return object
 }
 
-export class AppDatabase {
+class GameSaveInterface {
     private db: InnerDatabase
 
-    constructor() {
-        this.db = new InnerDatabase()
+    constructor(db: InnerDatabase) {
+        this.db = db
     }
 
-    async createGameSave(data: GameSaveV1) {
+    async create(data: GameSaveV1) {
         const dataWithTimestamps = addTimestamps(data)
         const id = await this.db.gameSaves.put(dataWithTimestamps)
         return {id, ...dataWithTimestamps}
     }
 
-    async getGameSaveById(id: number) {
+    async getById(id: number) {
         return await this.db.gameSaves.get(id) as GameSave | undefined
     }
 
-    async getLatestSave() {
+    async latest() {
         return await this.db.gameSaves
             .orderBy("updatedAt")
             .last() as GameSave | undefined
+    }
+
+    async getAll() {
+        return await this.db.gameSaves.toArray() as Array<GameSave>
+    }
+
+    async updateOne(id: number, changes: GameSave) {
+        const withTimestamps = updateTimestamps(changes)
+        await this.db.gameSaves.update(id, changes)
+        return withTimestamps
+    }
+
+    async deleteById(id: number) {
+        return await this.db.gameSaves.delete(id)
+    }
+}
+
+export class AppDatabase {
+    private db: InnerDatabase
+
+    gameSaves: GameSaveInterface
+
+    constructor() {
+        this.db = new InnerDatabase()
+        this.gameSaves = new GameSaveInterface(this.db)
     }
 
     clear() {

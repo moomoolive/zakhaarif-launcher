@@ -81,7 +81,7 @@ const NewGamePage = () => {
                     if (!await confirm({title: "Are you sure you want to create a new game?"})) {
                         return
                     }
-                    navigate(`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=latest`)
+                    navigate(`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=-1`)
                 }}
             >
                 <div className="mb-1">
@@ -120,8 +120,9 @@ const NewGamePage = () => {
                         type="submit"
                         onClick={async () => {
                             setLoading(true)
-                            const {id: gameId} = await appDatabase.createGameSave({
+                            const {id: gameId} = await appDatabase.gameSaves.create({
                                 name: gameName,
+                                type: "manual",
                                 mods: {
                                     canonicalUrls: linkedMods.map((cargo) => cargo.canonicalUrl),
                                     entryUrls: linkedMods.map((cargo) => cargo.entry),

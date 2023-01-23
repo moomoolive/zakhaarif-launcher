@@ -111,11 +111,11 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             return true
         },
         async getSaveFile(id: number) {
-            return await state.database.getGameSaveById(id)
+            if (id < 0) {
+                return await state.database.gameSaves.latest()
+            }
+            return await state.database.gameSaves.getById(id)
         },
-        async getLatestSave() {
-            return await state.database.getLatestSave()
-        }
     } as const
 }
 

@@ -18,16 +18,13 @@ export const main = async (args: MainScriptArguments) => {
     cssSheet.id = "main-style-sheet"
     document.head.appendChild(cssSheet)
     rootElement.className = "bg-neutral-800 leading-snug relative z-0"
-    const getLatest = queryState === "latest"
-    const gameId = getLatest ? 1 : parseInt(queryState, 10)
+    const gameId = parseInt(queryState, 10)
     if (isNaN(gameId)) {
         console.error("inputted game id is not a number. game_id =", queryState)
         messageAppShell("signalFatalError", authToken)
         return
     }
-    const gameSave = getLatest
-        ? await messageAppShell("getLatestSave")
-        : await messageAppShell("getSaveFile", gameId)
+    const gameSave = await messageAppShell("getSaveFile", gameId)
     if (!gameSave) {
         console.error("inputted game id doesn't exist", gameId)
         messageAppShell("signalFatalError", authToken)

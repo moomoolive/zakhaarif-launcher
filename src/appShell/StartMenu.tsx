@@ -15,28 +15,29 @@ const StartMenuPage = () => {
                 className="w-3/5 mx-auto sm:mx-0 sm:ml-16 h-full sm:w-60 bg-neutral-900/70 flex items-center justify-center"
             >
                 <div className="w-full">
-                    <div>
-                        <Link 
-                            to={`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=latest`}
-                            style={gameSaveExists.current 
-                                ? {}
-                                : {pointerEvents: "none"}
-                            }
-                        >
-                            <Button 
-                                color="success"
-                                fullWidth 
-                                size="large"
-                                disabled={!gameSaveExists.current}
+                    {gameSaveExists.current ? <>
+                        <div>
+                            <Link 
+                                to={`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=-1`}
+                                style={gameSaveExists.current 
+                                    ? {}
+                                    : {pointerEvents: "none"}
+                                }
                             >
-                                {"Continue"}
-                            </Button>
-                        </Link>
-                    </div>
+                                <Button 
+                                    color="success"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"Continue"}
+                                </Button>
+                            </Link>
+                        </div>
+                    </> : <></>}
                     
                     {([
                         {text: "New Game", route: "/new-game", color: "success"},
-                        {text: "Load Game", route: "/load-game", color: "success"},
+                        ...(gameSaveExists.current ? [{text: "Load Game", route: "/load-game", color: "success"}] as const : []),
                         {text: "Add-ons", route: "/add-ons", color: "info"},
                         {text: "Extensions", route: "/extensions-list", color: "info"},
                         {text: "Settings", route: "/settings", color: "info"},
