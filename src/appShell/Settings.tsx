@@ -180,7 +180,7 @@ const SettingsPage = () => {
             </div>
             <div className="w-full h-4/5 flex items-center justify-center">
                 <div className="w-full text-center">
-                    <div className="text-4xl mb-2">
+                    <div className="text-4xl mb-2 text-yellow-500">
                         <FontAwesomeIcon icon={faFaceLaughSquint} />
                     </div>
                     <div>

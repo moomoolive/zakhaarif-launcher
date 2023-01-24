@@ -41,16 +41,98 @@ const stripRelativePath = (url: string) => {
     }
 }
 
+const cargoHeaders = {
+    ...serviceWorkerPolicies.networkOnly,
+    pragma: "no-cache",
+    "cache-control": "no-cache"
+} as const
+
+class CargoFetchResponse {
+    error: string
+    cargo: {pkg: Cargo, errors: string[] ,semanticVersion: SemVer} | null
+    text: string
+    response: Response | null
+    resolvedUrl: string
+
+    constructor({
+        error = "",
+        cargo = null,
+        text = "",
+        response = null,
+        resolvedUrl = ""
+    }: Partial<CargoFetchResponse>) {
+        this.error = error
+        this.cargo = cargo
+        this.text = text
+        this.response = response
+        this.resolvedUrl = resolvedUrl
+    }
+}
+
+const fetchCargo = async (
+    fullUrl: string,
+    name: string,
+    fetchFn: FetchFunction
+) => {
+    const newCargoFetch = await io.retry(
+        () => fetchFn(fullUrl, {
+            method: "GET",
+            headers: cargoHeaders
+        }),
+        3
+    )
+    if (!newCargoFetch.ok) {
+        return new CargoFetchResponse({
+            error: `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
+        })
+    }
+    const newCargoRes = newCargoFetch.data
+    if (!newCargoRes.ok) {
+        return new CargoFetchResponse({
+            error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
+        })
+    }
+    const newCargoResponseCopy = newCargoRes.clone()
+    const newCargoText = await io.wrap(newCargoRes.text())
+    if (!newCargoText.ok) {
+        return new CargoFetchResponse({
+            error: `new cargo for "${name}" found no text. Error: ${newCargoText.msg}`
+        })
+    }
+    const newCargoJson = resultJsonParse(newCargoText.data)
+    if (!newCargoJson.ok) {
+        return new CargoFetchResponse({
+            error: `new cargo for "${name}" was not json encoded. Error: ${newCargoJson.msg}`,
+        })
+    }
+    const newCargoPkg = validateManifest(newCargoJson.data)
+    if (newCargoPkg.errors.length > 0) {
+        return new CargoFetchResponse({
+            error: `new cargo for "${name}" is not a valid ${MANIFEST_NAME}. Errors: ${newCargoPkg.errors.join(",")}`,
+        })
+    }
+    const [baseUrl] = newCargoRes.url.split(MANIFEST_NAME)
+    if (baseUrl.length < 1) {
+        return new CargoFetchResponse({error: `Cargo request redirected to empty url`})
+    }
+    return new CargoFetchResponse({
+        cargo: newCargoPkg, 
+        text: newCargoText.data,
+        response: newCargoResponseCopy,
+        resolvedUrl: baseUrl
+    })
+}
+
 type DownloadResponse = {
     downloadableResources: RequestableResource[] 
     errors: string[]
     bytesToDownload: number
     newCargo: {
-        storageUrl: string
-        requestUrl: string
         response: Response
         text: string
         parsed: Cargo
+        canonicalUrl: string
+        resolvedUrl: string
     } | null
     resoucesToDelete: RequestableResource[]
     totalBytes: number
@@ -93,77 +175,6 @@ const downloadError = (
 
 const versionUpToDate = () => downloadResponse({})
 
-const cargoHeaders = {
-    ...serviceWorkerPolicies.networkOnly,
-    pragma: "no-cache",
-    "cache-control": "no-cache"
-} as const
-
-const fetchCargo = async (
-    fullUrl: string,
-    name: string,
-    fetchFn: FetchFunction
-) => {
-    const newCargoFetch = await io.retry(
-        () => fetchFn(fullUrl, {
-            method: "GET",
-            headers: cargoHeaders
-        }),
-        3
-    )
-    if (!newCargoFetch.ok) {
-        return {
-            error: `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
-            cargo: null,
-            text: "",
-            response: null
-        }
-    }
-    const newCargoRes = newCargoFetch.data
-    if (!newCargoRes.ok) {
-        return {
-            error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
-            cargo: null,
-            text: "",
-            response: null
-        }
-    }
-    const newCargoResponseCopy = newCargoRes.clone()
-    const newCargoText = await io.wrap(newCargoRes.text())
-    if (!newCargoText.ok) {
-        return {
-            error: `new cargo for "${name}" found no text. Error: ${newCargoText.msg}`,
-            cargo: null,
-            text: "",
-            response: null
-        }
-    }
-    const newCargoJson = resultJsonParse(newCargoText.data)
-    if (!newCargoJson.ok) {
-        return {
-            error: `new cargo for "${name}" was not json encoded. Error: ${newCargoJson.msg}`,
-            cargo: null,
-            text: "",
-            response: null
-        }
-    }
-    const newCargoPkg = validateManifest(newCargoJson.data)
-    if (newCargoPkg.errors.length > 0) {
-        return {
-            error: `new cargo for "${name}" is not a valid ${MANIFEST_NAME}. Errors: ${newCargoPkg.errors.join(",")}`,
-            cargo: null,
-            text: "",
-            response: null
-        }
-    }
-    return {
-        error: "", 
-        cargo: newCargoPkg, 
-        text: newCargoText.data,
-        response: newCargoResponseCopy
-    }
-}
-
 const verifyAllRequestableFiles = async (
     fileUrls: string[], 
     fetchFn: FetchFunction
@@ -204,27 +215,25 @@ export const checkForUpdates = async (
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
+    const oldResolvedUrl = addSlashToEnd(resolvedUrl)
     const storageFileBase = addSlashToEnd(resolvedUrl)
     const requestFileBase = addSlashToEnd(canonicalUrl)
     const cargoUrl = storageFileBase + MANIFEST_NAME
+
     const storedCargoRes = await fileCache.getFile(cargoUrl)
-
-    const found = !!storedCargoRes
-    if (
-        found 
-        && !storedCargoRes.ok 
-        && storedCargoRes.status !== 404
-    ) {
-        return downloadError(
-            `previous cargo for "${name}" returned with a non-404 error http code`,
-            false
-        )
-    }
-
-    const notFound = !storedCargoRes
     const newCargoUrl = requestFileBase + MANIFEST_NAME
-    if (notFound || storedCargoRes.status === 404) {
-        const {error, cargo: newCargoPkg, text, response} = await fetchCargo(
+    if (
+        resolvedUrl.length < 0 
+        || !storedCargoRes 
+        || storedCargoRes.status === 404
+    ) {
+        const {
+            error, 
+            cargo: newCargoPkg, 
+            text, 
+            response,
+            resolvedUrl: finalUrl
+        } = await fetchCargo(
             newCargoUrl, name, fetchFn
         )
         if (!newCargoPkg || !response || error.length > 0) {
@@ -232,9 +241,10 @@ export const checkForUpdates = async (
         }
         const filesToDownload = newCargoPkg.pkg.files.map((f) => {
             const filename = stripRelativePath(f.name)
+            const fileUrl = finalUrl + filename
             return {
-                requestUrl: requestFileBase + filename,
-                storageUrl: storageFileBase + filename,
+                requestUrl: fileUrl,
+                storageUrl: fileUrl,
                 bytes: f.bytes
             } as RequestableResource
         })
@@ -249,12 +259,18 @@ export const checkForUpdates = async (
             )
         }
         newCargoPkg.pkg.files.forEach((file) => {
-            const target = requestFileBase + file.name
-            const bytes = filePreflightResponses.filesWithBytes.get(target) || 0
+            const target = finalUrl + file.name
+            const bytes = (
+                filePreflightResponses.filesWithBytes.get(target) 
+                || 0
+            )
             file.bytes = bytes
         })
         filesToDownload.forEach((file) => {
-            const bytes = filePreflightResponses.filesWithBytes.get(file.requestUrl) || 0
+            const bytes = (
+                filePreflightResponses.filesWithBytes.get(file.requestUrl) 
+                || 0
+            )
             file.bytes = bytes
         })
         const bytesToDownload = filesToDownload.reduce((total, file) => {
@@ -264,11 +280,11 @@ export const checkForUpdates = async (
             bytesToDownload,
             downloadableResources: filesToDownload,
             newCargo: {
-                storageUrl: cargoUrl,
                 response,
                 text, 
                 parsed: newCargoPkg.pkg,
-                requestUrl: newCargoUrl
+                canonicalUrl,
+                resolvedUrl: finalUrl
             },
             totalBytes: bytesToDownload,
             cargoManifestBytes: stringBytes(text),
@@ -306,7 +322,13 @@ export const checkForUpdates = async (
         return versionUpToDate()
     }
 
-    const {error, cargo: newCargoPkg, text, response} = await fetchCargo(
+    const {
+        error, 
+        cargo: newCargoPkg, 
+        text, 
+        response, 
+        resolvedUrl: finalUrl 
+    } = await fetchCargo(
         newCargoUrl, name, fetchFn
     )
 
@@ -318,16 +340,88 @@ export const checkForUpdates = async (
         return versionUpToDate()
     }
 
+
+    const newResolvedUrl = finalUrl
+    if (oldResolvedUrl !== newResolvedUrl) {
+        const filesToDownload = newCargoPkg.pkg.files.map((file) => {
+            const fileUrl = finalUrl + stripRelativePath(file.name)
+            return {
+                requestUrl: fileUrl,
+                storageUrl: fileUrl,
+                bytes: file.bytes
+            } as RequestableResource
+        })
+        const filePreflightResponses = await verifyAllRequestableFiles(
+            filesToDownload.map((file) => file.requestUrl),
+            fetchFn
+        )
+        filesToDownload.forEach((file) => {
+            const bytes = (
+                filePreflightResponses.filesWithBytes.get(file.requestUrl)
+                || 0
+            )
+            file.bytes = bytes
+        })
+        newCargoPkg.pkg.files.forEach((file) => {
+            const target = finalUrl + stripRelativePath(file.name)
+            const bytes = (
+                filePreflightResponses.filesWithBytes.get(target)
+                || 0
+            )
+            file.bytes = bytes
+        })
+        if (filePreflightResponses.errorUrls.length > 0) {
+            return downloadError(
+                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+                false
+            )
+        }
+        const filesToDelete = oldCargoPkg.files.map((file) => {
+            const fileUrl = oldResolvedUrl + stripRelativePath(file.name)
+            return {
+                requestUrl: fileUrl,
+                storageUrl: fileUrl,
+                bytes: file.bytes
+            } as RequestableResource
+        })
+        const bytesToDownload = filesToDownload.reduce(
+            (total, f) => total + f.bytes, 
+            0
+        )
+        return downloadResponse({
+            downloadableResources: filesToDownload,
+            bytesToDownload,
+            bytesToDelete: filesToDelete.reduce(
+                (total, f) => total + f.bytes,
+                0
+            ),
+            cargoManifestBytes: stringBytes(text),
+            totalBytes: bytesToDownload,
+            resoucesToDelete: filesToDelete,
+            newCargo: {
+                response,
+                text,
+                parsed: newCargoPkg.pkg,
+                canonicalUrl,
+                resolvedUrl
+            },
+            previousCargo: oldCargo.pkg
+        })
+    }
+
     const diff = diffManifestFiles(
         newCargoPkg.pkg,
         oldCargo.pkg,
         "url-diff"    
     )
-    const filesToDownload = diff.add.map((file) => ({
-        requestUrl: requestFileBase + stripRelativePath(file.name),
-        storageUrl: storageFileBase + stripRelativePath(file.name),
-        bytes: file.bytes
-    }))
+    const filesToDownload = diff.add.map((file) => {
+        const fileUrl = finalUrl + stripRelativePath(file.name)
+        return {
+            requestUrl: fileUrl,
+            storageUrl: fileUrl,
+            bytes: file.bytes
+        }
+    })
     const filePreflightResponses = await verifyAllRequestableFiles(
         filesToDownload.map((file) => file.requestUrl),
         fetchFn
@@ -338,14 +432,15 @@ export const checkForUpdates = async (
             false
         )
     }
+    
     oldCargo.pkg.files.forEach((file) => {
         // get old file sizes, put them into sizes map
         filePreflightResponses.filesWithBytes.set(
-            requestFileBase + file.name, file.bytes
+            finalUrl + file.name, file.bytes
         )
     })
     newCargoPkg.pkg.files.forEach((file) => {
-        const target = requestFileBase + file.name
+        const target = finalUrl + file.name
         const bytes = filePreflightResponses.filesWithBytes.get(target) || 0
         file.bytes = bytes
     })
@@ -380,11 +475,11 @@ export const checkForUpdates = async (
         totalBytes: totalBytesOfCargo,
         resoucesToDelete: filesToDelete,
         newCargo: {
-            storageUrl: cargoUrl,
             response, 
-            text: text,
+            text,
             parsed: newCargoPkg.pkg,
-            requestUrl: newCargoUrl
+            canonicalUrl,
+            resolvedUrl: finalUrl,
         },
         previousCargo: oldCargo.pkg
     })

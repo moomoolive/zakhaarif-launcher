@@ -236,7 +236,7 @@ export const LauncherRoot = ({
     const root = location.origin + "/"
     const [res] = await Promise.all([
       downloadClient.checkForCargoUpdates({
-        requestUrl: root,
+        canonicalUrl: root,
         storageUrl: root,
         id: APP_CARGO_ID
       }),

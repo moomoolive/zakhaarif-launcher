@@ -131,13 +131,18 @@ export class Shabah {
 
     async checkForCargoUpdates(cargo: {
         storageUrl: string
-        requestUrl: string
+        canonicalUrl: string
         id: string
     }) {
         const {networkRequest, fileCache} = this
+        const indexes = await this.getCargoIndices()
+        const cargoIndex = indexes.cargos.findIndex((cargoIndex) => cargoIndex.canonicalUrl === cargo.canonicalUrl)
+        const resolvedUrl = cargoIndex < 0
+            ? ""
+            : indexes.cargos[cargoIndex].resolvedUrl
         const response = await checkForUpdates({
-            canonicalUrl: cargo.requestUrl,
-            resolvedUrl: cargo.storageUrl,
+            canonicalUrl: cargo.canonicalUrl,
+            resolvedUrl,
             name: cargo.id
         }, networkRequest, fileCache)
         const disk = await this.diskInfo()
@@ -241,7 +246,10 @@ export class Shabah {
         details: UpdateDetails,
         updateTitle: string,
     ) {
-        if (!details.updateAvailable) {
+        if (
+            !details.updateAvailable 
+            || !details.updateCheckResponse.newCargo
+        ) {
             return io.ok(
                 Shabah.STATUS.updateNotAvailable,
                 //"update not available"
@@ -283,11 +291,11 @@ export class Shabah {
         }
         const {fileCache, downloadManager} = this
         updateDownloadIndex(downloadsIndex, updateIndex)
-        const newCargo = details.updateCheckResponse.newCargo!
+        const newCargo = details.updateCheckResponse.newCargo
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
             fileCache.putFile(
-                newCargo.requestUrl, 
+                newCargo.resolvedUrl + MANIFEST_NAME, 
                 new Response(JSON.stringify(newCargo.parsed), {
                     status: 200,
                     statusText: "OK",
@@ -305,8 +313,8 @@ export class Shabah {
                     version: details.versions.new,
                     entry: newCargo.parsed.entry,
                     bytes: details.updateCheckResponse.totalBytes,
-                    resolvedUrl: details.storageUrl,
-                    canonicalUrl: details.requestUrl,
+                    resolvedUrl: newCargo.resolvedUrl,
+                    canonicalUrl: newCargo.canonicalUrl,
                     logoUrl: newCargo.parsed.crateLogoUrl
                 },
                 {persistChanges: true}

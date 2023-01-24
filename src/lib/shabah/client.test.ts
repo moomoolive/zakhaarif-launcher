@@ -7,21 +7,48 @@ import {LATEST_CRATE_VERSION} from "../cargo/consts"
 
 type FileRecord = Record<string, () => ResultType<Response>>
 
-const fetchFnAndFileCache = (files: FileRecord) => {
+const fetchFnAndFileCache = (
+    cacheFiles: FileRecord,
+    networkFiles: FileRecord
+) => {
     const fetchFn: FetchFunction = async (input) => {
         const url = ((i: typeof input) => {
             return i instanceof URL 
                 ? i.href
                 : i instanceof Request ? i.url : i
         })(input)
-        const file = files[url]
+        const file = networkFiles[url]
         if (file) {
             try {
-                const f = file()
-                if (!f.ok) {
+                const initalFile = file()
+                if (!initalFile.ok) {
                     throw("should never be here!!")
                 }
-                return f.data 
+                let f = initalFile
+                let resolvedUrl = url
+                if (
+                    initalFile.data.status > 299
+                    && initalFile.data.status < 400
+                    && initalFile.data.headers.has("location")
+                ) {
+                    const redirectUrl = initalFile.data.headers.get("location") || ""
+                    const redirectFile = networkFiles[redirectUrl]
+                    if (!redirectFile) {
+                        throw ("test case provided redirect but no file found at redirect. Url=" + redirectUrl)
+                    }
+                    const redirectResponse = redirectFile()
+                    if (!redirectResponse.ok) {
+                        throw new Error("should never be here!!")
+                    }
+                    f = redirectResponse
+                    resolvedUrl = redirectUrl
+                }
+                const response = f.data
+                Object.defineProperty(response, "url", {
+                    value: resolvedUrl,
+                    enumerable: true
+                })
+                return response
             } catch (err) {
                 return new Response(String(err), {
                     status: 400,
@@ -36,7 +63,16 @@ const fetchFnAndFileCache = (files: FileRecord) => {
     }
 
     const fileCache: FileCache = {
-        getFile: (url) => fetchFn(url, {}),
+        getFile: async (url) => {
+            if (!cacheFiles[url]) {
+                return null
+            }
+            const result = cacheFiles[url]()
+            if (!result.ok) {
+                return null
+            }
+            return result.data
+        },
         putFile: async () => true,
         queryUsage: async () => ({usage: 0, quota: 0}),
         deleteFile: async () => true,
@@ -57,24 +93,8 @@ const cargoPkg = new Cargo({
 })
 
 describe("diff cargos function", () => {
-    it("if storage url request encounters fatal error no update urls are returned", async () => {
-        const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
-                throw new Error("old cargo network error")
-            }
-        })
-        const res = await checkForUpdates({
-            canonicalUrl: "https://mywebsite.com/pkg", 
-            resolvedUrl: "https://local.com/store", 
-            name: "pkg"
-        }, ...adaptors)
-        expect(res.downloadableResources.length).toBe(0)
-        expect(res.errors.length).toBeGreaterThan(0)
-        expect(res.previousVersionExists).toBe(false)
-    })
-
     it("if cargo has not been downloaded before and new cargo cannot be fetched due to network error no download urls should be returned", async () => {
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 throw new Error("new cargo network error")
             }
@@ -82,7 +102,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -92,7 +112,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo cannot be fetched because http error occurred no download urls should be returned", async () => {
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response("", {
                     status: 404,
@@ -103,7 +123,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -113,7 +133,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found but is not json-encoded no download urls should be returned", async () => {
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const invalidJson = "{"
                 return io.ok(new Response(invalidJson, {
@@ -125,7 +145,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -135,7 +155,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found but is not a valid cargo.json no download urls should be returned", async () => {
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const invalidCargo = `{"random-key": 2}`
                 return io.ok(new Response(invalidCargo, {
@@ -147,7 +167,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -156,11 +176,11 @@ describe("diff cargos function", () => {
         expect(res.previousVersionExists).toBe(false)
     })
 
-    it("if cargo has not been downloaded before and new cargo is found new cargo file urls return an error http code, an error should be returned", async () => {
+    it("if cargo has not been downloaded before and new cargo is found and new cargo file urls return an error http code, an error should be returned", async () => {
         const manifest = cloneCargo(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
@@ -185,7 +205,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -196,7 +216,7 @@ describe("diff cargos function", () => {
         const manifest = cloneCargo(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
@@ -214,18 +234,18 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
     })
 
-    it("if cargo has not been downloaded before and new cargo is found new cargo file urls returns a valid http response with the 'content-length' header, an error should be returned", async () => {
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls returns a valid http response without the 'content-length' header, an error should be returned", async () => {
         const manifest = cloneCargo(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
@@ -250,7 +270,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -262,7 +282,7 @@ describe("diff cargos function", () => {
         const manifest = cloneCargo(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
@@ -287,7 +307,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -295,9 +315,6 @@ describe("diff cargos function", () => {
         expect(res.errors.length).toBe(0)
         expect(res.resoucesToDelete.length).toBe(0)
         expect(res.bytesToDownload).toBeGreaterThan(0)
-        expect(res.newCargo?.storageUrl).toBe(
-            "https://local.com/store/cargo.json"
-        )
         expect(res.newCargo?.text).toBe(cargoString)
         expect(res.previousVersionExists).toBe(false)
     })
@@ -307,7 +324,7 @@ describe("diff cargos function", () => {
         const cargoString = JSON.stringify(manifest)
 
         const contentLength = ["10"] as const
-        const adaptors = fetchFnAndFileCache({
+        const adaptors = fetchFnAndFileCache({}, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 return io.ok(new Response(cargoString, {
                     status: 200,
@@ -332,7 +349,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -350,25 +367,50 @@ describe("diff cargos function", () => {
         )
     })
 
-    it("if previous cargo responds with error http that is not 404 should return no update urls", async () => {
-        const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
-                return io.ok(new Response("", {
-                    status: 403,
-                    statusText: "FORBIDDEN"
+    it("passing in an empty string as resolvedUrl has the same effect as having not downloaded a cargo before", async () => {
+        const manifest = cloneCargo(cargoPkg)
+        const cargoString = JSON.stringify(manifest)
+
+        const contentLength = ["10"] as const
+        const adaptors = fetchFnAndFileCache({}, {
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": contentLength[0],
+                        "Content-Type": "text/javascript"
+                    }
                 }))
             }
         })
-        const res = await checkForUpdates(
-            {
+        const res = await checkForUpdates({
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "", 
                 name: "pkg"
-            }
-        , ...adaptors)
-        expect(res.downloadableResources.length).toBe(0)
-        expect(res.errors.length).toBeGreaterThan(0)
-        expect(res.previousVersionExists).toBe(false)
+        }, ...adaptors)
+        expect(res.downloadableResources.length).toBe(manifest.files.length)
+        expect(res.errors.length).toBe(0)
+        expect(res.resoucesToDelete.length).toBe(0)
+        expect(res.bytesToDownload).toBe(parseInt(contentLength[0], 10))
+        expect(res.newCargo?.parsed.files || []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: "index.js", 
+                    bytes: parseInt(contentLength[0], 10),
+                })
+            ])
+        )
     })
 
     it("if previous cargo is found and new mini cargo version is not greater, no download urls should be returned and full new cargo should not be requested", async () => {
@@ -381,13 +423,14 @@ describe("diff cargos function", () => {
             newCargo: 0
         }
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.mini.json": () => {
                 requestRecord.newCargoMini++
                 const pkg = JSON.stringify(toMiniCargo(newCargo))
@@ -408,7 +451,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -429,13 +472,14 @@ describe("diff cargos function", () => {
             newCargo: 0
         }
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.mini.json": () => {
                 requestRecord.newCargoMini++
                 throw new Error("network error")
@@ -457,7 +501,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -476,13 +520,14 @@ describe("diff cargos function", () => {
             newCargo: 0
         }
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.mini.json": () => {
                 requestRecord.newCargoMini++
                 return io.ok(new Response("", {
@@ -502,7 +547,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -517,13 +562,14 @@ describe("diff cargos function", () => {
         const newCargo = cloneCargo(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 throw new Error("network error")
                 const pkg = JSON.stringify(newCargo)
@@ -536,7 +582,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -551,13 +597,14 @@ describe("diff cargos function", () => {
         const newCargo = cloneCargo(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -569,7 +616,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -584,13 +631,14 @@ describe("diff cargos function", () => {
         const newCargo = cloneCargo(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 // ruin the json encoding
                 const pkg = JSON.stringify(newCargo) + "{"
@@ -603,7 +651,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -618,13 +666,14 @@ describe("diff cargos function", () => {
         const newCargo = cloneCargo(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify({})
                 return io.ok(new Response(pkg, {
@@ -636,7 +685,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -651,13 +700,14 @@ describe("diff cargos function", () => {
         const newCargo = cloneCargo(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -669,7 +719,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -693,13 +743,14 @@ describe("diff cargos function", () => {
         ] as const
         newCargo.files.push(...newResources)
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -724,7 +775,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -746,13 +797,14 @@ describe("diff cargos function", () => {
         ] as const
         newCargo.files.push(...newResources)
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -784,7 +836,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -806,13 +858,14 @@ describe("diff cargos function", () => {
         ] as const
         newCargo.files.push(...newResources)
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -844,7 +897,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -866,13 +919,14 @@ describe("diff cargos function", () => {
         ] as const
         newCargo.files.push(...newResources)
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json":  () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
-            },
+            }
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -904,7 +958,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -916,7 +970,6 @@ describe("diff cargos function", () => {
             expiredResources.length
         )
         const cargoString = JSON.stringify(newCargo)
-        expect(res.newCargo?.storageUrl).toBe("https://local.com/store/cargo.json")
         expect(res.newCargo?.text).toBe(cargoString)
         expect(res.previousVersionExists).toBe(true)
     })
@@ -940,13 +993,14 @@ describe("diff cargos function", () => {
             "20", "100"
         ] as const
         const adaptors = fetchFnAndFileCache({
-            "https://local.com/store/cargo.json": () => {
+            "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)
                 return io.ok(new Response(pkg, {
                     status: 200,
                     statusText: "OK"
                 }))
             },
+        }, {
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(newCargo)
                 return io.ok(new Response(pkg, {
@@ -978,7 +1032,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://local.com/store", 
+                resolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -988,6 +1042,116 @@ describe("diff cargos function", () => {
         )
         expect(res.resoucesToDelete.length).toBe(
             expiredResources.length
+        )
+        
+        expect(res.newCargo?.parsed.files || []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: "rand.5.js",
+                    bytes: parseInt(contentLengths[0], 10)
+                }),
+                expect.objectContaining({
+                    name: "styles.6.css",
+                    bytes: parseInt(contentLengths[1], 10)
+                }),
+                expect.objectContaining({
+                    name: "index.js",
+                    bytes: 1000
+                })
+            ])
+        )
+        expect(res.bytesToDownload).toBe(
+            contentLengths
+                .map((length) => parseInt(length, 10))
+                .reduce((total, next) => total + next, 0)
+        )
+    })
+
+    it("if previous cargo is found and new cargo version is greater, and canonical url resolves to a different url than input 'resolvedUrl', reinstallation should occur (purge all old files, download all files in new package)", async () => {
+        const oldCargo = cloneCargo(cargoPkg)
+        oldCargo.version = "0.1.2"
+        const expiredResources = [
+            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+        ] as const
+        oldCargo.files.push(...expiredResources)
+        const newCargo = cloneCargo(cargoPkg)
+        newCargo.version = "0.1.3"
+        const newResources = [
+            {name: "rand.5.js", bytes: 600, invalidation: "default"},
+            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+        ] as const
+        newCargo.files.push(...newResources)
+
+        const contentLengths = ["20", "100", "1000"] as const
+        const redirecturl = "https://assets.mywebsite.com"
+        const adaptors = fetchFnAndFileCache({
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(oldCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+        }, {
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 302,
+                    statusText: "OK",
+                    headers: {
+                        "location": `${redirecturl}/pkg/cargo.json`
+                    }
+                }))
+            },
+            [`${redirecturl}/pkg/cargo.json`]: () => {
+                const pkg = JSON.stringify(newCargo)
+                return io.ok(new Response(pkg, {
+                    status: 200,
+                    statusText: "OK"
+                }))
+            },
+            [`${redirecturl}/pkg/rand.5.js`]: () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": contentLengths[0],
+                        "content-type": "text/javascript"
+                    }
+                }))
+            },
+            [`${redirecturl}/pkg/styles.6.css`]: () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": contentLengths[1],
+                        "content-type": "text/css"
+                    }
+                }))
+            },
+            [`${redirecturl}/pkg/index.js`]: () => {
+                return io.ok(new Response("", {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "content-length": contentLengths[2],
+                        "content-type": "text/css"
+                    }
+                }))
+            },
+        })
+        const res = await checkForUpdates({
+            canonicalUrl: "https://mywebsite.com/pkg", 
+            resolvedUrl: "https://mywebsite.com/pkg", 
+            name: "pkg"
+        }, ...adaptors)
+        expect(res.errors.length).toBe(0)
+        expect(res.downloadableResources.length).toBe(
+            newCargo.files.length
+        )
+        expect(res.resoucesToDelete.length).toBe(
+            oldCargo.files.length
         )
         expect(res.newCargo?.parsed.files || []).toEqual(
             expect.arrayContaining([
@@ -1011,382 +1175,70 @@ describe("diff cargos function", () => {
                 .reduce((total, next) => total + next, 0)
         )
     })
-})
 
-import {
-    getDownloadIndices,
-    updateDownloadIndex,
-    emptyDownloadIndex,
-    operationCodes,
-    removeDownloadIndex,
-    saveDownloadIndices
-} from "./backend"
+    it("if request for cargo is redirected to another url, all cargo files will be requested with redirected root url", async () => {
+        const manifest = cloneCargo(cargoPkg)
+        const cargoString = JSON.stringify(manifest)
 
-const createFileCache = (initFiles: Record<string, Response>) => {
-    const cache = {
-        getFile: async (url: string) => initFiles[url],
-        putFile: async (url: string, file: Response) => { 
-            initFiles[url] = file 
-            return true
-        },
-        queryUsage: async () => ({usage: 0, quota: 0}),
-        deleteFile: async () => true,
-        deleteAllFiles: async () => true,
-        isPersisted: async () => true,
-        requestPersistence: async () => true,
-        listFiles: async () => [],
-    }
-    return cache
-}
-
-describe("reading and writing to download index", () => {
-    it("if download index collection hasn't been created yet, should return empty index", async () => {
-        const fileCache = createFileCache({})
-        const index = await getDownloadIndices(
-            "/__dl-index__.json",
-            fileCache
-        )
-        expect(!!index.downloads).toBe(true)
-        expect(!!index.updatedAt).toBe(true)
-        expect(!!index.createdAt).toBe(true)
-    })
-
-    it("if download index is not in index collection new index should be created", () => {
-        const index = emptyDownloadIndex()
-        expect(index.downloads.length).toBe(0)
-        const res = updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.downloads.length).toBe(1)
-        expect(res).toBe(operationCodes.createdNew)
-    })
-
-    it("if download index is not in index collection download index total bytes should be incremented", () => {
-        const index = emptyDownloadIndex()
-        expect(index.downloads.length).toBe(0)
-        expect(index.totalBytes).toBe(0)
-        const bytes = 10
-        const res = updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.totalBytes).toBe(bytes)
-        expect(index.downloads.length).toBe(1)
-        expect(res).toBe(operationCodes.createdNew)
-    })
-
-    it("if download index is in index collection new index should overwrite old", () => {
-        const index = emptyDownloadIndex()
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.downloads.length).toBe(1)
-        const res = updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0", resolvedUrl: ""}
-        )
-        expect(index.downloads.length).toBe(1)
-        expect(index.downloads.find((d) => d.id === "pkg")?.bytes).toBe(1)
-        expect(res).toBe(operationCodes.updatedExisting)
-    })
-
-    it("if download index is in index collection download index total bytes should be be incremented by the bytes difference between the two", async () => {
-        const fileCache = createFileCache({})
-        const origin = "https://a-cool-place.site"
-        const index = await getDownloadIndices(origin, fileCache)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        const res = await saveDownloadIndices(index, origin, fileCache)
-        expect(res).toBe(operationCodes.saved)
-        expect(
-            JSON.stringify(await getDownloadIndices(origin, fileCache))
-        ).toEqual(JSON.stringify(index))
-    })
-
-    it("if download index is in index collection download index total bytes should be be incremented by the bytes difference between the two, even if origin has a trailing slash", async () => {
-        const fileCache = createFileCache({})
-        const origin = "https://a-cool-place.site/"
-        const index = await getDownloadIndices(origin, fileCache)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        const res = await saveDownloadIndices(index, origin, fileCache)
-        expect(res).toBe(operationCodes.saved)
-        expect(
-            JSON.stringify(await getDownloadIndices(origin, fileCache))
-        ).toEqual(JSON.stringify(index))
-    })
-
-    it("if remove download index is called with an existing id, index with id should be removed and download collection bytes should be decremented by the amount of bytes in the removed index", () => {
-        const index = emptyDownloadIndex()
-        expect(index.totalBytes).toBe(0)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "pkg")
-        expect(index.totalBytes).toBe(50)
-        expect(index.downloads.length).toBe(1)
-        expect(res).toBe(operationCodes.removed)
-    })
-
-    it("if remove download index is called with an non existing id, nothing should occur", () => {
-        const index = emptyDownloadIndex()
-        expect(index.totalBytes).toBe(0)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "random-pkg")
-        expect(index.totalBytes).toBe(70)
-        expect(index.downloads.length).toBe(2)
-        expect(res).toBe(operationCodes.notFound)
-    })
-
-    it("saved download indices should be able to be fetched with the getDownloadIndices function", () => {
-        const index = emptyDownloadIndex()
-        expect(index.totalBytes).toBe(0)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "random-pkg")
-        expect(index.totalBytes).toBe(70)
-        expect(index.downloads.length).toBe(2)
-        expect(res).toBe(operationCodes.notFound)
-    })
-})
-
-import {
-    getCargoIndices,
-    emptyCargoIndices,
-    updateCargoIndex,
-    saveCargoIndices,
-} from "./backend"
-
-describe("reading and writing to cargo indices", () => {
-    it("should return empty cargo indices if one is not found", async () => {
-        const fileFetcher = createFileCache({})
-        const index = await getCargoIndices(
-            "https://myhouse.com",
-            fileFetcher
-        )
-        expect(!!index.cargos).toBe(true)
-        expect(!!index.updatedAt).toBe(true)
-        expect(!!index.createdAt).toBe(true)
-    })
-
-    it("if download index is not in index collection new index should be created", () => {
-        const index = emptyCargoIndices()
-        expect(index.cargos.length).toBe(0)
-        const res = updateCargoIndex(
-            index,
-            {
-                id: "pkg",
-                logoUrl: "",
-                name: "pkg",
-                state: "updating",
-                version: "0.1.0",
-                bytes: 0,
-                entry: "store/index.js",
-                resolvedUrl: "store/",
-                canonicalUrl: "store/",
+        const contentLength = ["10"] as const
+        const redirectOrigin = "https://assets.mywebsites.com/pkg"
+        const redirectCargo = `${redirectOrigin}/cargo.json`
+        const adaptors = fetchFnAndFileCache({}, {
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 302,
+                    statusText: "OK",
+                    headers: {
+                        "location": redirectCargo
+                    }
+                }))
+            },
+            [redirectCargo]: () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            [`${redirectOrigin}/index.js`]: () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": contentLength[0],
+                        "Content-Type": "text/javascript"
+                    }
+                }))
             }
+        })
+        const res = await checkForUpdates({
+                canonicalUrl: "https://mywebsite.com/pkg", 
+                resolvedUrl: "", 
+                name: "pkg"
+        }, ...adaptors)
+        expect(res.downloadableResources.length).toBe(manifest.files.length)
+        expect(res.downloadableResources).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    requestUrl: `${redirectOrigin}/index.js`,
+                    storageUrl: `${redirectOrigin}/index.js`,
+                    bytes: parseInt(contentLength[0], 10),
+                })
+            ])
         )
-        expect(index.cargos.length).toBe(1)
-        expect(res).toBe(operationCodes.createdNew)
-    })
-
-    it("if cargo index is not in index collection new index should be created", () => {
-        const index = emptyCargoIndices()
-        const first = {
-            id: "pkg",
-            name: "pkg",
-            logoUrl: "",
-            state: "updating",
-            version: "0.1.0",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        updateCargoIndex(index, first)
-        expect(index.cargos.length).toBe(1)
-        const second = {
-            id: "pkg",
-            name: "pkg",
-            logoUrl: "",
-            state: "cached",
-            version: "0.2.0",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        const res = updateCargoIndex(index, second)
-        expect(index.cargos.length).toBe(1)
-        expect(index.cargos[0].version).toBe("0.2.0")
-        expect(res).toBe(operationCodes.updatedExisting)
-    })
-
-    it("saved cargo indices should be able to be fetched with the get download indices function", async () => {
-        const fileCache = createFileCache({})
-        const origin = "https://myhouse.com"
-        const index = await getCargoIndices(origin, fileCache)
-        const first = {
-            id: "pkg",
-            name: "pkg",
-            logoUrl: "",
-            state: "updating",
-            version: "0.1.0",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        updateCargoIndex(index, first)
-        const second = {
-            id: "pkg-2",
-            name: "pkg",
-            state: "cached",
-            logoUrl: "",
-            version: "0.2.0",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        updateCargoIndex(index, second)
-        expect(index.cargos.length).toBe(2)
-        const res = await saveCargoIndices(
-            index, origin, fileCache
+        expect(res.errors.length).toBe(0)
+        expect(res.resoucesToDelete.length).toBe(0)
+        expect(res.bytesToDownload).toBe(parseInt(contentLength[0], 10))
+        expect(res.newCargo?.parsed.files || []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    name: "index.js", 
+                    bytes: parseInt(contentLength[0], 10),
+                })
+            ])
         )
-        expect(res).toBe(operationCodes.saved)
-        const indexAgain = await getCargoIndices(origin, fileCache)
-        expect(JSON.stringify(indexAgain)).toEqual(JSON.stringify(index))
-    })
-
-    it("saved cargo indices should be able to be fetched with the get download indices function even when origin has a trailing slash", async () => {
-        const fileCache = createFileCache({})
-        const origin = "https://myhouse.com/"
-        const index = await getCargoIndices(origin, fileCache)
-        const first = {
-            id: "pkg",
-            name: "pkg",
-            state: "updating",
-            logoUrl: "",
-            version: "0.1.0",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        updateCargoIndex(index, first)
-        const second = {
-            id: "pkg-2",
-            name: "pkg",
-            state: "cached",
-            version: "0.2.0",
-            logoUrl: "",
-            bytes: 0,
-            entry: "store/index.js",
-            resolvedUrl: "store/",
-            canonicalUrl: "store/",
-        } as const
-        updateCargoIndex(index, second)
-        expect(index.cargos.length).toBe(2)
-        const res = await saveCargoIndices(
-            index, origin, fileCache
-        )
-        expect(res).toBe(operationCodes.saved)
-        const indexAgain = await getCargoIndices(origin, fileCache)
-        expect(JSON.stringify(indexAgain)).toEqual(JSON.stringify(index))
-    })
-})
-
-import {
-    getErrorDownloadIndex, 
-    saveErrorDownloadIndex
-} from "./backend"
-
-describe("reading and writing error download indices", () => {
-    it("if error index doesn't exist return null", async () => {
-        const fileFetcher = createFileCache({})
-        const origin = "https://potato-house.com"
-        const resolvedUrl = `${origin}/potato/`
-        const res = await getErrorDownloadIndex(
-            resolvedUrl, fileFetcher
-        )
-        expect(res).toBe(null)
-    })
-
-    it("if error index exists, getting index should return a valid index", async () => {
-        const fileFetcher = createFileCache({})
-        const origin = "https://potato-house.com"
-        const resolvedUrl = `${origin}/potato/`
-        const index = {
-            id: "tmp",
-            map: {},
-            title: "none",
-            startedAt: Date.now(),
-            bytes: 0,
-            version: "0.1.0",
-            previousVersion: "0.1.0-beta",
-            resolvedUrl: "",
-        } as const
-        await saveErrorDownloadIndex(
-            resolvedUrl, index, fileFetcher
-        )
-        const res = await getErrorDownloadIndex(
-            resolvedUrl, fileFetcher
-        )
-        expect(res).not.toBe(null)
-    })
-
-    it("attempting to save an error download index with a relative url should throw an error", async () => {
-        const fileFetcher = createFileCache({})
-        const resolvedUrl = `/potato/`
-        const index = {
-            id: "tmp",
-            map: {},
-            title: "none",
-            startedAt: Date.now(),
-            bytes: 0,
-            version: "0.1.0",
-            previousVersion: "0.1.0-beta",
-            resolvedUrl: "",
-        } as const
-        
-        expect(async () => await saveErrorDownloadIndex(
-            resolvedUrl, index, fileFetcher
-        )).rejects.toThrow()
     })
 })

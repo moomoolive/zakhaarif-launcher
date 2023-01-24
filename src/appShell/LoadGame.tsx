@@ -10,10 +10,11 @@ import { useGlobalConfirm } from "@/hooks/globalConfirm"
 import { ModLinker } from "@/components/mods/ModLinker"
 import { useAppShellContext } from "./store"
 import { emptyCargoIndices } from "@/lib/shabah/backend"
-import { addStandardCargosToCargoIndexes } from "@/standardCargos"
+import { addStandardCargosToCargoIndexes, GAME_CARGO_INDEX, STANDARD_MOD_CARGO_INDEX } from "@/standardCargos"
 import { MOD_CARGO_ID_PREFIX } from "@/config"
 import { SAVE_EXISTS } from "@/lib/utils/localStorageKeys"
 import { FilterChevron, FilterOrder } from "@/components/FilterChevron"
+import { useNavigate } from "react-router-dom"
 
 const DO_NOT_SHOW_LINKER = -1
 
@@ -35,6 +36,7 @@ const LoadGamePage = () => {
     const {current: appDatabase} = useRef(new AppDatabase())
     const {downloadClient} = useAppShellContext()
     const confirm = useGlobalConfirm()
+    const navigate = useNavigate()
 
     const [loading, setLoading] = useState(true)
     const [saves, setSaves] = useState([] as GameSave[])
@@ -205,11 +207,15 @@ const LoadGamePage = () => {
                         <div className="w-full h-5/6 overflow-y-scroll overflow-x-clip px-2">
                             {filteredSaves.map((save, index) => {
                                 const {name, type, updatedAt, id} = save
+                                const openGame = () => navigate(`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=${id.toString()}`)
                                 return <div
                                     key={`save-${index}`}
                                     className="w-full text-left bg-neutral-900 cursor-pointer hover:bg-neutral-900/60 mb-2 rounded shadow-2xl border-l-4 border-solid border-blue-500"
                                 >
-                                    <div className="w-full flex items-center pt-2 px-2">
+                                    <div 
+                                        className="w-full flex items-center pt-2 px-2"
+                                        onClick={openGame}
+                                    >
                                         <div className="w-3/4 overflow-x-clip break-words">
                                             {name}
                                         </div>
@@ -238,7 +244,7 @@ const LoadGamePage = () => {
                                     </div>
 
                                     <div className="w-full py-2 px-2 text-xs text-neutral-500 flex items-center">
-                                        <div className="w-1/2">
+                                        <div className="w-1/2" onClick={openGame}>
                                             {new Date(updatedAt).toLocaleString("en-us", {
                                                 month: "short",
                                                 day: "numeric",
