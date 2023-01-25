@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react"
+import {useState, useEffect, useMemo} from "react"
 import {Tooltip} from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -8,7 +8,17 @@ import {
     faCopy,
     faEnvelope,
     faGlobe,
-    faArrowLeft
+    faArrowLeft,
+    faLockOpen,
+    faFile,
+    faCode,
+    faGlobeAfrica,
+    faCamera,
+    faMicrophone,
+    faDisplay,
+    faVideo,
+    faArrowPointer,
+    faLocationDot
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, ClickAwayListener, IconButton} from "@mui/material"
 import {Cargo} from "@/lib/cargo/index"
@@ -18,12 +28,167 @@ import {isStandardCargo} from "../../lib/utils/cargos"
 import {CargoIndex} from "../../lib/shabah/wrapper"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
-import type {Permissions} from "../../lib/types/permissions"
+import {Permissions, permissionsMeta} from "../../lib/types/permissions"
 
 export type CargoInfoProps = {
     onClose: () => void
     cargo: Cargo<Permissions>
     cargoIndex: CargoIndex
+}
+
+type PermissionsArray = Cargo<Permissions>["permissions"]
+
+type PermissionsIconProps = {
+    permission: PermissionsArray[number]
+}
+
+// taken from https://stackoverflow.com/questions/7225407/convert-camelcasetext-to-title-case-text
+const camelCaseToTitleCase = (text: string) => {
+    const result = text.replace(/([A-Z])/g, " $1");
+    return result.charAt(0).toUpperCase() + result.slice(1)
+}
+
+const defaultPermission = (key: PermissionsArray[number]["key"]) => {
+    switch (key) {
+        case "geoLocation":
+            return <span className="text-yellow-500">
+                <FontAwesomeIcon icon={faLocationDot}/>
+            </span>
+        case "unlimitedStorage":
+            return <span className="text-green-500">
+                <FontAwesomeIcon icon={faLockOpen}/>
+            </span>
+        case "camera":
+            return <span className="text-yellow-500">
+                <FontAwesomeIcon icon={faCamera}/>
+            </span>
+        case "microphone":
+            return <span className="text-yellow-500">
+                <FontAwesomeIcon icon={faMicrophone}/>
+            </span>
+        case "fullScreen":
+            return <span className="text-green-500">
+                <FontAwesomeIcon icon={faDisplay}/>
+            </span>
+        case "*":
+            return <span className="text-red-500">
+                <FontAwesomeIcon icon={faLockOpen}/>
+            </span>
+        case "files":
+            return <span className="text-green-500">
+                <FontAwesomeIcon icon={faFile}/>
+            </span>
+        case "displayCapture":
+            return <span className="text-yellow-500">
+                <FontAwesomeIcon icon={faVideo}/>
+            </span>
+        case "pointerLock":
+            return <span className="text-green-500">
+                <FontAwesomeIcon icon={faArrowPointer}/>
+            </span>
+        default:
+            return <></>
+    }
+}
+
+const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
+    const [showDetails, setShowDetails] = useState(false)
+    
+    return <div className="text-sm">
+        {((p: typeof permission) => {
+            switch (p.key) {
+                case "webRequest": {
+                    if ((permission.value as string[]).includes("*")) {
+                        return <>
+                            <span className="text-red-500 mr-2.5">
+                                <FontAwesomeIcon icon={faGlobeAfrica}/>
+                            </span>
+                            {`Unrestricted Network Access`}
+                        </>
+                    }
+                    return <>
+                        <div>
+                            <span className="text-yellow-500 mr-2.5">
+                                <FontAwesomeIcon icon={faGlobeAfrica}/>
+                            </span>
+                            {`Network Access`}
+                            <button 
+                                className="text-xs ml-2 text-blue-500 hover:text-green-500"
+                                onClick={() => setShowDetails(!showDetails)}
+                            >
+                                {showDetails ? "less" : "more"}
+                            </button>
+                        </div>
+                        {showDetails ? <div
+                            className="animate-fade-in-left mb-2"
+                        >
+                            <div className="mt-1 text-xs text-neutral-400 ml-2">
+                                {"Send and recieve data from:"}
+                            </div>
+
+                            {permission.value.map((value, index) => {
+                                return <div
+                                    key={`permission-${permission.key}-detail-${index}`}
+                                    className="ml-2"
+                                >
+                                    <span className="mr-1 text-yellow-400">{`${index + 1}.`}</span>
+                                    {value}
+                                </div>
+                            })}
+                        </div> : <></>}
+                    </>
+                }
+                case "embedExtensions": {
+                    if ((permission.value as string[]).includes("*")) {
+                        return <>
+                            <span className="text-red-500 mr-2.5">
+                                <FontAwesomeIcon icon={faCode}/>
+                            </span>
+                            {`Embed Any Extension`}
+                        </>
+                    }
+                    return <>
+                        <div>
+                            <span className="text-yellow-500 mr-2.5">
+                                <FontAwesomeIcon icon={faCode}/>
+                            </span>
+                            {`Embed Extensions`}
+                            <button 
+                                className="text-xs ml-2 text-blue-500 hover:text-green-500"
+                                onClick={() => setShowDetails(!showDetails)}
+                            >
+                                {showDetails ? "less" : "more"}
+                            </button>
+                        </div>
+                        {showDetails ? <div
+                            className="animate-fade-in-left mb-2"
+                        >
+                            <div className="mt-1 text-xs text-neutral-400 ml-2">
+                                {"Embed one or all of the following:"}
+                            </div>
+
+                            {permission.value.map((value, index) => {
+                                return <div
+                                    key={`permission-${permission.key}-detail-${index}`}
+                                    className="ml-2"
+                                >
+                                    <span className="mr-1 text-yellow-400">{`${index + 1}.`}</span>
+                                    {value}
+                                </div>
+                            })}
+                        </div> : <></>}
+                    </>
+                }
+                default:
+                    return <>
+                        <span className="mr-2">
+                            {defaultPermission(p.key)}
+                        </span>
+                        {permissionsMeta[p.key].name || camelCaseToTitleCase(p.key)}
+                    </>
+            }
+        })(permission)}
+    </div>
 }
 
 export const CargoInfo = ({
@@ -44,6 +209,7 @@ export const CargoInfo = ({
         repo,
         authors,
         crateLogoUrl,
+        permissions,
     } = cargo
 
     const noLicense = license === CARGO_NULL_FIELD
@@ -83,6 +249,29 @@ export const CargoInfo = ({
         }
         return keywords
     })(id)
+
+    const permissionsFiltered = useMemo(() => {
+        const preFiltered = permissions.some((permission) => permission.key === "*")
+            ? permissions.filter((permission) => permission.key === "*")
+            : permissions
+        if (preFiltered.length < 2) {
+            return preFiltered
+        }
+        const extendableDangerousPermissions = preFiltered.filter(
+            ({key}) => permissionsMeta[key].dangerous && permissionsMeta[key].extendable
+        )
+        const dangerousPermissions = preFiltered.filter(
+            ({key}) => permissionsMeta[key].dangerous && !permissionsMeta[key].extendable
+        )
+        const safePermissions = preFiltered.filter(
+            ({key}) => !permissionsMeta[key].dangerous
+        )
+        return [
+            ...extendableDangerousPermissions, 
+            ...dangerousPermissions, 
+            ...safePermissions
+        ]
+    }, [cargo])
 
     return <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
         <div className="absolute top-0 left-0">
@@ -131,11 +320,15 @@ export const CargoInfo = ({
                         <div>
                             {description}
                         </div>
-                        <div className="my-3">
+                        <div className="mt-3 mb-1">
                             <Divider className=" bg-neutral-700"/>
                         </div>
 
-                        <div className="text-sm text-neutral-400 my-4">
+                        <div className="text-xs text-neutral-400">
+                            {"Updated: " + reactiveDate(new Date(updatedAt))}
+                        </div>
+
+                        <div className="text-sm text-neutral-400 my-3">
                             <div>
                                 <a 
                                     className="hover:text-green-500 mr-4 cursor-pointer"
@@ -198,13 +391,23 @@ export const CargoInfo = ({
                                 </div>
                             </> : <></>}
 
-                            <div className="mb-2">
+                            <div className="mb-2 w-full">
                                 <div className="text-neutral-500 text-xs">
                                     {`Permissions:`}
                                 </div>
-                                <div className="text-sm">
-                                    none
-                                </div>
+                                
+                                    {permissions.length < 1 ? <div className="text-sm">
+                                        none
+                                    </div> : <>
+                                        <div className="w-full px-1">
+                                            {permissionsFiltered.map((permission, index) => {
+                                                return <PermissionsDisplay 
+                                                    key={`permission-${index}`}
+                                                    permission={permission}
+                                                />
+                                            })}
+                                        </div>
+                                    </>}
                             </div>
 
                             <div className="text-xs mb-1">
@@ -221,9 +424,6 @@ export const CargoInfo = ({
                                     <span className="ml-3">
                                         {`crate v${crateVersion}`}
                                     </span>
-                                </div>
-                                <div className="text-xs text-neutral-400">
-                                    {"Updated: " + reactiveDate(new Date(updatedAt))}
                                 </div>
                             </div>
                         </div>

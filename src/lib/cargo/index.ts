@@ -152,12 +152,22 @@ export class Cargo<
         this.version = version
         this.name = name
         this.crateVersion = crateVersion
-        this.permissions = permissions.map((permission) => {
+        const permissionsExpanded = permissions.map((permission) => {
             if (typeof permission === "string") {
                 return {key: permission, value: []}
             }
             return permission
         }) as PermissionsList<Permissions>
+        const permissionsMap = new Map<string, number>()
+        const noDuplicates = permissionsExpanded.reduce((permissionsArray, next) => {
+            if (permissionsMap.has(next.key as string)) {
+                return permissionsArray
+            }
+            permissionsMap.set(next.key as string, 1)
+            permissionsArray.push(next)
+            return permissionsArray
+        }, [] as PermissionsList<Permissions>)
+        this.permissions = noDuplicates
     }
 }
 
@@ -322,6 +332,7 @@ export const validateManifest = <T>(cargo: T) => {
         errors.push(`permissions should be an array, got "${type(c.permissions)}"`)
     }
 
+    const permissionsMap = new Map<string, number>()
     for (let i = 0; i < permissions.length; i++) {
         const permission = permissions[i]
         const permissionType = type(permission)
@@ -330,6 +341,10 @@ export const validateManifest = <T>(cargo: T) => {
         }
 
         if (typeof permission === "string") {
+            if (permissionsMap.has(permission)) {
+                continue
+            }
+            permissionsMap.set(permission, 1)
             pkg.permissions.push({key: permission, value: []})
             continue
         }
@@ -345,6 +360,10 @@ export const validateManifest = <T>(cargo: T) => {
             errors.push(`permission ${i} property "value" is not an array. got = ${type(permission.key)}`)
             continue
         }
+        if (permissionsMap.has(permission.key)) {
+            continue
+        }
+        permissionsMap.set(permission.key, 1)
         pkg.permissions.push({
             key: permission.key, 
             value: value.filter((val) => typeof val !== "string")

@@ -40,7 +40,7 @@ const  App = () => {
   }))
   
   const [showTerminal, setShowTerminal] = useState(false)
-  const [showLauncher, setShowLauncher] = useState(location.pathname !== "/")
+  const [showLauncher, setShowLauncher] = useState(location.pathname === "/")
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
   const {current: globalState} = useRef<TopLevelAppProps>({

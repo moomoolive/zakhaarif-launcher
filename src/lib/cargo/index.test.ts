@@ -401,6 +401,34 @@ describe("manifest validation function", () => {
         expect(validateManifest(t({key: "", value: true})).errors.length).toBeGreaterThan(0)
         expect(validateManifest(t({key: "", value: 3n})).errors.length).toBeGreaterThan(0)
     })
+
+    it("duplicate permission keys should be filtered out", () => {
+        const dup = (keys: string[], count: number) => {
+            const m = cloneCargo(manifest)
+            const arr = []
+            for (const key of keys) {
+                const val = {key, value: []}
+                for (let i = 0; i < count; i++) {
+                    arr.push(val)
+                }
+            }
+            m.permissions = arr
+            return validateManifest(m).pkg
+        }
+        expect(dup(["rand", "hi"], 2).permissions.length).toBe(2)
+        expect(dup(["another", "hi", "yeah"], 3).permissions.length).toBe(3)
+    })
+
+    it("duplicate string variant and key, value variant of permissions are filtered", () => {
+        const m = cloneCargo(manifest)
+        {(m.permissions as unknown) = [
+            "key",
+            {key: "key", value: []},
+            "another",
+            {key: "another", value: ["val"]}
+        ]}
+        expect(validateManifest(m).pkg.permissions.length).toBe(2)
+    })
 })
 
 import {validateMiniCargo} from "./index"

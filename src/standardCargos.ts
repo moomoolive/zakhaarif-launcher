@@ -27,7 +27,6 @@ export const STANDARD_MOD_CARGO = new Cargo<Permissions>({
     permissions: [
         "unlimitedStorage",
         {key: "files", value: ["read"]},
-        {key: "gameSaves", value: ["read", "write"]}
     ]
 })
 
@@ -57,6 +56,8 @@ export const GAME_CARGO = new Cargo<Permissions>({
         {name: GAME_RELATIVE_URL, bytes: GAME_ESTIMATED_BYTES}
     ],
     permissions: [
+        "fullScreen",
+        "pointerLock",
         {key: "embedExtensions", value: ["*"]}
     ]
 })

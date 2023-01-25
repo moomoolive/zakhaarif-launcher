@@ -10,6 +10,7 @@ import {
 import {faTerminal, faGhost, faTimes, faKeyboard, faQuestionCircle} from "@fortawesome/free-solid-svg-icons"
 import {useDebounce} from "@/hooks/debounce"
 import terminalLoadingElement from "@/components/loadingElements/terminal"
+import { PROFILE_NAME } from "@/lib/utils/localStorageKeys"
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 
@@ -153,7 +154,10 @@ const TerminalCore = ({
 } : TerminalCoreProps) => {
     const intellisenseDebounce = useDebounce(50)
     
-    const [user] = useState("root")
+    const [user] = useState((() => {
+        const value = localStorage.getItem(PROFILE_NAME) || ""
+        return value.length < 1 ? "default" : value
+    })())
     const [currentPath] = useState("~")
     const [machineName] = useState("terminal-std")
     const [promptText, setPromptText] = useState("")
