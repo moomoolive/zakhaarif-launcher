@@ -50,28 +50,7 @@ table {
 	border-spacing: 0;
 }
 
-:root {
-  font-family: Roboto, Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  min-width: 320px;
-  min-height: 100vh;
-}
-
+/* scroll bar for Chromium and Safari */
 ::-webkit-scrollbar {
   width: 12px;
 }
@@ -90,7 +69,27 @@ body {
   background-color: #525252;
 }
 
+/* scroll bar for firefox */
 body {
   scrollbar-width: thin;          
-  scrollbar-color: #404040 transparent; 
+  scrollbar-color: #404040 transparent;
+}
+
+body {
+  font-family: Roboto, Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.375; /* equal to tailwind's leading-snug */
+  font-weight: 400;
+  color: rgb(250 250 250);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  min-width: 320px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 0;
+  background-color: rgb(38 38 38); /* equal to tailwinds bg-neutral-800 */
 }

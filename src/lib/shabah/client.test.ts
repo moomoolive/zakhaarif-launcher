@@ -3,7 +3,7 @@ import {checkForUpdates} from "./client"
 import {FetchFunction, FileCache} from "./backend"
 import {ResultType, io} from "../monads/result"
 import {Cargo, toMiniCargo, cloneCargo} from "../cargo/index"
-import {LATEST_CRATE_VERSION} from "../cargo/consts"
+import {LATEST_CRATE_VERSION} from "../cargo/index"
 
 type FileRecord = Record<string, () => ResultType<Response>>
 
@@ -102,7 +102,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -123,7 +123,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -145,7 +145,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -167,7 +167,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -205,7 +205,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -234,7 +234,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -270,7 +270,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -307,7 +307,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -349,7 +349,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -396,7 +396,7 @@ describe("diff cargos function", () => {
         })
         const res = await checkForUpdates({
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "", 
+                oldResolvedUrl: "", 
                 name: "pkg"
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
@@ -451,7 +451,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -501,7 +501,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -547,7 +547,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -582,7 +582,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -616,7 +616,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -651,7 +651,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -685,7 +685,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -719,7 +719,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -775,7 +775,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -836,7 +836,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -897,7 +897,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -958,7 +958,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -1032,7 +1032,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
                 name: "pkg"
             }
         , ...adaptors)
@@ -1143,7 +1143,7 @@ describe("diff cargos function", () => {
         })
         const res = await checkForUpdates({
             canonicalUrl: "https://mywebsite.com/pkg", 
-            resolvedUrl: "https://mywebsite.com/pkg", 
+            oldResolvedUrl: "https://mywebsite.com/pkg", 
             name: "pkg"
         }, ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -1216,7 +1216,7 @@ describe("diff cargos function", () => {
         })
         const res = await checkForUpdates({
                 canonicalUrl: "https://mywebsite.com/pkg", 
-                resolvedUrl: "", 
+                oldResolvedUrl: "", 
                 name: "pkg"
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)

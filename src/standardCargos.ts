@@ -9,11 +9,12 @@ import startGameUrl from "./game/main?url"
 import modStdUrl from "./modStd/main?url"
 import {stripRelativePath} from "./lib/utils/urls/stripRelativePath"
 import {GAME_ESTIMATED_BYTES, STANDARD_MOD_ESTIMATED_BYTES} from "./cargosMeta"
+import type {Permissions} from "./lib/types/permissions"
 
 const CURRENT_ORIGIN = window.location.origin + "/"
 
 const STANDARD_MOD_RELATIVE_URL = stripRelativePath(modStdUrl)
-export const STANDARD_MOD_CARGO = new Cargo({
+export const STANDARD_MOD_CARGO = new Cargo<Permissions>({
     name: "Std",
     description: "The one mod to rule them all. No seriously, the game needs this mod to function as it provides all the game's core code.",
     crateVersion: "0.1.0",
@@ -22,8 +23,14 @@ export const STANDARD_MOD_CARGO = new Cargo({
     license: "GPL-3",
     files: [
         {name: STANDARD_MOD_RELATIVE_URL, bytes: STANDARD_MOD_ESTIMATED_BYTES}
+    ],
+    permissions: [
+        "unlimitedStorage",
+        {key: "files", value: ["read"]},
+        {key: "gameSaves", value: ["read", "write"]}
     ]
 })
+
 export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
     id: STANDARD_MOD_ID,
     name: STANDARD_MOD_CARGO.name,
@@ -39,7 +46,7 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
 }
 
 const GAME_RELATIVE_URL = stripRelativePath(startGameUrl)
-export const GAME_CARGO = new Cargo({
+export const GAME_CARGO = new Cargo<Permissions>({
     name: "Game",
     description: "Starts game loop and injects any linked mods",
     crateVersion: "0.1.0",
@@ -48,6 +55,9 @@ export const GAME_CARGO = new Cargo({
     license: "GPL-3",
     files: [
         {name: GAME_RELATIVE_URL, bytes: GAME_ESTIMATED_BYTES}
+    ],
+    permissions: [
+        {key: "embedExtensions", value: ["*"]}
     ]
 })
 

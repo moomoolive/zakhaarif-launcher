@@ -1,7 +1,7 @@
 {
     "crateVersion": "0.1.0",
     "name": "Launcher",
-    "version": "0.1.0-alpha.0",
+    "version": "0.1.0-prealpha.0",
     "entry": "bg-fetch-test/entry.js",
     "files": [
         "bg-fetch-test/entry.js",
@@ -21,5 +21,6 @@
     "keywords": ["app"],
     "homepageUrl": "https://github.com",
     "repo": {"type": "git", "url": "https://github.com"},
-    "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg"
+    "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg",
+    "permissions": ["*"]
 }

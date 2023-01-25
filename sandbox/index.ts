@@ -1,4 +1,5 @@
-export {}
+import {SERVICE_WORKER_FILE} from "./config"
+
 const main = async () => {
     console.info("[SANDBOX]: registering worker...")
     if (window.top === window.self) {
@@ -7,7 +8,7 @@ const main = async () => {
     if (!navigator.serviceWorker) {
         throw new Error("current browser doesn't support service workers")
     }
-    const registration = await navigator.serviceWorker.register("sw.compiled.js")
+    const registration = await navigator.serviceWorker.register(SERVICE_WORKER_FILE)
     if (!navigator.serviceWorker.controller || !registration.active) {
         console.warn(`service worker controller not found`)
     }

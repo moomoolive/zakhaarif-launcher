@@ -6,8 +6,6 @@ import {
     updateCargoIndex,
     saveCargoIndices,
     FileCache,
-    headers,
-    appendShabahHeaders,
     removeSlashAtEnd,
     DownloadIndex,
     saveErrorDownloadIndex,
@@ -103,7 +101,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                         )
                     }
                     resourcesProcessed++
-                    const {storageUrl, bytes, mime} = targetResource
+                    const {bytes} = targetResource
                     if (!response.ok) {
                         // stash for later
                         errorDownloadIndex.map[targetUrl] = {

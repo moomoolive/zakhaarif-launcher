@@ -1,13 +1,8 @@
 import {useState, useEffect, useRef} from 'react'
-import {
-  createTheme,
-  ThemeProvider,
-} from "@mui/material"
+import {createTheme, ThemeProvider} from "@mui/material"
 import {LauncherRoot} from "./launcher/LauncherEntry"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import type {
-  OutboundMessage as ServiceWorkerMessage
-} from "@/lib/types/serviceWorkers"
+import type {OutboundMessage as ServiceWorkerMessage} from "@/lib/types/serviceWorkers"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "@/components/Lazy"
@@ -45,12 +40,7 @@ const  App = () => {
   }))
   
   const [showTerminal, setShowTerminal] = useState(false)
-  const [showLauncher, setShowLauncher] = useState((() => {
-    if (import.meta.env.DEV && location.pathname !== "/") {
-      return false
-    }
-    return true
-  })())
+  const [showLauncher, setShowLauncher] = useState(location.pathname !== "/")
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
   const {current: globalState} = useRef<TopLevelAppProps>({
@@ -107,9 +97,7 @@ const  App = () => {
     if (!ALL_APIS_SUPPORTED || serviceWorkerInitialized) {
       return
     }
-    const swUrl = import.meta.env.DEV
-      ? "dev-sw.compiled.js"
-      : "sw.compiled.js"
+    const swUrl = import.meta.env.DEV ? "dev-sw.compiled.js" : "sw.compiled.js"
     navigator.serviceWorker.register(swUrl)
     const prefix = "[👷 service-worker]: "
     navigator.serviceWorker.onmessage = (msg) => {
@@ -130,33 +118,31 @@ const  App = () => {
   }, [])
 
   return (
-    <div>
-      <main className="bg-neutral-800 leading-snug relative z-0">
-        <ThemeProvider theme={launcherTheme}>
-          <ConfirmProvider>
-            {showTerminal ? <>
-              <Terminal
-                engine={terminalEngine}
-                onClose={() => setShowTerminal(false)}
-              />
-            </> : <></>}
+    <main>
+      <ThemeProvider theme={launcherTheme}>
+        <ConfirmProvider>
+          {showTerminal ? <>
+            <Terminal
+              engine={terminalEngine}
+              onClose={() => setShowTerminal(false)}
+            />
+          </> : <></>}
 
-            {showLauncher ? <>
-              <LauncherRoot 
-                id={"launcher-root"}
-                globalState={globalState}
-              />
-            </>: <>
-              <AppShellRoot
-                id={"app-shell-root"}
-                globalState={globalState}
-              />
-            </>}
+          {showLauncher ? <>
+            <LauncherRoot 
+              id={"launcher-root"}
+              globalState={globalState}
+            />
+          </>: <>
+            <AppShellRoot
+              id={"app-shell-root"}
+              globalState={globalState}
+            />
+          </>}
 
-            </ConfirmProvider>
-        </ThemeProvider>
-      </main>
-    </div>
+          </ConfirmProvider>
+      </ThemeProvider>
+    </main>
   )
 }
 

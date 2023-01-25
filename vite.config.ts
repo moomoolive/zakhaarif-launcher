@@ -44,7 +44,8 @@ export default defineConfig({
   ],
   build: {
     manifest: "build-manifest.json",
-    target: "es2020"
+    target: "es2020",
+    outDir: "dist/main"
   },
   resolve: {
     alias: {

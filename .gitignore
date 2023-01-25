@@ -15,10 +15,8 @@ node_modules
 dist
 dist-ssr
 *.local
-dist-embedder
 bundle-anaylsis/
 dist-preview
-dist-sandbox
 
 # Editor directories and files
 .vscode/*

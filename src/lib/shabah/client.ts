@@ -1,5 +1,5 @@
 import {ResultType, io} from "@/lib/monads/result"
-import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "@/lib/cargo/consts"
+import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "@/lib/cargo/index"
 import {
     validateManifest, 
     validateMiniCargo, 
@@ -16,6 +16,7 @@ import {
     serviceWorkerPolicies,
 } from "./backend"
 import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
+import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
 type RequestableResource = {
     requestUrl: string
@@ -23,23 +24,7 @@ type RequestableResource = {
     bytes: number
 }
 
-type CargoReference = {
-    canonicalUrl: string
-    resolvedUrl: string
-    name: string
-}
-
 const addSlashToEnd = (str: string) => str.endsWith("/") ? str : str + "/"
-
-const stripRelativePath = (url: string) => {
-    if (url.startsWith("/")) {
-        return url.slice(1)
-    } else if (url.startsWith("./")) {
-        return url.slice(2)
-    } else {
-        return url
-    }
-}
 
 const cargoHeaders = {
     ...serviceWorkerPolicies.networkOnly,
@@ -210,20 +195,25 @@ const verifyAllRequestableFiles = async (
     return {errorUrls, filesWithBytes}
 }
 
+type CargoReference = {
+    canonicalUrl: string
+    oldResolvedUrl: string
+    name: string
+}
+
 export const checkForUpdates = async (
-    {resolvedUrl, canonicalUrl, name}: CargoReference, 
+    {oldResolvedUrl, canonicalUrl, name}: CargoReference, 
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
-    const oldResolvedUrl = addSlashToEnd(resolvedUrl)
-    const storageFileBase = addSlashToEnd(resolvedUrl)
-    const requestFileBase = addSlashToEnd(canonicalUrl)
-    const cargoUrl = storageFileBase + MANIFEST_NAME
+    const oldResolvedRootUrl = addSlashToEnd(oldResolvedUrl)
+    const requestRootUrl = addSlashToEnd(canonicalUrl)
+    const cargoUrl = oldResolvedRootUrl + MANIFEST_NAME
 
     const storedCargoRes = await fileCache.getFile(cargoUrl)
-    const newCargoUrl = requestFileBase + MANIFEST_NAME
+    const newCargoUrl = requestRootUrl + MANIFEST_NAME
     if (
-        resolvedUrl.length < 0 
+        oldResolvedUrl.length < 0 
         || !storedCargoRes 
         || storedCargoRes.status === 404
     ) {
@@ -300,9 +290,8 @@ export const checkForUpdates = async (
         pkg: oldCargoPkg,
         semanticVersion: oldCargoSemanticVersion
     }
-    //const oldCargo = validateManifest(await storedCargoRes.json())
 
-    const newMiniCargoUrl = requestFileBase + MANIFEST_MINI_NAME
+    const newMiniCargoUrl = requestRootUrl + MANIFEST_MINI_NAME
     const newMiniCargoRes = await io.retry(
         () => fetchFn(newMiniCargoUrl, {
             method: "GET",
@@ -342,7 +331,7 @@ export const checkForUpdates = async (
 
 
     const newResolvedUrl = finalUrl
-    if (oldResolvedUrl !== newResolvedUrl) {
+    if (oldResolvedRootUrl !== newResolvedUrl) {
         const filesToDownload = newCargoPkg.pkg.files.map((file) => {
             const fileUrl = finalUrl + stripRelativePath(file.name)
             return {
@@ -377,7 +366,7 @@ export const checkForUpdates = async (
             )
         }
         const filesToDelete = oldCargoPkg.files.map((file) => {
-            const fileUrl = oldResolvedUrl + stripRelativePath(file.name)
+            const fileUrl = oldResolvedRootUrl + stripRelativePath(file.name)
             return {
                 requestUrl: fileUrl,
                 storageUrl: fileUrl,
@@ -403,7 +392,7 @@ export const checkForUpdates = async (
                 text,
                 parsed: newCargoPkg.pkg,
                 canonicalUrl,
-                resolvedUrl
+                resolvedUrl: oldResolvedUrl
             },
             previousCargo: oldCargo.pkg
         })
@@ -459,8 +448,8 @@ export const checkForUpdates = async (
         0
     )
     const filesToDelete = diff.delete.map((file) => ({
-        requestUrl: requestFileBase + stripRelativePath(file.name),
-        storageUrl: storageFileBase + stripRelativePath(file.name),
+        requestUrl: requestRootUrl + stripRelativePath(file.name),
+        storageUrl: oldResolvedRootUrl + stripRelativePath(file.name),
         bytes: file.bytes
     }))
     const bytesToDelete = filesToDelete.reduce(

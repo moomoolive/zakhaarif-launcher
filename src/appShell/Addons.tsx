@@ -47,7 +47,7 @@ import FailedAddonIcon from "@mui/icons-material/ReportProblem"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {Cargo} from "@/lib/cargo/index"
 import {urlToMime, Mime} from "@/lib/miniMime/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/consts"
+import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/index"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {MimeIcon} from "../components/cargo/FileOverlay"
@@ -64,8 +64,9 @@ import {
     GAME_EXTENSION_ID,
     STANDARD_MOD_ID
 } from "../config"
-import {MANIFEST_NAME} from "../lib/cargo/consts"
+import {MANIFEST_NAME} from "../lib/cargo/index"
 import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
+import type {Permissions} from "../lib/types/permissions"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -247,7 +248,7 @@ const AddOns = () => {
     const [order, setOrder] = useState<FilterOrder>("descending")
     const [viewingCargo, setViewingCargo] = useState("none")
     const [targetCargo, setTargetCargo] = useState(
-        new Cargo()
+        new Cargo<Permissions>()
     )
     const [cargoFound, setCargoFound] = useState(false)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
@@ -348,7 +349,9 @@ const AddOns = () => {
         cargoDirectoryRef.current = rootDirectory
         setDirectoryPath([rootDirectory])
         setViewingCargoIndex(index)
-        setTargetCargo(new Cargo(cargoTarget))
+        setTargetCargo(
+            new Cargo(cargoTarget as Cargo<Permissions>)
+        )
         setCargoFound(true)
         setFilter("name")
         setOrder("descending")
@@ -1302,16 +1305,19 @@ const AddOns = () => {
                                                                     }
                                                                 )
                                                             })(id, fullPath)
-                                                            if (fileResponse) {
-                                                                setFileDetails({
-                                                                    name: file.name,
-                                                                    mime,
-                                                                    url: fullPath,
-                                                                    fileResponse,
-                                                                    bytes: file.bytes,
-                                                                })
-                                                                setShowFileOverlay(true)
+                                                            if (!fileResponse) {
+                                                                console.error(`file ${fullPath} was not found although it should be cached!`)
+                                                                await confirm({title: "An error occurred when fetching file!"})
+                                                                return
                                                             }
+                                                            setFileDetails({
+                                                                name: file.name,
+                                                                mime,
+                                                                url: fullPath,
+                                                                fileResponse,
+                                                                bytes: file.bytes,
+                                                            })
+                                                            setShowFileOverlay(true)
                                                         }}
                                                         icon={<MimeIcon mime={mime} className="mr-3"/>}
                                                         name={file.name}

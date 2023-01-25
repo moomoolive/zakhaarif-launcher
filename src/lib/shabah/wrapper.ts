@@ -25,7 +25,7 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
 import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
-import {MANIFEST_NAME} from "@/lib/cargo/consts"
+import {MANIFEST_NAME} from "@/lib/cargo/index"
 import {Cargo} from "../cargo/index"
 import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
 
@@ -135,14 +135,12 @@ export class Shabah {
         id: string
     }) {
         const {networkRequest, fileCache} = this
-        const indexes = await this.getCargoIndices()
-        const cargoIndex = indexes.cargos.findIndex((cargoIndex) => cargoIndex.canonicalUrl === cargo.canonicalUrl)
-        const resolvedUrl = cargoIndex < 0
-            ? ""
-            : indexes.cargos[cargoIndex].resolvedUrl
+        const cargoIndex = await this.getCargoMetaByCanonicalUrl(
+            cargo.canonicalUrl
+        )
         const response = await checkForUpdates({
             canonicalUrl: cargo.canonicalUrl,
-            resolvedUrl,
+            oldResolvedUrl: !cargoIndex ? "" : cargoIndex.resolvedUrl,
             name: cargo.id
         }, networkRequest, fileCache)
         const disk = await this.diskInfo()
@@ -348,6 +346,15 @@ export class Shabah {
     async getCargoMetaByEntry(entryUrl: string) {
         const indices = await this.getCargoIndices()
         const index = indices.cargos.findIndex((cargo) => cargo.entry === entryUrl)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
+    }
+
+    async getCargoMetaByCanonicalUrl(canonicalUrl: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.canonicalUrl === canonicalUrl)
         if (index < 0) {
             return null
         }

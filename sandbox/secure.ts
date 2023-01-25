@@ -2,6 +2,7 @@ import {wRpc} from "../src/lib/wRpc/simple"
 import type {ServiceWorkerFunctions} from "./serviceWorkerFunctions"
 import {serviceWorkerToSandboxRpc, controllerRpc} from "./sandboxFunctions"
 import type {ExtensionModule, MainScriptArguments} from "../src/lib/types/extensions"
+import {SERVICE_WORKER_FILE} from "./config"
 
 if (window.top !== window.parent) {
     throw new Error("second-level embedding is disallowed")
@@ -18,7 +19,7 @@ if (!("serviceWorker" in navigator)) {
 
 const [registration] = await Promise.all([
     navigator.serviceWorker.ready,
-    navigator.serviceWorker.register("sw.compiled.js")
+    navigator.serviceWorker.register(SERVICE_WORKER_FILE)
 ] as const)
 const {active: sw} = registration
 const rpc = new wRpc<ServiceWorkerFunctions>({

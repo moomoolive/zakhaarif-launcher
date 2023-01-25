@@ -17,6 +17,7 @@ import {nanoid} from "nanoid"
 import type {CargoIndex} from "../lib/shabah/wrapper"
 import type {DeepReadonly} from "../lib/types/utility"
 import {AppDatabase} from "../lib/database/AppDatabase"
+import rawCssExtension from "../index.css?url"
 
 type RpcStateDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
@@ -62,10 +63,14 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             }
             const {queryState, authToken, cargoIndex} = state
             const {resolvedUrl} = cargoIndex.current
+            const cssExtension = rawCssExtension.startsWith("/")
+                ? rawCssExtension.slice(1)
+                : rawCssExtension
             return {
                 queryState, 
                 authToken, 
-                rootUrl: resolvedUrl
+                rootUrl: resolvedUrl,
+                recommendedStyleSheetUrl: `${window.location.origin}/${cssExtension}`
             }
         },
         secureContextEstablished: () => {
@@ -145,7 +150,7 @@ const ExtensionShellPage = () => {
     const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
 
     const closeExtension = async () => {
-        if (!await confirm({title: "Are you sure you want to close this extension?"})) {
+        if (!await confirm({title: "Are you sure you want to close this extension?", confirmButtonColor: "warning"})) {
             return
         }
         navigate("/start")

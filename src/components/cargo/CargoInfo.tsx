@@ -12,16 +12,17 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, ClickAwayListener, IconButton} from "@mui/material"
 import {Cargo} from "@/lib/cargo/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/consts"
+import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/index"
 import {CargoIcon} from "../../components/cargo/Icon"
 import {isStandardCargo} from "../../lib/utils/cargos"
 import {CargoIndex} from "../../lib/shabah/wrapper"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
+import type {Permissions} from "../../lib/types/permissions"
 
 export type CargoInfoProps = {
     onClose: () => void
-    cargo: Cargo
+    cargo: Cargo<Permissions>
     cargoIndex: CargoIndex
 }
 

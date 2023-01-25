@@ -3,9 +3,9 @@ import {
     cargoIsUpdatable, 
     Cargo, 
     NULL_MANIFEST_VERSION,
-    cloneCargo
+    cloneCargo,
+    LATEST_CRATE_VERSION, NULL_FIELD
 } from "./index"
-import {LATEST_CRATE_VERSION} from "./consts"
 
 const entry = "index.js"
 const manifest = new Cargo({
@@ -199,7 +199,6 @@ describe("manifest validation function", () => {
         expect(del("crateVersion").errors.length).toBeGreaterThan(0)
         expect(del("name").errors.length).toBeGreaterThan(0)
         expect(del("version").errors.length).toBeGreaterThan(0)
-        expect(del("entry").errors.length).toBeGreaterThan(0)
         expect(del("files").errors.length).toBeGreaterThan(0)
     })
 
@@ -279,24 +278,31 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
     })
 
-    it("should return error if cargo.entry is not the name of one of files, unless there are zero files in listed", () => {
+    it("should return error if cargo.entry is provided but is not the name of one of cargo files", () => {
         const m = cloneCargo(manifest)
         m.entry = "random_file_not_listed.js"
-        expect(validateManifest(m).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(m).errors.length).toBeGreaterThan(0)        
+    })
+
+    it("should not return error if cargo.entry is set to NULL_FIELD or empty string", () => {
+        const m = cloneCargo(manifest)
+        m.entry = ""
+        expect(validateManifest(m).errors.length).toBe(0)
         const empty = cloneCargo(manifest)
-        empty.files = []
-        empty.entry = ""
+        empty.entry = NULL_FIELD
         expect(validateManifest(empty).errors.length).toBe(0)
     })
 
     it("should return no errors when missing all optional fields", () => {
-        expect(validateManifest({
-            crateVersion: LATEST_CRATE_VERSION,
-            version: "0.1.0", 
-            name: "test-pkg", 
-            entry, 
-            files: [{name: entry, bytes: 1_000}]
-        }).errors.length).toBe(0)
+        expect((() => {
+            const value = validateManifest({
+                crateVersion: LATEST_CRATE_VERSION,
+                version: "0.1.0", 
+                name: "test-pkg",
+                files: [{name: entry, bytes: 1_000}]
+            }).errors
+            return value.length
+        })()).toBe(0)
     })
 
     it("should return no errors when missing one optional field", () => {
@@ -334,6 +340,66 @@ describe("manifest validation function", () => {
         ]
         const res = validateManifest(m)
         expect(res.pkg.authors.length).toBe(0)
+    })
+
+    it("should return error if permissions is not an array of strings or objects", () => {
+        const t = <T>(val: T) => {
+            const m = cloneCargo(manifest)
+            {(m.permissions as any) = [val]}
+            return m
+        }
+        expect(validateManifest(t(1)).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t(3n)).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t([])).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t(null)).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t(true)).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t(Symbol())).errors.length).toBeGreaterThan(0)        
+        expect(validateManifest(t(() => {})).errors.length).toBeGreaterThan(0)        
+    })
+
+    it("should return error if permissions is an array of objects and 'key' property is not a string", () => {
+        const t = <T>(val: T) => {
+            const m = cloneCargo(manifest)
+            {(m.permissions as any) = [val]}
+            return m
+        }
+        expect(validateManifest(t({})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: null})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: 0})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: true})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: 1n})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: {}})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: []})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: Symbol()})).errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return error if permissions is an array of objects and 'key' property is not a string", () => {
+        const t = <T>(val: T) => {
+            const m = cloneCargo(manifest)
+            {(m.permissions as any) = [val]}
+            return m
+        }
+        expect(validateManifest(t({})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: null})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: 0})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: true})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: 1n})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: {}})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: []})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: Symbol()})).errors.length).toBeGreaterThan(0)
+    })
+
+    it("should return error if permissions is an array of objects and 'value' property is not an array", () => {
+        const t = <T>(val: T) => {
+            const m = cloneCargo(manifest)
+            {(m.permissions as any) = [val]}
+            return m
+        }
+        expect(validateManifest(t({key: "", value: 1})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: "", value: {}})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: "", value: Symbol()})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: "", value: true})).errors.length).toBeGreaterThan(0)
+        expect(validateManifest(t({key: "", value: 3n})).errors.length).toBeGreaterThan(0)
     })
 })
 

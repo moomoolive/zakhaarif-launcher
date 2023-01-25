@@ -425,7 +425,7 @@ export const LauncherRoot = ({
                           closeSettings()
                           return
                         }
-                        if (!(await confirm({title: "Are you sure you want to uninstall all files?"}))) {
+                        if (!(await confirm({title: "Are you sure you want to uninstall all files?", confirmButtonColor: "error"}))) {
                           return
                         }
                         setShowProgress(true)

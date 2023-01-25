@@ -1,4 +1,4 @@
-import {NULL_FIELD as CARGO_NULL_FIELD} from "../../lib/cargo/consts"
+import {NULL_FIELD as CARGO_NULL_FIELD} from "../../lib/cargo/index"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faBoxOpen} from "@fortawesome/free-solid-svg-icons"
 import {ReactNode} from "react"

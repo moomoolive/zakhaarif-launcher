@@ -32,10 +32,6 @@ export const headers = (mimeType: Mime, contentLength: number) => ({
     "Content-Type": mimeType
 } as const)
 
-export const appendShabahHeaders = (response: Response) => {
-    response.headers.append("Sw-Source", "Shabah")
-}
-
 export type DownloadState = {
     id: string
     downloaded: number

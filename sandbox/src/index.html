@@ -11,7 +11,7 @@
     />
 </head>
 <body>
-    <script type="module" defer>var o=async()=>{if(console.info("[SANDBOX]: registering worker..."),window.top===window.self&&console.warn("sandbox is not loaded in iframe! Place this in a sandboxed iframe for better security!"),!navigator.serviceWorker)throw new Error("current browser doesn't support service workers");let e=await navigator.serviceWorker.register("sw.compiled.js");(!navigator.serviceWorker.controller||!e.active)&&console.warn("service worker controller not found"),await Promise.all((await caches.keys()).map(r=>caches.delete(r))),top?.postMessage("finished","*")};o();
+    <script type="module" defer>var e="mirror-sw.compiled.js";var i=async()=>{if(console.info("[SANDBOX]: registering worker..."),window.top===window.self&&console.warn("sandbox is not loaded in iframe! Place this in a sandboxed iframe for better security!"),!navigator.serviceWorker)throw new Error("current browser doesn't support service workers");let r=await navigator.serviceWorker.register(e);(!navigator.serviceWorker.controller||!r.active)&&console.warn("service worker controller not found"),await Promise.all((await caches.keys()).map(o=>caches.delete(o))),top?.postMessage("finished","*")};i();
 </script>
 </body>
 </html>

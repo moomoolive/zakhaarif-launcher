@@ -1,51 +1,96 @@
 import {SemVer} from "@/lib/smallSemver/index"
-import {
-    NULL_FIELD,
-    CargoManifest,
-    ALL_CRATE_VERSIONS,
-    LATEST_CRATE_VERSION,
-    MiniCodeManifest
-} from "./consts"
-import {
-    InvalidationStrategy, 
-    CrateVersion,
-    RepoType,
-    ValidDefaultStrategies
-} from "./consts"
 import {type} from "@/lib/utils/betterTypeof"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
-type CargoFileOptional = Partial<{
-    name: string,   
-    bytes: number,
-    invalidation: InvalidationStrategy
-}>
+export const MANIFEST_NAME = "cargo.json"
+export const MANIFEST_MINI_NAME = "cargo.mini.json"
+export const NULL_FIELD = "none"
+export const ALL_CRATE_VERSIONS = {"0.1.0": 1} as const
+export const LATEST_CRATE_VERSION = "0.1.0"
 
-type CargoOptions = (Partial<CargoManifest> & Partial<{
-    authors: Array<Partial<{
-        name: string, 
-        email: string, 
-        url: string
-    }>>
-    files: Array<CargoFileOptional> | Array<string>
-    repo: Partial<{ type: RepoType, url: string }>
-}>)
+export type CrateVersion = keyof typeof ALL_CRATE_VERSIONS
+export type NullField = typeof NULL_FIELD
+export type RepoType = "git" | "other" | NullField
+export type ValidDefaultStrategies = ("url-diff" | "purge")
+export type InvalidationStrategy = ValidDefaultStrategies | "default"
+export type MiniCodeManifest = { version: string }
+
+type PermissionsListRaw = ReadonlyArray<
+    string | {key: string, value: Array<string> | ReadonlyArray<string>}
+>
+
+type FillEmptyPermissions<
+    P extends PermissionsListRaw
+> = {
+    [index in keyof P]: P[index] extends string
+        ?  {key: P[index], value: string[]}
+        :  P[index] extends {
+                key: infer Key, 
+                value: Array<infer Value> | ReadonlyArray<infer Value>
+        }
+            ?  {key: Key, value: Value[]}
+            : never
+}
+
+type FillEmptyPermissionsOptional<P extends PermissionsListRaw> = {
+    [index in keyof P]: P[index] extends string
+        ?  P[index] | {key: P[index], value: string[]}
+        :  P[index] extends {
+                key: infer Key, 
+                value: Array<infer Value> | ReadonlyArray<infer Value>
+        }
+            ? Key | {key: Key, value: Value[]}
+            : never
+}
+
+type PermissionsListOptions<
+    P extends PermissionsListRaw = {key: string, value: string[]}[]
+> = Array<FillEmptyPermissionsOptional<P>[number]>
+
+export type PermissionsList<
+    P extends PermissionsListRaw = {key: string, value: string[]}[]
+> = Array<FillEmptyPermissions<P>[number]>
+
+type CargoPartial= Partial<
+    Omit<Cargo, "files" | "authors" | "repo" | "permissions">
+>
+
+type CargoOptions<
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
+> = (
+    CargoPartial & Partial<{
+        authors: Array<Partial<{
+            name: string, 
+            email: string, 
+            url: string
+        }>>
+        files: Array<string> | Array<Partial<{
+            name: string,   
+            bytes: number,
+            invalidation: InvalidationStrategy
+        }>>
+        repo: Partial<{ type: RepoType, url: string }>,
+        permissions: PermissionsListOptions<Permissions>
+    }>
+)
 
 export const NULL_MANIFEST_VERSION = "0.0.0"
 
-export class Cargo {
+export class Cargo<
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
+> {
     // required fields
     crateVersion: CrateVersion
     name: string
     version: string
-    entry: string
     files: Array<{
         name: string, 
         bytes: number,
         invalidation: InvalidationStrategy
     }>
 
-    // optional fields in Code Manifest
+    // optional fields
+    entry: string
     invalidation: InvalidationStrategy
     description: string
     authors: Array<{ name: string, email: string, url: string }>
@@ -54,12 +99,13 @@ export class Cargo {
     license: string
     repo: {type: RepoType, url: string}
     homepageUrl: string
+    permissions: PermissionsList<Permissions>
 
     constructor({
         crateVersion = "0.1.0",
         name = "unspecified-name",
         version = NULL_MANIFEST_VERSION,
-        entry = "",
+        entry = NULL_FIELD,
         files = [],
 
         // optionalfields
@@ -70,8 +116,9 @@ export class Cargo {
         keywords = [],
         license = NULL_FIELD,
         repo = {type: NULL_FIELD, url: NULL_FIELD},
-        homepageUrl = NULL_FIELD
-    }: CargoOptions = {}) {
+        homepageUrl = NULL_FIELD,
+        permissions = []
+    }: CargoOptions<Permissions> = {}) {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
@@ -90,7 +137,10 @@ export class Cargo {
         this.description = description
         this.invalidation = invalidation
         this.files = files
-            .map((file) => typeof file === "string" ? {name: file} as CargoFileOptional : file)
+            .map((file) => typeof file === "string" 
+                ? {name: file, bytes: 0, invalidation: "default"} as const
+                : file
+            )
             .map(({
                 name = "", bytes = 0, invalidation = "default"
             }) => ({
@@ -102,15 +152,27 @@ export class Cargo {
         this.version = version
         this.name = name
         this.crateVersion = crateVersion
+        this.permissions = permissions.map((permission) => {
+            if (typeof permission === "string") {
+                return {key: permission, value: []}
+            }
+            return permission
+        }) as PermissionsList<Permissions>
     }
 }
 
-export const cloneCargo = (cargo: Cargo) => {
-    const copy = new Cargo({...cargo})
+export const cloneCargo = <
+    T extends PermissionsListRaw
+>(cargo: Cargo<T>) => {
+    const copy = new Cargo<T>({...cargo})
     copy.files = copy.files.map(el => ({...el}))
     copy.authors = copy.authors.map(el => ({...el}))
     copy.keywords = [...copy.keywords]
     copy.repo = {...copy.repo}
+    copy.permissions = copy.permissions.map((e) => ({
+        key: e.key,
+        value: [...e.value]
+    })) as PermissionsList<T>
     return copy
 }
 
@@ -184,14 +246,13 @@ export type ValidatedMiniCargo = ReturnType<typeof validateMiniCargo>
 export const validateManifest = <T>(cargo: T) => {
     const out = dummyManifest()
     const {pkg, errors} = out
-    const c = cargo as CargoManifest
+    const c = cargo as CargoOptions
     const baseType = type(c)
     if (baseType !== "object") {
         errors.push(`expected cargo to be type "object" got "${baseType}"`)
         return out
     }
-
-    if (!ALL_CRATE_VERSIONS[c.crateVersion]) {
+    if (!ALL_CRATE_VERSIONS[c.crateVersion || "" as CrateVersion]) {
         errors.push(`crate version is invalid, got "${c.crateVersion}", valid=${Object.keys(ALL_CRATE_VERSIONS).join()}`)
     }
     pkg.crateVersion = c.crateVersion || LATEST_CRATE_VERSION
@@ -202,38 +263,38 @@ export const validateManifest = <T>(cargo: T) => {
     let semverTmp: SemVer | null
     if (!typevalid(c, "version", "string", errors)) {
 
-    } else if (!(semverTmp = SemVer.fromString(c.version))) {
+    } else if (!(semverTmp = SemVer.fromString(c.version || ""))) {
         errors.push(`${c.version} is not a vaild semantic version`)
     } else {
         out.semanticVersion = semverTmp
     }
     pkg.version = orNull(c.version)
 
-    const fIsArray = Array.isArray(c.files)
-    if (!fIsArray) {
-        errors.push(`files should be an array, got "${typeof c.files}"`)
+    const filesIsArray = Array.isArray(c.files)
+    if (!filesIsArray) {
+        errors.push(`files should be an array, got "${type(c.files)}"`)
     }
     
     const fileRecord: Record<string, boolean> = {}
-    const f = !fIsArray ? [] : c.files
-    for (let i = 0; i < f.length; i++) {
-        const preFile = f[i]
+    const files = !filesIsArray ? [] : c.files || []
+    for (let i = 0; i < files.length; i++) {
+        const preFile = files[i]
         if (typeof preFile === "string") {
-            f[i] = {name: preFile, bytes: 0}
+            files[i] = {name: preFile, bytes: 0, invalidation: "default"}
         }
-        const fi = f[i]
-        if (type(fi) !== "object") {
-            errors.push(`file ${i} is not an object. Expected an object with a "name" field, got ${type(fi)}`)
+        const file = files[i] as Partial<{name: string, bytes: 0, invalidation: string}>
+        if (type(file) !== "object") {
+            errors.push(`file ${i} is not an object. Expected an object with a "name" field, got ${type(file)}`)
             break
         }
         if (
-            typeof fi?.name !== "string" 
-            || typeof (fi?.invalidation || "") !== "string" 
+            typeof file?.name !== "string" 
+            || typeof (file?.invalidation || "") !== "string" 
         ) {
             errors.push(`file ${i} is not a valid file format, file.name and file.invalidation must be a string`)
             break
         }
-        const stdName = stripRelativePath(fi.name)
+        const stdName = stripRelativePath(file.name)
         if (
             // ignore cross-origin
             stdName.startsWith("https://")
@@ -247,18 +308,51 @@ export const validateManifest = <T>(cargo: T) => {
         pkg.files.push({
             name: stdName,
             bytes: Math.max(
-                typeof fi.bytes === "number" ? fi.bytes : 0, 
+                typeof file.bytes === "number" ? file.bytes : 0, 
                 0
             ),
             invalidation: toInvalidation(
-                fi?.invalidation || "default"
+                file?.invalidation || "default"
             )
         })
     }
 
-    if (typevalid(c, "entry", "string", errors)) {}
-    pkg.entry = c.entry || ""
-    if (!fileRecord[pkg.entry] && pkg.files.length > 0) {
+    const permissions = c.permissions || []
+    if (!Array.isArray(permissions)) {
+        errors.push(`permissions should be an array, got "${type(c.permissions)}"`)
+    }
+
+    for (let i = 0; i < permissions.length; i++) {
+        const permission = permissions[i]
+        const permissionType = type(permission)
+        if (permissionType !== "string" && permissionType !== "object") {
+            errors.push(`permission should be a string or object with "key" & "value" properties. Permission ${i} type=${type(permission)}`)
+        }
+
+        if (typeof permission === "string") {
+            pkg.permissions.push({key: permission, value: []})
+            continue
+        }
+        if (permissionType !== "object") {
+            continue
+        }
+        if (typeof permission.key !== "string") {
+            errors.push(`permission ${i} property "key" is not a string. got = ${type(permission.key)}`)
+            continue
+        }
+        const value = permission.value || []
+        if (!Array.isArray(value)) {
+            errors.push(`permission ${i} property "value" is not an array. got = ${type(permission.key)}`)
+            continue
+        }
+        pkg.permissions.push({
+            key: permission.key, 
+            value: value.filter((val) => typeof val !== "string")
+        })
+    }
+
+    pkg.entry = orNull(c.entry)
+    if (pkg.entry !== NULL_FIELD && !fileRecord[pkg.entry]) {
         errors.push(`entry must be one of package listed files, got ${pkg.entry}`)
     }
 
@@ -268,7 +362,7 @@ export const validateManifest = <T>(cargo: T) => {
     pkg.description = orNull(c.description)
     pkg.authors = (c.authors || [])
         .filter(a => typeof a?.name === "string")
-        .map(({name, email, url}) => ({
+        .map(({name = "", email, url}) => ({
             name,  email: orNull(email), url: orNull(url)
         }))
     pkg.crateLogoUrl = stripRelativePath(orNull(c.crateLogoUrl))
