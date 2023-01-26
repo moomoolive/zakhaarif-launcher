@@ -29,6 +29,105 @@ import { useEffectAsync } from "@/hooks/effectAsync"
 import { io } from "@/lib/monads/result"
 import { faNpm } from "@fortawesome/free-brands-svg-icons"
 
+type SettingRouteProps = {
+    children: ReactNode
+    returnToHome: () => void
+    className: string
+    onAnimationEnd: () => void
+}
+
+const SettingRoute = ({
+    children, 
+    returnToHome,
+    className,
+    onAnimationEnd
+}: SettingRouteProps) => {
+    return <div
+        className={"fixed z-10 top-0 left-0 md:relative w-screen md:w-2/3 md:py-5 h-screen md:border-l-2 border-solid border-neutral-600 md:h-full bg-neutral-800 "}
+    >
+        <div className="px-2 h-1/12 w-full flex max-w-3xl items-center justify-start">
+            <div className="ml-2 h-full mt-3 md:hidden">
+                <Tooltip title="Back" placement="right">
+                    <IconButton onClick={returnToHome}>
+                        <FontAwesomeIcon icon={faArrowLeft}/>
+                    </IconButton>
+                </Tooltip>
+            </div>
+            <CoolEscapeButton className="w-full h-full hidden md:block"/>
+        </div>
+        <div 
+            className={"p-6 h-11/12 " + className}
+            onAnimationEnd={onAnimationEnd}
+        >
+            {children}
+        </div>
+    </div>
+}
+
+type MiniRoutes = {
+    readonly [key: string]: () => JSX.Element
+}
+
+type MiniRouterProps<Routes extends MiniRoutes> = {
+    displayLocation: keyof Routes | "none"
+    routes: Routes
+    FallbackRoute: (props: {className: string, onAnimationEnd: () => void}) => JSX.Element
+    returnToHome: () => void
+}
+
+const fadeIn = 1
+const fadeOut = 2
+
+function MiniRouter<Routes extends MiniRoutes>({
+    displayLocation, 
+    routes, 
+    FallbackRoute, 
+    returnToHome
+}: MiniRouterProps<Routes>) {
+    const [transition, setTransition] = useState(fadeIn)
+    const [renderedLocation, setRenderedLocation] = useState(displayLocation)
+
+    useEffect(() => {
+        console.log("called fade-out")
+        if (displayLocation !== renderedLocation) {
+            setTransition(fadeOut)
+        }
+    }, [displayLocation, renderedLocation])
+
+    if (renderedLocation === "none") {
+        if (transition === fadeOut) {
+            setTransition(fadeIn)
+            setRenderedLocation(displayLocation)
+        }
+        return <FallbackRoute
+            className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
+            onAnimationEnd={() => {
+                if (transition === fadeOut) {
+                    setTransition(fadeIn)
+                    setRenderedLocation(displayLocation)
+                }
+            }}
+        />
+    }
+
+
+    const Component = routes[renderedLocation] as () => JSX.Element
+
+    return <SettingRoute 
+        returnToHome={returnToHome}
+        className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
+        onAnimationEnd={() => {
+            if (transition === fadeOut) {
+                setTransition(fadeIn)
+                setRenderedLocation(displayLocation)
+            }
+        }}
+    >
+        <Component/>
+    </SettingRoute>
+    
+}
+
 const OPEN_PAGE_ICON = <FontAwesomeIcon icon={faAngleRight}/>
 
 type SettingSubsection = {
@@ -423,8 +522,12 @@ const SettingsPage = () => {
             </div>
         </div>
 
-        {subpage === "none" ? <>
-            <div className="hidden md:block w-2/3 border-l-2 border-solid border-neutral-600 py-5 h-full bg-neutral-800 animate-fade-in-left">
+
+        <MiniRouter 
+            FallbackRoute={({className, onAnimationEnd}) => <div 
+                className={"hidden md:block w-2/3 border-l-2 border-solid border-neutral-600 py-5 h-full bg-neutral-800 " + className}
+                onAnimationEnd={onAnimationEnd}
+            >
                 <div className="w-full px-2 flex max-w-3xl items-center justify-start">
                     <CoolEscapeButton className="w-full"/>
                 </div>
@@ -438,24 +541,11 @@ const SettingsPage = () => {
                         </div>
                     </div>
                 </div>
-            </div>
-        </> : <>
-            <div className="fixed md:relative w-screen md:w-2/3 md:py-5 h-screen md:border-l-2 border-solid border-neutral-600 md:h-full top-0 left-0 z-10 bg-neutral-800">
-                <div className="px-2 h-1/12 w-full flex max-w-3xl items-center justify-start">
-                    <div className="ml-2 h-full mt-3 md:hidden">
-                        <Tooltip title="Back" placement="right">
-                            <IconButton onClick={() => setSubpage("none")}>
-                                <FontAwesomeIcon icon={faArrowLeft}/>
-                            </IconButton>
-                        </Tooltip>
-                    </div>
-                    <CoolEscapeButton className="w-full h-full hidden md:block"/>
-                </div>
-                <div className="p-6 h-11/12 animate-fade-in-left">
-                    <SubpageComponent/>
-                </div>
-            </div>
-        </>}
+            </div>}
+            displayLocation={subpage}
+            routes={SubPageList}
+            returnToHome={() => setSubpage("none")}
+        />
     </div>
 }
 

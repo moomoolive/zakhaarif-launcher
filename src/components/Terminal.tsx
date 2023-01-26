@@ -604,7 +604,7 @@ const TerminalCore = ({
                                     title={`[${TERMINAL_CLIENT_NAME}] ${user}@${machineName}: ${currentPath}`}
                                     placement="top"
                                 >
-                                    <div>
+                                    <div className="w-full text-ellipsis overflow-x-clip whitespace-nowrap">
                                         <span className="mr-2">
                                             <FontAwesomeIcon
                                                 icon={faGhost}
