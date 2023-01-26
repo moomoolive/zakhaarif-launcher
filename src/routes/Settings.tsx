@@ -88,7 +88,6 @@ function MiniRouter<Routes extends MiniRoutes>({
     const [renderedLocation, setRenderedLocation] = useState(displayLocation)
 
     useEffect(() => {
-        console.log("called fade-out")
         if (displayLocation !== renderedLocation) {
             setTransition(fadeOut)
         }

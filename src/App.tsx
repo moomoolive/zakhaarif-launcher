@@ -1,30 +1,21 @@
 import {useState, useEffect, useRef} from 'react'
 import {createTheme, ThemeProvider} from "@mui/material"
-import {LauncherRoot} from "./launcher/LauncherEntry"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import type {OutboundMessage as ServiceWorkerMessage} from "@/lib/types/serviceWorkers"
-import {featureCheck} from "@/lib/utils/appFeatureCheck"
+import type {OutboundMessage as ServiceWorkerMessage} from "./lib/types/serviceWorkers"
+import {featureCheck} from "./lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
-import {lazyComponent} from "@/components/Lazy"
-import terminalLoadingElement from "@/components/loadingElements/terminal"
+import {lazyComponent} from "./components/Lazy"
+import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
-import type {TopLevelAppProps} from "@/lib/types/globalState"
-import {Shabah} from "@/lib/shabah/wrapper"
+import type {TopLevelAppProps} from "./lib/types/globalState"
+import {Shabah} from "./lib/shabah/wrapper"
 import {APP_CACHE} from "./config"
-import {webAdaptors} from "@/lib/shabah/adaptors/web-preset"
+import {webAdaptors} from "./lib/shabah/adaptors/web-preset"
 
-const AppShellRoot = lazyComponent(async () => (await import("./appShell/AppShellEntry")).AppShellRoot)
+const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })
-
-const terminalState = {
-  onBackTick: () => {}
-}
-
-const ALL_APIS_SUPPORTED = featureCheck().every((feature) => feature.supported)
-
-let serviceWorkerInitialized = false
 
 const  App = () => {
   const [launcherTheme] = useState(createTheme({
@@ -40,17 +31,22 @@ const  App = () => {
   }))
   
   const [showTerminal, setShowTerminal] = useState(false)
-  const [showLauncher, setShowLauncher] = useState(location.pathname === "/")
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
   const {current: globalState} = useRef<TopLevelAppProps>({
-    showLauncher: setShowLauncher,
     setTerminalVisibility: setShowTerminal,
     downloadClient: new Shabah({
       origin: location.origin,
       adaptors: webAdaptors(APP_CACHE)
     })
   })
+
+  const serviceWorkerInitialized = useRef(false)
+  const {current: ALL_APIS_SUPPORTED} = useRef(featureCheck().every((feature) => feature.supported))
+  const {current: terminalState} = useRef({
+    onBackTick: () => {}
+  })
+
 
   terminalState.onBackTick = () => {
     if (!showTerminal) {
@@ -71,8 +67,7 @@ const  App = () => {
     setTerminalEngine(engine)
     const {createCommands} = commandsStandardLibrary 
     const commands = createCommands({
-      setShowTerminal, 
-      setShowLauncher,
+      setShowTerminal,
       source: "std"
     })
     for (let i = 0; i < commands.length; i++) {
@@ -94,7 +89,7 @@ const  App = () => {
   }, [])
 
   useEffect(() => {
-    if (!ALL_APIS_SUPPORTED || serviceWorkerInitialized) {
+    if (!ALL_APIS_SUPPORTED || serviceWorkerInitialized.current) {
       return
     }
     const swUrl = import.meta.env.DEV ? "dev-sw.compiled.js" : "sw.compiled.js"
@@ -114,7 +109,7 @@ const  App = () => {
           console.warn("recieved message from service worker that is encoded incorrectly", msg.data)
       }
     }
-    serviceWorkerInitialized = true
+    serviceWorkerInitialized.current = true
   }, [])
 
   return (
@@ -128,17 +123,7 @@ const  App = () => {
             />
           </> : <></>}
 
-          {showLauncher ? <>
-            <LauncherRoot 
-              id={"launcher-root"}
-              globalState={globalState}
-            />
-          </>: <>
-            <AppShellRoot
-              id={"app-shell-root"}
-              globalState={globalState}
-            />
-          </>}
+          <AppRouter globalState={globalState}/>
 
           </ConfirmProvider>
       </ThemeProvider>

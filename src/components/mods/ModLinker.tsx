@@ -15,7 +15,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
-import {useAppShellContext} from "../../appShell/store"
+import {useAppShellContext} from "../../routes/store"
 import {CargoIndices} from "../../lib/shabah/backend"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_MOD_CARGO} from "../../standardCargos"

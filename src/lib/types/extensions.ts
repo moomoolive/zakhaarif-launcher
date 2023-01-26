@@ -1,4 +1,4 @@
-import type {ControllerRpc, ExtensionShellFunctions} from "../../appShell/ExtensionShell"
+import type {ControllerRpc, ExtensionShellFunctions} from "../../routes/ExtensionShell"
 
 export type MessageAppShell = ControllerRpc["execute"]
 

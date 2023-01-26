@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect, ReactNode, useRef } from 'react'
 import {
   Button, 
   Menu,
@@ -21,8 +21,9 @@ import {roundDecimal} from "@/lib/math/rounding"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"
 import {sleep} from "@/lib/utils/sleep"
-import type {TopLevelAppProps} from "@/lib/types/globalState"
 import {APP_CARGO_ID} from "@/config"
+import {useAppShellContext} from "./store"
+import {useNavigate} from "react-router-dom"
 
 const LoadingIcon = () => <span className="text-lg animate-spin">
   <LoadingIconGlobal/>
@@ -153,18 +154,13 @@ let pwaInstallPrompt = null as null | PwaInstallEvent
 
 const LAST_UPDATE_KEY = "last-update"
 
-export const LauncherRoot = ({
-  id,
-  globalState
-}: {
-  id: string
-  globalState: TopLevelAppProps
-}) => {
+const LauncherRoot = () => {
   const confirm = useGlobalConfirm()
-  const {
-    showLauncher, setTerminalVisibility, downloadClient
-  } = globalState
-  const launchApp = () => showLauncher(false)
+  const {setTerminalVisibility, downloadClient} = useAppShellContext()
+  const navigate = useNavigate()
+
+
+  const {current: launchApp} = useRef(() => navigate("/launch"))
 
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState<ReactNode>("")
@@ -357,7 +353,7 @@ export const LauncherRoot = ({
 
   return (
     <div 
-      id={id}
+      id="launcher-root"
       className="relative text-center animate-fade-in-left z-0 w-screen h-screen flex justify-center items-center"
     >
         <div className="relative z-0">
@@ -529,3 +525,5 @@ export const LauncherRoot = ({
     </div>
   )
 }
+
+export default LauncherRoot

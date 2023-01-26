@@ -41,7 +41,7 @@ const StartMenuPage = () => {
                         {text: "Add-ons", route: "/add-ons", color: "info"},
                         {text: "Extensions", route: "/extensions-list", color: "info"},
                         {text: "Settings", route: "/settings", color: "info"},
-                        {text: "Launcher", route: "/launcher", color: "warning"},
+                        {text: "Launcher", route: "/", color: "warning"},
                     ] as const).map((item, index) => {
                         const {route, text, color} = item
                         return <div

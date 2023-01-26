@@ -198,7 +198,7 @@ const ExtensionsListPage = () => {
                                     to={((extensionId: string) => {
                                         switch (extensionId) {
                                             case APP_CARGO_ID:
-                                                return "/launcher"
+                                                return "/"
                                             case GAME_EXTENSION_ID:
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"

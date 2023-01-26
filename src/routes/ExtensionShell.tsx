@@ -18,6 +18,7 @@ import type {CargoIndex} from "../lib/shabah/wrapper"
 import type {DeepReadonly} from "../lib/types/utility"
 import {AppDatabase} from "../lib/database/AppDatabase"
 import rawCssExtension from "../index.css?url"
+import type {Permissions} from "../lib/types/permissions"
 
 type RpcStateDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
@@ -27,7 +28,7 @@ type RpcStateDependencies = DeepReadonly<{
     createFatalErrorMessage: (msg: string) => void
     confirmExtensionExit: () => Promise<void>
     cargoIndex: {current: CargoIndex}
-    cargo: {current: Cargo}
+    cargo: {current: Cargo<Permissions>}
 }>
 
 const createRpcState = (dependencies: RpcStateDependencies) => {
@@ -157,7 +158,7 @@ const ExtensionShellPage = () => {
     }
     
     const iframeRpc = useRef<null | ControllerRpc>(null)
-    const extensionCargo = useRef(new Cargo())
+    const extensionCargo = useRef(new Cargo<Permissions>())
     const extensionCargoIndex = useRef(GAME_CARGO_INDEX)
     const extensionIframe = useRef<null | HTMLIFrameElement>(null)
     const extensionListener = useRef<(_: MessageEvent) => any>(() => {})
@@ -232,7 +233,7 @@ const ExtensionShellPage = () => {
 
         const cargoResponse = await downloadClient.getCargoAtUrl(meta.resolvedUrl)
         if (cargoResponse.ok) {
-            extensionCargo.current = cargoResponse.data.pkg
+            extensionCargo.current = cargoResponse.data.pkg as Cargo<Permissions>
             extensionCargoIndex.current = meta
             setExtensionEntry({url: meta.entry, retry: 0})
             return

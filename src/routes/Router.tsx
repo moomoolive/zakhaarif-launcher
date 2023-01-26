@@ -4,22 +4,17 @@ import {
     Routes,
     Route,
 } from "react-router-dom"
-import AppLaunch from "./AppLaunch"
-import NotFound from "./NotFound"
 import {useState, useEffect, useRef} from "react"
 import {
     lazyComponent, 
     LazyComponentOptions,
     LazyComponent
 } from "@/components/Lazy"
-import {isIframe} from "@/lib/utils/isIframe"
 import type {TopLevelAppProps} from "@/lib/types/globalState"
 import {AppShellContext} from "./store"
-import ToLauncherPage from "./ToLauncher"
-
-if (isIframe()) {
-    new Error("app-shell cannot run inside an iframe")
-}
+import Launcher from "./Launcher"
+import AppLaunch from "./AppLaunch"
+import NotFound from "./NotFound"
 
 type LazyRouteLoader<T> = () => Promise<{ default: LazyComponent<T> }>
 
@@ -51,55 +46,21 @@ const PageDisplay = () => {
     const [displayLocation, setDisplayLocation] = useState(location)
     const [transitionStage, setTransitionStage] = useState(fadeIn)
 
-    useEffect(() => {
-        if (location !== displayLocation) {
-            setTransitionStage(fadeOut)
-        }
-      }, [location, displayLocation])
-
-    return <div
-        className={transitionStage === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}
-        onAnimationEnd={() => {
-            if (transitionStage === fadeOut) {
-                setTransitionStage(fadeIn)
-                setDisplayLocation(location)
-            }
-        }}
-    >
-        <Routes location={displayLocation}>
-            <Route path="*" element={<NotFound/>}/>
-            <Route path="/" element={<AppLaunch/>}/>
-            <Route path="/launcher" element={<ToLauncherPage/>}/>
-            <Route path="/start" element={<StartMenu/>}/>
-            <Route path="/extension" element={<ExtensionShell/>}/>
-            <Route path="/extensions-list" element={<ExtensionList/>}/>
-            <Route path="/add-ons" element={<Addons/>}/>
-            <Route path="/settings" element={<Settings/>}/>
-            <Route path="/new-game" element={<NewGame/>}/>
-            <Route path="/load-game" element={<LoadGame/>}/>
-        </Routes>
-    </div>
-}
-
-type AppShellProps = {
-    id: string
-    globalState: TopLevelAppProps
-}
-
-export const AppShellRoot = ({
-    id,
-    globalState
-}: AppShellProps) => {
-
     const sandboxRef = useRef<null | HTMLIFrameElement>(null)
     const sandboxListenerRef = useRef<(event: MessageEvent) => any>(
         () => {}
     )
+    const sandboxInitialized = useRef(false)
 
     useEffect(() => {
-        if (location.href.includes("/extension")) {
+        if (
+            sandboxInitialized.current
+            || location.pathname === "/"
+            || location.pathname.includes("/extension")
+        ) {
             return
         }
+        console.log("sandbox worker run...")
         const milliseconds = 500
         const timerId = window.setTimeout(() => {
             const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
@@ -126,10 +87,48 @@ export const AppShellRoot = ({
             sandbox.height = "0px"
             document.body.appendChild(sandbox)
         }, milliseconds)
+        sandboxInitialized.current = true
         return () => window.clearTimeout(timerId)
-    }, [])
+    }, [location])
 
-    return <div id={id}>
+    useEffect(() => {
+        if (location !== displayLocation) {
+            setTransitionStage(fadeOut)
+        }
+      }, [location, displayLocation])
+
+    return <div
+        className={transitionStage === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}
+        onAnimationEnd={() => {
+            if (transitionStage === fadeOut) {
+                setTransitionStage(fadeIn)
+                setDisplayLocation(location)
+            }
+        }}
+    >
+        <Routes location={displayLocation}>
+            <Route path="*" element={<NotFound/>}/>
+            <Route path="/" element={<Launcher/>}/>
+            <Route path="/launch" element={<AppLaunch/>}/>
+            
+            {/* lazy-loaded */}
+            <Route path="/start" element={<StartMenu/>}/>
+            <Route path="/extension" element={<ExtensionShell/>}/>
+            <Route path="/extensions-list" element={<ExtensionList/>}/>
+            <Route path="/add-ons" element={<Addons/>}/>
+            <Route path="/settings" element={<Settings/>}/>
+            <Route path="/new-game" element={<NewGame/>}/>
+            <Route path="/load-game" element={<LoadGame/>}/>
+        </Routes>
+    </div>
+}
+
+type AppShellProps = {
+    globalState: TopLevelAppProps
+}
+
+export const AppRouter = ({globalState}: AppShellProps) => {
+    return <div>
         <BrowserRouter>
             <div id="viewing-page">
                 <AppShellContext.Provider value={globalState}>

@@ -3,49 +3,14 @@ import {initCommand} from "@/lib/terminalEngine/utility"
 
 type TerminalDependencies = {
     setShowTerminal: (val: SetStateAction<boolean>) => void
-    setShowLauncher: (val: SetStateAction<boolean>) => void
     source: string
 }
 
 export const createCommands = (deps: TerminalDependencies) => {
     const {
-        setShowLauncher, 
         setShowTerminal,
         source
     } = deps
-
-    const toggleLauncher = initCommand({
-        name: "toggle_launcher",
-        fn: async (output, {parsedInputs}) => {
-            const launcherElement = document.getElementById("app-shell-launcher")
-            const launcherIsOpen = !!launcherElement
-            const {force} = parsedInputs
-            if (force) {
-                output.info("forcing launcher toggle...")
-                return setShowLauncher((current) => !current)
-            }
-            if (launcherIsOpen) {
-                output.info("Would you like to launch app shell?")
-            } else {
-                output.info("Would you like to destroy app shell?")
-            }
-            const res = await output.input(`type "y" to confirm or "n" to cancel`)
-            const answer = res.trim().toLowerCase()
-            if (answer === "n" || answer !== "y") {
-                output.warn("Aborting operation...")
-                return
-            }
-            output.info("success. closing now...")
-            setShowLauncher((current) => !current)
-        },
-        documentation: async () => {
-            return `use the "force" option to avoid confirmation dialog`
-        },
-        source,
-        inputs: {
-            force: "bool"
-        }
-    })
 
     const list = initCommand({
         name: "list",
@@ -97,5 +62,5 @@ export const createCommands = (deps: TerminalDependencies) => {
         source
     })
 
-    return [toggleLauncher, list, exit, manyArg] as const
+    return [list, exit, manyArg] as const
 }
