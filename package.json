@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "main-server": "vite",
-    "dev": "npm run generate-cargo-meta && npm run sw && npm run main-server",
+    "dev": "npm run compile-credits && npm run generate-cargo-meta && npm run sw && npm run main-server",
     "type-check": "tsc",
     "build": "npm run type-check && npm run build-sandbox && npm run build-main",
     "generate-cargo-meta": "node ./src/cli/getStandardCargosMeta.mjs",
-    "build-main": "npm run generate-cargo-meta && npm run sw && vite build",
+    "build-main": "npm run compile-credits && npm run generate-cargo-meta && npm run sw && vite build",
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
@@ -21,7 +21,8 @@
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.compiled.js",
     "cargo-cli": "node ./src/lib/cargo/cli.mjs",
     "check-types": "tsc",
-    "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst"
+    "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst",
+    "compile-credits": "node ./cli/compileCredits.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",

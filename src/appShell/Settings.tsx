@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { DetailedHTMLProps, ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
 import {usePromise} from "@/hooks/promise"
@@ -16,14 +16,36 @@ import {
     faAngleRight,
     faCheck,
     faUser,
-    faHandshakeAngle
+    faHandshakeAngle,
+    IconDefinition,
+    faHeartBroken
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
 import {PROFILE_NAME, UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
 import { useDebounce } from "@/hooks/debounce"
 import { useGlobalConfirm } from "@/hooks/globalConfirm"
+import LoadingIcon from "@/components/LoadingIcon"
+import { useEffectAsync } from "@/hooks/effectAsync"
+import { io } from "@/lib/monads/result"
+import { faNpm } from "@fortawesome/free-brands-svg-icons"
 
 const OPEN_PAGE_ICON = <FontAwesomeIcon icon={faAngleRight}/>
+
+type SettingSubsection = {
+    id: string
+    icon: IconDefinition
+    name: string
+    contents: ReactNode,
+    onClick: () => unknown
+    nameStyles?: Partial<{width: string}>
+    contentStyles?: Partial<{width: string}>
+}
+
+type CreditElement = {
+    name: string
+    type: "npm"
+    url: string
+}
 
 const SubPageList = {
     userProfile: () => {
@@ -68,10 +90,88 @@ const SubPageList = {
         </div>
     },
     acknowledgments: () => {
-        return <div>
-            <div>
-                {"ack ack"}
-            </div>
+        const [credits, setCredits] = useState<CreditElement[]>([])
+        const [loading, setLoading] = useState(true)
+        const [error, setError] = useState(false)
+
+        useEffectAsync(async () => {
+            const creditsResponse = await io.wrap(fetch("/credits.json"))
+            if (!creditsResponse.ok) {
+                setError(true)
+                return
+            }
+            const credits = await io.wrap(creditsResponse.data.json())
+            if (!credits.ok) {
+                setError(true)
+                return
+            }
+            setError(false)
+            setCredits(credits.data)
+            setLoading(false)
+        }, [])
+
+        return <div className="w-full h-full">
+            {!error && loading ? <>
+                <div className="w-full flex items-center justify-center">
+                    <div>
+                        <div className="animate-spin text-4xl text-blue-500">
+                            <LoadingIcon/>
+                        </div>
+                    </div>
+                </div>
+            </> : <>
+                {error ? <>
+                    <div className="w-full text-center flex items-center justify-center">
+                        <div className="w-full">
+                            <div className="text-4xl mb-2 text-red-500">
+                                <FontAwesomeIcon icon={faHeartBroken}/>
+                            </div>
+                            <div className="w-4/5 mx-auto max-w-md">
+                                {"Error occurred!"}
+                                <div className="text-neutral-400 text-xs mt-1">
+                                    {"Never wanted to give credits to others anyways..."}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </> : <>
+                    <div className="w-11/12 border-b-2 border-solid border-neutral-600 pb-2 text-xs md:text-sm text-neutral-400">
+                        {"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source packages (and their dependencies)."}
+                    </div>
+                    <div 
+                        id="credits-compiled"
+                        className="w-full h-10/12 px-2 py-3 overflow-x-clip overflow-y-scroll"
+                    >
+                        {credits.map((credit, index) => {
+                            const {name, url, type} = credit
+                            return <a
+                                href={url}
+                                rel="noopener"
+                                target="_blank"
+                                key={`credit-${index}`}
+                                id={`credit-link-${index}`}
+                            >
+                                <button className="w-full flex mb-3 hover:text-green-500">
+                                    <div className="mr-2">
+                                        {((source: typeof type) => {
+                                            switch (source) {
+                                                case "npm":
+                                                default:
+                                                    return <span className="text-red-500">
+                                                        <FontAwesomeIcon icon={faNpm}/>
+                                                    </span>
+                                            }
+                                        })(type)}
+                                    </div>
+                                    <div>
+                                        {name}
+                                    </div>
+                                </button>
+                            </a>
+                        })}
+                    </div>
+                </>}
+            </>}
         </div>
     },
     developerOptions: () => {
@@ -214,7 +314,9 @@ const SettingsPage = () => {
                                 {
                                     id: "new-content",
                                     icon: faCodeBranch, 
-                                    name: "What's new", 
+                                    name: "What's new",
+                                    nameStyles: {width: "60%"},
+                                    contentStyles: {width: "40%"},
                                     contents: <FontAwesomeIcon icon={faLink}/>,
                                     onClick: () => {
                                         window.open(
@@ -227,7 +329,9 @@ const SettingsPage = () => {
                                 {
                                     id: "acknowledgements",
                                     icon: faHandshakeAngle, 
-                                    name: "Acknowledgments", 
+                                    name: "Acknowledgments",
+                                    nameStyles: {width: "80%"},
+                                    contentStyles: {width: "20%"},
                                     contents: OPEN_PAGE_ICON,
                                     onClick: () => setSubpage("acknowledgments")
                                 },
@@ -285,19 +389,30 @@ const SettingsPage = () => {
                                 {header}
                             </div>
                             {subsections.map((subsection, subIndex) => {
-                                const {icon, name, contents, onClick} = subsection
+                                const {
+                                    icon, name, 
+                                    contents, onClick,
+                                    contentStyles = {},
+                                    nameStyles = {}
+                                } = subsection as SettingSubsection
                                 return <button
                                     key={`section-${index}-sub-${subIndex}`}
                                     className="w-full px-4 py-3 flex hover:bg-neutral-700"
                                     onClick={onClick}
                                 >
-                                    <div className="w-1/2 text-left overflow-clip text-ellipsis whitespace-nowrap">
+                                    <div 
+                                        className="w-1/2 text-left overflow-clip text-ellipsis whitespace-nowrap"
+                                        style={nameStyles}
+                                    >
                                         <span className="mr-3 text-neutral-400">
                                             <FontAwesomeIcon icon={icon}/>
                                         </span>
                                         {name}
                                     </div>
-                                    <div className="w-1/2 text-right text-neutral-400 overflow-x-clip text-ellipsis whitespace-nowrap">
+                                    <div 
+                                        className="w-1/2 text-right text-neutral-400 overflow-x-clip text-ellipsis whitespace-nowrap"
+                                        style={contentStyles}
+                                    >
                                         {contents}
                                     </div>
                                 </button>
@@ -309,7 +424,7 @@ const SettingsPage = () => {
         </div>
 
         {subpage === "none" ? <>
-            <div className="hidden md:block w-2/3 py-5 h-full bg-neutral-700 animate-fade-in-left">
+            <div className="hidden md:block w-2/3 border-l-2 border-solid border-neutral-600 py-5 h-full bg-neutral-800 animate-fade-in-left">
                 <div className="w-full px-2 flex max-w-3xl items-center justify-start">
                     <CoolEscapeButton className="w-full"/>
                 </div>
@@ -319,24 +434,24 @@ const SettingsPage = () => {
                             <FontAwesomeIcon icon={faFaceLaughSquint} />
                         </div>
                         <div>
-                            Nothing here yet...
+                            {"Welcome!"}
                         </div>
                     </div>
                 </div>
             </div>
         </> : <>
-            <div className="fixed md:relative w-screen md:w-2/3 md:py-5 h-screen md:h-full top-0 left-0 z-10 bg-neutral-700">
-                <div className="px-2 w-full flex max-w-3xl items-center justify-start">
-                    <div className="ml-2 mt-3 md:hidden">
+            <div className="fixed md:relative w-screen md:w-2/3 md:py-5 h-screen md:border-l-2 border-solid border-neutral-600 md:h-full top-0 left-0 z-10 bg-neutral-800">
+                <div className="px-2 h-1/12 w-full flex max-w-3xl items-center justify-start">
+                    <div className="ml-2 h-full mt-3 md:hidden">
                         <Tooltip title="Back" placement="right">
                             <IconButton onClick={() => setSubpage("none")}>
                                 <FontAwesomeIcon icon={faArrowLeft}/>
                             </IconButton>
                         </Tooltip>
                     </div>
-                    <CoolEscapeButton className="w-full hidden md:block"/>
+                    <CoolEscapeButton className="w-full h-full hidden md:block"/>
                 </div>
-                <div className="p-6 animate-fade-in-left">
+                <div className="p-6 h-11/12 animate-fade-in-left">
                     <SubpageComponent/>
                 </div>
             </div>
