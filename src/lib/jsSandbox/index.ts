@@ -196,6 +196,9 @@ export class JsSandbox {
         if (permissionsSummary.microphone) {
             allowList.push("microphone 'self';")
         }
+        if (permissionsSummary.geoLocation) {
+            allowList.push("geolocation 'self';")
+        }
 
         extensionFrame.allow = allowList.join(" ")
         let sandboxAttribute = "allow-scripts allow-same-origin"

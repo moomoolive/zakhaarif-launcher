@@ -11,12 +11,15 @@ const permissions = [
     "geoLocation",
     "microphone",
     "camera",
-    "unlimitedStorage",
+    "displayCapture",
+
     "fullScreen",
     "pointerLock",
-    "displayCapture",
     "allowInlineContent",
     "allowUnsafeEval",
+    
+    "unlimitedStorage",
+
     {key: "files", value: ["read"]},
     {key: "embedExtensions", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]},
     {key: "webRequest", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]}
