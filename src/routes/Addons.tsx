@@ -620,7 +620,7 @@ const AddOns = () => {
                                 </Menu>
                             </div>
                         </div>
-                        <div className="w-full mb-3 sm:mb-0 sm:w-3/5 sm:ml-1.5">
+                        <div className="w-full mb-2 sm:mb-0 sm:w-3/5 sm:ml-1.5">
                             <TextField
                                 fullWidth
                                 size="small"
@@ -643,6 +643,28 @@ const AddOns = () => {
                         </div>
                     </div>
 
+                </div>
+
+                <div className="sm:hidden w-11/12 mx-auto">
+                    <div className="pb-2 text-xs text-neutral-300">
+                        <span className="ml-1 mr-2 text-blue-500">
+                            <FontAwesomeIcon 
+                                icon={faHardDrive}
+                            />
+                        </span>
+
+                        {loadingInitialData ? <span 
+                            className="animate-pulse"
+                        >
+                            {"calculating..."}
+                        </span> : <>
+                            {isInErrorState
+                                ? "unknown"
+                                : `${toGigabytesString(storageUsage.used, 1)} of ${toGigabytesString(storageUsage.total, 1)} used` 
+                            }
+                        </>}
+                    
+                    </div>
                 </div>
                 
                 <div className="w-full relative z-0 h-10/12 sm:h-11/12 flex items-center justify-center">

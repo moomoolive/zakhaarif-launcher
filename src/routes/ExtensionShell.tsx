@@ -9,126 +9,19 @@ import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
 import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
 import {Cargo} from "../lib/cargo/index"
-import {APP_CACHE} from "../config"
-import {sleep} from "../lib/utils/sleep"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import {nanoid} from "nanoid"
-import type {CargoIndex} from "../lib/shabah/wrapper"
-import type {DeepReadonly} from "../lib/types/utility"
-import {AppDatabase} from "../lib/database/AppDatabase"
 import rawCssExtension from "../index.css?url"
 import type {Permissions} from "../lib/types/permissions"
+import {generateIframePolicy, hasUnsafePermissions} from "../lib/utils/security/generateIframePolicy"
+import {UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
+import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 
-type RpcStateDependencies = DeepReadonly<{
-    displayExtensionFrame: () => void
-    minimumLoadTime: number
-    queryState: string
-    authToken: string
-    createFatalErrorMessage: (msg: string) => void
-    confirmExtensionExit: () => Promise<void>
-    cargoIndex: {current: CargoIndex}
-    cargo: {current: Cargo<Permissions>}
-}>
-
-const createRpcState = (dependencies: RpcStateDependencies) => {
-    const {minimumLoadTime} = dependencies
-    const mutableState = {
-        readyForDisplay: false,
-        secureContextEstablished: false,
-        minimumLoadTimePromise: sleep(minimumLoadTime),
-        fatalErrorOccurred: false,
-        database: new AppDatabase()
-    }
-    type RpcMutableState = typeof mutableState
-    type RpcState = RpcStateDependencies & RpcMutableState
-    return {...dependencies, ...mutableState} as RpcState
-}
-
-const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
-    return {
-        getFile: async (url: string) => {
-            const cache = await caches.open(APP_CACHE)
-            const file = await cache.match(url)
-            if (!file || !file.body) {
-                return null
-            }
-            const type = file.headers.get("content-type") || "text/plain"
-            const length = file.headers.get("content-length") || "0"
-            const transfer = {type, length, body: file.body} as const
-            return wRpc.transfer(transfer, [file.body])
-        },
-        getInitialState: () => {
-            if (state.secureContextEstablished) {
-                return null
-            }
-            const {queryState, authToken, cargoIndex} = state
-            const {resolvedUrl} = cargoIndex.current
-            const cssExtension = rawCssExtension.startsWith("/")
-                ? rawCssExtension.slice(1)
-                : rawCssExtension
-            return {
-                queryState, 
-                authToken, 
-                rootUrl: resolvedUrl,
-                recommendedStyleSheetUrl: `${window.location.origin}/${cssExtension}`
-            }
-        },
-        secureContextEstablished: () => {
-            state.secureContextEstablished = true
-            return true
-        },
-        signalFatalError: (extensionToken: string) => {
-            if (
-                state.secureContextEstablished 
-                && extensionToken !== state.authToken
-            ) {
-                console.warn("application signaled fatal error but provided wrong auth token")
-                return false
-            }
-            state.fatalErrorOccurred = true
-            console.log("extension encountered fatal error")
-            state.createFatalErrorMessage("Extension encountered a fatal error")
-            return true
-        },
-        readyForDisplay: () => {
-            if (
-                state.readyForDisplay 
-                || state.fatalErrorOccurred
-            ) {
-                return false
-            }
-            console.info("Extension requested to show display")
-            state.readyForDisplay = true
-            state.minimumLoadTimePromise.then(() => {
-                console.info("Opening extension frame")
-                state.displayExtensionFrame()
-            })
-            return true
-        },
-        exit: async (extensionToken: string) => {
-            if (
-                state.fatalErrorOccurred 
-                || extensionToken !== state.authToken
-            ) {
-                return false
-            }
-            await state.confirmExtensionExit()
-            return true
-        },
-        async getSaveFile(id: number) {
-            if (id < 0) {
-                return await state.database.gameSaves.latest()
-            }
-            return await state.database.gameSaves.getById(id)
-        },
-    } as const
-}
-
-export type ExtensionShellFunctions = ReturnType<typeof createRpcFunctions>
+export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
 
-const sanboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
+const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
 const EXTENSION_IFRAME_ID = "extension-frame"
 const NO_EXTENSION_ENTRY = ""
 const IFRAME_CONTAINER_ID = "extension-iframe"
@@ -149,6 +42,17 @@ const ExtensionShellPage = () => {
     const [errorMessage, setErrorMessage] = useState("An error occurred...")
     const [loading, setLoading] = useState(true)
     const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
+    
+    const extensionCargo = useRef(new Cargo<Permissions>())
+    const extensionCargoIndex = useRef(GAME_CARGO_INDEX)
+    const sandbox = useRef<JsSandbox | null>(null)
+    const cleanupExtension = useRef(() => {
+        setShowRestartExtension(false)
+        if (sandbox.current) {
+            sandbox.current.destroy()
+        }
+        console.info("All extension resouces cleaned up")
+    })
 
     const closeExtension = async () => {
         if (!await confirm({title: "Are you sure you want to close this extension?", confirmButtonColor: "warning"})) {
@@ -156,47 +60,9 @@ const ExtensionShellPage = () => {
         }
         navigate("/start")
     }
-    
-    const iframeRpc = useRef<null | ControllerRpc>(null)
-    const extensionCargo = useRef(new Cargo<Permissions>())
-    const extensionCargoIndex = useRef(GAME_CARGO_INDEX)
-    const extensionIframe = useRef<null | HTMLIFrameElement>(null)
-    const extensionListener = useRef<(_: MessageEvent) => any>(() => {})
-    const extensionInitialState = useRef("")
-
-    const rpcStateFactory = useRef(() => createRpcState({
-        displayExtensionFrame: () => {
-            setLoading(false)
-        },
-        minimumLoadTime: 10_000,
-        queryState: searchParams.get("state") || "",
-        authToken: nanoid(AUTH_TOKEN_LENGTH),
-        createFatalErrorMessage: (msg) => {
-            setErrorMessage(msg)
-            setShowRestartExtension(true)
-            setError(true)
-        },
-        confirmExtensionExit: closeExtension,
-        cargo: extensionCargo,
-        cargoIndex: extensionCargoIndex
-    }))
-
-    const rpcState = useRef(rpcStateFactory.current())
-    const cleanupExtension = useRef(() => {
-        setShowRestartExtension(false)
-        window.removeEventListener("message", extensionListener.current)
-        iframeRpc.current = null
-        const extensionFrameContainer = document.getElementById(IFRAME_CONTAINER_ID)
-        if (extensionFrameContainer && extensionIframe.current) {
-            extensionFrameContainer.removeChild(extensionIframe.current)
-        }
-        extensionIframe.current = null
-        console.log("All extension resouces cleaned up")
-    })
 
     useEffectAsync(async () => {
         const entry = searchParams.get("entry") || NO_EXTENSION_ENTRY
-        extensionInitialState.current = searchParams.get("state") || ""
         const entryUrl = decodeURIComponent(entry)
 
         if (entryUrl.length < 1) {
@@ -261,36 +127,52 @@ const ExtensionShellPage = () => {
         if (extensionIframeExists) {
             return
         }
-        const entry = extensionEntry.url
-        const extensionFrame = document.createElement("iframe")
-        extensionFrame.allow = ""
-        extensionFrame.name = "extension-frame"
-        extensionFrame.id = EXTENSION_IFRAME_ID
-        extensionFrame.setAttribute("sandbox", "allow-scripts allow-same-origin")
-        extensionFrame.width = "100%"
-        extensionFrame.height = "100%"
-        iframeRpc.current = new wRpc({
-            responses: createRpcFunctions(rpcState.current),
-            messageTarget: {
-                postMessage: (data, transferables) => {
-                    extensionFrame.contentWindow?.postMessage(
-                        data, "*", transferables
-                    )
-                }
+        const unsafePackagesDisallowed = !localStorage.getItem(UNSAFE_PACKAGE_PERMISSIONS)
+        const permissionsSummary = generateIframePolicy(
+            extensionCargo.current.permissions
+        )
+        const isUnsafe = (
+            unsafePackagesDisallowed
+            && hasUnsafePermissions(permissionsSummary)
+            && extensionCargoIndex.current.id !== GAME_CARGO_INDEX.id
+        )
+        if (isUnsafe) {
+            setError(true)
+            setErrorMessage("Fatal Error Occurred")
+            console.error("[UNSAFE]: Blocked unsafe package from starting")
+            return
+        }
+
+        const jsSandbox = new JsSandbox({
+            entryUrl: extensionEntry.url,
+            sandboxOrigin: sandboxOrigin,
+            id: EXTENSION_IFRAME_ID,
+            dependencies: {
+                displayExtensionFrame: () => {
+                    setLoading(false)
+                },
+                minimumLoadTime: 10_000,
+                queryState: searchParams.get("state") || "",
+                authToken: nanoid(AUTH_TOKEN_LENGTH),
+                createFatalErrorMessage: (msg) => {
+                    setErrorMessage(msg)
+                    setShowRestartExtension(true)
+                    setError(true)
+                },
+                confirmExtensionExit: closeExtension,
+                cargo: extensionCargo,
+                cargoIndex: extensionCargoIndex,
+                baseStyleSheetUrl: rawCssExtension
             },
-            messageInterceptor: {
-                addEventListener: (_, handler) => {
-                    const listener = (event: MessageEvent) => {
-                        handler({data: event.data})
-                    }
-                    extensionListener.current = listener
-                    window.addEventListener("message", listener)
-                }
-            }
         })
-        extensionFrame.src = `${sanboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(`default-src 'self' ${location.origin};`)}`
-        extensionIframe.current = extensionFrame
-        extensionFrameContainer.appendChild(extensionFrame)
+        const sandboxFrame = jsSandbox.domElement()
+        sandboxFrame.style.width = "100%"
+        sandboxFrame.style.height = "100%"
+        sandbox.current = jsSandbox
+
+        // open program frame
+        extensionFrameContainer.appendChild(sandboxFrame)
+                
         return cleanupExtension.current
     }, [extensionEntry])
 
@@ -317,7 +199,6 @@ const ExtensionShellPage = () => {
                                 <Button
                                     onClick={() => {
                                         cleanupExtension.current()
-                                        rpcState.current = rpcStateFactory.current()
                                         setError(false)
                                         setLoading(true)
                                         setExtensionEntry((old) => ({

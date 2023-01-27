@@ -28,7 +28,7 @@ import {isStandardCargo} from "../../lib/utils/cargos"
 import {CargoIndex} from "../../lib/shabah/wrapper"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
-import {Permissions, permissionsMeta} from "../../lib/types/permissions"
+import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
 
 export type CargoInfoProps = {
     onClose: () => void
@@ -70,7 +70,7 @@ const defaultPermission = (key: PermissionsArray[number]["key"]) => {
             return <span className="text-green-500">
                 <FontAwesomeIcon icon={faDisplay}/>
             </span>
-        case "*":
+        case ALLOW_ALL_PERMISSIONS:
             return <span className="text-red-500">
                 <FontAwesomeIcon icon={faLockOpen}/>
             </span>
@@ -98,7 +98,7 @@ const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
         {((p: typeof permission) => {
             switch (p.key) {
                 case "webRequest": {
-                    if ((permission.value as string[]).includes("*")) {
+                    if ((permission.value as string[]).includes(ALLOW_ALL_PERMISSIONS)) {
                         return <>
                             <span className="text-red-500 mr-2.5">
                                 <FontAwesomeIcon icon={faGlobeAfrica}/>
@@ -139,7 +139,7 @@ const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                     </>
                 }
                 case "embedExtensions": {
-                    if ((permission.value as string[]).includes("*")) {
+                    if ((permission.value as string[]).includes(ALLOW_ALL_PERMISSIONS)) {
                         return <>
                             <span className="text-red-500 mr-2.5">
                                 <FontAwesomeIcon icon={faCode}/>
@@ -149,7 +149,7 @@ const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                     }
                     return <>
                         <div>
-                            <span className="text-yellow-500 mr-2.5">
+                            <span className="text-red-500 mr-2.5">
                                 <FontAwesomeIcon icon={faCode}/>
                             </span>
                             {`Embed Extensions`}
@@ -251,12 +251,12 @@ export const CargoInfo = ({
     })(id)
 
     const permissionsFiltered = useMemo(() => {
-        const preFiltered = permissions.some((permission) => permission.key === "*")
-            ? permissions.filter((permission) => permission.key === "*")
-            : permissions
-        if (preFiltered.length < 2) {
-            return preFiltered
+        const allowAll = permissions.some((permission) => permission.key === ALLOW_ALL_PERMISSIONS)
+        if (allowAll) {
+            return [{key: ALLOW_ALL_PERMISSIONS, value: [] as string[]}] as typeof permissions
         }
+        
+        const preFiltered = permissions.filter(({key}) => !permissionsMeta[key].implicit)
         const extendableDangerousPermissions = preFiltered.filter(
             ({key}) => permissionsMeta[key].dangerous && permissionsMeta[key].extendable
         )

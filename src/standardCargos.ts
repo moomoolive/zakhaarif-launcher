@@ -9,7 +9,7 @@ import startGameUrl from "./game/main?url"
 import modStdUrl from "./modStd/main?url"
 import {stripRelativePath} from "./lib/utils/urls/stripRelativePath"
 import {GAME_ESTIMATED_BYTES, STANDARD_MOD_ESTIMATED_BYTES} from "./cargosMeta"
-import type {Permissions} from "./lib/types/permissions"
+import {Permissions} from "./lib/types/permissions"
 
 const CURRENT_ORIGIN = window.location.origin + "/"
 
@@ -58,7 +58,9 @@ export const GAME_CARGO = new Cargo<Permissions>({
     permissions: [
         "fullScreen",
         "pointerLock",
-        {key: "embedExtensions", value: ["*"]}
+        "allowInlineContent",
+        "allowUnsafeEval",
+        {key: "embedExtensions", value: ["allowAll"]}
     ]
 })
 
