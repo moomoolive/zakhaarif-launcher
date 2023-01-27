@@ -11,7 +11,6 @@ import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
 import {Cargo} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
-import {nanoid} from "nanoid"
 import rawCssExtension from "../index.css?url"
 import type {Permissions} from "../lib/types/permissions"
 import {generateIframePolicy, hasUnsafePermissions} from "../lib/utils/security/generateIframePolicy"
@@ -24,12 +23,7 @@ export type ControllerRpc = wRpc<ExtensionShellFunctions>
 const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
 const EXTENSION_IFRAME_ID = "extension-frame"
 const NO_EXTENSION_ENTRY = ""
-const IFRAME_CONTAINER_ID = "extension-iframe"
-const MINIMUM_AUTH_TOKEN_LENGTH = 20
-const AUTH_TOKEN_LENGTH = (() => {
-    const additionalLength = Math.trunc(Math.random() * 20)
-    return MINIMUM_AUTH_TOKEN_LENGTH + additionalLength
-})()
+const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
     const {downloadClient} = useAppShellContext()
@@ -123,8 +117,12 @@ const ExtensionShellPage = () => {
             setLoading(false)
             return
         }
-        const extensionIframeExists = document.getElementById(EXTENSION_IFRAME_ID)
-        if (extensionIframeExists) {
+        const sandboxElement = sandbox.current
+        const sandboxAlreadyLoaded = sandboxElement
+            ? !!(document.getElementById(sandboxElement.domElement().id))
+            : false
+        if (sandboxAlreadyLoaded) {
+            console.warn("Sandbox refused to load because another extension sandbox already exists")
             return
         }
         const unsafePackagesDisallowed = !localStorage.getItem(UNSAFE_PACKAGE_PERMISSIONS)
@@ -147,22 +145,22 @@ const ExtensionShellPage = () => {
             entryUrl: extensionEntry.url,
             sandboxOrigin: sandboxOrigin,
             id: EXTENSION_IFRAME_ID,
+            name: `${extensionCargo.current.name}-sandbox`,
             dependencies: {
                 displayExtensionFrame: () => {
                     setLoading(false)
                 },
                 minimumLoadTime: 10_000,
                 queryState: searchParams.get("state") || "",
-                authToken: nanoid(AUTH_TOKEN_LENGTH),
                 createFatalErrorMessage: (msg) => {
                     setErrorMessage(msg)
                     setShowRestartExtension(true)
                     setError(true)
                 },
                 confirmExtensionExit: closeExtension,
-                cargo: extensionCargo,
-                cargoIndex: extensionCargoIndex,
-                baseStyleSheetUrl: rawCssExtension
+                cargo: extensionCargo.current,
+                cargoIndex: extensionCargoIndex.current,
+                recommendedStyleSheetUrl: rawCssExtension
             },
         })
         const sandboxFrame = jsSandbox.domElement()

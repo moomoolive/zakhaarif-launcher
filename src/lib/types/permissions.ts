@@ -6,6 +6,8 @@ export type AllowAllPermissionsDirective = typeof ALLOW_ALL_PERMISSIONS
 
 const permissions = [
     ALLOW_ALL_PERMISSIONS,
+    // maybe later "web-share" permission may be added
+    // allowing for this: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy/web-share
     "geoLocation",
     "microphone",
     "camera",

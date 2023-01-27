@@ -7,23 +7,29 @@ import {AppDatabase} from "../database/AppDatabase"
 import {sleep} from "../utils/sleep"
 import { APP_CACHE } from "../../config"
 import {wRpc} from "../wRpc/simple"
+import {nanoid} from "nanoid"
+
+const MINIMUM_AUTH_TOKEN_LENGTH = 20
+const AUTH_TOKEN_LENGTH = (() => {
+    const additionalLength = Math.trunc(Math.random() * 20)
+    return MINIMUM_AUTH_TOKEN_LENGTH + additionalLength
+})()
 
 type SandboxDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
     minimumLoadTime: number
     queryState: string
-    authToken: string
     createFatalErrorMessage: (msg: string) => void
     confirmExtensionExit: () => Promise<void>
-    cargoIndex: {current: CargoIndex}
-    cargo: {current: Cargo<Permissions>}
-    baseStyleSheetUrl: string
+    cargoIndex: CargoIndex
+    cargo: Cargo<Permissions>
+    recommendedStyleSheetUrl: string
 }>
 
 const createRpcState = (dependencies: SandboxDependencies) => {
     const {minimumLoadTime} = dependencies
     const permissionsSummary = generateIframePolicy(
-        dependencies.cargo.current.permissions
+        dependencies.cargo.permissions
     )
     const mutableState = {
         readyForDisplay: false,
@@ -32,6 +38,7 @@ const createRpcState = (dependencies: SandboxDependencies) => {
         fatalErrorOccurred: false,
         database: new AppDatabase(),
         permissionsSummary,
+        authToken: nanoid(AUTH_TOKEN_LENGTH)
     }
     type SandboxMutableState = typeof mutableState
     type InitialState = SandboxDependencies & SandboxMutableState
@@ -57,8 +64,8 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
                 return null
             }
             const {queryState, authToken, cargoIndex} = state
-            const {resolvedUrl} = cargoIndex.current
-            const {baseStyleSheetUrl: rawCssExtension} = state
+            const {resolvedUrl} = cargoIndex
+            const {recommendedStyleSheetUrl: rawCssExtension} = state
             const cssExtension = rawCssExtension.startsWith("https://") || rawCssExtension.startsWith("http://")
                 ? rawCssExtension
                 : rawCssExtension.startsWith("/") ? rawCssExtension.slice(1) : rawCssExtension
@@ -127,6 +134,7 @@ type JsSandboxOptions = {
     dependencies: SandboxDependencies
     sandboxOrigin: string
     id: string
+    name: string
 }
 
 export type SandboxFunctions = ReturnType<typeof createRpcFunctions>
@@ -137,14 +145,18 @@ export class JsSandbox {
     private iframeElement: HTMLIFrameElement
     private state: RpcState
     readonly id: string
+    readonly name: string
     readonly entry: string
 
     constructor(config: JsSandboxOptions) {
-        const {entryUrl, dependencies, sandboxOrigin, id} = config
+        const {
+            entryUrl, dependencies, sandboxOrigin, id, name
+        } = config
         const state = createRpcState(dependencies)
         this.state = state
         this.entry = entryUrl
         this.id = id
+        this.name = name 
         const entry = entryUrl
         const extensionFrame = document.createElement("iframe")
         extensionFrame.id = id
@@ -173,8 +185,19 @@ export class JsSandbox {
         })
         
         // setting permissions start
-        extensionFrame.allow = ""
         const {permissionsSummary} = state
+        let allowList = []
+        if (permissionsSummary.camera) {
+            allowList.push("camera 'self';")
+        }
+        if (permissionsSummary.displayCapture) {
+            allowList.push("display-capture 'self';")
+        }
+        if (permissionsSummary.microphone) {
+            allowList.push("microphone 'self';")
+        }
+
+        extensionFrame.allow = allowList.join(" ")
         let sandboxAttribute = "allow-scripts allow-same-origin"
         if (permissionsSummary.pointerLock) {
             sandboxAttribute += " allow-pointer-lock"
@@ -198,9 +221,9 @@ export class JsSandbox {
         const contentSecurityPolicy = encodeURIComponent(
             `default-src 'self'${compiledUnsafeDirectives} ${originName} ${allowedRequests}; object-src 'none'; frame-src 'none'; manifest-src 'none';`
         )
-        extensionFrame.src = `${sandboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         // permissions end
 
+        extensionFrame.src = `${sandboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         this.iframeElement = extensionFrame
         this.rpc = rpc
     }

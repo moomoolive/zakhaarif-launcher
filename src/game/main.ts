@@ -25,6 +25,9 @@ export const main = async (args: MainScriptArguments) => {
     }
     console.log("game save found", gameSave)
     const res = await messageAppShell("readyForDisplay")
-    //messageAppShell("signalFatalError", authToken)
     console.info("controller res", res)
+    //window.setTimeout(() => {
+    //    console.error("creating error")
+    //    messageAppShell("signalFatalError", authToken)
+    //}, 10_000)
 }
