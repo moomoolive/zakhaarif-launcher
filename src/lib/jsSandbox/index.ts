@@ -2,7 +2,7 @@ import type {DeepReadonly} from "../types/utility"
 import {Cargo} from "../cargo/index"
 import {CargoIndex} from "../shabah/backend"
 import {Permissions} from "../types/permissions"
-import {generateIframePolicy} from "../utils/security/generateIframePolicy"
+import {generatePermissionsSummary} from "../utils/security/permissionsSummary"
 import {AppDatabase} from "../database/AppDatabase"
 import {sleep} from "../utils/sleep"
 import { APP_CACHE } from "../../config"
@@ -29,7 +29,7 @@ type SandboxDependencies = DeepReadonly<{
 
 const createRpcState = (dependencies: SandboxDependencies) => {
     const {minimumLoadTime} = dependencies
-    const permissionsSummary = generateIframePolicy(
+    const permissionsSummary = generatePermissionsSummary(
         dependencies.cargo.permissions
     )
     const mutableState = {

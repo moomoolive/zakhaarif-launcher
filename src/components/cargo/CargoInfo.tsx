@@ -21,15 +21,15 @@ import {
     faLocationDot
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, ClickAwayListener, IconButton} from "@mui/material"
-import {Cargo} from "@/lib/cargo/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/index"
+import {Cargo} from "../../lib/cargo/index"
+import {NULL_FIELD as CARGO_NULL_FIELD} from "../../lib/cargo/index"
 import {CargoIcon} from "../../components/cargo/Icon"
 import {isStandardCargo} from "../../lib/utils/cargos"
-import {CargoIndex} from "../../lib/shabah/wrapper"
+import {CargoIndex} from "../../lib/shabah/downloadClient"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
 import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
-import { cleanPermissions } from "@/lib/utils/security/generateIframePolicy"
+import { cleanPermissions } from "../../lib/utils/security/permissionsSummary"
 
 export type CargoInfoProps = {
     onClose: () => void

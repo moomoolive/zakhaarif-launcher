@@ -3,7 +3,7 @@ import {
     APP_CARGO_ID,
     STANDARD_MOD_ID,
 } from "./config"
-import {CargoIndex} from "./lib/shabah/wrapper"
+import {CargoIndex} from "./lib/shabah/downloadClient"
 import {Cargo} from "./lib/cargo/index"
 import startGameUrl from "./game/main?url"
 import modStdUrl from "./modStd/main?url"

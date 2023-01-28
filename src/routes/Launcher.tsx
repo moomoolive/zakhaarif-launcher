@@ -16,7 +16,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import {BYTES_PER_GB} from "@/lib/utils/consts/storage"
-import {Shabah} from "@/lib/shabah/wrapper"
+import {Shabah} from "@/lib/shabah/downloadClient"
 import {roundDecimal} from "@/lib/math/rounding"
 import {featureCheck} from "@/lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "@/hooks/globalConfirm"

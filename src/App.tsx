@@ -8,7 +8,7 @@ import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
 import type {TopLevelAppProps} from "./lib/types/globalState"
-import {Shabah} from "./lib/shabah/wrapper"
+import {Shabah} from "./lib/shabah/downloadClient"
 import {APP_CACHE} from "./config"
 import {webAdaptors} from "./lib/shabah/adaptors/web-preset"
 

@@ -20,7 +20,7 @@ import {CargoIndices} from "../../lib/shabah/backend"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_MOD_CARGO} from "../../standardCargos"
 import {NUMBER_OF_STANDARD_MODS, STANDARD_MOD_ID} from "../../config"
-import type {CargoIndex} from "../../lib/shabah/wrapper"
+import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
 
 type LinkableModProps = {

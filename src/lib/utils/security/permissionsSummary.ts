@@ -43,7 +43,7 @@ export const isDangerousCspOrigin = (cspValue: string) => {
 
 type GeneralPermissions = {key: string, value: string[]}[]
 
-export const generateIframePolicy = (
+export const generatePermissionsSummary = (
     permissions: GeneralPermissions
 ) => {
     const summary = permissionsSummary(false)
@@ -80,7 +80,7 @@ export const generateIframePolicy = (
     return summary
 }
 
-export type PermissionsSummary = ReturnType<typeof generateIframePolicy>
+export type PermissionsSummary = ReturnType<typeof generatePermissionsSummary>
 
 export const hasUnsafePermissions = (summary: PermissionsSummary) => {
     return (

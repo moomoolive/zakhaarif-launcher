@@ -13,7 +13,10 @@ import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import rawCssExtension from "../index.css?url"
 import type {Permissions} from "../lib/types/permissions"
-import {generateIframePolicy, hasUnsafePermissions} from "../lib/utils/security/generateIframePolicy"
+import {
+    generatePermissionsSummary, 
+    hasUnsafePermissions
+} from "../lib/utils/security/permissionsSummary"
 import {UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 
@@ -127,7 +130,7 @@ const ExtensionShellPage = () => {
             return
         }
         const unsafePackagesDisallowed = !localStorage.getItem(UNSAFE_PACKAGE_PERMISSIONS)
-        const permissionsSummary = generateIframePolicy(
+        const permissionsSummary = generatePermissionsSummary(
             extensionCargo.current.permissions
         )
         const isUnsafe = (

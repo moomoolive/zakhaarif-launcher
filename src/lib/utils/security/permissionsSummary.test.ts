@@ -1,5 +1,5 @@
 import {expect, describe, it} from "vitest"
-import {cleanPermissions, generateIframePolicy, isDangerousCspOrigin} from "./generateIframePolicy"
+import {cleanPermissions, generatePermissionsSummary, isDangerousCspOrigin} from "./permissionsSummary"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
 
 describe("filtering malicous csp values", () => {
@@ -55,7 +55,7 @@ describe("filtering malicous csp values", () => {
 
 describe("policy generator", () => {
     it("if non-extendable permission is preset it's relavent field should be set to false", () => {
-        const result = generateIframePolicy([
+        const result = generatePermissionsSummary([
             {key: "camera", value: []},
             {key: "unlimitedStorage", value: []},
         ])
@@ -75,7 +75,7 @@ describe("policy generator", () => {
     })
 
     it("if extendable permission (webRequest, embedExtensions, etc.) have the '*' directive, all other values should be removed except the directive itself", () => {
-        const result = generateIframePolicy([
+        const result = generatePermissionsSummary([
             {key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS, "https://a-cargo-i-want-to-embed.com"]},
             {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS, "https://mymamashouse.com"]},
         ])
@@ -91,7 +91,7 @@ describe("policy generator", () => {
     })
 
     it(`if '${ALLOW_ALL_PERMISSIONS}' (allow-all) permission is found all permissions should be set to true`, () => {
-        const result = generateIframePolicy([
+        const result = generatePermissionsSummary([
             {key: ALLOW_ALL_PERMISSIONS, value: []}
         ])
         for (const key of Object.keys(result)) {

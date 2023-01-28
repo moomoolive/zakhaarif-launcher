@@ -1,4 +1,4 @@
-import type {Shabah} from "@/lib/shabah/wrapper"
+import type {Shabah} from "@/lib/shabah/downloadClient"
 
 export type TopLevelAppProps = {
     readonly setTerminalVisibility: (visible: boolean) => void

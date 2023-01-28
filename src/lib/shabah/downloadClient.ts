@@ -31,9 +31,9 @@ import {resultJsonParse} from "../monads/utils/jsonParse"
 import {
     cleanPermissions, 
     hasUnsafePermissions, 
-    generateIframePolicy,
+    generatePermissionsSummary,
     CleanedPermissions
-} from "../utils/security/generateIframePolicy"
+} from "../utils/security/permissionsSummary"
 import { Permissions } from "../types/permissions"
 
 export type {CargoIndex} from "./backend"
@@ -224,7 +224,7 @@ export class Shabah {
             newPermissionsRequested,
             unsafeCargo: response.newCargo 
                 ? hasUnsafePermissions(
-                    generateIframePolicy(
+                    generatePermissionsSummary(
                         (response.newCargo.parsed as Cargo<Permissions>).permissions
                     )
                 )
