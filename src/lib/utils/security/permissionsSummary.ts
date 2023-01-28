@@ -85,7 +85,7 @@ export type PermissionsSummary = ReturnType<typeof generatePermissionsSummary>
 export const hasUnsafePermissions = (summary: PermissionsSummary) => {
     return (
         summary.allowAll
-        || (summary.embedExtensions.length > 0 && summary.embedExtensions[0] === ALLOW_ALL_PERMISSIONS)
+        || summary.embedExtensions.length > 0
         || (summary.webRequest.length > 0 && summary.webRequest[0] === ALLOW_ALL_PERMISSIONS)
     )
 }
@@ -110,10 +110,7 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
         if (!(key in permissionsMeta)) {
             continue
         }
-        if (
-            value.length < 1 
-            || !permissionsMeta[key].extendable
-        ) {
+        if (value.length < 1) {
             cleaned.push({key, value: []})
             continue
         }

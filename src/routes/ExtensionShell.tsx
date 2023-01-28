@@ -49,6 +49,18 @@ const ExtensionShellPage = () => {
         }
         console.info("All extension resouces cleaned up")
     })
+    const appendSandboxToDom = useRef(async (sandboxContainer: HTMLElement) => {
+        const jsSandbox = sandbox.current
+        if (!jsSandbox) {
+            return
+        }
+        const sandboxDomElement = await jsSandbox.initialize()
+        sandboxDomElement.style.width = "100%"
+        sandboxDomElement.style.height = "100%"
+
+        // open program frame
+        sandboxContainer.appendChild(sandboxDomElement)
+    })
 
     const closeExtension = async () => {
         if (!await confirm({title: "Are you sure you want to close this extension?", confirmButtonColor: "warning"})) {
@@ -150,6 +162,7 @@ const ExtensionShellPage = () => {
             id: EXTENSION_IFRAME_ID,
             name: `${extensionCargo.current.name}-sandbox`,
             dependencies: {
+                downloadClient,
                 displayExtensionFrame: () => {
                     setLoading(false)
                 },
@@ -166,14 +179,8 @@ const ExtensionShellPage = () => {
                 recommendedStyleSheetUrl: rawCssExtension
             },
         })
-        const sandboxFrame = jsSandbox.domElement()
-        sandboxFrame.style.width = "100%"
-        sandboxFrame.style.height = "100%"
         sandbox.current = jsSandbox
-
-        // open program frame
-        extensionFrameContainer.appendChild(sandboxFrame)
-                
+        appendSandboxToDom.current(extensionFrameContainer)
         return cleanupExtension.current
     }, [extensionEntry])
 

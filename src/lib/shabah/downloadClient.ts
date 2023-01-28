@@ -36,7 +36,7 @@ import {
 } from "../utils/security/permissionsSummary"
 import { Permissions } from "../types/permissions"
 
-export type {CargoIndex} from "./backend"
+export type {CargoIndex, CargoIndices} from "./backend"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
