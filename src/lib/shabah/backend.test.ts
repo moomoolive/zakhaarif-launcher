@@ -6,7 +6,8 @@ import {
     emptyDownloadIndex,
     operationCodes,
     removeDownloadIndex,
-    saveDownloadIndices
+    saveDownloadIndices,
+    Permissions
 } from "./backend"
 
 const createFileCache = (initFiles: Record<string, Response>) => {
@@ -199,6 +200,7 @@ describe("reading and writing to cargo indices", () => {
             {
                 id: "pkg",
                 logoUrl: "",
+                permissions: [] as Permissions,
                 name: "pkg",
                 state: "updating",
                 version: "0.1.0",
@@ -218,6 +220,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg",
             name: "pkg",
             logoUrl: "",
+            permissions: [] as Permissions,
             state: "updating",
             version: "0.1.0",
             bytes: 0,
@@ -231,6 +234,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg",
             name: "pkg",
             logoUrl: "",
+            permissions: [] as Permissions,
             state: "cached",
             version: "0.2.0",
             bytes: 0,
@@ -252,6 +256,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg",
             name: "pkg",
             logoUrl: "",
+            permissions: [] as Permissions,
             state: "updating",
             version: "0.1.0",
             bytes: 0,
@@ -265,6 +270,7 @@ describe("reading and writing to cargo indices", () => {
             name: "pkg",
             state: "cached",
             logoUrl: "",
+            permissions: [] as Permissions,
             version: "0.2.0",
             bytes: 0,
             entry: "store/index.js",
@@ -290,6 +296,7 @@ describe("reading and writing to cargo indices", () => {
             name: "pkg",
             state: "updating",
             logoUrl: "",
+            permissions: [] as Permissions,
             version: "0.1.0",
             bytes: 0,
             entry: "store/index.js",
@@ -301,6 +308,7 @@ describe("reading and writing to cargo indices", () => {
             id: "pkg-2",
             name: "pkg",
             state: "cached",
+            permissions: [] as Permissions,
             version: "0.2.0",
             logoUrl: "",
             bytes: 0,

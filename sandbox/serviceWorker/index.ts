@@ -46,7 +46,14 @@ const fetchHandler = createFetchHandler({
                 return null
             }
             const file = await rpc.executeWithSource("getFile", client, url)
-            if (!file) {
+            if (typeof file !== "object" || file === null) {
+                return null
+            }
+            if (
+                !(file.body instanceof ReadableStream)
+                || typeof file.type !== "string"
+                || typeof file.length !== "number"
+            ) {
                 return null
             }
             return new Response(file.body, {

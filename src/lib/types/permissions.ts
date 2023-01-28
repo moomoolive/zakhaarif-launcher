@@ -17,6 +17,8 @@ const permissions = [
     "pointerLock",
     "allowInlineContent",
     "allowUnsafeEval",
+    "allowDataUrls",
+    "allowBlobs",
     
     "unlimitedStorage",
 
@@ -27,29 +29,38 @@ const permissions = [
 
 export type PermissionKeys = PermissionsList<typeof permissions>[number]["key"]
 
+const createMeta = ({
+    name = "",
+    dangerous = false,
+    extendable = false,
+    implicit = false
+} = {}) => ({
+    name,
+    dangerous,
+    extendable,
+    implicit
+}) as const
+
 type PermissionsMeta<P extends string> = {
-    readonly [key in P]: Readonly<{
-        name?: string
-        dangerous?: boolean
-        extendable?: boolean
-        implicit?: boolean
-    }>
+    readonly [key in P]: ReturnType<typeof createMeta>
 }
 
 export const permissionsMeta: PermissionsMeta<PermissionKeys> = {
-    allowAll: {name: "Unrestricted", dangerous: true},
-    webRequest: {dangerous: true, extendable: true},
-    geoLocation: {name: "Location", dangerous: true},
-    microphone: {dangerous: true},
-    camera: {dangerous: true},
-    unlimitedStorage: {},
-    fullScreen: {},
-    allowInlineContent: {implicit: true},
-    allowUnsafeEval: {implicit: true},
-    pointerLock: {name: "Hide Mouse"},
-    displayCapture: {name: "Screen Record", dangerous: true},
-    files: {name: "Read Files"},
-    embedExtensions: {dangerous: true, extendable: true}
+    allowAll: createMeta({name: "Unrestricted", dangerous: true}),
+    webRequest: createMeta({dangerous: true, extendable: true}),
+    geoLocation: createMeta({name: "Location", dangerous: true}),
+    microphone: createMeta({dangerous: true}),
+    camera: createMeta({dangerous: true}),
+    unlimitedStorage: createMeta(),
+    fullScreen: createMeta(),
+    allowInlineContent: createMeta({implicit: true}),
+    allowUnsafeEval: createMeta({implicit: true}),
+    allowDataUrls: createMeta({implicit: true}),
+    allowBlobs: createMeta({implicit: true}),
+    pointerLock: createMeta({name: "Hide Mouse"}),
+    displayCapture: createMeta({name: "Record Screen", dangerous: true}),
+    files: createMeta({name: "Read Files"}),
+    embedExtensions: createMeta({dangerous: true, extendable: true})
 }
 
 export type Permissions = typeof permissions

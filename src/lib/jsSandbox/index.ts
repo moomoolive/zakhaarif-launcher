@@ -8,6 +8,7 @@ import {sleep} from "../utils/sleep"
 import { APP_CACHE } from "../../config"
 import {wRpc} from "../wRpc/simple"
 import {nanoid} from "nanoid"
+import {type as betterTypeof} from "../utils/betterTypeof"
 
 const MINIMUM_AUTH_TOKEN_LENGTH = 20
 const AUTH_TOKEN_LENGTH = (() => {
@@ -49,6 +50,10 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
     console.log("permissions", state.permissionsSummary)
     return {
         getFile: async (url: string) => {
+            if (typeof url !== "string") {
+                console.warn(`provided url was not a string, got "${betterTypeof(url)}"`)
+                return null
+            }
             const cache = await caches.open(APP_CACHE)
             const file = await cache.match(url)
             if (!file || !file.body) {
@@ -81,6 +86,10 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             return true
         },
         signalFatalError: (extensionToken: string) => {
+            if (typeof extensionToken !== "string") {
+                console.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
+                return false
+            }
             if (
                 state.secureContextEstablished 
                 && extensionToken !== state.authToken
@@ -109,6 +118,10 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             return true
         },
         exit: async (extensionToken: string) => {
+            if (typeof extensionToken !== "string") {
+                console.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
+                return false
+            }
             if (
                 state.fatalErrorOccurred 
                 || extensionToken !== state.authToken
@@ -119,6 +132,10 @@ const createRpcFunctions = (state: ReturnType<typeof createRpcState>) => {
             return true
         },
         async getSaveFile(id: number) {
+            if (typeof id !== "number") {
+                console.warn(`extension token must be a number, got "${betterTypeof(id)}"`)
+                return false
+            }
             if (id < 0) {
                 return await state.database.gameSaves.latest()
             }
@@ -132,7 +149,6 @@ type RpcState = ReturnType<typeof createRpcState>
 type JsSandboxOptions = {
     entryUrl: string
     dependencies: SandboxDependencies
-    sandboxOrigin: string
     id: string
     name: string
 }
@@ -149,9 +165,7 @@ export class JsSandbox {
     readonly entry: string
 
     constructor(config: JsSandboxOptions) {
-        const {
-            entryUrl, dependencies, sandboxOrigin, id, name
-        } = config
+        const {entryUrl, dependencies, id, name} = config
         const state = createRpcState(dependencies)
         this.state = state
         this.entry = entryUrl
@@ -209,7 +223,6 @@ export class JsSandbox {
         if (permissionsSummary.fullScreen) {
             extensionFrame.setAttribute("allowfullscreen", "")
         }
-        const allowedRequests = permissionsSummary.webRequest.join(" ")
         let unsafeDirectives = []
         if (permissionsSummary.allowInlineContent) {
             unsafeDirectives.push("'unsafe-inline'")
@@ -217,16 +230,27 @@ export class JsSandbox {
         if (permissionsSummary.allowUnsafeEval) {
             unsafeDirectives.push("'unsafe-eval'")
         }
-        const compiledUnsafeDirectives = unsafeDirectives.length < 1 
-            ? "" 
-            : " " + unsafeDirectives.join(" ")
-        const originName = location.origin + "/"
-        const contentSecurityPolicy = encodeURIComponent(
-            `default-src 'self'${compiledUnsafeDirectives} ${originName} ${allowedRequests}; object-src 'none'; frame-src 'none'; manifest-src 'none';`
-        )
-        // permissions end
+        if (permissionsSummary.allowDataUrls) {
+            unsafeDirectives.push("data:")
+        }
+        if (permissionsSummary.allowBlobs) {
+            unsafeDirectives.push("blob:")
+        }
 
-        extensionFrame.src = `${sandboxOrigin}/runProgram?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
+        const originName = location.origin + "/"
+
+        const extensionOrigin = dependencies.cargoIndex.resolvedUrl
+        const allowedOrigins = extensionOrigin === originName
+            ? [...permissionsSummary.webRequest]
+            : [extensionOrigin, ...permissionsSummary.webRequest]
+
+        const contentSecurityPolicy = encodeURIComponent(
+            `default-src 'self' ${unsafeDirectives.join(" ")} ${originName} ${allowedOrigins.join(" ")}; object-src 'none'; frame-src 'none'; manifest-src 'none'; base-uri 'self';`
+        )
+
+        // permissions end
+        const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
+        extensionFrame.src = `${sandboxOrigin}/runProgram.html?entry=${encodeURIComponent(entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         this.iframeElement = extensionFrame
         this.rpc = rpc
     }

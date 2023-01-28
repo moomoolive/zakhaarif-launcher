@@ -20,13 +20,12 @@ import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
 
-const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
 const EXTENSION_IFRAME_ID = "extension-frame"
 const NO_EXTENSION_ENTRY = ""
 const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, sandboxInitializePromise} = useAppShellContext()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
@@ -68,6 +67,7 @@ const ExtensionShellPage = () => {
         }
 
         if (entryUrl === GAME_CARGO_INDEX.entry) {
+            await sandboxInitializePromise.promise
             setExtensionEntry({url: GAME_CARGO_INDEX.entry, retry: 0})
             extensionCargoIndex.current = GAME_CARGO_INDEX
             extensionCargo.current = GAME_CARGO
@@ -93,6 +93,7 @@ const ExtensionShellPage = () => {
 
         const cargoResponse = await downloadClient.getCargoAtUrl(meta.resolvedUrl)
         if (cargoResponse.ok) {
+            await sandboxInitializePromise.promise
             extensionCargo.current = cargoResponse.data.pkg as Cargo<Permissions>
             extensionCargoIndex.current = meta
             setExtensionEntry({url: meta.entry, retry: 0})
@@ -143,7 +144,6 @@ const ExtensionShellPage = () => {
 
         const jsSandbox = new JsSandbox({
             entryUrl: extensionEntry.url,
-            sandboxOrigin: sandboxOrigin,
             id: EXTENSION_IFRAME_ID,
             name: `${extensionCargo.current.name}-sandbox`,
             dependencies: {

@@ -240,7 +240,7 @@ const LauncherRoot = () => {
       sleep(500),
     ] as const)
     const previousVersionExists = res.updateCheckResponse.previousVersionExists
-    
+    console.log("download res", res)
     setCheckedForUpdates(true)
     if (previousVersionExists && !res.enoughSpaceForPackage) {
       const updateVersion = res.versions.new

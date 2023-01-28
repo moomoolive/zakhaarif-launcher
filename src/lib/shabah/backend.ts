@@ -203,6 +203,8 @@ export type CargoState = (
     | "update-failed" | "update-aborted"
 )
 
+export type Permissions = {key: string, value: string[]}[]
+
 export type CargoIndex = {
     name: string
     id: string
@@ -212,6 +214,7 @@ export type CargoIndex = {
     bytes: number
     entry: string
     version: string
+    permissions: Permissions
     state: CargoState
     createdAt: number
     updatedAt: number

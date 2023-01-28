@@ -1,5 +1,5 @@
 import {wRpc, MessagableEntity} from "../src/lib/wRpc/simple"
-import type {ExtensionShellFunctions} from "../src/appShell/ExtensionShell"
+import type {ExtensionShellFunctions} from "../src/routes/ExtensionShell"
 
 type WindowMessageEvent = {
     source: MessagableEntity

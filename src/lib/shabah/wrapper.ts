@@ -2,7 +2,7 @@ import {
     checkForUpdates,
     createResourceMap,
 } from "./client"
-import {io} from "@/lib/monads/result"
+import {io} from "../monads/result"
 import {
     CargoIndexWithoutMeta,
     CargoIndices,
@@ -23,11 +23,18 @@ import {
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
 } from "./backend"
-import {BYTES_PER_MB} from "@/lib/utils/consts/storage"
-import {readableByteCount} from "@/lib/utils/storage/friendlyBytes"
-import {MANIFEST_NAME} from "@/lib/cargo/index"
+import {BYTES_PER_MB} from "../utils/consts/storage"
+import {readableByteCount} from "../utils/storage/friendlyBytes"
+import {MANIFEST_NAME} from "../cargo/index"
 import {Cargo} from "../cargo/index"
-import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
+import {resultJsonParse} from "../monads/utils/jsonParse"
+import {
+    cleanPermissions, 
+    hasUnsafePermissions, 
+    generateIframePolicy,
+    CleanedPermissions
+} from "../utils/security/generateIframePolicy"
+import { Permissions } from "../types/permissions"
 
 export type {CargoIndex} from "./backend"
 
@@ -143,6 +150,10 @@ export class Shabah {
             oldResolvedUrl: !cargoIndex ? "" : cargoIndex.resolvedUrl,
             name: cargo.id
         }, networkRequest, fileCache)
+        if (response.newCargo) {
+            const permissions = response.newCargo.parsed.permissions
+            response.newCargo.parsed.permissions = cleanPermissions(permissions)
+        }
         const disk = await this.diskInfo()
         const diskWithCargo = (
             disk.used + response.bytesToDownload
@@ -161,6 +172,48 @@ export class Shabah {
              response.newCargo?.parsed.version
             || Shabah.NO_PREVIOUS_INSTALLATION
         )
+
+       
+        let newPermissionsRequested = [] as CleanedPermissions
+        if (response.newCargo && response.previousCargo) {
+            const oldPermissions = cleanPermissions(response.previousCargo.permissions)
+            const oldPermissionsMap = new Map<string, number>()
+            for (let i = 0; i < oldPermissions.length; i++) {
+                const {key, value} = oldPermissions[i]
+                oldPermissionsMap.set(key, 1)
+                for (let x = 0; x < value.length; x++) {
+                    const current = value[x]
+                    oldPermissionsMap.set(`${key}:${current}`, 1)
+                }
+            }
+            const newPermissions = response.newCargo.parsed.permissions as CleanedPermissions
+            for (let i = 0; i < newPermissions.length; i++) {
+                const permission = newPermissions[i]
+                const {key, value} = newPermissions[i]
+                if (!oldPermissionsMap.has(key)) {
+                    newPermissionsRequested.push(permission)
+                    continue
+                }
+                const newValues = []
+                let newCount = 0
+                for (let x = 0; x < value.length; x++) {
+                    const current = value[x]
+                    if (oldPermissionsMap.has(`${key}:${current}`)) {
+                        continue
+                    }
+                    newCount += 1
+                    newValues.push(current)
+                }
+                if (newCount > 0) {
+                    newPermissionsRequested.push(
+                        {key, value: newValues} as typeof permission
+                    )
+                }
+            }
+        } else if (response.newCargo) {
+            newPermissionsRequested = response.newCargo.parsed.permissions as CleanedPermissions
+        }
+
         const friendlyBytes = readableByteCount(bytesNeededToDownload)
         return {
             updateCheckResponse: response,
@@ -168,6 +221,14 @@ export class Shabah {
             errorOccurred: response.errors.length > 0,
             enoughSpaceForPackage,
             updateAvailable: !!response.newCargo,
+            newPermissionsRequested,
+            unsafeCargo: response.newCargo 
+                ? hasUnsafePermissions(
+                    generateIframePolicy(
+                        (response.newCargo.parsed as Cargo<Permissions>).permissions
+                    )
+                )
+                : false,
             diskInfo: {
                 ...disk,
                 usageAfterDownload: diskWithCargo,
@@ -308,6 +369,7 @@ export class Shabah {
                     name: newCargo.parsed.name,
                     id: details.id,
                     state: "updating",
+                    permissions: newCargo.parsed.permissions,
                     version: details.versions.new,
                     entry: newCargo.parsed.entry,
                     bytes: details.updateCheckResponse.totalBytes,

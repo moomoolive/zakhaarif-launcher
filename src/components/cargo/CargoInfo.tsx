@@ -29,6 +29,7 @@ import {CargoIndex} from "../../lib/shabah/wrapper"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_ID_PREFIX, EXTENSION_CARGO_ID_PREFIX} from "../../config"
 import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
+import { cleanPermissions } from "@/lib/utils/security/generateIframePolicy"
 
 export type CargoInfoProps = {
     onClose: () => void
@@ -255,8 +256,10 @@ export const CargoInfo = ({
         if (allowAll) {
             return [{key: ALLOW_ALL_PERMISSIONS, value: [] as string[]}] as typeof permissions
         }
-        
-        const preFiltered = permissions.filter(({key}) => !permissionsMeta[key].implicit)
+
+        const preFiltered = cleanPermissions(permissions).filter(
+            ({key}) => !permissionsMeta[key].implicit
+        )
         const extendableDangerousPermissions = preFiltered.filter(
             ({key}) => permissionsMeta[key].dangerous && permissionsMeta[key].extendable
         )

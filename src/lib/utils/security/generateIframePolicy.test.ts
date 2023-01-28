@@ -1,5 +1,5 @@
 import {expect, describe, it} from "vitest"
-import {generateIframePolicy, isCspHttpValueDangerous} from "./generateIframePolicy"
+import {cleanPermissions, generateIframePolicy, isDangerousCspOrigin} from "./generateIframePolicy"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
 
 describe("filtering malicous csp values", () => {
@@ -12,18 +12,21 @@ describe("filtering malicous csp values", () => {
             "https.notagoodpolicy.com"
         ] as const
         for (const c of cases) {
-            expect(isCspHttpValueDangerous(c)).toBe(true)
+            expect(isDangerousCspOrigin(c)).toBe(true)
         }
     })
 
-    it("values that include single or double quotes should be rejected", () => {
+    it("csp directives should be rejected", () => {
         const cases = [
-            "https://'unsafe-hashes'",
-            encodeURIComponent("'unsafe-inline'"),
-            '"none"'
+            "'unsafe-hashes'",
+            "'unsafe-inline'",
+            "'none'",
+            "'nonce-DhcnhD3khTMePgXwdayK9BsMqXjhguVV'",
+            "'strict-dynamic'",
+            "'sha256-jzgBGA4UWFFmpOBq0JpdsySukE1FrEN5bUpoK8Z29fY='",
         ] as const
         for (const c of cases) {
-            expect(isCspHttpValueDangerous(c)).toBe(true)
+            expect(isDangerousCspOrigin(c)).toBe(true)
         }
     })
 
@@ -34,7 +37,7 @@ describe("filtering malicous csp values", () => {
             'http://*.com'
         ] as const
         for (const c of cases) {
-            expect(isCspHttpValueDangerous(c)).toBe(true)
+            expect(isDangerousCspOrigin(c)).toBe(true)
         }
     })
 
@@ -45,7 +48,7 @@ describe("filtering malicous csp values", () => {
             'https://let-gooooo'
         ] as const
         for (const c of cases) {
-            expect(isCspHttpValueDangerous(c)).toBe(true)
+            expect(isDangerousCspOrigin(c)).toBe(true)
         }
     })
 })
@@ -99,5 +102,56 @@ describe("policy generator", () => {
                 expect(result[k]).toBe(true)
             }
         }
+    })
+})
+
+describe("permission filterer", () => {
+    it("unrecognized values should be filtered out", () => {
+        const cleaned = cleanPermissions([
+            {key: "random-key", value: []},
+            {key: "random-key2", value: []},
+            {key: "geoLocation", value: []},
+        ])
+        expect(cleaned.length).toBe(1)
+        expect(cleaned[0].key).toBe("geoLocation")
+    })
+
+    it(`extendable permissions (webRequest, embedExtensions, etc.) should filter out all other values if "${ALLOW_ALL_PERMISSIONS}" value exists`, () => {
+        const cleaned = cleanPermissions([
+            {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS, "https://hey.com", "https://nononon.org"]},
+            {key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS, "https://mymamashome.com", "https://google.com"]},
+        ])
+        expect(cleaned.length).toBe(2)
+        for (const {value} of cleaned) {
+            expect(value).toStrictEqual([ALLOW_ALL_PERMISSIONS])
+        }
+    })
+
+    it(`duplicate permission values should be filtered out`, () => {
+        const cleaned = cleanPermissions([
+            {key: "webRequest", value: ["https://hey.com", "https://hey.com", "https://nononon.org", "https://nononon.org"]},
+            {key: "embedExtensions", value: ["https://mymamashome.com", "https://mymamashome.com", "https://google.com", "https://google.com"]},
+        ])
+        expect(cleaned.length).toBe(2)
+        for (const {value} of cleaned) {
+            expect(value.length).toBe(2)
+        }
+    })
+
+    it("non-http (and https) url values for webRequest permission should be filtered out", () => {
+        const validUrls = [
+            "https://hey.com", 
+            "https://nononon.org"
+        ]
+        const cleaned = cleanPermissions([{
+            key: "webRequest", 
+            value: [
+                ...validUrls, 
+                "https://dangerous-site.*", "blob:",
+                "data:svg+xml:adfajklfdakslfdjalsdfjasdflkj"
+            ]
+        }])
+        expect(cleaned.length).toBe(1)
+        expect(cleaned[0].value).toStrictEqual(validUrls)
     })
 })

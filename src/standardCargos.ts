@@ -39,6 +39,7 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
     bytes: GAME_ESTIMATED_BYTES,
     entry: CURRENT_ORIGIN + STANDARD_MOD_RELATIVE_URL,
     version: STANDARD_MOD_CARGO.version,
+    permissions: STANDARD_MOD_CARGO.permissions,
     state: "cached",
     createdAt: 0,
     updatedAt: 0
@@ -73,6 +74,7 @@ export const GAME_CARGO_INDEX: Readonly<CargoIndex> = {
     bytes: GAME_ESTIMATED_BYTES,
     entry: CURRENT_ORIGIN + GAME_RELATIVE_URL,
     version: GAME_CARGO.version,
+    permissions: GAME_CARGO.permissions,
     state: "cached",
     createdAt: 0,
     updatedAt: 0

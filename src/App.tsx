@@ -38,7 +38,12 @@ const  App = () => {
     downloadClient: new Shabah({
       origin: location.origin,
       adaptors: webAdaptors(APP_CACHE)
-    })
+    }),
+    sandboxInitializePromise: {
+      resolve: () => {},
+      reject: () => {},
+      promise: Promise.resolve(true)
+    }
   })
 
   const serviceWorkerInitialized = useRef(false)

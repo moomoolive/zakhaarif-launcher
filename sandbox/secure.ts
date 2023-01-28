@@ -31,9 +31,10 @@ const rpc = new wRpc<ServiceWorkerFunctions>({
     },
     messageInterceptor: {
         addEventListener(_, handler) {
-            navigator.serviceWorker.addEventListener(
-                "message", handler
-            )
+            navigator.serviceWorker.addEventListener("message", (event) => {
+                console.log("message source", event.source)
+                handler(event)
+            })
         }
     }
 })
