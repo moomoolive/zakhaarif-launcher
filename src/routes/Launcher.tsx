@@ -24,6 +24,7 @@ import {sleep} from "@/lib/utils/sleep"
 import {APP_CARGO_ID} from "@/config"
 import {useAppShellContext} from "./store"
 import {useNavigate} from "react-router-dom"
+import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
 
 const LoadingIcon = () => <span className="text-lg animate-spin">
   <LoadingIconGlobal/>
@@ -152,15 +153,16 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
 
-const LAST_UPDATE_KEY = "last-update"
-
 const LauncherRoot = () => {
   const confirm = useGlobalConfirm()
   const {setTerminalVisibility, downloadClient} = useAppShellContext()
   const navigate = useNavigate()
 
 
-  const {current: launchApp} = useRef(() => navigate("/launch"))
+  const {current: launchApp} = useRef(() => {
+    sessionStorage.setItem(APP_LAUNCHED, "1")
+    navigate("/launch")
+  })
 
   const [showProgress, setShowProgress] = useState(false)
   const [progressMsg, setProgressMsg] = useState<ReactNode>("")
@@ -215,7 +217,8 @@ const LauncherRoot = () => {
   }
 
   const gatherAssets = async () => {
-    if (isIframe()) {
+    if (import.meta.env.PROD && !!sessionStorage.getItem(APP_LAUNCHED)) {
+      launchApp()
       return
     }
     if (checkedForUpdates && afterUpdateCheckAction) {

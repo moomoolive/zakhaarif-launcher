@@ -10,6 +10,7 @@ import type {TopLevelAppProps} from "../lib/types/globalState"
 import {AppShellContext, useAppShellContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
+import MadeWith from "./MadeWith"
 import NotFound from "./NotFound"
 
 type LazyRouteLoader<T> = () => Promise<{ default: LazyComponent<T> }>
@@ -113,6 +114,7 @@ const PageDisplay = () => {
             <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<Launcher/>}/>
             <Route path="/launch" element={<AppLaunch/>}/>
+            <Route path="/made-with" element={<MadeWith/>}/>
             
             {
             // lazy loaded routes

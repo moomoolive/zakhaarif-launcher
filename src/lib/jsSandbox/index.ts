@@ -11,7 +11,7 @@ import {nanoid} from "nanoid"
 import {type as betterTypeof} from "../utils/betterTypeof"
 import type {Shabah, CargoIndices} from "../shabah/downloadClient"
 import {PermissionsSummary, hasUnsafePermissions} from "../utils/security/permissionsSummary"
-import { addStandardCargosToCargoIndexes } from "@/standardCargos"
+import {addStandardCargosToCargoIndexes} from "../../standardCargos"
 
 const MINIMUM_AUTH_TOKEN_LENGTH = 20
 const AUTH_TOKEN_LENGTH = (() => {
@@ -95,6 +95,34 @@ const embedAnyExtensionRpcs = (state: RpcState) => {
         }
     } as const
     return rpcs
+}
+
+const gameSaveRpcs = (state: RpcState) => {
+    if (
+        !state.permissionsSummary.gameSaves.read
+        && !state.permissionsSummary.gameSaves.write
+    ) {
+        return {} as typeof allPermissions
+    }
+    const getSaveFile = async (id: number) => {
+        if (typeof id !== "number") {
+            console.warn(`extension token must be a number, got "${betterTypeof(id)}"`)
+            return null
+        }
+        if (id < 0) {
+            return await state.database.gameSaves.latest()
+        }
+        return await state.database.gameSaves.getById(id)
+    }
+    if (!state.permissionsSummary.gameSaves.read) {
+        return {
+            gameSaveRpcs
+        } as unknown as typeof allPermissions
+    }
+    const allPermissions = {
+        getSaveFile
+    }
+    return allPermissions
 }
 
 const essentialRpcs = (state: RpcState) => {
@@ -182,16 +210,6 @@ const essentialRpcs = (state: RpcState) => {
             }
             await state.confirmExtensionExit()
             return true
-        },
-        async getSaveFile(id: number) {
-            if (typeof id !== "number") {
-                console.warn(`extension token must be a number, got "${betterTypeof(id)}"`)
-                return null
-            }
-            if (id < 0) {
-                return await state.database.gameSaves.latest()
-            }
-            return await state.database.gameSaves.getById(id)
         }
     }
 }
@@ -199,7 +217,8 @@ const essentialRpcs = (state: RpcState) => {
 const createRpcFunctions = (state: RpcState) => {
     return {
         ...essentialRpcs(state),
-        ...embedAnyExtensionRpcs(state)
+        ...embedAnyExtensionRpcs(state),
+        ...gameSaveRpcs(state)
     } as const
 }
 
@@ -303,6 +322,7 @@ export class JsSandbox {
         const permissionsSummary = generatePermissionsSummary(
             dependencies.cargo.permissions
         )
+        console.log("summary", permissionsSummary)
         this.initialized = false
         this.originalPermissions = permissionsSummary
         this.reconfiguredPermissions = null
@@ -483,6 +503,7 @@ export class JsSandbox {
             ...this.originalPermissions,
             embedExtensions: canonicalUrls
         } as const
+        console.log("configured summary", configuredPermissions)
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
         const cargos = addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)

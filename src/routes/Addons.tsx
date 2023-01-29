@@ -40,7 +40,7 @@ import {
     IconButton
 } from "@mui/material"
 import {useAppShellContext} from "./store"
-import {io} from "@/lib/monads/result"
+import {io} from "../lib/monads/result"
 import {emptyCargoIndices, CargoState} from "@/lib/shabah/backend"
 import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
@@ -60,10 +60,7 @@ import {
     GAME_CARGO,
     STANDARD_MOD_CARGO
 } from "../standardCargos"
-import {
-    GAME_EXTENSION_ID,
-    STANDARD_MOD_ID
-} from "../config"
+import {GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
 import {MANIFEST_NAME} from "../lib/cargo/index"
 import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
 import type {Permissions} from "../lib/types/permissions"

@@ -59,6 +59,7 @@ export const GAME_CARGO = new Cargo<Permissions>({
         "pointerLock",
         "allowInlineContent",
         "allowUnsafeEval",
+        {key: "gameSaves", value: ["read", "write"]},
         {key: "embedExtensions", value: ["allowAll"]}
     ]
 })

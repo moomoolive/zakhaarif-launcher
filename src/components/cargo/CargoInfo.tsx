@@ -18,7 +18,8 @@ import {
     faDisplay,
     faVideo,
     faArrowPointer,
-    faLocationDot
+    faLocationDot,
+    faFloppyDisk
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, ClickAwayListener, IconButton} from "@mui/material"
 import {Cargo} from "../../lib/cargo/index"
@@ -180,6 +181,13 @@ const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                         </div> : <></>}
                     </>
                 }
+                case "gameSaves":
+                    return <>
+                        <span className="text-green-500 mr-2">
+                            <FontAwesomeIcon icon={faFloppyDisk}/>
+                        </span>
+                        {`${p.value.includes("write") ? "Read & Edit" : "Read"} Game Saves`}
+                    </>
                 default:
                     return <>
                         <span className="mr-2">

@@ -23,6 +23,7 @@ const permissions = [
     "unlimitedStorage",
 
     {key: "files", value: ["read"]},
+    {key: "gameSaves", value: ["read", "write"]},
     {key: "embedExtensions", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]},
     {key: "webRequest", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]}
 ] as const
@@ -33,12 +34,14 @@ const createMeta = ({
     name = "",
     dangerous = false,
     extendable = false,
-    implicit = false
+    implicit = false,
+    fixedOptions = false
 } = {}) => ({
     name,
     dangerous,
     extendable,
-    implicit
+    implicit,
+    fixedOptions
 }) as const
 
 type PermissionsMeta<P extends string> = {
@@ -47,7 +50,6 @@ type PermissionsMeta<P extends string> = {
 
 export const permissionsMeta: PermissionsMeta<PermissionKeys> = {
     allowAll: createMeta({name: "Unrestricted", dangerous: true}),
-    webRequest: createMeta({dangerous: true, extendable: true}),
     geoLocation: createMeta({name: "Location", dangerous: true}),
     microphone: createMeta({dangerous: true}),
     camera: createMeta({dangerous: true}),
@@ -60,7 +62,9 @@ export const permissionsMeta: PermissionsMeta<PermissionKeys> = {
     pointerLock: createMeta({name: "Hide Mouse"}),
     displayCapture: createMeta({name: "Record Screen", dangerous: true}),
     files: createMeta({name: "Read Files"}),
-    embedExtensions: createMeta({dangerous: true, extendable: true})
+    gameSaves: createMeta({fixedOptions: true}),
+    embedExtensions: createMeta({dangerous: true, extendable: true}),
+    webRequest: createMeta({dangerous: true, extendable: true}),
 }
 
 export type Permissions = typeof permissions

@@ -68,9 +68,54 @@ describe("policy generator", () => {
             }
             if (permissionsMeta[k].extendable) {
                 expect(result[k]).toStrictEqual([])
-                continue
+            } else if (permissionsMeta[k].fixedOptions) {
+                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+            } else {
+                expect(result[k]).toBe(false)
             }
-            expect(result[k]).toBe(false)
+        }
+    })
+
+    it("fixed option permissions should have fields found in values array set to true, if they exist in options, otherwise it should be set to false", () => {
+        const fixedOptionValidator = (value: string[]) => {
+            const key = "gameSaves" as const
+            const result = generatePermissionsSummary([
+                {key, value}
+            ])
+            const allKeys = new Map<string, boolean>([
+                ...Object.keys(result[key])
+                    .map((k) => [k, !!(result[key][k as keyof typeof result[typeof key]])] as const)
+            ])
+            const setKeys = new Map<string, boolean>([
+               ...value.map((v) => [v, true] as const)
+            ])
+            for (const [k] of allKeys) {
+                if (setKeys.has(k)) {
+                    expect(allKeys.get(k)).toBe(true)
+                } else {
+                    expect(allKeys.get(k)).toBe(false)
+                }
+            }
+        }
+        fixedOptionValidator(["read", "write"])
+        fixedOptionValidator(["read"])
+        fixedOptionValidator([])
+        const result = generatePermissionsSummary([
+            {key: "gameSaves", value: ["read", "write"]}
+        ])
+        expect(result.gameSaves).toStrictEqual({read: true, write: true})
+        for (const key of Object.keys(result)) {
+            const k = key as keyof typeof result
+            if (permissionsMeta[k].extendable) {
+                continue
+            } else if (permissionsMeta[k].fixedOptions) {
+                if (k === "gameSaves") {
+                    continue
+                }
+                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+            } else {
+                expect(result[k]).toBe(false)
+            }
         }
     })
 
@@ -85,8 +130,11 @@ describe("policy generator", () => {
             const k = key as keyof typeof result
             if (permissionsMeta[k].extendable) {
                 continue
+            } else if (permissionsMeta[k].fixedOptions) {
+                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+            } else {
+                expect(result[k]).toBe(false)
             }
-            expect(result[k]).toBe(false)
         }
     })
 
@@ -98,6 +146,8 @@ describe("policy generator", () => {
             const k = key as keyof typeof result
             if (permissionsMeta[k].extendable) {
                 expect(result.webRequest).toStrictEqual([ALLOW_ALL_PERMISSIONS])
+            } else if (permissionsMeta[k].fixedOptions) {
+                expect(Object.values(result[k]).every((value) => value)).toBe(true)
             } else {
                 expect(result[k]).toBe(true)
             }
@@ -138,6 +188,14 @@ describe("permission filterer", () => {
         }
     })
 
+    it(`all values other than read and write should be filtered out in 'gameSaves'`, () => {
+        const cleaned = cleanPermissions([
+            {key: "gameSaves", value: ["read", "write", "x-option", "y-option"]},
+        ])
+        expect(cleaned.length).toBe(1)
+        expect(cleaned[0].value).toStrictEqual(["read", "write"])
+    })
+
     it("non-http (and https) url values for webRequest permission should be filtered out", () => {
         const validUrls = [
             "https://hey.com", 
@@ -153,5 +211,15 @@ describe("permission filterer", () => {
         }])
         expect(cleaned.length).toBe(1)
         expect(cleaned[0].value).toStrictEqual(validUrls)
+    })
+
+    it(`extendable and fixed option permissions should be filtered out if there are no values`, () => {
+        const cleaned = cleanPermissions([
+            {key: "webRequest", value: []},
+            {key: "embedExtensions", value: []},
+            {key: "gameSaves", value: []},
+            {key: "geoLocation", value: []}
+        ])
+        expect(cleaned.length).toBe(1)
     })
 })

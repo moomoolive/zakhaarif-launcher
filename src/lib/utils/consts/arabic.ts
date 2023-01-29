@@ -1,0 +1,1 @@
+export const bismillah = "بسم الله الرحمن الرحيم"

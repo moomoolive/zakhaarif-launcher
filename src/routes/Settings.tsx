@@ -1,8 +1,8 @@
-import { DetailedHTMLProps, ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import {ReactNode, useEffect, useMemo, useState, useRef} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
-import {usePromise} from "@/hooks/promise"
-import {APP_CARGO_ID} from "@/config"
+import {usePromise} from "../hooks/promise"
+import {APP_CARGO_ID} from "../config"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faCodeBranch, 
@@ -22,12 +22,13 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
 import {PROFILE_NAME, UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
-import { useDebounce } from "@/hooks/debounce"
-import { useGlobalConfirm } from "@/hooks/globalConfirm"
-import LoadingIcon from "@/components/LoadingIcon"
-import { useEffectAsync } from "@/hooks/effectAsync"
-import { io } from "@/lib/monads/result"
+import { useDebounce } from "../hooks/debounce"
+import { useGlobalConfirm } from "../hooks/globalConfirm"
+import LoadingIcon from "../components/LoadingIcon"
+import { useEffectAsync } from "../hooks/effectAsync"
+import { io } from "../lib/monads/result"
 import { faNpm } from "@fortawesome/free-brands-svg-icons"
+import {bismillah} from "../lib/utils/consts/arabic"
 
 type SettingRouteProps = {
     children: ReactNode
@@ -145,6 +146,8 @@ type CreditElement = {
     url: string
 }
 
+const CREDITS_DIV_ID = "credits-compiled"
+
 const SubPageList = {
     userProfile: () => {
         const optionsDebounce = useDebounce(500)
@@ -191,6 +194,7 @@ const SubPageList = {
         const [credits, setCredits] = useState<CreditElement[]>([])
         const [loading, setLoading] = useState(true)
         const [error, setError] = useState(false)
+        const creditScrollerIntervalRef = useRef(-1)
 
         useEffectAsync(async () => {
             const creditsResponse = await io.wrap(fetch("/credits.json"))
@@ -207,6 +211,29 @@ const SubPageList = {
             setCredits(credits.data)
             setLoading(false)
         }, [])
+
+        useEffect(() => {
+            if (credits.length < 1) {
+                return
+            }
+            const creditsDiv = document.getElementById(CREDITS_DIV_ID)
+            if (!creditsDiv) {
+                return
+            }
+            const milliseconds = 16
+            const scrollerState = {
+                previousScroll: -1
+            }
+            creditScrollerIntervalRef.current = window.setInterval(() => {
+                if (scrollerState.previousScroll === creditsDiv.scrollTop) {
+                    window.clearInterval(creditScrollerIntervalRef.current)
+                    return
+                }
+                scrollerState.previousScroll = creditsDiv.scrollTop
+                creditsDiv.scrollTop += 1
+            }, milliseconds)
+            return () => window.clearInterval(creditScrollerIntervalRef.current)
+        }, [credits])
 
         return <div className="w-full h-full">
             {!error && loading ? <>
@@ -237,9 +264,12 @@ const SubPageList = {
                         {"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source packages (and their dependencies)."}
                     </div>
                     <div 
-                        id="credits-compiled"
+                        id={CREDITS_DIV_ID}
                         className="w-full h-10/12 px-2 py-3 overflow-x-clip overflow-y-scroll"
                     >
+                        <div className="mb-5 text-center text-lg text-neutral-400">
+                            {bismillah}
+                        </div>
                         {credits.map((credit, index) => {
                             const {name, url, type} = credit
                             return <a

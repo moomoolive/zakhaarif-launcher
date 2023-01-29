@@ -22,6 +22,7 @@ const permissionsSummary = (allowAll: boolean) => {
         allowDataUrls: startValue,
         allowBlobs: startValue,
         files: startValue,
+        gameSaves: {read: startValue, write: startValue},
         embedExtensions: allowAll ? [ALLOW_ALL_PERMISSIONS] : [],
         webRequest: allowAll ? [ALLOW_ALL_PERMISSIONS] : [],
     } satisfies Record<PermissionKeys, unknown>
@@ -72,6 +73,15 @@ export const generatePermissionsSummary = (
                     summary.embedExtensions = value
                 }
                 break
+            case "gameSaves":
+                summary.gameSaves.read = value.includes("read")
+                summary.gameSaves.write = value.includes("write")
+                break
+            case "files":
+                if (value.includes("read")) {
+                    summary.files = true
+                }
+                break
             default:
                 summary[key] = true
                 break
@@ -90,16 +100,27 @@ export const hasUnsafePermissions = (summary: PermissionsSummary) => {
     )
 }
 
-const isValidWebRequestValue = (value: string) => {
-    if (isDangerousCspOrigin(value)) {
-        return false
+const permissionCleaners = {
+    webRequest: (value: string) => {
+        if (isDangerousCspOrigin(value)) {
+            return false
+        }
+        try {
+            return !!(new URL(value))
+        } catch {
+            return false
+        }
+    },
+    gameSaves: (value: string) => {
+        switch (value) {
+            case "read":
+            case "write":
+                return true
+            default:
+                return false
+        }
     }
-    try {
-        return !!(new URL(value))
-    } catch {
-        return false
-    }
-}
+} as const
 
 export const cleanPermissions = (permissions: GeneralPermissions) => {
     const candidates = permissions as PermissionsList<Permissions>
@@ -107,7 +128,11 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
     for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i]
         const {key, value} = candidate
-        if (!(key in permissionsMeta)) {
+        if (
+            !(key in permissionsMeta)
+            || permissionsMeta[key].extendable && value.length < 1
+            || permissionsMeta[key].fixedOptions && value.length < 1
+        ) {
             continue
         }
         if (value.length < 1) {
@@ -120,13 +145,21 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
         }
         const duplicates = new Map<string, number>()
         const newValues = []
-        const isHttp = key === "webRequest"
+        let validator = null as (null | ((value: string) => boolean))
+        switch (key) {
+            case "webRequest":
+            case "gameSaves":
+                validator = permissionCleaners[key]
+                break
+            default:
+                break
+        }
         for (let x = 0; x < value.length; x++) {
             const v = value[x]
             if (duplicates.has(v)) {
                 continue
             }
-            if (isHttp && !isValidWebRequestValue(v)) {
+            if (validator && !validator(v)) {
                 continue
             }
             newValues.push(v)
