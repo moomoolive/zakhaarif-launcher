@@ -9,8 +9,8 @@ import { APP_CACHE } from "../../config"
 import {wRpc} from "../wRpc/simple"
 import {nanoid} from "nanoid"
 import {type as betterTypeof} from "../utils/betterTypeof"
-import type {Shabah, CargoIndices} from "../shabah/downloadClient"
-import {PermissionsSummary, hasUnsafePermissions} from "../utils/security/permissionsSummary"
+import type {Shabah} from "../shabah/downloadClient"
+import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
 import {addStandardCargosToCargoIndexes} from "../../standardCargos"
 
 const MINIMUM_AUTH_TOKEN_LENGTH = 20
@@ -222,88 +222,7 @@ const createRpcFunctions = (state: RpcState) => {
     } as const
 }
 
-const mergePermissions = (
-    currentPermissions: PermissionsSummary,
-    cargoIndexes: CargoIndices
-) => {
-    if (
-        currentPermissions.embedExtensions.length < 1
-        || currentPermissions.embedExtensions[0] === ALLOW_ALL_PERMISSIONS
-    ) {
-        return currentPermissions
-    }
-    const merged = {...currentPermissions}
-    const canonicalUrlMap = new Map<string, number>()
-    for (let i = 0; i < merged.embedExtensions.length; i++) {
-        const embed = merged.embedExtensions[i]
-        canonicalUrlMap.set(embed, 1)
-    }
-    const targetPermissions = []
-    for (let i = 0; i < cargoIndexes.cargos.length; i++) {
-        const cargo = cargoIndexes.cargos[i]
-        if (!canonicalUrlMap.has(cargo.canonicalUrl)) {
-            continue
-        }
-        const summary = generatePermissionsSummary(
-            cargo.permissions
-        )
-        // a cargo that is embedding other cargos
-        // cannot embed cargos with unsafe permissions
-        if (hasUnsafePermissions(summary)) {
-            continue
-        }
-        summary.webRequest.push(cargo.resolvedUrl)
-        targetPermissions.push(summary)
-    }
-    const finalPermissions: PermissionsSummary = {
-        ...merged, 
-        embedExtensions: []
-    }
-    for (let i = 0; i < targetPermissions.length; i++) {
-        const target = targetPermissions[i]
-        finalPermissions.fullScreen = target.fullScreen || finalPermissions.fullScreen
-        finalPermissions.pointerLock = target.pointerLock || finalPermissions.pointerLock
-        finalPermissions.displayCapture = target.displayCapture || finalPermissions.displayCapture
-        finalPermissions.camera = target.camera || finalPermissions.camera
-        finalPermissions.geoLocation = target.geoLocation || finalPermissions.geoLocation
-        finalPermissions.microphone = target.microphone || finalPermissions.microphone
-        finalPermissions.unlimitedStorage = target.unlimitedStorage || finalPermissions.unlimitedStorage
-        finalPermissions.allowInlineContent = target.allowInlineContent || finalPermissions.allowInlineContent
-        finalPermissions.allowUnsafeEval = target.allowUnsafeEval || finalPermissions.allowUnsafeEval
-        finalPermissions.allowDataUrls = target.allowDataUrls || finalPermissions.allowDataUrls
-        finalPermissions.allowBlobs = target.allowBlobs || finalPermissions.allowBlobs
-        finalPermissions.files = target.files || finalPermissions.files
-        finalPermissions.gameSaves.read = target.gameSaves.read || finalPermissions.gameSaves.read
-        finalPermissions.gameSaves.write = target.gameSaves.write || finalPermissions.gameSaves.write
-    }
-
-    const unrestrictedHttp = merged.webRequest.length > 0 && merged.webRequest[0] === ALLOW_ALL_PERMISSIONS
-    if (unrestrictedHttp) {
-        finalPermissions.webRequest = [ALLOW_ALL_PERMISSIONS]
-        return merged
-    }
-    const finalWebRequest = [...merged.webRequest]
-    const httpMap = new Map<string, number>()
-    for (let i = 0; i < targetPermissions.length; i++) {
-        const {webRequest} = targetPermissions[i]
-        for (let x = 0; x < webRequest.length; x++) {
-            const http = webRequest[x]
-            if (httpMap.has(http)) {
-                continue
-            }
-            finalWebRequest.push(http)
-            httpMap.set(http, 1)
-        }
-    }
-    finalPermissions.webRequest = finalWebRequest
-    return finalPermissions
-}
-
-type IframeAttributes = (
-    "allow" 
-    | "sandbox" 
-    | "allowfullscreen"
-)
+type IframeAttributes = ("allow" | "sandbox")
 
 class IframeArguments {
     attributes: {key: IframeAttributes, value: string}[] = []
@@ -400,7 +319,7 @@ export class JsSandbox {
             return originalPermissions
         }
         const cargoIndexes = await downloadClient.getCargoIndices()
-        return mergePermissions(originalPermissions, cargoIndexes)
+        return mergePermissionSummaries(originalPermissions, cargoIndexes)
     }
 
     private iframeArguments(
@@ -441,7 +360,7 @@ export class JsSandbox {
             iframe.setAttribute(key, value)
         }
         if (reconfigured) {
-            iframe.setAttribute("reconfigured-unix-timestamp", Date.now().toString())
+            iframe.setAttribute("reconfigured-timestamp", Date.now().toString())
         }
         const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
         iframe.src = `${sandboxOrigin}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
@@ -492,7 +411,7 @@ export class JsSandbox {
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
         const cargos = addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
-        const merged = mergePermissions(
+        const merged = mergePermissionSummaries(
             this.reconfiguredPermissions, 
             {...originalCargoIndexes, cargos}
         )

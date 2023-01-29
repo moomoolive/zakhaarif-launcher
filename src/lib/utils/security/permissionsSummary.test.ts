@@ -1,6 +1,28 @@
 import {expect, describe, it} from "vitest"
-import {ALLOW_ALL_ORIGINS_CSP, cleanPermissions, ContentSecurityPolicyConfig, createContentSecurityPolicy, CSP_CONSTANT_POLICY, GeneralPermissions, generatePermissionsSummary, iframeAllowlist, iframeSandbox, isDangerousCspOrigin, REQUIRED_DEFAULT_SRC_CSP, REQUIRED_SANDBOX_ATTRIBUTES, SAME_ORIGIN_CSP_KEYWORD, UNSAFE_BLOBS_CSP, UNSAFE_DATA_URLS_CSP, UNSAFE_EVAL_CSP, UNSAFE_INLINE_CSP} from "./permissionsSummary"
+import {
+    ALLOW_ALL_ORIGINS_CSP, 
+    cleanPermissions, 
+    ContentSecurityPolicyConfig, 
+    createContentSecurityPolicy, 
+    CSP_CONSTANT_POLICY, 
+    GeneralPermissions, 
+    generatePermissionsSummary, 
+    hasUnsafePermissions, 
+    iframeAllowlist, 
+    iframeSandbox, 
+    isDangerousCspOrigin, 
+    mergePermissionSummaries, 
+    REQUIRED_DEFAULT_SRC_CSP, 
+    REQUIRED_SANDBOX_ATTRIBUTES, 
+    SAME_ORIGIN_CSP_KEYWORD, 
+    UNSAFE_BLOBS_CSP, 
+    UNSAFE_DATA_URLS_CSP, 
+    UNSAFE_EVAL_CSP, 
+    UNSAFE_INLINE_CSP
+} from "./permissionsSummary"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
+import { CargoIndex, emptyCargoIndices } from "../../shabah/backend"
+import { NULL_FIELD } from "../../cargo/index"
 
 describe("filtering malicous csp values", () => {
     it("values that don't start with https or http should be rejected", () => {
@@ -493,6 +515,284 @@ describe("iframe sandbox attribute generator", () => {
             const summary = generatePermissionsSummary(permissions)
             const sandbox = iframeSandbox(summary)
             expect(sandbox).toBe(REQUIRED_SANDBOX_ATTRIBUTES)
+        }
+    })
+})
+
+describe("unsafe permissions detector", () => {
+    it(`"${ALLOW_ALL_PERMISSIONS}" permission return true`, () => {
+        const summary = generatePermissionsSummary([{key: ALLOW_ALL_PERMISSIONS, value: []}])
+        expect(hasUnsafePermissions(summary)).toBe(true)
+    })
+
+    it(`web request permission with "${ALLOW_ALL_PERMISSIONS}" return true`, () => {
+        const summary = generatePermissionsSummary([{
+            key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]
+        }])
+        expect(hasUnsafePermissions(summary)).toBe(true)
+    })
+
+    it(`embed extensions permission with any value other than empty return true`, () => {
+        const allowAll = generatePermissionsSummary([{
+            key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS]
+        }])
+        expect(hasUnsafePermissions(allowAll)).toBe(true)
+        const notAllowAll = generatePermissionsSummary([{
+            key: "embedExtensions", value: ["https://random.https/", "https://coolio.com"]
+        }])
+        expect(hasUnsafePermissions(notAllowAll)).toBe(true)
+        const empty = generatePermissionsSummary([{
+            key: "embedExtensions", value: []
+        }])
+        expect(hasUnsafePermissions(empty)).toBe(false)
+    })
+
+    it("mixing multiple dangerous permission together should return true", () => {
+        const cases = [
+            [{key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS]}, {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]}],
+            [{key: ALLOW_ALL_PERMISSIONS, value: []}, {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]}],
+        ]
+        for (const c of cases) {
+            const summary = generatePermissionsSummary(c)
+            expect(hasUnsafePermissions(summary)).toBe(true)
+        }
+    })
+
+    it("mixing root permissions with other permissions should return true", () => {
+        const cases = [
+            [{key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS]}, {key: "geoLocation", value: []}],
+            [{key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]}, {key: "camera", value: []}],
+            [{key: ALLOW_ALL_PERMISSIONS, value: []}, {key: "fullScreen", value: []}, {key: "files", value: ["read"]}],
+        ]
+        for (const c of cases) {
+            const summary = generatePermissionsSummary(c)
+            expect(hasUnsafePermissions(summary)).toBe(true)
+        }
+    })
+
+    it("non-root permissions should return false", () => {
+        const cases = [
+            [{key: "microphone", value: []}, {key: "geoLocation", value: []}],
+            [{key: "allowUnsafeEval", value: []}, {key: "camera", value: []}],
+            [{key: "gameSaves", value: ["read", "write"]}, {key: "fullScreen", value: []}, {key: "files", value: ["read"]}],
+        ]
+        for (const c of cases) {
+            const summary = generatePermissionsSummary(c)
+            expect(hasUnsafePermissions(summary)).toBe(false)
+        }
+    })
+})
+
+const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
+    {
+        id: "random1",
+        name: "cool1",
+        logoUrl: NULL_FIELD,
+        resolvedUrl: `https://my-mamas-house.com/pkg/`,
+        canonicalUrl: `https://my-mamas-house.com/pkg/`,
+        bytes: 100,
+        entry: `index.js`,
+        version: "2.1.0",
+        permissions: [],
+        state: "cached",
+        createdAt: 0,
+        updatedAt: 0
+    },
+    {
+        id: "random4",
+        name: "cool2",
+        logoUrl: NULL_FIELD,
+        resolvedUrl: `https://my-dadas-house.com/pkg/`,
+        canonicalUrl: `https://my-dadas-house.com/pkg/`,
+        bytes: 100,
+        entry: `index.js`,
+        version: "32.3.0",
+        permissions: [],
+        state: "cached",
+        createdAt: 0,
+        updatedAt: 0
+    },
+    {
+        id: "random3",
+        name: "cool12",
+        logoUrl: NULL_FIELD,
+        resolvedUrl: `https://my-aunties-house.com/pkg/`,
+        canonicalUrl: `https://my-aunties-house.com/pkg/`,
+        bytes: 100,
+        entry: `index.js`,
+        version: "0.2.3",
+        permissions: [],
+        state: "cached",
+        createdAt: 0,
+        updatedAt: 0
+    },
+]
+
+describe("merging permission summaries", () => {
+    it("permissions without any embed extensions or with embed all permission, should return original permissions", () => {
+        const cases = [
+            [{key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS]}],
+            [{key: "embedExtensions", value: []}],
+            [{key: "camera", value: []}, {key: "geoLocation", value: []}],
+            [{key: "gameSaves", value: ["read", "write"]}],
+        ]
+        const cargoIndex = emptyCargoIndices()
+        cargoIndex.cargos.push(...structuredClone(DUMMY_CARGOS))
+        for (const permissions of cases) {
+            const summary = generatePermissionsSummary(permissions)
+            const merged = mergePermissionSummaries(summary, cargoIndex)
+            expect(structuredClone(summary)).toStrictEqual(merged)
+        }
+    })
+
+    it("if embedExtensions targets are valid but do not exist in cargoIndices, original permissions should be returned", () => {
+        const cases = [
+            [{key: "embedExtensions", value: [DUMMY_CARGOS[0].canonicalUrl + Math.random()]}],
+            [{key: "embedExtensions", value: [DUMMY_CARGOS[2].canonicalUrl + Math.random()]}],
+        ]
+        const cargoIndex = emptyCargoIndices()
+        for (const c of cases) {
+            const {value} = c[0]
+            for (const v of value) {
+                expect(cargoIndex.cargos.find((cargo) => cargo.canonicalUrl === v)).toBe(undefined)
+            }
+        }
+        cargoIndex.cargos.push(...structuredClone(DUMMY_CARGOS))
+        for (const permissions of cases) {
+            const summary = generatePermissionsSummary(permissions)
+            const merged = mergePermissionSummaries(summary, cargoIndex)
+            expect(structuredClone(summary)).toStrictEqual(merged)
+        }
+    })
+
+    it("if embedExtensions targets exist but include unsafe permissions, original permissions should be returned", () => {
+        const cloned = structuredClone(DUMMY_CARGOS)
+        const embedLinks = cloned.map((index) => index.canonicalUrl)
+        const permissions = [
+            [{key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]}],
+            [{key: ALLOW_ALL_PERMISSIONS, value: []}],
+            [{key: "embedExtensions", value: ["https://hey.com"]}],
+        ]
+        for (let i = 0; i < cloned.length; i++) {
+            const target = cloned[i]
+            target.permissions = permissions[i]
+            const summary = generatePermissionsSummary(target.permissions)
+            expect(hasUnsafePermissions(summary)).toBe(true)
+        }
+        const cargoIndexes = emptyCargoIndices()
+        cargoIndexes.cargos = cloned
+        for (const url of embedLinks) {
+            expect(cargoIndexes.cargos.find((cargo) => cargo.canonicalUrl === url)).not.toBe(undefined)
+        }
+        const mainPermissions = [
+            {key: "embedExtensions", value: [...embedLinks]}
+        ]
+        const mainSummary = generatePermissionsSummary(mainPermissions)
+        const merged = mergePermissionSummaries(mainSummary, cargoIndexes)
+        expect(structuredClone(merged)).toStrictEqual(mainSummary)
+    })
+
+    it("original permissions should inherit embed target permissions and add there resolved urls to webRequest permission if they exist in cargo index", () => {
+        const cloned = structuredClone(DUMMY_CARGOS)
+        const permissions = [
+            [{key: "camera", value: []}, {key: "webRequest", value: ["https://hey.com", "https://google.com"]}],
+            [{key: "geoLocation", value: []}],
+            [{key: "gameSaves", value: ["read", "write"]}, {key: "fullScreen", value: []}],
+        ]
+        for (let i = 0; i < cloned.length; i++) {
+            cloned[i].permissions = permissions[i]
+        }
+
+        const cargoIndex = emptyCargoIndices()
+        cargoIndex.cargos.push(...cloned)
+        const cargosToMerge = [
+            [0, 1, 2],
+            [0, 1],
+            [0, 2],
+            [1, 2],
+            [0],
+            [1],
+            [2],
+        ] as const
+        for (const c of cargosToMerge) {
+            const originalPermissions = [{
+                key: "embedExtensions", 
+                value: c.map((index) => cloned[index].canonicalUrl)
+            }]
+            const originalSummary = generatePermissionsSummary(originalPermissions)
+            const mergedSummary = mergePermissionSummaries(
+                originalSummary, cargoIndex
+            )
+            expect(structuredClone(originalSummary)).not.toStrictEqual(mergedSummary)
+            // merges all permissions and adds the resolved
+            // urls of embed targets to web requests
+            const cargoUrls = c.map((index) => cloned[index].resolvedUrl)
+            const mergedPermissions = c
+                .map((index) => cloned[index].permissions)
+                .flat()
+            const extraWebRequests = mergedPermissions
+                .filter((permission) => permission.key === "webRequest")
+                .map(({value}) => value)
+                .flat()
+            const cleanedPermissions = [
+                ...mergedPermissions.filter((permission) => permission.key !== "webRequest"),
+                {key: "webRequest", value: [...cargoUrls, ...extraWebRequests]}
+            ]
+            const cleanedSummary = generatePermissionsSummary(cleanedPermissions)
+            const cleanedCopy = structuredClone(cleanedSummary)
+            cleanedCopy.webRequest.sort()
+            const mergedCopy = structuredClone(mergedSummary)
+            mergedCopy.webRequest.sort()
+            expect(cleanedCopy).toStrictEqual(mergedCopy)
+        }
+    })
+
+    it(`original permissions should inherit embed target permissions and webRequest should only have the "${ALLOW_ALL_PERMISSIONS}" value if original permission possess it, permission if they exist in cargo index`, () => {
+        const cloned = structuredClone(DUMMY_CARGOS)
+        const permissions = [
+            [{key: "camera", value: []}, {key: "webRequest", value: ["https://hey.com", "https://google.com"]}],
+            [{key: "geoLocation", value: []}],
+            [{key: "gameSaves", value: ["read", "write"]}, {key: "fullScreen", value: []}],
+        ]
+        for (let i = 0; i < cloned.length; i++) {
+            cloned[i].permissions = permissions[i]
+        }
+
+        const cargoIndex = emptyCargoIndices()
+        cargoIndex.cargos.push(...cloned)
+        const cargosToMerge = [
+            [0, 1, 2],
+            [0, 1],
+            [0, 2],
+            [1, 2],
+            [0],
+            [1],
+            [2],
+        ] as const
+        for (const c of cargosToMerge) {
+            const allowAllRequests = {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS]}
+            const originalPermissions = [
+                {key: "embedExtensions", value: c.map((index) => cloned[index].canonicalUrl)},
+                structuredClone(allowAllRequests)
+            ]
+            const originalSummary = generatePermissionsSummary(originalPermissions)
+            const mergedSummary = mergePermissionSummaries(
+                originalSummary, cargoIndex
+            )
+            expect(structuredClone(originalSummary)).not.toStrictEqual(mergedSummary)
+            const mergedPermissions = c
+                .map((index) => cloned[index].permissions)
+                .flat()
+            const cleanedPermissions = [
+                ...mergedPermissions.filter((permission) => permission.key !== "webRequest"),
+                structuredClone(allowAllRequests)
+            ]
+            const cleanedSummary = generatePermissionsSummary(cleanedPermissions)
+            const cleanedCopy = structuredClone(cleanedSummary)
+            cleanedCopy.webRequest.sort()
+            const mergedCopy = structuredClone(mergedSummary)
+            mergedCopy.webRequest.sort()
+            expect(cleanedCopy).toStrictEqual(mergedCopy)
         }
     })
 })

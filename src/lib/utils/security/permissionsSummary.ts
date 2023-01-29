@@ -5,6 +5,7 @@ import {
     permissionsMeta
 } from "../../types/permissions"
 import {PermissionsList} from "../../cargo/index"
+import { CargoIndices } from "../../shabah/backend"
 
 const permissionsSummary = (allowAll: boolean) => {
     const startValue = allowAll
@@ -97,6 +98,16 @@ export const hasUnsafePermissions = (summary: PermissionsSummary) => {
         summary.allowAll
         || summary.embedExtensions.length > 0
         || (summary.webRequest.length > 0 && summary.webRequest[0] === ALLOW_ALL_PERMISSIONS)
+    )
+}
+
+export const hasRootLevelPermissions = (summary: PermissionsSummary) => {
+    if (summary.allowAll) {
+        return true
+    }
+    return (
+        summary.embedExtensions.length > 0 
+        && summary.embedExtensions[0] === ALLOW_ALL_PERMISSIONS
     )
 }
 
@@ -290,4 +301,88 @@ export const iframeSandbox = (permissions: PermissionsSummary) => {
         return base + " allow-pointer-lock"
     }
     return base
+}
+
+export const mergePermissionSummaries = (
+    originalPermissions: PermissionsSummary,
+    cargoIndexes: CargoIndices
+) => {
+    if (
+        originalPermissions.embedExtensions.length < 1
+        || originalPermissions.embedExtensions[0] === ALLOW_ALL_PERMISSIONS
+    ) {
+        return originalPermissions
+    }
+
+    const canonicalUrlMap = new Map<string, number>()
+    for (let i = 0; i < originalPermissions.embedExtensions.length; i++) {
+        const embed = originalPermissions.embedExtensions[i]
+        canonicalUrlMap.set(embed, 1)
+    }
+    const targetPermissions = []
+    for (let i = 0; i < cargoIndexes.cargos.length; i++) {
+        const cargo = cargoIndexes.cargos[i]
+        if (!canonicalUrlMap.has(cargo.canonicalUrl)) {
+            continue
+        }
+        const summary = generatePermissionsSummary(
+            cargo.permissions
+        )
+        // a cargo that is embedding other cargos
+        // cannot embed cargos with unsafe permissions
+        if (hasUnsafePermissions(summary)) {
+            continue
+        }
+        summary.webRequest.push(cargo.resolvedUrl)
+        targetPermissions.push(summary)
+    }
+    if (targetPermissions.length < 1) {
+        return originalPermissions
+    }
+    const merged: PermissionsSummary = JSON.parse(JSON.stringify(originalPermissions))
+    merged.embedExtensions = []
+    const unrestrictedHttp = (
+        originalPermissions.webRequest.length > 0 
+        && originalPermissions.webRequest[0] === ALLOW_ALL_PERMISSIONS
+    )
+    const httpMap = new Map<string, boolean>(
+        unrestrictedHttp ? [] : merged.webRequest.map(
+            (url) => [url, true] as const
+        )
+    )
+    for (let i = 0; i < targetPermissions.length; i++) {
+        // wow, this is cancerous
+        const target = targetPermissions[i]
+        merged.fullScreen ||= target.fullScreen
+        merged.pointerLock ||= target.pointerLock
+        merged.displayCapture ||= target.displayCapture
+        merged.camera ||= target.camera
+        merged.geoLocation ||= target.geoLocation
+        merged.microphone ||= target.microphone
+        merged.unlimitedStorage ||= target.unlimitedStorage
+        merged.allowInlineContent ||= target.allowInlineContent
+        merged.allowUnsafeEval ||= target.allowUnsafeEval
+        merged.allowDataUrls ||= target.allowDataUrls
+        merged.allowBlobs ||= target.allowBlobs
+        merged.files ||= target.files
+        merged.gameSaves.read ||= target.gameSaves.read
+        merged.gameSaves.write ||= target.gameSaves.write
+        if (unrestrictedHttp) {
+            continue
+        }
+        for (let x = 0; x < target.webRequest.length; x++) {
+            const url = target.webRequest[x]
+            if (httpMap.has(url)) {
+                continue
+            }
+            merged.webRequest.push(url)
+            httpMap.set(url, true)
+        }
+    }
+
+    if (unrestrictedHttp) {
+        merged.webRequest = [ALLOW_ALL_PERMISSIONS]
+    }
+
+    return merged
 }
