@@ -2,7 +2,7 @@ import type {DeepReadonly} from "../types/utility"
 import {Cargo} from "../cargo/index"
 import {CargoIndex} from "../shabah/backend"
 import {ALLOW_ALL_PERMISSIONS, Permissions} from "../types/permissions"
-import {generatePermissionsSummary} from "../utils/security/permissionsSummary"
+import {createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
 import {AppDatabase} from "../database/AppDatabase"
 import {sleep} from "../utils/sleep"
 import { APP_CACHE } from "../../config"
@@ -255,11 +255,28 @@ const mergePermissions = (
         summary.webRequest.push(cargo.resolvedUrl)
         targetPermissions.push(summary)
     }
-    const finalPermissions = {...merged, embedExtensions: [] as string[]}
+    const finalPermissions: PermissionsSummary = {
+        ...merged, 
+        embedExtensions: []
+    }
     for (let i = 0; i < targetPermissions.length; i++) {
         const target = targetPermissions[i]
-        Object.assign(finalPermissions, target)
+        finalPermissions.fullScreen = target.fullScreen || finalPermissions.fullScreen
+        finalPermissions.pointerLock = target.pointerLock || finalPermissions.pointerLock
+        finalPermissions.displayCapture = target.displayCapture || finalPermissions.displayCapture
+        finalPermissions.camera = target.camera || finalPermissions.camera
+        finalPermissions.geoLocation = target.geoLocation || finalPermissions.geoLocation
+        finalPermissions.microphone = target.microphone || finalPermissions.microphone
+        finalPermissions.unlimitedStorage = target.unlimitedStorage || finalPermissions.unlimitedStorage
+        finalPermissions.allowInlineContent = target.allowInlineContent || finalPermissions.allowInlineContent
+        finalPermissions.allowUnsafeEval = target.allowUnsafeEval || finalPermissions.allowUnsafeEval
+        finalPermissions.allowDataUrls = target.allowDataUrls || finalPermissions.allowDataUrls
+        finalPermissions.allowBlobs = target.allowBlobs || finalPermissions.allowBlobs
+        finalPermissions.files = target.files || finalPermissions.files
+        finalPermissions.gameSaves.read = target.gameSaves.read || finalPermissions.gameSaves.read
+        finalPermissions.gameSaves.write = target.gameSaves.write || finalPermissions.gameSaves.write
     }
+
     const unrestrictedHttp = merged.webRequest.length > 0 && merged.webRequest[0] === ALLOW_ALL_PERMISSIONS
     if (unrestrictedHttp) {
         finalPermissions.webRequest = [ALLOW_ALL_PERMISSIONS]
@@ -322,7 +339,6 @@ export class JsSandbox {
         const permissionsSummary = generatePermissionsSummary(
             dependencies.cargo.permissions
         )
-        console.log("summary", permissionsSummary)
         this.initialized = false
         this.originalPermissions = permissionsSummary
         this.reconfiguredPermissions = null
@@ -392,53 +408,23 @@ export class JsSandbox {
         currentOrigin: string
     ) {
         const iframeArgs = new IframeArguments()
-        let allowList = []
-        if (permissionsSummary.camera) {
-            allowList.push("camera 'self';")
-        }
-        if (permissionsSummary.displayCapture) {
-            allowList.push("display-capture 'self';")
-        }
-        if (permissionsSummary.microphone) {
-            allowList.push("microphone 'self';")
-        }
-        if (permissionsSummary.geoLocation) {
-            allowList.push("geolocation 'self';")
-        }
-        iframeArgs.attributes.push({key: "allow", value: allowList.join()})
+        iframeArgs.attributes.push({
+            key: "allow", 
+            value: iframeAllowlist(permissionsSummary)
+        })
     
-        let sandboxAttribute = "allow-scripts allow-same-origin"
-        if (permissionsSummary.pointerLock) {
-            sandboxAttribute += " allow-pointer-lock"
-        }
-        iframeArgs.attributes.push({key: "sandbox", value: sandboxAttribute})
-        
-        if (permissionsSummary.fullScreen) {
-            iframeArgs.attributes.push({key: "allowfullscreen", value: ""})
-        }
+        iframeArgs.attributes.push({
+            key: "sandbox", 
+            value: iframeSandbox(permissionsSummary)
+        })
 
-        let unsafeDirectives = []
-        if (permissionsSummary.allowInlineContent) {
-            unsafeDirectives.push("'unsafe-inline'")
-        }
-        if (permissionsSummary.allowUnsafeEval) {
-            unsafeDirectives.push("'unsafe-eval'")
-        }
-        if (permissionsSummary.allowDataUrls) {
-            unsafeDirectives.push("data:")
-        }
-        if (permissionsSummary.allowBlobs) {
-            unsafeDirectives.push("blob:")
-        }
-
-        const originName = currentOrigin + "/"
-
-        const extensionOrigin = this.state.cargoIndex.resolvedUrl
-        const allowedOrigins = extensionOrigin === originName
-            ? [...permissionsSummary.webRequest]
-            : [extensionOrigin, ...permissionsSummary.webRequest]
-
-        iframeArgs.contentSecurityPolicy = `default-src 'self' ${unsafeDirectives.join(" ")} ${originName} ${allowedOrigins.join(" ")}; object-src 'none'; frame-src 'none'; manifest-src 'none'; base-uri 'self';`
+        iframeArgs.contentSecurityPolicy = createContentSecurityPolicy(permissionsSummary, {
+            allowRequestsToHostOrigin: true,
+            hostOrigin: currentOrigin + "/",
+            cargoOrigin: this.state.cargoIndex.resolvedUrl,
+            workerSource: ["self"],
+            iframeSource: ["none"]
+        })
         return iframeArgs
     }
 
@@ -503,7 +489,6 @@ export class JsSandbox {
             ...this.originalPermissions,
             embedExtensions: canonicalUrls
         } as const
-        console.log("configured summary", configuredPermissions)
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
         const cargos = addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
@@ -511,6 +496,7 @@ export class JsSandbox {
             this.reconfiguredPermissions, 
             {...originalCargoIndexes, cargos}
         )
+        console.log("permissions", merged)
         this.persistentState.configuredPermissions = true
         const iframeArguments = this.iframeArguments(
             merged, location.origin,

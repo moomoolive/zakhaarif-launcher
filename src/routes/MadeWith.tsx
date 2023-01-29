@@ -4,10 +4,12 @@ import {
     faCss3, 
     faHtml5,
     faReact,
+    faOsi,
 } from "@fortawesome/free-brands-svg-icons"
 import {faAngleRight} from "@fortawesome/free-solid-svg-icons"
 import {useEffect} from "react"
 import {useNavigate, Link} from "react-router-dom"
+import { Tooltip } from "@mui/material"
 
 const AppLaunchPage = () => {
     const navigate = useNavigate()
@@ -29,36 +31,52 @@ const AppLaunchPage = () => {
 
                 <div className="flex items-center justify-center relative flex-wrap w-4/5 mx-auto">
                     {([
-                        {icon: faJs, className: "text-yellow-500 animate-bounce"},
-                        {icon: faCss3, className: "text-blue-600 animate-wiggle"},
-                        {icon: faHtml5, className: "text-orange-500 animate-pulse"},
-                        {icon: faReact, className: "text-blue-400 animate-spin-slow"},
-                    ] as const).map(({icon, className}, i) => {
+                        {icon: faJs, className: "text-yellow-500 animate-bounce", title: "Javascript", link: "https://developer.mozilla.org/en-US/docs/Learn/JavaScript/First_steps/What_is_JavaScript"},
+                        {icon: faCss3, className: "text-blue-600 animate-wiggle", title: "CSS", link: "https://www.w3.org/Style/CSS/Overview.en.html"},
+                        {icon: faHtml5, className: "text-orange-500 animate-pulse", title: "HTML", link: "https://www.w3.org/standards/webdesign/htmlcss.html"},
+                        {icon: faReact, className: "text-blue-400 animate-spin-slow", title: "React", link: "https://reactjs.org/"},
+                    ] as const).map((metadata, i) => {
+                        const {icon, className, title, link} = metadata
                         return <div
                             key={`icon-${i}`}
                             className={`${className} mr-8 text-6xl mb-4`}
                         >
-                            <FontAwesomeIcon icon={icon}/>
+                            <a
+                                href={link}
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Tooltip title={title}>
+                                    <FontAwesomeIcon icon={icon}/>
+                                </Tooltip>
+                            </a>
                         </div>
                     })}
+
                     <div>
-                        <img 
-                            src="logos/babylon_logo_color.png"
-                            width={64}
-                            height={64}
-                            className="mb-3 animate-swing"
-                        />
+                        <a 
+                            href="https://www.babylonjs.com/" 
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <Tooltip title="Babylon.js">
+                                <img 
+                                    src="logos/babylon_logo_color.png"
+                                    width={64}
+                                    height={64}
+                                    className="mb-3 animate-swing mr-8"
+                                />
+                            </Tooltip>
+                        </a>
                     </div>
-                </div>
-                <div className="text-neutral-500 text-sm">
-                    <Link to="/settings?tab=acknowledgments">
-                        <button className="hover:text-green-500">
-                            {"and many more "}
-                            <span className="text-xs">
-                                <FontAwesomeIcon icon={faAngleRight}/>
-                            </span>
-                        </button>
-                    </Link>
+                
+                    <div className={`text-green-500 text-6xl mb-4 mr-8`}>
+                        <Link to="/settings?tab=acknowledgments">
+                            <Tooltip title="Many other open-source projects">
+                                <FontAwesomeIcon icon={faOsi}/>
+                            </Tooltip>
+                        </Link>
+                    </div>
                 </div>
             </div>
         </div>

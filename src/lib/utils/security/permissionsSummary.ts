@@ -42,7 +42,7 @@ export const isDangerousCspOrigin = (cspValue: string) => {
     return false
 }
 
-type GeneralPermissions = {key: string, value: string[]}[]
+export type GeneralPermissions = {key: string, value: string[]}[]
 
 export const generatePermissionsSummary = (
     permissions: GeneralPermissions
@@ -171,3 +171,123 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
 }
 
 export type CleanedPermissions = ReturnType<typeof cleanPermissions>
+
+const cspKeywords = {
+    "none": true,
+    "self": true,
+    "strict-dynamic": true,
+    "unsafe-inline": true,
+    "unsafe-eval": true,
+    "unsafe-hashes": true,
+    "report-sample": true,
+} as const
+
+export type ContentSecurityPolicyKeyword = (
+    keyof typeof cspKeywords | string & {}
+)
+
+const addQuoteToKeyword = (keyword: ContentSecurityPolicyKeyword) => {
+    if (keyword in cspKeywords) {
+        return `'${keyword}'`
+    }
+    return keyword
+}
+
+export type ContentSecurityPolicyConfig = {
+    iframeSource?: ContentSecurityPolicyKeyword[]
+    workerSource?: ContentSecurityPolicyKeyword[]
+    hostOrigin?: string,
+    cargoOrigin?: string,
+    allowRequestsToHostOrigin?: boolean
+}
+
+export const CSP_CONSTANT_POLICY = "object-src 'none';manifest-src 'none';base-uri 'none';"
+
+export const UNSAFE_INLINE_CSP = "'unsafe-inline'"
+export const UNSAFE_EVAL_CSP = "'unsafe-eval'"
+export const UNSAFE_DATA_URLS_CSP = "data:"
+export const UNSAFE_BLOBS_CSP = "blob:"
+export const ALLOW_ALL_ORIGINS_CSP = "*"
+export const SAME_ORIGIN_CSP_KEYWORD = "'self'"
+export const REQUIRED_DEFAULT_SRC_CSP = SAME_ORIGIN_CSP_KEYWORD
+
+export const createContentSecurityPolicy = (
+    permissions: PermissionsSummary,
+    config: ContentSecurityPolicyConfig
+) => {
+    if (
+        permissions.allowAll 
+        || (permissions.webRequest.length > 0 && permissions.webRequest[0] === ALLOW_ALL_PERMISSIONS)
+    ) {
+        return `default-src ${ALLOW_ALL_ORIGINS_CSP};${CSP_CONSTANT_POLICY}`
+    }
+    const {
+        iframeSource = ["none"],
+        workerSource = ["none"],
+        hostOrigin = "",
+        allowRequestsToHostOrigin = false,
+        cargoOrigin = ""
+    } = config
+    const iframe = iframeSource.reduce((total, next) => `${total} ${addQuoteToKeyword(next)}`, "")
+    const worker = workerSource.reduce((total, next) => `${total} ${addQuoteToKeyword(next)}`, "")
+    const intialOrigins = [...permissions.webRequest]
+    if (allowRequestsToHostOrigin && hostOrigin.length > 0) {
+        intialOrigins.push(hostOrigin)
+    }
+    if (cargoOrigin.length > 0) {
+        intialOrigins.push(cargoOrigin)
+    }
+    const originMap = new Map<string, number>()
+    const allowedOrigins = intialOrigins.filter((origin) => {
+        if (originMap.has(origin)) {
+            return false
+        }
+        originMap.set(origin, 1)
+        return true
+    })
+
+    let unsafeDirectives = []
+    if (permissions.allowInlineContent) {
+        unsafeDirectives.push(UNSAFE_INLINE_CSP)
+    }
+    if (permissions.allowUnsafeEval) {
+        unsafeDirectives.push(UNSAFE_EVAL_CSP)
+    }
+    if (permissions.allowDataUrls) {
+        unsafeDirectives.push(UNSAFE_DATA_URLS_CSP)
+    }
+    if (permissions.allowBlobs) {
+        unsafeDirectives.push(UNSAFE_BLOBS_CSP)
+    }
+    return `default-src ${REQUIRED_DEFAULT_SRC_CSP}${unsafeDirectives.length > 0 ? " " + unsafeDirectives.join(" ") : ""}${allowedOrigins.length > 0 ? " " + allowedOrigins.join(" ") : ""};frame-src ${iframe};worker-src ${worker};${CSP_CONSTANT_POLICY}`
+}
+
+export const iframeAllowlist = (permissions: PermissionsSummary) => {
+    let allowList = []
+    if (permissions.camera) {
+        allowList.push(`camera ${SAME_ORIGIN_CSP_KEYWORD};`)
+    }
+    if (permissions.displayCapture) {
+        allowList.push(`display-capture ${SAME_ORIGIN_CSP_KEYWORD};`)
+    }
+    if (permissions.microphone) {
+        allowList.push(`microphone ${SAME_ORIGIN_CSP_KEYWORD};`)
+    }
+    if (permissions.geoLocation) {
+        allowList.push(`geolocation ${SAME_ORIGIN_CSP_KEYWORD};`)
+    }
+    if (permissions.fullScreen) {
+        allowList.push(`fullscreen ${SAME_ORIGIN_CSP_KEYWORD};`)
+    }
+    return allowList.join(" ")
+}
+
+export const REQUIRED_SANDBOX_ATTRIBUTES = "allow-scripts allow-same-origin"
+
+export const iframeSandbox = (permissions: PermissionsSummary) => {
+    const base = REQUIRED_SANDBOX_ATTRIBUTES
+    if (permissions.pointerLock) {
+        return base + " allow-pointer-lock"
+    }
+    return base
+}

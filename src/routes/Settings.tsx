@@ -261,7 +261,7 @@ const SubPageList = {
                     </div>
                 </> : <>
                     <div className="w-11/12 border-b-2 border-solid border-neutral-600 pb-2 text-xs md:text-sm text-neutral-400">
-                        {"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source packages (and their dependencies)."}
+                        {"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source projects (and their dependencies)."}
                     </div>
                     <div 
                         id={CREDITS_DIV_ID}
@@ -297,6 +297,9 @@ const SubPageList = {
                                 </button>
                             </a>
                         })}
+                        <div className="mb-3 text-neutral-400">
+                            {"And probably many, many more..."}
+                        </div>
                     </div>
                 </>}
             </>}
