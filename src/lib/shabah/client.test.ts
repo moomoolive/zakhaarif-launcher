@@ -2,7 +2,7 @@ import {describe, it, expect} from "vitest"
 import {checkForUpdates} from "./client"
 import {FetchFunction, FileCache} from "./backend"
 import {ResultType, io} from "../monads/result"
-import {Cargo, toMiniCargo, cloneCargo} from "../cargo/index"
+import {Cargo, toMiniCargo} from "../cargo/index"
 import {LATEST_CRATE_VERSION} from "../cargo/index"
 
 type FileRecord = Record<string, () => ResultType<Response>>
@@ -177,7 +177,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found and new cargo file urls return an error http code, an error should be returned", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
         const adaptors = fetchFnAndFileCache({}, {
@@ -213,7 +213,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found new cargo file urls return a network error, an error should be returned", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
         const adaptors = fetchFnAndFileCache({}, {
@@ -242,7 +242,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found new cargo file urls returns a valid http response without the 'content-length' header, an error should be returned", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
         const adaptors = fetchFnAndFileCache({}, {
@@ -279,7 +279,7 @@ describe("diff cargos function", () => {
 
 
     it("if cargo has not been downloaded before and new cargo is found new cargo file urls should be returned", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
         
         const adaptors = fetchFnAndFileCache({}, {
@@ -320,7 +320,7 @@ describe("diff cargos function", () => {
     })
 
     it("if cargo has not been downloaded before and new cargo is found new cargo file urls should be returned, with files of cargo corresponding to their 'content-length' header", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
 
         const contentLength = ["10"] as const
@@ -368,7 +368,7 @@ describe("diff cargos function", () => {
     })
 
     it("passing in an empty string as resolvedUrl has the same effect as having not downloaded a cargo before", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
 
         const contentLength = ["10"] as const
@@ -414,9 +414,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new mini cargo version is not greater, no download urls should be returned and full new cargo should not be requested", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const requestRecord = {
             newCargoMini: 0,
@@ -463,9 +463,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and fetching new mini cargo version cannot be fetched due to network error, full new cargo should be fetched as a fallback", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const requestRecord = {
             newCargoMini: 0,
@@ -511,9 +511,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and fetching new mini cargo version cannot be fetched due to error http code returned, full new cargo should be fetched as a fallback", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const requestRecord = {
             newCargoMini: 0,
@@ -557,9 +557,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and fetching new cargo returns network error, no download links should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
@@ -592,9 +592,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and fetching new cargo returns http error, no download links should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
@@ -626,9 +626,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo is not json encoded, no download links should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
@@ -661,9 +661,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo is not a valid cargo json, no download links should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
@@ -695,9 +695,9 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is not greater, no download links and errors should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "2.1.2"
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.0"
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
@@ -729,13 +729,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, and new download links return with a network error, an error should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -783,13 +783,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, and new download links return with an error http-code, an error should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -844,13 +844,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, and new download links return without the 'content-length' header, an error should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -905,13 +905,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, download links not found in previous cargo, download links that are expired, and no errors should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -975,13 +975,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, download links not found in previous cargo, download links that are expired, and no errors should be returned", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -1068,13 +1068,13 @@ describe("diff cargos function", () => {
     })
 
     it("if previous cargo is found and new cargo version is greater, and canonical url resolves to a different url than input 'resolvedUrl', reinstallation should occur (purge all old files, download all files in new package)", async () => {
-        const oldCargo = cloneCargo(cargoPkg)
+        const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
             {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
-        const newCargo = cloneCargo(cargoPkg)
+        const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
             {name: "rand.5.js", bytes: 600, invalidation: "default"},
@@ -1177,7 +1177,7 @@ describe("diff cargos function", () => {
     })
 
     it("if request for cargo is redirected to another url, all cargo files will be requested with redirected root url", async () => {
-        const manifest = cloneCargo(cargoPkg)
+        const manifest = structuredClone(cargoPkg)
         const cargoString = JSON.stringify(manifest)
 
         const contentLength = ["10"] as const

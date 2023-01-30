@@ -1,6 +1,8 @@
 import type {PermissionsList} from "../cargo/index"
 
 export const ALLOW_ALL_PERMISSIONS = "allowAll"
+export const ALLOW_ALL_EMBEDS = ALLOW_ALL_PERMISSIONS
+export const ALLOW_ALL_HTTP = ALLOW_ALL_PERMISSIONS
 
 export type AllowAllPermissionsDirective = typeof ALLOW_ALL_PERMISSIONS
 

@@ -4,3 +4,8 @@ export type DeepReadonly<T> = {
         ? DeepReadonly<T[key]>
         : T[key]
 }
+
+// taken from Matt Pocock's awesome vid: https://www.youtube.com/watch?v=EU0TB_8KHpY
+export type Mutable<T> = {
+    -readonly [key in keyof T]: T[key]
+}

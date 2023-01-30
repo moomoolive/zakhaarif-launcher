@@ -161,8 +161,8 @@ const ExtensionShellPage = () => {
             entryUrl: extensionEntry.url,
             id: EXTENSION_IFRAME_ID,
             name: `${extensionCargo.current.name}-sandbox`,
+            downloadClient,
             dependencies: {
-                downloadClient,
                 displayExtensionFrame: () => {
                     setLoading(false)
                 },

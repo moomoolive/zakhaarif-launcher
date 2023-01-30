@@ -171,21 +171,6 @@ export class Cargo<
     }
 }
 
-export const cloneCargo = <
-    T extends PermissionsListRaw
->(cargo: Cargo<T>) => {
-    const copy = new Cargo<T>({...cargo})
-    copy.files = copy.files.map(el => ({...el}))
-    copy.authors = copy.authors.map(el => ({...el}))
-    copy.keywords = [...copy.keywords]
-    copy.repo = {...copy.repo}
-    copy.permissions = copy.permissions.map((e) => ({
-        key: e.key,
-        value: [...e.value]
-    })) as PermissionsList<T>
-    return copy
-}
-
 export const toMiniCargo = ({version}: Cargo) => ({
     version
 } as MiniCodeManifest) 

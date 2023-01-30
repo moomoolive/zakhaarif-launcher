@@ -132,32 +132,6 @@ const StartMenuPage = () => {
                             </Button>
                         </Link>
                     </div>
-
-                    {/**
-                     * {([
-                        {text: "New Game", route: "/new-game", color: "success"},
-                        ...(gameSaveExists.current ? [{text: "Load Game", route: "/load-game", color: "success"}] as const : []),
-                        {text: "Add-ons", route: "/add-ons", color: "info"},
-                        {text: "Extensions", route: "/extensions-list", color: "info"},
-                        {text: "Settings", route: "/settings", color: "info"},
-                        {text: "Launcher", route: "/", color: "warning"},
-                    ] as const).map((item, index) => {
-                        const {route, text, color} = item
-                        return <div
-                            key={`menu-item-${index}`}
-                        >
-                            <Link to={route}>
-                                <Button 
-                                    color={color}
-                                    fullWidth 
-                                    size="large"
-                                >
-                                    {text}
-                                </Button>
-                            </Link>
-                        </div>
-                    })}
-                     */}
                 </div>
             </div>
         </div>

@@ -1,218 +1,19 @@
-import type {DeepReadonly} from "../types/utility"
-import {Cargo} from "../cargo/index"
-import {CargoIndex} from "../shabah/backend"
-import {ALLOW_ALL_PERMISSIONS, Permissions} from "../types/permissions"
+import {ALLOW_ALL_PERMISSIONS} from "../types/permissions"
 import {createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
-import {AppDatabase} from "../database/AppDatabase"
-import {sleep} from "../utils/sleep"
-import { APP_CACHE } from "../../config"
 import {wRpc} from "../wRpc/simple"
-import {nanoid} from "nanoid"
-import {type as betterTypeof} from "../utils/betterTypeof"
-import type {Shabah} from "../shabah/downloadClient"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
 import {addStandardCargosToCargoIndexes} from "../../standardCargos"
-
-const MINIMUM_AUTH_TOKEN_LENGTH = 20
-const AUTH_TOKEN_LENGTH = (() => {
-    const additionalLength = Math.trunc(Math.random() * 20)
-    return MINIMUM_AUTH_TOKEN_LENGTH + additionalLength
-})()
-
-type SandboxDependencies = DeepReadonly<{
-    displayExtensionFrame: () => void
-    minimumLoadTime: number
-    queryState: string
-    createFatalErrorMessage: (msg: string) => void
-    confirmExtensionExit: () => Promise<void>
-    cargoIndex: CargoIndex
-    cargo: Cargo<Permissions>
-    recommendedStyleSheetUrl: string
-    downloadClient: Shabah
-}>
-
-type PersistentState = {
-    configuredPermissions: boolean
-    setEmbedUrls: (canonicalUrls: string[]) => unknown
-}
-
-const createRpcState = (
-    dependencies: SandboxDependencies, 
-    persistentState: PersistentState,
-    permissionsSummary: PermissionsSummary
-) => {
-    const {minimumLoadTime} = dependencies
-    const mutableState = {
-        readyForDisplay: false,
-        secureContextEstablished: false,
-        minimumLoadTimePromise: sleep(minimumLoadTime),
-        fatalErrorOccurred: false,
-        database: new AppDatabase(),
-        permissionsSummary,
-        authToken: nanoid(AUTH_TOKEN_LENGTH)
-    }
-    type SandboxMutableState = typeof mutableState
-    type InitialState = (
-        SandboxDependencies 
-        & SandboxMutableState
-        & {persistentState: PersistentState}
-    )
-    return {...dependencies, ...mutableState, persistentState} as InitialState
-}
-
-type RpcState = ReturnType<typeof createRpcState>
-
-const embedAnyExtensionRpcs = (state: RpcState) => {
-    if (state.persistentState.configuredPermissions) {
-        return {} as unknown as typeof rpcs
-    }
-    const rpcs = {
-        reconfigurePermissions: (parameters :{canonicalUrls: string[], authToken: string}) => {
-            if (state.persistentState.configuredPermissions) {
-                console.warn("attempted to reconfigure permissions, but permissions are already configured")
-                return false
-            }
-            if (
-                typeof parameters !== "object"
-                || parameters === null
-                || typeof parameters.authToken !== "string"
-                || !Array.isArray(parameters.canonicalUrls)
-            ) {
-                console.warn("could not configure permissions because input is invalid. input =", parameters)
-                return false
-            }
-            const {canonicalUrls, authToken} = parameters
-            if (authToken !== state.authToken) {
-                console.warn("extension attempted to reconfigure permissions but provided wrong auth token")
-                return false
-            }
-            const urls = canonicalUrls.filter((url) => typeof url === "string")
-            console.log("got canonical urls", urls)
-            window.setTimeout(() => {
-                state.persistentState.setEmbedUrls(urls)
-            }, 0)
-            return true
-        }
-    } as const
-    return rpcs
-}
-
-const gameSaveRpcs = (state: RpcState) => {
-    if (
-        !state.permissionsSummary.gameSaves.read
-        && !state.permissionsSummary.gameSaves.write
-    ) {
-        return {} as typeof allPermissions
-    }
-    const getSaveFile = async (id: number) => {
-        if (typeof id !== "number") {
-            console.warn(`extension token must be a number, got "${betterTypeof(id)}"`)
-            return null
-        }
-        if (id < 0) {
-            return await state.database.gameSaves.latest()
-        }
-        return await state.database.gameSaves.getById(id)
-    }
-    if (!state.permissionsSummary.gameSaves.read) {
-        return {
-            gameSaveRpcs
-        } as unknown as typeof allPermissions
-    }
-    const allPermissions = {
-        getSaveFile
-    }
-    return allPermissions
-}
-
-const essentialRpcs = (state: RpcState) => {
-    return {
-        getFile: async (url: string) => {
-            if (typeof url !== "string") {
-                console.warn(`provided url was not a string, got "${betterTypeof(url)}"`)
-                return null
-            }
-            const cache = await caches.open(APP_CACHE)
-            const file = await cache.match(url)
-            if (!file || !file.body) {
-                return null
-            }
-            const type = file.headers.get("content-type") || "text/plain"
-            const length = file.headers.get("content-length") || "0"
-            const transfer = {type, length, body: file.body} as const
-            return wRpc.transfer(transfer, [file.body])
-        },
-        getInitialState: () => {
-            if (state.secureContextEstablished) {
-                return null
-            }
-            const {queryState, authToken, cargoIndex} = state
-            const {resolvedUrl} = cargoIndex
-            const {recommendedStyleSheetUrl: rawCssExtension} = state
-            const cssExtension = rawCssExtension.startsWith("https://") || rawCssExtension.startsWith("http://")
-                ? rawCssExtension
-                : rawCssExtension.startsWith("/") ? rawCssExtension.slice(1) : rawCssExtension
-            const {configuredPermissions} = state.persistentState
-            return {
-                configuredPermissions,
-                queryState, 
-                authToken, 
-                rootUrl: resolvedUrl,
-                recommendedStyleSheetUrl: `${window.location.origin}/${cssExtension}`
-            }
-        },
-        secureContextEstablished: () => {
-            state.secureContextEstablished = true
-            return true
-        },
-        signalFatalError: (extensionToken: string) => {
-            if (typeof extensionToken !== "string") {
-                console.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
-                return false
-            }
-            if (
-                state.secureContextEstablished 
-                && extensionToken !== state.authToken
-            ) {
-                console.warn("application signaled fatal error but provided wrong auth token")
-                return false
-            }
-            state.fatalErrorOccurred = true
-            console.log("extension encountered fatal error")
-            state.createFatalErrorMessage("Extension encountered a fatal error")
-            return true
-        },
-        readyForDisplay: () => {
-            if (
-                state.readyForDisplay 
-                || state.fatalErrorOccurred
-            ) {
-                return false
-            }
-            console.info("Extension requested to show display")
-            state.readyForDisplay = true
-            state.minimumLoadTimePromise.then(() => {
-                console.info("Opening extension frame")
-                state.displayExtensionFrame()
-            })
-            return true
-        },
-        exit: async (extensionToken: string) => {
-            if (typeof extensionToken !== "string") {
-                console.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
-                return false
-            }
-            if (
-                state.fatalErrorOccurred 
-                || extensionToken !== state.authToken
-            ) {
-                return false
-            }
-            await state.confirmExtensionExit()
-            return true
-        }
-    }
-}
+import {
+    essentialRpcs, 
+    embedAnyExtensionRpcs,
+    gameSaveRpcs,
+    RpcState,
+    SandboxDependencies,
+    createRpcState,
+    RpcPersistentState
+} from "./rpc"
+import type {Shabah} from "../shabah/downloadClient"
+import { DeepReadonly } from "../types/utility"
 
 const createRpcFunctions = (state: RpcState) => {
     return {
@@ -222,10 +23,10 @@ const createRpcFunctions = (state: RpcState) => {
     } as const
 }
 
-type IframeAttributes = ("allow" | "sandbox")
+export type SandboxFunctions = ReturnType<typeof createRpcFunctions>
 
 class IframeArguments {
-    attributes: {key: IframeAttributes, value: string}[] = []
+    attributes: {key: ("allow" | "sandbox"), value: string}[] = []
     contentSecurityPolicy = ""
 }
 
@@ -234,16 +35,15 @@ type JsSandboxOptions = {
     dependencies: SandboxDependencies
     id: string
     name: string
+    downloadClient: Shabah
 }
-
-export type SandboxFunctions = ReturnType<typeof createRpcFunctions>
 
 export class JsSandbox {
     private frameListener: (message: MessageEvent<unknown>) => void
     private iframeElement: HTMLIFrameElement
     private state: RpcState
     private readonly dependencies: SandboxDependencies
-    private readonly persistentState: PersistentState
+    private readonly persistentState: RpcPersistentState
     private readonly originalPermissions: PermissionsSummary
     private reconfiguredPermissions: PermissionsSummary | null
     private initialized: boolean
@@ -252,9 +52,11 @@ export class JsSandbox {
     readonly id: string
     readonly name: string
     readonly entry: string
+    readonly downloadClient: DeepReadonly<Shabah>
 
     constructor(config: JsSandboxOptions) {
         const {entryUrl, dependencies, id, name} = config
+        this.downloadClient = config.downloadClient
         const permissionsSummary = generatePermissionsSummary(
             dependencies.cargo.permissions
         )
@@ -310,7 +112,7 @@ export class JsSandbox {
     }
 
     private async createPermissions() {
-        const {downloadClient} = this.state
+        const {downloadClient} = this
         const {originalPermissions} = this
         if (originalPermissions.embedExtensions.length < 1) {
             return originalPermissions
@@ -394,13 +196,12 @@ export class JsSandbox {
 
     private async mutatePermissions(canonicalUrls: string[]) {
         const {originalPermissions} = this
-        const {downloadClient} = this.dependencies
+        const {downloadClient} = this
         if (
             this.persistentState.configuredPermissions
             || !this.initialized
             || originalPermissions.embedExtensions.length < 1
             || originalPermissions.embedExtensions[0] !== ALLOW_ALL_PERMISSIONS
-            || canonicalUrls.length < 1
         ) {
             return false
         }
@@ -411,11 +212,13 @@ export class JsSandbox {
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
         const cargos = addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
-        const merged = mergePermissionSummaries(
-            this.reconfiguredPermissions, 
-            {...originalCargoIndexes, cargos}
-        )
-        console.log("permissions", merged)
+        const merged = canonicalUrls.length < 1 
+            ? configuredPermissions
+            : mergePermissionSummaries(
+                this.reconfiguredPermissions, 
+                {...originalCargoIndexes, cargos}
+            )
+        //console.log("permissions", merged)
         this.persistentState.configuredPermissions = true
         const iframeArguments = this.iframeArguments(
             merged, location.origin,

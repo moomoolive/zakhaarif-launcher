@@ -3,7 +3,6 @@ import {
     cargoIsUpdatable, 
     Cargo, 
     NULL_MANIFEST_VERSION,
-    cloneCargo,
     LATEST_CRATE_VERSION, NULL_FIELD
 } from "./index"
 
@@ -20,7 +19,7 @@ describe("cargo update detection function", () => {
     it("should return true if new package is higher version", () => {
         const oldPkg = manifest
         for (let i = 0; i < 3; i++) {
-            const newPkg = cloneCargo(manifest)
+            const newPkg = structuredClone(manifest)
             newPkg.version = `0.1.${i + 1}`
             const res = cargoIsUpdatable(newPkg, oldPkg)
             expect(res.updateAvailable).toBe(true)
@@ -28,9 +27,9 @@ describe("cargo update detection function", () => {
     })
 
     it("should return false if new and old packages have null version (0.0.0)", () => {
-        const newPkg = cloneCargo(manifest)
+        const newPkg = structuredClone(manifest)
         newPkg.version = NULL_MANIFEST_VERSION
-        const oldPkg = cloneCargo(manifest)
+        const oldPkg = structuredClone(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
@@ -38,16 +37,16 @@ describe("cargo update detection function", () => {
 
     it("should return false if new package has null version (0.0.0)", () => {
         const oldPkg = manifest
-        const newPkg = cloneCargo(manifest)
+        const newPkg = structuredClone(manifest)
         newPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
     })
 
     it("should return true if old package has null version (0.0.0) and new package is non-null", () => {
-        const newPkg = cloneCargo(manifest)
+        const newPkg = structuredClone(manifest)
         newPkg.version = "0.1.0"
-        const oldPkg = cloneCargo(manifest)
+        const oldPkg = structuredClone(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
         const res = cargoIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(true)
@@ -78,7 +77,7 @@ import {diffManifestFiles} from "./index"
 describe("manifest file diffing function", () => {
     it("should return 0 additions and deletions new and old manifest are identical if ", () => {
         const oldPkg = manifest
-        const newPkg = cloneCargo(manifest)
+        const newPkg = structuredClone(manifest)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
         )
@@ -92,7 +91,7 @@ describe("manifest file diffing function", () => {
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = cloneCargo(oldPkg)
+        const newPkg = structuredClone(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
@@ -105,12 +104,12 @@ describe("manifest file diffing function", () => {
     })
 
     it("should return all new package files as additions and all old package file as deletions if default strategy is 'purge'", () => {
-        const oldPkg = cloneCargo(manifest)
+        const oldPkg = structuredClone(manifest)
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = cloneCargo(oldPkg)
+        const newPkg = structuredClone(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "purge"
@@ -126,13 +125,13 @@ describe("manifest file diffing function", () => {
     })
 
     it("should respect individual file invalidation strategies", () => {
-        const oldPkg = cloneCargo(manifest)
+        const oldPkg = structuredClone(manifest)
         oldPkg.files[0].invalidation = "url-diff"
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = cloneCargo(oldPkg)
+        const newPkg = structuredClone(oldPkg)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "purge"
@@ -152,13 +151,13 @@ describe("manifest file diffing function", () => {
             {name: "delete_asset.js", bytes: 0, invalidation: "default"},
             {name: "delete_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const oldPkg = cloneCargo(manifest)
+        const oldPkg = structuredClone(manifest)
         oldPkg.files.push(...deleteAssets)
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},
         ] as typeof manifest.files
-        const newPkg = cloneCargo(manifest)
+        const newPkg = structuredClone(manifest)
         newPkg.files.push(...addAssets)
         const updates = diffManifestFiles(
             newPkg, oldPkg, "url-diff"
@@ -192,7 +191,7 @@ describe("manifest validation function", () => {
 
     it("should return error if one of required fields is missing", () => {
         const del = <T extends keyof Cargo>(k: T) => {
-            const v = cloneCargo(manifest)
+            const v = structuredClone(manifest)
             delete v[k]
             return validateManifest(v)
         }
@@ -203,13 +202,13 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if cargo.crateVersion is not a valid version", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.crateVersion = "random_version" as any
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
     it("should return error if cargo.version is not a valid semantic version", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.version = "not_a_valid_semver"
         const semverRes = SemVer.fromString(m.version)
         const notValid = semverRes === null
@@ -218,14 +217,14 @@ describe("manifest validation function", () => {
     })
 
     it("should not return error if cargo.file is an array of strings", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         {((m.files as any) = m.files.map((file) => file.name))}
         expect(validateManifest(m).errors.length).toBe(0)
     })
 
     it("should return error if cargo.file is an array of primitives other than strings", () => {
         const injectPrimitive = <T>(primitive: T) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             {((m.files as any) = [primitive])}
             return m
         }
@@ -240,13 +239,13 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if cargo.file is an object is missing required name field and is not a string", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         delete ((m.files[0] as any).name)
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
     it("should return no error is file.bytes is not a number, and place a 0 in it's place instead", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         const fileCopy = {...m.files[0]}
         m.files[0] = {...fileCopy}
         delete ((m.files[0] as any).bytes)
@@ -279,16 +278,16 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if cargo.entry is provided but is not the name of one of cargo files", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.entry = "random_file_not_listed.js"
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)        
     })
 
     it("should not return error if cargo.entry is set to NULL_FIELD or empty string", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.entry = ""
         expect(validateManifest(m).errors.length).toBe(0)
-        const empty = cloneCargo(manifest)
+        const empty = structuredClone(manifest)
         empty.entry = NULL_FIELD
         expect(validateManifest(empty).errors.length).toBe(0)
     })
@@ -307,7 +306,7 @@ describe("manifest validation function", () => {
 
     it("should return no errors when missing one optional field", () => {
         const del = <T extends keyof Cargo>(k: T) => {
-            const v = cloneCargo(manifest)
+            const v = structuredClone(manifest)
             delete v[k]
             return validateManifest(v)
         }
@@ -322,14 +321,14 @@ describe("manifest validation function", () => {
     })
 
     it("non-string keywords should be filtered during validation", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.keywords = [null, 0, Symbol(), {}, [], true] as any
         const res = validateManifest(m)
         expect(res.pkg.keywords.length).toBe(0)
     })
 
     it("author entries with non string names should be filtered out", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         m.authors = [
             {name: null} as any,
             {name: 0} as any,
@@ -344,7 +343,7 @@ describe("manifest validation function", () => {
 
     it("should return error if permissions is not an array of strings or objects", () => {
         const t = <T>(val: T) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             {(m.permissions as any) = [val]}
             return m
         }
@@ -359,7 +358,7 @@ describe("manifest validation function", () => {
 
     it("should return error if permissions is an array of objects and 'key' property is not a string", () => {
         const t = <T>(val: T) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             {(m.permissions as any) = [val]}
             return m
         }
@@ -375,7 +374,7 @@ describe("manifest validation function", () => {
 
     it("should return error if permissions is an array of objects and 'key' property is not a string", () => {
         const t = <T>(val: T) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             {(m.permissions as any) = [val]}
             return m
         }
@@ -391,7 +390,7 @@ describe("manifest validation function", () => {
 
     it("should return error if permissions is an array of objects and 'value' property is not an array", () => {
         const t = <T>(val: T) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             {(m.permissions as any) = [val]}
             return m
         }
@@ -404,7 +403,7 @@ describe("manifest validation function", () => {
 
     it("duplicate permission keys should be filtered out", () => {
         const dup = (keys: string[], count: number) => {
-            const m = cloneCargo(manifest)
+            const m = structuredClone(manifest)
             const arr = []
             for (const key of keys) {
                 const val = {key, value: []}
@@ -420,7 +419,7 @@ describe("manifest validation function", () => {
     })
 
     it("duplicate string variant and key, value variant of permissions are filtered", () => {
-        const m = cloneCargo(manifest)
+        const m = structuredClone(manifest)
         {(m.permissions as unknown) = [
             "key",
             {key: "key", value: []},
