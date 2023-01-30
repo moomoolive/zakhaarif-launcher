@@ -245,7 +245,8 @@ export const CargoInfo = ({
         return () => window.removeEventListener("keyup", handler)
     }, [])
 
-    const standardKewords = ((cargoId: string) => {
+    const standardKeywords = useMemo(() => {
+        const cargoId = id
         const keywords = []
         if (isStandardCargo(cargoId)) {
             keywords.push({text: "core", type: "std"})
@@ -257,7 +258,7 @@ export const CargoInfo = ({
             keywords.push({text: "extension", type: "ext"})
         }
         return keywords
-    })(id)
+    }, [cargo])
 
     const permissionsFiltered = useMemo(() => {
         const allowAll = permissions.some((permission) => permission.key === ALLOW_ALL_PERMISSIONS)
@@ -444,9 +445,9 @@ export const CargoInfo = ({
                 </div>
 
                 <div className="pt-3">
-                    {keywords.length > 0 || standardKewords.length > 0 ? <>
+                    {keywords.length > 0 || standardKeywords.length > 0 ? <>
                         <div className="flex w-full px-3 items-center justify-start flex-wrap">
-                            {standardKewords.map(({text: keyword, type}, index) => {
+                            {standardKeywords.map(({text: keyword, type}, index) => {
                                 return <div
                                     key={`keyword-${index}`}
                                     className={`mr-2 mb-2 text-xs rounded-full py-1 px-2 ${

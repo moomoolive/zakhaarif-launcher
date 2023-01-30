@@ -76,98 +76,110 @@ describe("filtering malicous csp values", () => {
 })
 
 describe("permissions summary generator", () => {
-    it("if non-extendable permission is preset it's relavent field should be set to false", () => {
-        const result = generatePermissionsSummary([
-            {key: "camera", value: []},
-            {key: "unlimitedStorage", value: []},
-        ])
-        expect(result.unlimitedStorage).toBe(true)
-        expect(result.camera).toBe(true)
-        for (const key of Object.keys(result)) {
-            const k = key as keyof typeof result
-            if (k === "unlimitedStorage" || k === "camera") {
-                continue
-            }
-            if (permissionsMeta[k].extendable) {
-                expect(result[k]).toStrictEqual([])
-            } else if (permissionsMeta[k].fixedOptions) {
-                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
-            } else {
-                expect(result[k]).toBe(false)
-            }
-        }
-    })
+    it("boolean flag permissions should be set to true if found in permissions input", () => {
+        const cases = [
+            [{key: "camera", value: []}, {key: "unlimitedStorage", value: []}],
+            [{key: "microphone", value: []}, {key: "allowInlineContent", value: []}],
+            [{key: "displayCapture", value: []}],
+            [{key: "fullScreen", value: []}],
+            [{key: "pointerLock", value: ["values", "value2"]}],
+        ]
+        for (const input of cases) {
+            const targetKeys = input.map((i) => i.key)
+            const result = generatePermissionsSummary(input)
 
-    it("inputting 'read option' for file permission should result in files being true", () => {
-        const result = generatePermissionsSummary([
-            {key: "files", value: ["read"]}
-        ])
-        expect(result.files).toBe(true)
-    })
-
-    it("fixed option permissions should have fields found in values array set to true, if they exist in options, otherwise it should be set to false", () => {
-        const fixedOptionValidator = (value: string[]) => {
-            const key = "gameSaves" as const
-            const result = generatePermissionsSummary([
-                {key, value}
-            ])
-            const allKeys = new Map<string, boolean>([
-                ...Object.keys(result[key])
-                    .map((k) => [k, !!(result[key][k as keyof typeof result[typeof key]])] as const)
-            ])
-            const setKeys = new Map<string, boolean>([
-               ...value.map((v) => [v, true] as const)
-            ])
-            for (const [k] of allKeys) {
-                if (setKeys.has(k)) {
-                    expect(allKeys.get(k)).toBe(true)
-                } else {
-                    expect(allKeys.get(k)).toBe(false)
-                }
+            for (const key of targetKeys) {
+                expect(result[key as keyof typeof result]).toBe(true)
             }
-        }
-        fixedOptionValidator(["read", "write"])
-        fixedOptionValidator(["read"])
-        fixedOptionValidator([])
-        const result = generatePermissionsSummary([
-            {key: "gameSaves", value: ["read", "write"]}
-        ])
-        expect(result.gameSaves).toStrictEqual({read: true, write: true})
-        for (const key of Object.keys(result)) {
-            const k = key as keyof typeof result
-            if (permissionsMeta[k].extendable) {
-                continue
-            } else if (permissionsMeta[k].fixedOptions) {
-                if (k === "gameSaves") {
+
+            for (const key of Object.keys(result)) {
+                const k = key as keyof typeof result
+                if (targetKeys.includes(k)) {
+                    expect(permissionsMeta[k].booleanFlag).toBe(true)
                     continue
                 }
-                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
-            } else {
-                expect(result[k]).toBe(false)
+                if (permissionsMeta[k].extendable) {
+                    expect(result[k]).toStrictEqual([])
+                } else if (permissionsMeta[k].fixedOptions) {
+                    expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+                } else if (permissionsMeta[k].booleanFlag) {
+                    expect(result[k]).toBe(false)
+                }
             }
         }
     })
 
-    it("if extendable permission (webRequest, embedExtensions, etc.) have the '*' directive, all other values should be removed except the directive itself", () => {
-        const result = generatePermissionsSummary([
-            {key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS, "https://a-cargo-i-want-to-embed.com"]},
-            {key: "webRequest", value: [ALLOW_ALL_PERMISSIONS, "https://mymamashouse.com"]},
-        ])
-        expect(result.webRequest).toStrictEqual([ALLOW_ALL_PERMISSIONS])
-        expect(result.embedExtensions).toStrictEqual([ALLOW_ALL_PERMISSIONS])
-        for (const key of Object.keys(result)) {
-            const k = key as keyof typeof result
-            if (permissionsMeta[k].extendable) {
-                continue
-            } else if (permissionsMeta[k].fixedOptions) {
-                expect(Object.values(result[k]).every((value) => !value)).toBe(true)
-            } else {
-                expect(result[k]).toBe(false)
+    it("fixed option permissions should set value string that maps to option to true if present", () => {
+        const cases = [
+            [{key: "files", value: ["read"]}],
+            [{key: "gameSaves", value: ["read", "write"]}],
+            [{key: "gameSaves", value: ["read"]}, {key: "files", value: ["read"]}],
+        ]
+        for (const input of cases) {
+            const targetKeys = input.map((i) => i.key)
+            const result = generatePermissionsSummary(input)
+
+            for (const {key, value} of input) {
+                for (const option of value) {
+                    const target = result[key as keyof typeof result]
+                    expect(target[option as keyof typeof target]).toBe(true)
+                }
+            }
+
+            for (const key of Object.keys(result)) {
+                const k = key as keyof typeof result
+                if (targetKeys.includes(k)) {
+                    expect(permissionsMeta[k].fixedOptions).toBe(true)
+                    continue
+                }
+                if (permissionsMeta[k].extendable) {
+                    expect(result[k]).toStrictEqual([])
+                } else if (permissionsMeta[k].fixedOptions) {
+                    expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+                } else if (permissionsMeta[k].booleanFlag) {
+                    expect(result[k]).toBe(false)
+                }
             }
         }
     })
 
-    it(`if '${ALLOW_ALL_PERMISSIONS}' (allow-all) permission is found all permissions should be set to true`, () => {
+    it(`extendable permissions should return an array with input values or an array with only "${ALLOW_ALL_PERMISSIONS}", if value is found`, () => {
+        const cases = [
+            [{key: "webRequest", value: [ALLOW_ALL_PERMISSIONS, "https://mymamashouse.com"]}],
+            [{key: "webRequest", value: ["https://mymamashouse.com", "https://myaunties-home.org"]}],
+            [{key: "webRequest", value: ["https://mymamashouse.com", "https://myaunties-home.org"]}, {key: "embedExtensions", value: [ALLOW_ALL_PERMISSIONS, "https://another-website.com"]}],
+        ]
+        for (const input of cases) {
+            const targetKeys = input.map((i) => i.key)
+            const result = generatePermissionsSummary(input)
+
+            for (const {key, value} of input) {
+                const target = result[key as keyof typeof result]
+                if (value.includes(ALLOW_ALL_PERMISSIONS)) {
+                    expect(target).toStrictEqual([ALLOW_ALL_PERMISSIONS])
+                } else {
+                    expect(target).toStrictEqual(value)
+                }
+            }
+
+            for (const key of Object.keys(result)) {
+                const k = key as keyof typeof result
+                if (targetKeys.includes(k)) {
+                    expect(permissionsMeta[k].extendable).toBe(true)
+                    continue
+                }
+                if (permissionsMeta[k].extendable) {
+                    expect(result[k]).toStrictEqual([])
+                } else if (permissionsMeta[k].fixedOptions) {
+                    expect(Object.values(result[k]).every((value) => !value)).toBe(true)
+                } else if (permissionsMeta[k].booleanFlag) {
+                    expect(result[k]).toBe(false)
+                }
+            }
+        }
+    })
+
+    it(`if '${ALLOW_ALL_PERMISSIONS}' boolean permission is set all permissions should be set to true`, () => {
         const result = generatePermissionsSummary([
             {key: ALLOW_ALL_PERMISSIONS, value: []}
         ])
@@ -177,7 +189,7 @@ describe("permissions summary generator", () => {
                 expect(result.webRequest).toStrictEqual([ALLOW_ALL_PERMISSIONS])
             } else if (permissionsMeta[k].fixedOptions) {
                 expect(Object.values(result[k]).every((value) => value)).toBe(true)
-            } else {
+            } else if (permissionsMeta[k].booleanFlag) {
                 expect(result[k]).toBe(true)
             }
         }
@@ -217,12 +229,37 @@ describe("permission filterer", () => {
         }
     })
 
-    it(`all values other than read and write should be filtered out in 'gameSaves'`, () => {
-        const cleaned = cleanPermissions([
-            {key: "gameSaves", value: ["read", "write", "x-option", "y-option"]},
-        ])
-        expect(cleaned.length).toBe(1)
-        expect(cleaned[0].value).toStrictEqual(["read", "write"])
+    it(`all values for boolean flags should be filtered out`, () => {
+        const cases = [
+            {permissions: [{key: "camera", value: ["read", "write", "x-option", "y-option"]},]},
+            {permissions: [{key: "geoLocation", value: ["read", "write", "x-option", "y-option"]},]},
+            {permissions: [{key: "pointerLock", value: ["read", "write", "x-option", "y-option"]},]},
+        ]
+        for (const {permissions} of cases) {
+            const cleaned = cleanPermissions(permissions)
+            expect(cleaned.length).toBe(1)
+            const {value, key} = cleaned[0]
+            const target = permissionsMeta[key as keyof typeof permissionsMeta]
+            expect(target.booleanFlag).toBe(true)
+            expect(value).toStrictEqual([])
+        }
+    })
+
+    it(`all values that do not exist on fixed option permission should be filtered`, () => {
+        const cases = [
+            {permissions: [{key: "gameSaves", value: ["read", "write", "x-option", "y-option"]},], result: ["read", "write"]},
+            {permissions: [{key: "files", value: ["read", "write", "x-option", "y-option"]},], result: ["read"]},
+        ]
+        for (const {permissions, result} of cases) {
+            const cleaned = cleanPermissions(permissions)
+            expect(cleaned.length).toBe(1)
+            const {value, key} = cleaned[0]
+            const target = permissionsMeta[key as keyof typeof permissionsMeta]
+            expect(target.fixedOptions).toBe(true)
+            for (const v of value) {
+                expect(result).includes(v)
+            }
+        }
     })
 
     it("non-http (and https) url values for webRequest permission should be filtered out", () => {

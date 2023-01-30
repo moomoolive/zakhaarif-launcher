@@ -4,16 +4,18 @@ export const ALLOW_ALL_PERMISSIONS = "allowAll"
 
 export type AllowAllPermissionsDirective = typeof ALLOW_ALL_PERMISSIONS
 
+type ExtendableValue = typeof ALLOW_ALL_PERMISSIONS | string & {}
+
 const permissions = [
     ALLOW_ALL_PERMISSIONS,
-    // maybe later "web-share" permission may be added
+    // "web-share" permission may be added later?
     // allowing for this: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy/web-share
     "geoLocation",
     "microphone",
     "camera",
     "displayCapture",
-
     "fullScreen",
+    
     "pointerLock",
     "allowInlineContent",
     "allowUnsafeEval",
@@ -24,8 +26,8 @@ const permissions = [
 
     {key: "files", value: ["read"]},
     {key: "gameSaves", value: ["read", "write"]},
-    {key: "embedExtensions", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]},
-    {key: "webRequest", value: [] as (typeof ALLOW_ALL_PERMISSIONS | string & {})[]}
+    {key: "embedExtensions", value: [] as ExtendableValue[]},
+    {key: "webRequest", value: [] as ExtendableValue[]}
 ] as const
 
 export type PermissionKeys = PermissionsList<typeof permissions>[number]["key"]
@@ -35,36 +37,41 @@ const createMeta = ({
     dangerous = false,
     extendable = false,
     implicit = false,
-    fixedOptions = false
+    fixedOptions = false,
+    booleanFlag = false
 } = {}) => ({
     name,
     dangerous,
     extendable,
     implicit,
-    fixedOptions
+    fixedOptions,
+    booleanFlag
 }) as const
 
-type PermissionsMeta<P extends string> = {
-    readonly [key in P]: ReturnType<typeof createMeta>
-}
+export type PermissionMeta = ReturnType<typeof createMeta>
 
-export const permissionsMeta: PermissionsMeta<PermissionKeys> = {
-    allowAll: createMeta({name: "Unrestricted", dangerous: true}),
-    geoLocation: createMeta({name: "Location", dangerous: true}),
-    microphone: createMeta({dangerous: true}),
-    camera: createMeta({dangerous: true}),
-    unlimitedStorage: createMeta(),
-    fullScreen: createMeta(),
-    allowInlineContent: createMeta({implicit: true}),
-    allowUnsafeEval: createMeta({implicit: true}),
-    allowDataUrls: createMeta({implicit: true}),
-    allowBlobs: createMeta({implicit: true}),
-    pointerLock: createMeta({name: "Hide Mouse"}),
-    displayCapture: createMeta({name: "Record Screen", dangerous: true}),
-    files: createMeta({name: "Read Files"}),
+export const permissionsMeta = {
+    // boolean permissions
+    allowAll: createMeta({booleanFlag: true, name: "Unrestricted", dangerous: true}),
+    geoLocation: createMeta({booleanFlag: true, name: "Location", dangerous: true}),
+    microphone: createMeta({booleanFlag: true, dangerous: true}),
+    camera: createMeta({booleanFlag: true, dangerous: true}),
+    unlimitedStorage: createMeta({booleanFlag: true}),
+    fullScreen: createMeta({booleanFlag: true}),
+    allowInlineContent: createMeta({booleanFlag: true, implicit: true}),
+    allowUnsafeEval: createMeta({booleanFlag: true, implicit: true}),
+    allowDataUrls: createMeta({booleanFlag: true, implicit: true}),
+    allowBlobs: createMeta({booleanFlag: true, implicit: true}),
+    pointerLock: createMeta({booleanFlag: true, name: "Hide Mouse"}),
+    displayCapture: createMeta({booleanFlag: true, name: "Record Screen", dangerous: true}),
+    
+    // fixed permissions
+    files: createMeta({fixedOptions: true, name: "Read Files"}),
     gameSaves: createMeta({fixedOptions: true}),
-    embedExtensions: createMeta({dangerous: true, extendable: true}),
-    webRequest: createMeta({dangerous: true, extendable: true}),
-}
+
+    // extendable permissions
+    embedExtensions: createMeta({extendable: true, dangerous: true}),
+    webRequest: createMeta({extendable: true, dangerous: true}),
+} as const satisfies Record<PermissionKeys, PermissionMeta>
 
 export type Permissions = typeof permissions

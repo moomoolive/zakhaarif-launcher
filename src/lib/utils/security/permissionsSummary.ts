@@ -22,7 +22,7 @@ const permissionsSummary = (allowAll: boolean) => {
         allowUnsafeEval: startValue,
         allowDataUrls: startValue,
         allowBlobs: startValue,
-        files: startValue,
+        files: {read: startValue},
         gameSaves: {read: startValue, write: startValue},
         embedExtensions: allowAll ? [ALLOW_ALL_PERMISSIONS] : [],
         webRequest: allowAll ? [ALLOW_ALL_PERMISSIONS] : [],
@@ -79,9 +79,7 @@ export const generatePermissionsSummary = (
                 summary.gameSaves.write = value.includes("write")
                 break
             case "files":
-                if (value.includes("read")) {
-                    summary.files = true
-                }
+                summary.files.read = value.includes("read")
                 break
             default:
                 summary[key] = true
@@ -130,6 +128,12 @@ const permissionCleaners = {
             default:
                 return false
         }
+    },
+    files: (value: string) => {
+        if (value === "read") {
+            return true
+        }
+        return false
     }
 } as const
 
@@ -146,7 +150,7 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
         ) {
             continue
         }
-        if (value.length < 1) {
+        if (value.length < 1 || permissionsMeta[key].booleanFlag) {
             cleaned.push({key, value: []})
             continue
         }
@@ -160,6 +164,7 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
         switch (key) {
             case "webRequest":
             case "gameSaves":
+            case "files":
                 validator = permissionCleaners[key]
                 break
             default:

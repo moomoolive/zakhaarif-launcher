@@ -2,10 +2,14 @@ import {Button} from "@mui/material"
 import {Link} from "react-router-dom"
 import {GAME_CARGO_INDEX} from "../standardCargos"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
-import { useRef } from "react"
+import { useRef, useState } from "react"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+import { faAngleDown, faAngleUp } from "@fortawesome/free-solid-svg-icons"
+import { FadeIn } from "../components/FadeIn"
 
 const StartMenuPage = () => {
     const gameSaveExists = useRef(Boolean(window.localStorage.getItem(SAVE_EXISTS)))
+    const [expandSettings, setExpandSettings] = useState(false)
 
     return <div 
         className="fixed z-0 w-screen h-screen flex overflow-clip"
@@ -34,8 +38,103 @@ const StartMenuPage = () => {
                             </Link>
                         </div>
                     </> : <></>}
-                    
-                    {([
+
+                    <div>
+                        <Link to="/new-game">
+                            <Button 
+                                color="success"
+                                fullWidth 
+                                size="large"
+                            >
+                                {"New Game"}
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {gameSaveExists.current ? <>
+                        <div>
+                            <Link to="/load-game">
+                                <Button 
+                                    color="success"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"Load Game"}
+                                </Button>
+                            </Link>
+                        </div>
+                    </> : <></>}
+
+                    <div>
+                        <Button 
+                            color={expandSettings ? "warning" : "info"}
+                            fullWidth 
+                            size="large"
+                            onClick={() => setExpandSettings(!expandSettings)}
+                        >
+                            {"Settings"}
+                            
+                            <span className="ml-1">
+                                {expandSettings 
+                                    ? <FontAwesomeIcon icon={faAngleUp} /> 
+                                    : <FontAwesomeIcon icon={faAngleDown} />
+                                }
+                            </span>
+                        </Button>
+                    </div>
+
+                    <FadeIn show={expandSettings}>
+                        <div>
+                            <Link to="/settings">
+                                <Button 
+                                    color="info"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"General"}
+                                </Button>
+                            </Link>
+                        </div>
+
+                        <div>
+                            <Link to="/add-ons">
+                                <Button 
+                                    color="info"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"Add-ons"}
+                                </Button>
+                            </Link>
+                        </div>
+
+                        <div>
+                            <Link to="/extensions-list">
+                                <Button 
+                                    color="info"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"Extensions"}
+                                </Button>
+                            </Link>
+                        </div>
+                    </FadeIn>
+
+                    <div>
+                        <Link to="/">
+                            <Button 
+                                color="warning"
+                                fullWidth 
+                                size="large"
+                            >
+                                {"Launcher"}
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {/**
+                     * {([
                         {text: "New Game", route: "/new-game", color: "success"},
                         ...(gameSaveExists.current ? [{text: "Load Game", route: "/load-game", color: "success"}] as const : []),
                         {text: "Add-ons", route: "/add-ons", color: "info"},
@@ -58,6 +157,7 @@ const StartMenuPage = () => {
                             </Link>
                         </div>
                     })}
+                     */}
                 </div>
             </div>
         </div>

@@ -27,7 +27,7 @@ import { useGlobalConfirm } from "../hooks/globalConfirm"
 import LoadingIcon from "../components/LoadingIcon"
 import { useEffectAsync } from "../hooks/effectAsync"
 import { io } from "../lib/monads/result"
-import { faNpm } from "@fortawesome/free-brands-svg-icons"
+import { faNodeJs, faNpm } from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../lib/utils/consts/arabic"
 
 type SettingRouteProps = {
@@ -142,7 +142,7 @@ type SettingSubsection = {
 
 type CreditElement = {
     name: string
-    type: "npm"
+    type: "npm" | "node"
     url: string
 }
 
@@ -283,6 +283,10 @@ const SubPageList = {
                                     <div className="mr-2">
                                         {((source: typeof type) => {
                                             switch (source) {
+                                                case "node":
+                                                    return <span className="text-green-600 mx-0.5">
+                                                        <FontAwesomeIcon icon={faNodeJs}/>
+                                                    </span>
                                                 case "npm":
                                                 default:
                                                     return <span className="text-red-500">
@@ -297,6 +301,9 @@ const SubPageList = {
                                 </button>
                             </a>
                         })}
+                        <div className="mb-3 text-neutral-200">
+                            {"All the folks who maintain the web standards and browsers"}
+                        </div>
                         <div className="mb-3 text-neutral-400">
                             {"And probably many, many more..."}
                         </div>

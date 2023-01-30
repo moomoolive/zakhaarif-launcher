@@ -33,8 +33,19 @@ const getNpm = async () => {
     return npmDependenciesWithLinks
 }
 
+const getRuntimesUsed = () => {
+    const runtimes = [
+        {name: "Node.js", type: "node", url: "https://nodejs.org/en/"}
+    ]
+    console.log("found", runtimes.length, "runtimes")
+    return runtimes
+}
+
 /** @type {Array<{name: string, type: string, url: string}>} */
-const allCredits = [...(await getNpm())]
+const allCredits = [
+    ...getRuntimesUsed(),
+    ...(await getNpm())
+]
 
 await fs.writeFile(CREDITS_OUTPUT, JSON.stringify(allCredits), {
     encoding: "utf-8"
