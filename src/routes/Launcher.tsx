@@ -8,20 +8,19 @@ import {
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
 import LoadingIconGlobal from "@/components/LoadingIcon"
-import {isIframe} from "@/lib/utils/isIframe"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
   faTimes, faCheck, faBox, faCodeBranch,
   faLink, faTerminal, faFolderMinus
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import {BYTES_PER_GB} from "@/lib/utils/consts/storage"
-import {Shabah} from "@/lib/shabah/downloadClient"
-import {roundDecimal} from "@/lib/math/rounding"
-import {featureCheck} from "@/lib/utils/appFeatureCheck"
-import {useGlobalConfirm} from "@/hooks/globalConfirm"
-import {sleep} from "@/lib/utils/sleep"
-import {APP_CARGO_ID} from "@/config"
+import {BYTES_PER_GB} from "../lib/utils/consts/storage"
+import {Shabah} from "../lib/shabah/downloadClient"
+import {roundDecimal} from "../lib/math/rounding"
+import {featureCheck} from "../lib/utils/appFeatureCheck"
+import {useGlobalConfirm} from "../hooks/globalConfirm"
+import {sleep} from "../lib/utils/sleep"
+import {APP_CARGO_ID} from "../config"
 import {useAppShellContext} from "./store"
 import {useNavigate} from "react-router-dom"
 import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
@@ -233,36 +232,32 @@ const LauncherRoot = () => {
     )
     setProgressMsg("Checking for Updates...")
     const root = location.origin + "/"
-    const [res] = await Promise.all([
-      downloadClient.checkForCargoUpdates({
-        canonicalUrl: root,
-        storageUrl: root,
-        id: APP_CARGO_ID
-      }),
+    const [updateResponse] = await Promise.all([
+      downloadClient.checkForCargoUpdates({canonicalUrl: root, id: APP_CARGO_ID}),
       // should take at least 500ms
       sleep(500),
     ] as const)
-    const previousVersionExists = res.updateCheckResponse.previousVersionExists
+    const previousVersionExists = updateResponse.previousVersionExists
     setCheckedForUpdates(true)
-    if (previousVersionExists && !res.enoughSpaceForPackage) {
-      const updateVersion = res.versions.new
-      setDownloadError(`Not enough disk space for update v${updateVersion} (${res.diskInfo.bytesNeededToDownloadFriendly} required)`)
+    if (previousVersionExists && !updateResponse.enoughSpaceForPackage) {
+      const updateVersion = updateResponse.versions.new
+      setDownloadError(`Not enough disk space for update v${updateVersion} (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
-    } else if (previousVersionExists && res.errorOccurred) {
+    } else if (previousVersionExists && updateResponse.errorOccurred) {
       setDownloadError(`Error occured when checking for updates`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
     } else if (
-      (!previousVersionExists && res.errorOccurred)
-      || (!previousVersionExists && !res.enoughSpaceForPackage)
+      (!previousVersionExists && updateResponse.errorOccurred)
+      || (!previousVersionExists && !updateResponse.enoughSpaceForPackage)
     ) {
-      if (!res.enoughSpaceForPackage) {
-        setDownloadError(`Not enough disk space install (${res.diskInfo.bytesNeededToDownloadFriendly} required)`)
+      if (!updateResponse.enoughSpaceForPackage) {
+        setDownloadError(`Not enough disk space install (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
       } else {
         setDownloadError("Couldn't contact update server")
       }
@@ -272,7 +267,7 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!res.updateAvailable && previousUpdateFailed) {
+    if (!updateResponse.updateAvailable && previousUpdateFailed) {
       setProgressMsg("Updating...")
       document.title = "Updating..."
       setAppUpdateInProgress(true)
@@ -281,18 +276,18 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!res.updateAvailable) {
+    if (!updateResponse.updateAvailable) {
       launchApp()
       return
     }
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
-    const updateQueueRes = await downloadClient.executeUpdates(
-      res,
-      `core v${res.versions.new}`,
+    const updateQueueResponse = await downloadClient.executeUpdates(
+      updateResponse,
+      `core v${updateResponse.versions.new}`,
     )
     
-    if (updateQueueRes.data !== Shabah.STATUS.updateQueued) {
+    if (updateQueueResponse.data !== Shabah.STATUS.updateQueued) {
       await sleep(2_000)
       setShowProgress(false)
       setDownloadError("Couldn't Queue Update")
@@ -303,8 +298,8 @@ const LauncherRoot = () => {
     setProgressMsg("Updating...")
     document.title = "Updating..."
     setAppUpdateInProgress(true)
-    setCurrentAppVersion(res.versions.old)
-    setNextUpdateVersion(res.versions.new)
+    setCurrentAppVersion(updateResponse.versions.old)
+    setNextUpdateVersion(updateResponse.versions.new)
     addProgressListener()
   }
 
@@ -350,7 +345,7 @@ const LauncherRoot = () => {
       setNextUpdateVersion(version)
       addProgressListener()
     })()
-    return downloadClient.removeProgressListener(APP_CARGO_ID)
+    return () => downloadClient.removeProgressListener(APP_CARGO_ID)
   }, [])
 
   return (

@@ -1,10 +1,5 @@
 import {describe, it, expect} from "vitest"
 import {
-    serviceWorkerCacheHitHeader, 
-    serviceWorkerErrorCatchHeader,
-    serviceWorkerPolicies
-} from "../backend"
-import {
     makeBackgroundFetchHandler
 } from "./backgroundFetchHandler"
 import {
@@ -23,18 +18,6 @@ import {
     BackgroundFetchUIEventCore,
     BackgroundFetchResult,
 } from "@/lib/types/serviceWorkers"
-
-const requestInfoToUrl = (request: RequestInfo | URL) => {
-    if (typeof request === "string") {
-        return request
-    } else if (request instanceof Request) {
-        return request.url
-    } else if (request instanceof URL) {
-        return request.href
-    } else {
-        return request as string
-    }
-}
 
 const createBgFetchEvent = ({
     id, 
@@ -87,45 +70,6 @@ const createBgFetchEvent = ({
             }
         } as BackgroundFetchUIEventCore
     }
-}
-
-class CacheEngine {
-    readonly cache = {} as Record<string, () => Response>
-    readonly accessLog = [] as Array<{url: string, time: number}>
-
-    constructor(initCache?: Record<string, () => Response>) {
-        this.cache = initCache || {}
-        this.accessLog = []
-    }
-
-    async getFile(url: string) {
-        this.accessLog.push({url, time: Date.now()})
-        const entry = this.cache[url]
-        if (!entry) {
-            return null
-        }
-        return entry()
-    }
-
-    async putFile(url: string, file: Response) {
-        return true
-    }
-
-    async queryUsage() {
-        return {usage: 0, quota: 0}
-    }
-
-    async deleteFile(url: string) {
-        return true
-    }
-
-    async deleteAllFiles() {
-        return true
-    }
-
-    async isPersisted() { return true }
-    async requestPersistence() { return true }
-    async listFiles() { return [] as const }
 }
 
 const createFileCache = (initFiles: Record<string, Response>) => {
@@ -191,6 +135,7 @@ describe("background fetch success handler", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: "",
+            canonicalUrl: cargoId,
             map: {},
             bytes: 0
         })
@@ -223,6 +168,7 @@ describe("background fetch success handler", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: "",
+            canonicalUrl: cargoId,
             map: {},
             bytes: 0
         })
@@ -300,6 +246,7 @@ describe("background fetch success handler", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: "",
+            canonicalUrl: cargoId,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = {
@@ -389,6 +336,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl,
+            canonicalUrl: cargoId,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -480,6 +428,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl,
+            canonicalUrl: cargoId,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -575,6 +524,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: storageExtension,
+            canonicalUrl: cargoId,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item

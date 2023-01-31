@@ -31,12 +31,14 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
-        const targetId = bgfetch.id
+        const canonicalUrl = bgfetch.id
         const fetchedResources = await bgfetch.matchAll()
         log(
             eventName,
             "resources downloaded",
-            fetchedResources.map(r => r.request.url)
+            fetchedResources.map(
+                (resource) => resource.request.url
+            )
         )
         if (fetchedResources.length < 0) {
             return
@@ -45,12 +47,12 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             getDownloadIndices(origin, fileCache),
             getCargoIndices(origin, fileCache)
         ] as const)
-        const downloadIndexPosition = downloadIndices
-            .downloads
-            .findIndex(({id}) => id === targetId)
-        const cargoIndexPosition = cargoIndices
-            .cargos
-            .findIndex((cargo) => cargo.id === targetId)
+        const downloadIndexPosition = downloadIndices.downloads.findIndex(
+            ({canonicalUrl}) => canonicalUrl === canonicalUrl
+        )
+        const cargoIndexPosition = cargoIndices.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
+        )
         log(
             eventName, 
             `found: cargo=${cargoIndexPosition > -1}, download=${downloadIndexPosition > -1}`
@@ -129,7 +131,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             eventName,
             `processed ${resourcesProcessed} out of ${len}. orphan_count=${len - resourcesProcessed}, fail_count=${failedResources}`
         )
-        removeDownloadIndex(downloadIndices, targetId)
+        removeDownloadIndex(downloadIndices, canonicalUrl)
         updateCargoIndex(cargoIndices, {
             ...cargoIndices.cargos[cargoIndexPosition],
             state: ((event: typeof eventType) => {

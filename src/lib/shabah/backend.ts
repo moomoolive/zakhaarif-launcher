@@ -76,6 +76,7 @@ export type DownloadIndex = {
     bytes: number
     version: string
     previousVersion: string
+    canonicalUrl: string
     resolvedUrl: string
 }
 
@@ -254,7 +255,9 @@ export const updateCargoIndex = (
 ) => {
     const updatedAt = Date.now()
     indices.updatedAt = updatedAt
-    const existingIndex = indices.cargos.findIndex((cargo) => cargo.id === target.id)
+    const existingIndex = indices.cargos.findIndex(
+        (cargo) => cargo.canonicalUrl === target.canonicalUrl
+    )
     if (existingIndex < 0) {
         indices.cargos.push({...target, updatedAt, createdAt: updatedAt})
         return operationCodes.createdNew

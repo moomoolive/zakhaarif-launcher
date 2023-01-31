@@ -28,7 +28,7 @@ const NewGamePage = () => {
     const confirm = useGlobalConfirm()
     const {downloadClient} = useAppShellContext()
 
-    const [gameName, setGameName] = useState(`unnamed`)
+    const [gameName, setGameName] = useState(`unnamed-${(Math.trunc(Math.random() * 99_999)).toString()}`)
     const [cargoIndices, setCargoIndices] = useState(emptyCargoIndices())
     const [showModLinker, setShowModLinker] = useState(false)
     const [linkedMods, setLinkedMods] = useState([] as CargoIndex[])
