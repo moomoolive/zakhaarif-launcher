@@ -106,6 +106,14 @@ const ExtensionShellPage = () => {
             return
         }
 
+        if (meta.state !== "cached") {
+            setLoading(false)
+            setError(true)
+            setErrorMessage("Invalid Extension")
+            console.warn(`Prevented extension "${entryUrl}" from running, as extension is not in cached on disk (current_state=${meta.state})`)
+            return
+        }
+
         const cargoResponse = await downloadClient.getCargoAtUrl(meta.resolvedUrl)
         if (cargoResponse.ok) {
             await sandboxInitializePromise.promise

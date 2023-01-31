@@ -17,14 +17,40 @@ import {
 } from "./backend"
 import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
+import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 
-type RequestableResource = {
+export type RequestableResource = {
     requestUrl: string
     storageUrl: string
     bytes: number
 }
 
-const addSlashToEnd = (str: string) => str.endsWith("/") ? str : str + "/"
+export const STATUS_CODES = {
+    ok: 0,
+    updateNotEnoughDiskSpace: 1,
+    updateNotAvailable: 2,
+    updateQueued: 3,
+    sameUpdateInProgress: 4,
+    updateAlreadyQueue: 5,
+    cargoNotFound: 6,
+    cargoNotInErrorState: 7,
+    errorIndexNotFound: 8,
+    cacheIsFresh: 9,
+    cached: 10,
+    deleted: 11,
+    archived: 12,
+    updateError: 13,
+    cargoIsUpToDate: 14,
+
+    networkError: 100,
+    badHttpCode: 101,
+    encodingNotAcceptable: 102,
+    invalidCargo: 103,
+    invalidRedirect: 104,
+    preflightVerificationFailed: 105,
+} as const
+
+export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
 
 const cargoHeaders = {
     ...serviceWorkerPolicies.networkOnly,
@@ -38,19 +64,22 @@ class CargoFetchResponse {
     text: string
     response: Response | null
     resolvedUrl: string
+    code: StatusCode
 
     constructor({
         error = "",
         cargo = null,
         text = "",
         response = null,
-        resolvedUrl = ""
+        resolvedUrl = "",
+        code = STATUS_CODES.ok
     }: Partial<CargoFetchResponse>) {
         this.error = error
         this.cargo = cargo
         this.text = text
         this.response = response
         this.resolvedUrl = resolvedUrl
+        this.code = code
     }
 }
 
@@ -68,12 +97,14 @@ const fetchCargo = async (
     )
     if (!newCargoFetch.ok) {
         return new CargoFetchResponse({
+            code: STATUS_CODES.networkError,
             error: `http request for new cargo encountered a fatal error: ${newCargoFetch.msg}`,
         })
     }
     const newCargoRes = newCargoFetch.data
     if (!newCargoRes.ok) {
         return new CargoFetchResponse({
+            code: STATUS_CODES.badHttpCode,
             error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
         })
     }
@@ -81,26 +112,33 @@ const fetchCargo = async (
     const newCargoText = await io.wrap(newCargoRes.text())
     if (!newCargoText.ok) {
         return new CargoFetchResponse({
+            code: STATUS_CODES.encodingNotAcceptable,
             error: `new cargo for "${name}" found no text. Error: ${newCargoText.msg}`
         })
     }
     const newCargoJson = resultJsonParse(newCargoText.data)
     if (!newCargoJson.ok) {
         return new CargoFetchResponse({
+            code: STATUS_CODES.encodingNotAcceptable,
             error: `new cargo for "${name}" was not json encoded. Error: ${newCargoJson.msg}`,
         })
     }
     const newCargoPkg = validateManifest(newCargoJson.data)
     if (newCargoPkg.errors.length > 0) {
         return new CargoFetchResponse({
+            code: STATUS_CODES.invalidCargo,
             error: `new cargo for "${name}" is not a valid ${MANIFEST_NAME}. Errors: ${newCargoPkg.errors.join(",")}`,
         })
     }
     const [baseUrl] = newCargoRes.url.split(MANIFEST_NAME)
     if (baseUrl.length < 1) {
-        return new CargoFetchResponse({error: `Cargo request redirected to empty url`})
+        return new CargoFetchResponse({
+            code: STATUS_CODES.invalidRedirect,
+            error: `Cargo request redirected to empty url`
+        })
     }
     return new CargoFetchResponse({
+        code: STATUS_CODES.ok,
         cargo: newCargoPkg, 
         text: newCargoText.data,
         response: newCargoResponseCopy,
@@ -125,6 +163,7 @@ type DownloadResponse = {
     cargoManifestBytes: number
     previousVersionExists: boolean
     previousCargo: null | Cargo
+    code: StatusCode
 }
 
 const downloadResponse = ({
@@ -138,6 +177,7 @@ const downloadResponse = ({
     cargoManifestBytes = 0,
     previousVersionExists = true,
     previousCargo = null,
+    code = STATUS_CODES.ok
 }: Partial<DownloadResponse>) => ({
     downloadableResources, 
     errors,
@@ -148,17 +188,19 @@ const downloadResponse = ({
     bytesToDelete,
     cargoManifestBytes,
     previousVersionExists,
-    previousCargo
+    previousCargo,
+    code
 })
 
 const downloadError = (
-    msg: string, 
+    msg: string,
+    code: StatusCode,
     previousVersionExists = true
 ) => {
-    return downloadResponse({errors: [msg], previousVersionExists})
+    return downloadResponse({errors: [msg], code, previousVersionExists})
 }
 
-const versionUpToDate = () => downloadResponse({})
+const versionUpToDate = () => downloadResponse({code: STATUS_CODES.cargoIsUpToDate})
 
 const verifyAllRequestableFiles = async (
     fileUrls: string[], 
@@ -222,12 +264,15 @@ export const checkForUpdates = async (
             cargo: newCargoPkg, 
             text, 
             response,
-            resolvedUrl: finalUrl
+            resolvedUrl: finalUrl,
+            code
         } = await fetchCargo(
             newCargoUrl, name, fetchFn
         )
         if (!newCargoPkg || !response || error.length > 0) {
-            return downloadError(error, false)
+            return downloadError(
+                error, code, false
+            )
         }
         const filesToDownload = newCargoPkg.pkg.files.map((f) => {
             const filename = stripRelativePath(f.name)
@@ -244,7 +289,8 @@ export const checkForUpdates = async (
         )
         if (filePreflightResponses.errorUrls.length > 0) {
             return downloadError(
-                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+                STATUS_CODES.preflightVerificationFailed,
                 false
             )
         }
@@ -278,7 +324,8 @@ export const checkForUpdates = async (
             },
             totalBytes: bytesToDownload,
             cargoManifestBytes: stringBytes(text),
-            previousVersionExists: false
+            previousVersionExists: false,
+            code: STATUS_CODES.ok
         })
     }
 
@@ -316,19 +363,19 @@ export const checkForUpdates = async (
         cargo: newCargoPkg, 
         text, 
         response, 
-        resolvedUrl: finalUrl 
+        resolvedUrl: finalUrl,
+        code
     } = await fetchCargo(
         newCargoUrl, name, fetchFn
     )
 
     if (!newCargoPkg || !response || error.length > 0) {
-        return downloadError(error)
+        return downloadError(error, code)
     }
 
     if (!newCargoPkg.semanticVersion.isGreater(oldCargo.semanticVersion)) {
         return versionUpToDate()
     }
-
 
     const newResolvedUrl = finalUrl
     if (oldResolvedRootUrl !== newResolvedUrl) {
@@ -361,7 +408,8 @@ export const checkForUpdates = async (
         })
         if (filePreflightResponses.errorUrls.length > 0) {
             return downloadError(
-                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+                STATUS_CODES.preflightVerificationFailed,
                 false
             )
         }
@@ -394,7 +442,8 @@ export const checkForUpdates = async (
                 canonicalUrl,
                 resolvedUrl: oldResolvedUrl
             },
-            previousCargo: oldCargo.pkg
+            previousCargo: oldCargo.pkg,
+            code: STATUS_CODES.ok
         })
     }
 
@@ -417,7 +466,8 @@ export const checkForUpdates = async (
     )
     if (filePreflightResponses.errorUrls.length > 0) {
         return downloadError(
-            `the following urls are invalid: ${filePreflightResponses.errorUrls.join(",")}`,
+            `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+            STATUS_CODES.preflightVerificationFailed,
             false
         )
     }
@@ -470,7 +520,8 @@ export const checkForUpdates = async (
             canonicalUrl,
             resolvedUrl: finalUrl,
         },
-        previousCargo: oldCargo.pkg
+        previousCargo: oldCargo.pkg,
+        code: STATUS_CODES.ok,
     })
 }
 

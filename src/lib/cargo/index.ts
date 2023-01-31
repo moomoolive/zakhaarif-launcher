@@ -105,10 +105,10 @@ export class Cargo<
         crateVersion = "0.1.0",
         name = "unspecified-name",
         version = NULL_MANIFEST_VERSION,
-        entry = NULL_FIELD,
         files = [],
 
         // optionalfields
+        entry = NULL_FIELD,
         invalidation = "default",
         description = NULL_FIELD,
         authors = [],
@@ -171,7 +171,9 @@ export class Cargo<
     }
 }
 
-export const toMiniCargo = ({version}: Cargo) => ({
+export const toMiniCargo = <
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
+>({version}: Cargo<Permissions>) => ({
     version
 } as MiniCodeManifest) 
 

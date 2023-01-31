@@ -222,7 +222,7 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).errors.length).toBe(0)
     })
 
-    it("should return error if cargo.file is an array of primitives other than strings", () => {
+    it("should return error if cargo.file is an array of primitives other than strings or object", () => {
         const injectPrimitive = <T>(primitive: T) => {
             const m = structuredClone(manifest)
             {((m.files as any) = [primitive])}
@@ -238,7 +238,7 @@ describe("manifest validation function", () => {
         expect(validateManifest(injectPrimitive(1n)).errors.length).toBeGreaterThan(0)
     })
 
-    it("should return error if cargo.file is an object is missing required name field and is not a string", () => {
+    it("should return error if cargo.file is an array of objects and one is missing required name field", () => {
         const m = structuredClone(manifest)
         delete ((m.files[0] as any).name)
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
@@ -277,10 +277,15 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).pkg.files[0].bytes).toBe(0)
     })
 
-    it("should return error if cargo.entry is provided but is not the name of one of cargo files", () => {
-        const m = structuredClone(manifest)
-        m.entry = "random_file_not_listed.js"
-        expect(validateManifest(m).errors.length).toBeGreaterThan(0)        
+    it(`should return error if cargo.entry is provided but is not the name of one of cargo files, unless entry is '${NULL_FIELD}'`, () => {
+        const entry = (entry: string) => {
+            const m = structuredClone(manifest)
+            m.entry = entry
+            return validateManifest(m)
+        }
+        expect(entry("random_file_not_listed.js").errors.length).toBeGreaterThan(0)        
+        expect(entry("another.js").errors.length).toBeGreaterThan(0)        
+        expect(entry(NULL_FIELD).errors.length).toBe(0)        
     })
 
     it("should not return error if cargo.entry is set to NULL_FIELD or empty string", () => {

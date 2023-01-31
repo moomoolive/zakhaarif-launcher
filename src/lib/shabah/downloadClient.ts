@@ -1,6 +1,9 @@
 import {
     checkForUpdates,
     createResourceMap,
+    RequestableResource,
+    STATUS_CODES,
+    StatusCode
 } from "./client"
 import {io} from "../monads/result"
 import {
@@ -25,23 +28,74 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {readableByteCount} from "../utils/storage/friendlyBytes"
-import {MANIFEST_NAME} from "../cargo/index"
+import {MANIFEST_NAME, PermissionsList} from "../cargo/index"
 import {Cargo} from "../cargo/index"
 import {resultJsonParse} from "../monads/utils/jsonParse"
 import {
     cleanPermissions, 
     hasUnsafePermissions, 
     generatePermissionsSummary,
-    CleanedPermissions
+    CleanedPermissions,
+    PermissionsSummary
 } from "../utils/security/permissionsSummary"
 import { Permissions } from "../types/permissions"
+import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
+import { DeepReadonly } from "../types/utility"
 
 export type {CargoIndex, CargoIndices, CargoState} from "./backend"
 export {emptyCargoIndices} from "./backend"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
-type UpdateDetails = Awaited<ReturnType<Shabah["checkForCargoUpdates"]>>
+export type UpdateCheckResponse = DeepReadonly<{
+    metadata: {
+        id: string
+        originalResolvedUrl: string
+        resolvedUrl: string
+        canonicalUrl: string
+    }
+    errors: string[]
+    versions: {
+        new: string
+        old: string
+    }
+    errorOccurred: boolean
+    enoughStorageForCargo: boolean
+    newCargo: {
+        response: Response
+        text: string
+        parsed: Cargo
+        canonicalUrl: string
+        resolvedUrl: string
+    } | null,
+    previousCargo: Cargo | null
+    previousVersionExists: boolean
+    download: {
+        cargoTotalBytes: number
+        bytesToDownload: number
+        downloadableResources: RequestableResource[]
+        resourcesToDelete: RequestableResource[]
+        bytesToDelete: number
+    }
+    updateAvailable: boolean
+    permissions: {
+        permissionsSummary: PermissionsSummary | null
+        newPermissionsRequested: PermissionsList<Permissions>
+        cargoIsUnsafe: boolean
+    }
+    diskInfo: {
+        raw: {
+            used: number
+            total: number
+            left: number
+        }
+        usageAfterDownload: number
+        bytesNeededToDownload: number
+        bytesNeededToDownloadFriendly: string
+        cargoStorageBytes: number
+    }
+    status: StatusCode
+}>
 
 type ProgressIndicator = DownloadState & {
     installing: boolean
@@ -76,21 +130,7 @@ export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = "none"
     static readonly POLICIES = {...serviceWorkerPolicies} as const
 
-    static readonly STATUS = {
-        updateError: 0,
-        updateNotEnoughDiskSpace: 1,
-        updateNotAvailable: 2,
-        updateQueued: 3,
-        sameUpdateInProgress: 4,
-        updateAlreadyQueue: 5,
-        cargoNotFound: 6,
-        cargoNotInErrorState: 7,
-        errorIndexNotFound: 8,
-        cacheIsFresh: 9,
-        cached: 10,
-        deleted: 11,
-        archived: 12
-    } as const
+    static readonly STATUS = STATUS_CODES
 
     networkRequest: FetchFunction
     fileCache: FileCache
@@ -106,6 +146,9 @@ export class Shabah {
     private progressListenerTimeoutId: string | number | NodeJS.Timeout
 
     constructor({adaptors, origin}: ShabahProps) {
+        if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
+            throw new Error("origin of download client must be full url, starting with https:// or http://")
+        }
         const {
             networkRequest, 
             fileCache, 
@@ -114,9 +157,7 @@ export class Shabah {
         this.networkRequest = networkRequest
         this.fileCache = fileCache
         this.downloadManager = downloadManager
-        this.origin = origin.endsWith("/")
-            ? origin.slice(0, -1)
-            : origin
+        this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
         this.cargoIndicesCache = null
         this.downloadIndicesCache = null
         this.progressListeners = []
@@ -141,16 +182,19 @@ export class Shabah {
         canonicalUrl: string
         id: string
     }) {
-        const {networkRequest, fileCache} = this
+        if (!cargo.canonicalUrl.startsWith("https://") && !cargo.canonicalUrl.startsWith("http://")) {
+            throw new Error("cargo canonical url must be a full url, starting with https:// or http://")
+        }
         const cargoIndex = await this.getCargoMetaByCanonicalUrl(
             cargo.canonicalUrl
         )
-        const cargoId = cargoIndex?.id || cargo.id
+        
         const response = await checkForUpdates({
             canonicalUrl: cargo.canonicalUrl,
             oldResolvedUrl: !cargoIndex ? "" : cargoIndex.resolvedUrl,
             name: cargo.id
-        }, networkRequest, fileCache)
+        }, this.networkRequest, this.fileCache)
+        
         if (response.newCargo) {
             const permissions = response.newCargo.parsed.permissions
             const cleanedPermissions = cleanPermissions(permissions)
@@ -166,16 +210,16 @@ export class Shabah {
                 )
             }
         }
+
         const disk = await this.diskInfo()
-        const diskWithCargo = (
-            disk.used + response.bytesToDownload
-        )
-        const enoughSpaceForPackage = disk.total < 1
+        const diskWithCargo = disk.used + response.bytesToDownload
+        const enoughStorageForCargo = disk.total < 1
             ? false
             : diskWithCargo < disk.total
         const bytesNeededToDownload = Math.max(
             0, (diskWithCargo - disk.total)
         )
+
         const previousVersion = (
             response.previousCargo?.version 
             || Shabah.NO_PREVIOUS_INSTALLATION
@@ -227,23 +271,27 @@ export class Shabah {
         }
 
         const friendlyBytes = readableByteCount(bytesNeededToDownload)
-        const cargoIsUnsafe = response.newCargo 
-            ? hasUnsafePermissions(
-                generatePermissionsSummary(
-                    (response.newCargo.parsed as Cargo<Permissions>).permissions
-                )
-            )
+        const permissionsSummary = response.newCargo
+            ? generatePermissionsSummary((response.newCargo.parsed as Cargo<Permissions>).permissions)
+            : null
+        const cargoIsUnsafe = permissionsSummary
+            ? hasUnsafePermissions(permissionsSummary)
             : false
-        return {
-            id: cargoId,
-            storageUrl: response.newCargo?.resolvedUrl || "",
-            canonicalUrl: cargo.canonicalUrl,
+        const updateResponse: UpdateCheckResponse = {
+            status: response.code,
+            metadata: {
+                id: cargoIndex?.id || cargo.id,
+                originalResolvedUrl: cargoIndex?.resolvedUrl || "",
+                resolvedUrl: response.newCargo?.resolvedUrl || "",
+                canonicalUrl: addSlashToEnd(cargo.canonicalUrl),
+            },
             versions: {new: newVersion, old: previousVersion},
             errorOccurred: response.errors.length > 0,
-            enoughSpaceForPackage,
-            newCargo: response.newCargo,
-            previousCargo: response.previousCargo,
-            previousVersionExists: !!response.previousCargo,
+            errors: response.errors,
+            enoughStorageForCargo,
+            newCargo: response.newCargo || null,
+            previousCargo: response.previousCargo || null,
+            previousVersionExists: response.previousVersionExists,
             download: {
                 cargoTotalBytes: response.totalBytes,
                 bytesToDownload: response.bytesToDownload,
@@ -252,16 +300,20 @@ export class Shabah {
                 bytesToDelete: response.bytesToDelete
             },
             updateAvailable: !!response.newCargo,
-            newPermissionsRequested,
-            cargoIsUnsafe,
+            permissions: {
+                permissionsSummary,
+                newPermissionsRequested,
+                cargoIsUnsafe,
+            },
             diskInfo: {
-                ...disk,
+                raw: disk,
                 usageAfterDownload: diskWithCargo,
                 bytesNeededToDownload,
                 bytesNeededToDownloadFriendly: `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`,
                 cargoStorageBytes: cargoIndex?.storageBytes || 0
             },
-        }  
+        }
+        return updateResponse
     }
 
     private async refreshDownloadIndicies() {
@@ -315,7 +367,7 @@ export class Shabah {
 
     }
 
-    private async putCargoIndex(
+    async putCargoIndex(
         newIndex: CargoIndexWithoutMeta,
         {persistChanges}: {persistChanges: boolean}
     ) {
@@ -327,7 +379,7 @@ export class Shabah {
     }
 
     async executeUpdates(
-        details: UpdateDetails,
+        details: UpdateCheckResponse,
         updateTitle: string,
     ) {
         if (!details.updateAvailable || !details.newCargo) {
@@ -335,7 +387,7 @@ export class Shabah {
                 Shabah.STATUS.updateNotAvailable,
                 //"update not available"
             )
-        } else if (!details.enoughSpaceForPackage) {
+        } else if (!details.enoughStorageForCargo) {
             return io.ok(
                 Shabah.STATUS.updateNotEnoughDiskSpace,
                 //"not enough disk space for update"
@@ -348,7 +400,7 @@ export class Shabah {
         }
         const downloadsIndex = await this.getDownloadIndices()
         const prevUpdateIndex = downloadsIndex.downloads.findIndex(
-            (index) => index.canonicalUrl === details.canonicalUrl
+            (index) => index.canonicalUrl === details.metadata.canonicalUrl
         )
         const updateInProgress = prevUpdateIndex > -1
         if (updateInProgress) {
@@ -357,18 +409,18 @@ export class Shabah {
                 //"update is already in progress",
             )
         }
-        const updateBytes = details.download.bytesToDownload
-        const updateIndex = {
-            id: details.id,
-            bytes: updateBytes,
+        
+        const updatedIndex = {
+            id: details.metadata.id,
+            bytes: details.download.bytesToDownload,
             map: createResourceMap(details.download.downloadableResources),
             version: details.versions.new,
             previousVersion: details.versions.old,
             title: updateTitle,
-            resolvedUrl: details.storageUrl,
-            canonicalUrl: details.canonicalUrl
+            resolvedUrl: details.metadata.resolvedUrl,
+            canonicalUrl: details.metadata.canonicalUrl
         }
-        updateDownloadIndex(downloadsIndex, updateIndex)
+        updateDownloadIndex(downloadsIndex, updatedIndex)
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
             this.fileCache.putFile(
@@ -385,7 +437,7 @@ export class Shabah {
             this.putCargoIndex(
                 {
                     name: details.newCargo.parsed.name,
-                    id: details.id,
+                    id: details.metadata.id,
                     state: "updating",
                     permissions: details.newCargo.parsed.permissions,
                     version: details.versions.new,
@@ -408,9 +460,12 @@ export class Shabah {
 
         const downloadFiles = details.download.downloadableResources
         await this.downloadManager.queueDownload(
-            details.canonicalUrl,
+            details.metadata.canonicalUrl,
             downloadFiles.map((file) => file.requestUrl),
-            {title: updateTitle, downloadTotal: updateBytes}
+            {
+                title: updateTitle, 
+                downloadTotal: details.download.bytesToDownload
+            }
         )
 
         return io.ok(

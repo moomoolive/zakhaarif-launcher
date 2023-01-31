@@ -239,7 +239,7 @@ const LauncherRoot = () => {
     ] as const)
     const previousVersionExists = updateResponse.previousVersionExists
     setCheckedForUpdates(true)
-    if (previousVersionExists && !updateResponse.enoughSpaceForPackage) {
+    if (previousVersionExists && !updateResponse.enoughStorageForCargo) {
       const updateVersion = updateResponse.versions.new
       setDownloadError(`Not enough disk space for update v${updateVersion} (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
       setButtonElement(<>{"Start Anyway"}</>)
@@ -254,9 +254,9 @@ const LauncherRoot = () => {
       return
     } else if (
       (!previousVersionExists && updateResponse.errorOccurred)
-      || (!previousVersionExists && !updateResponse.enoughSpaceForPackage)
+      || (!previousVersionExists && !updateResponse.enoughStorageForCargo)
     ) {
-      if (!updateResponse.enoughSpaceForPackage) {
+      if (!updateResponse.enoughStorageForCargo) {
         setDownloadError(`Not enough disk space install (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
       } else {
         setDownloadError("Couldn't contact update server")
