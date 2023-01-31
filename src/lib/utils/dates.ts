@@ -1,4 +1,4 @@
-import * as time from "@/lib/utils/consts/time"
+import * as time from "../utils/consts/time"
 
 export const reactiveDate = (date: Date) => {
     const now = Date.now()

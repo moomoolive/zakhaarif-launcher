@@ -1,6 +1,6 @@
 import type {DeepReadonly} from "../types/utility"
 import {Cargo} from "../cargo/index"
-import {CargoIndex} from "../shabah/backend"
+import {CargoIndex} from "../shabah/downloadClient"
 import {ALLOW_ALL_PERMISSIONS, Permissions} from "../types/permissions"
 import {AppDatabase} from "../database/AppDatabase"
 import {sleep} from "../utils/sleep"

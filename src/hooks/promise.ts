@@ -1,6 +1,6 @@
 import {useState, useRef} from "react"
 import {useEffectAsync} from "./effectAsync"
-import {io, ResultType} from "@/lib/monads/result"
+import {io, ResultType} from "../lib/monads/result"
 
 export const usePromise = <T>(promise: Promise<T>) => {
     const [promiseState, setPromiseState] = useState<

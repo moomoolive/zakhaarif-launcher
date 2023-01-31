@@ -6,11 +6,11 @@ import {
     TerminalMsg,
     CommandsList,
     ValidInputType
-} from "@/lib/terminalEngine/index"
+} from "../lib/terminalEngine/index"
 import {faTerminal, faGhost, faTimes, faKeyboard, faQuestionCircle} from "@fortawesome/free-solid-svg-icons"
-import {useDebounce} from "@/hooks/debounce"
-import terminalLoadingElement from "@/components/loadingElements/terminal"
-import { PROFILE_NAME } from "@/lib/utils/localStorageKeys"
+import {useDebounce} from "../hooks/debounce"
+import terminalLoadingElement from "../components/loadingElements/terminal"
+import { PROFILE_NAME } from "../lib/utils/localStorageKeys"
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 

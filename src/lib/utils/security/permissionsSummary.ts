@@ -5,7 +5,7 @@ import {
     permissionsMeta
 } from "../../types/permissions"
 import {PermissionsList} from "../../cargo/index"
-import { CargoIndices } from "../../shabah/backend"
+import { CargoIndices } from "../../shabah/downloadClient"
 
 const permissionsSummary = (allowAll: boolean) => {
     const startValue = allowAll

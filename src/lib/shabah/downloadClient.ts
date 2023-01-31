@@ -36,7 +36,8 @@ import {
 } from "../utils/security/permissionsSummary"
 import { Permissions } from "../types/permissions"
 
-export type {CargoIndex, CargoIndices} from "./backend"
+export type {CargoIndex, CargoIndices, CargoState} from "./backend"
+export {emptyCargoIndices} from "./backend"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
@@ -258,6 +259,7 @@ export class Shabah {
                 usageAfterDownload: diskWithCargo,
                 bytesNeededToDownload,
                 bytesNeededToDownloadFriendly: `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`,
+                cargoStorageBytes: cargoIndex?.storageBytes || 0
             },
         }  
     }
@@ -391,7 +393,8 @@ export class Shabah {
                     bytes: details.download.cargoTotalBytes,
                     resolvedUrl: details.newCargo.resolvedUrl,
                     canonicalUrl: details.newCargo.canonicalUrl,
-                    logoUrl: details.newCargo.parsed.crateLogoUrl
+                    logoUrl: details.newCargo.parsed.crateLogoUrl,
+                    storageBytes: details.diskInfo.cargoStorageBytes
                 },
                 {persistChanges: true}
             ),

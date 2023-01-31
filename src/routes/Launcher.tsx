@@ -7,7 +7,7 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import LoadingIconGlobal from "@/components/LoadingIcon"
+import LoadingIconGlobal from "../components/LoadingIcon"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
   faTimes, faCheck, faBox, faCodeBranch,

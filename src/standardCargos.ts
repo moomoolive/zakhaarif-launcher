@@ -37,6 +37,7 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
     version: STANDARD_MOD_CARGO.version,
     permissions: STANDARD_MOD_CARGO.permissions,
     state: "cached",
+    storageBytes: 0,
     createdAt: 0,
     updatedAt: 0
 }
@@ -75,6 +76,7 @@ export const GAME_CARGO_INDEX: Readonly<CargoIndex> = {
     version: GAME_CARGO.version,
     permissions: GAME_CARGO.permissions,
     state: "cached",
+    storageBytes: 0,
     createdAt: 0,
     updatedAt: 0
 }

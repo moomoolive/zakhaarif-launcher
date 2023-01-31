@@ -1,5 +1,5 @@
-import {BYTES_PER_MB, BYTES_PER_GB, BYTES_PER_KB} from "@/lib/utils/consts/storage"
-import {roundDecimal} from "@/lib/math/rounding"
+import {BYTES_PER_MB, BYTES_PER_GB, BYTES_PER_KB} from "../../utils/consts/storage"
+import {roundDecimal} from "../../math/rounding"
 
 const getBytesMetric = (bytes: number) => {
     if (bytes > BYTES_PER_GB) {

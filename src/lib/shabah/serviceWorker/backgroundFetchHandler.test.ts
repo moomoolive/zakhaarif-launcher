@@ -17,7 +17,7 @@ import {urlToMime} from "../../miniMime/index"
 import {
     BackgroundFetchUIEventCore,
     BackgroundFetchResult,
-} from "@/lib/types/serviceWorkers"
+} from "../../types/serviceWorkers"
 
 const createBgFetchEvent = ({
     id, 
@@ -102,6 +102,7 @@ describe("background fetch success handler", () => {
             entry: "index.js",
             logoUrl: "",
             permissions: [],
+            storageBytes: 0,
             name: "pkg-name",
             bytes: 20,
             canonicalUrl: "https://remote-origin.site/pkg",
@@ -162,13 +163,14 @@ describe("background fetch success handler", () => {
         const cargoId = "pkg"
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
+        const canonicalUrl = remoteOrigin
         updateDownloadIndex(downloadIndices, {
             id: cargoId,
             title: "unknown",
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: "",
-            canonicalUrl: cargoId,
+            canonicalUrl,
             map: {},
             bytes: 0
         })
@@ -180,9 +182,10 @@ describe("background fetch success handler", () => {
             entry: "index.js",
             logoUrl: "",
             permissions: [],
+            storageBytes: 0,
             name: "pkg-name",
             bytes: 20,
-            canonicalUrl: remoteOrigin + "/pkg",
+            canonicalUrl,
             version: "0.1.0",
             state: "updating"
         })
@@ -195,7 +198,7 @@ describe("background fetch success handler", () => {
         })
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
-            id: cargoId, 
+            id: canonicalUrl, 
             recordsAvailable: true,
             result: "success",
             fetchResult: {
@@ -238,6 +241,7 @@ describe("background fetch success handler", () => {
             mime: urlToMime(name) || "text/plain"
         }) as const)
         const cargoId = "pkg"
+        const canonicalUrl = remoteOrigin
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
         updateDownloadIndex(downloadIndices, {
@@ -246,7 +250,7 @@ describe("background fetch success handler", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: "",
-            canonicalUrl: cargoId,
+            canonicalUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = {
@@ -268,16 +272,17 @@ describe("background fetch success handler", () => {
             entry: "index.js",
             logoUrl: "",
             permissions: [],
+            storageBytes: 0,
             name: "pkg-name",
             bytes: 20,
-            canonicalUrl: remoteRootUrl,
+            canonicalUrl,
             version: "0.1.0",
             state: "updating"
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
-            id: cargoId, 
+            id: canonicalUrl, 
             recordsAvailable: true,
             result: "success",
             fetchResult: cacheFileMeta.reduce((total, item) => {
@@ -329,6 +334,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         }) as const)
         const cargoId = "pkg"
         const {fileCache, internalRecord} = createFileCache({})
+        const canonicalUrl = remoteOrigin
         const downloadIndices = emptyDownloadIndex()
         updateDownloadIndex(downloadIndices, {
             id: cargoId,
@@ -336,7 +342,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl,
-            canonicalUrl: cargoId,
+            canonicalUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -352,16 +358,17 @@ describe("background fetch fail handler (abort/fail)", () => {
             entry: "index.js",
             name: "pkg-name",
             permissions: [],
+            storageBytes: 0,
             logoUrl: "",
             bytes: 20,
-            canonicalUrl: remoteRootUrl,
+            canonicalUrl,
             version: "0.1.0",
             state: "updating"
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
-            id: cargoId, 
+            id: canonicalUrl, 
             recordsAvailable: true,
             result: "success",
             fetchResult: cacheFileMeta.reduce((total, item) => {
@@ -419,6 +426,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             status,
             statusText
         }) as const)
+        const canonicalUrl = remoteOrigin
         const cargoId = "pkg"
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
@@ -428,7 +436,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl,
-            canonicalUrl: cargoId,
+            canonicalUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -444,16 +452,17 @@ describe("background fetch fail handler (abort/fail)", () => {
             entry: "index.js",
             name: "pkg-name",
             permissions: [],
+            storageBytes: 0,
             logoUrl: "",
             bytes: 20,
-            canonicalUrl: remoteRootUrl,
+            canonicalUrl,
             version: "0.1.0",
             state: "updating"
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
-            id: cargoId, 
+            id: canonicalUrl, 
             recordsAvailable: true,
             result: "success",
             fetchResult: cacheFileMeta.reduce((total, item) => {
@@ -516,6 +525,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             statusText
         }) as const)
         const cargoId = "pkg"
+        const canonicalUrl = remoteOrigin
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
         updateDownloadIndex(downloadIndices, {
@@ -524,7 +534,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             version: "0.1.0",
             previousVersion: "none",
             resolvedUrl: storageExtension,
-            canonicalUrl: cargoId,
+            canonicalUrl,
             map: cacheFileMeta.reduce((total, item) => {
                 const {requestUrl} = item
                 total[requestUrl] = item
@@ -540,16 +550,17 @@ describe("background fetch fail handler (abort/fail)", () => {
             entry: "index.js",
             name: "pkg-name",
             permissions: [],
+            storageBytes: 0,
             logoUrl: "",
             bytes: 20,
-            canonicalUrl: remoteRootUrl,
+            canonicalUrl,
             version: "0.1.0",
             state: "updating"
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
-            id: cargoId, 
+        const {event} = createBgFetchEvent({
+            id: canonicalUrl, 
             recordsAvailable: true,
             result: "success",
             fetchResult: cacheFileMeta.reduce((total, item) => {

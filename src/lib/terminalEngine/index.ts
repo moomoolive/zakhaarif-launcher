@@ -1,5 +1,5 @@
-import {type} from "@/lib/utils/betterTypeof"
-import {Result} from "@/lib/monads/result"
+import {type} from "../utils/betterTypeof"
+import {Result} from "../monads/result"
 
 const messageTypes = {
     input: 0,

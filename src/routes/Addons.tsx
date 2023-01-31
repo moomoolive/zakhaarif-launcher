@@ -1,7 +1,7 @@
 import {useState, useMemo, useRef} from "react"
-import {useEffectAsync} from "@/hooks/effectAsync"
-import {FullScreenLoadingOverlay} from "@/components/LoadingOverlay"
-import {ErrorOverlay} from "@/components/ErrorOverlay"
+import {useEffectAsync} from "../hooks/effectAsync"
+import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
+import {ErrorOverlay} from "../components/ErrorOverlay"
 import {
     Button, 
     Tooltip,
@@ -31,8 +31,8 @@ import {
     faBars,
     faInfoCircle,
 } from "@fortawesome/free-solid-svg-icons"
-import {readableByteCount, toGigabytesString} from "@/lib/utils/storage/friendlyBytes"
-import {reactiveDate} from "@/lib/utils/dates"
+import {readableByteCount, toGigabytesString} from "../lib/utils/storage/friendlyBytes"
+import {reactiveDate} from "../lib/utils/dates"
 import {
     Divider, 
     LinearProgress,
@@ -41,13 +41,13 @@ import {
 } from "@mui/material"
 import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
-import {emptyCargoIndices, CargoState} from "@/lib/shabah/backend"
+import {emptyCargoIndices, CargoState} from "../lib/shabah/downloadClient"
 import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
-import {useGlobalConfirm} from "@/hooks/globalConfirm"
-import {Cargo} from "@/lib/cargo/index"
-import {urlToMime, Mime} from "@/lib/miniMime/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "@/lib/cargo/index"
+import {useGlobalConfirm} from "../hooks/globalConfirm"
+import {Cargo} from "../lib/cargo/index"
+import {urlToMime, Mime} from "../lib/miniMime/index"
+import {NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/index"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {MimeIcon} from "../components/cargo/FileOverlay"

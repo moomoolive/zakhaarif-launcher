@@ -21,7 +21,7 @@ import {
     UNSAFE_INLINE_CSP
 } from "./permissionsSummary"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
-import { CargoIndex, emptyCargoIndices } from "../../shabah/backend"
+import {CargoIndex, emptyCargoIndices} from "../../shabah/downloadClient"
 import { NULL_FIELD } from "../../cargo/index"
 
 describe("filtering malicous csp values", () => {
@@ -631,6 +631,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "2.1.0",
         permissions: [],
+        storageBytes: 0,
         state: "cached",
         createdAt: 0,
         updatedAt: 0
@@ -645,6 +646,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "32.3.0",
         permissions: [],
+        storageBytes: 0,
         state: "cached",
         createdAt: 0,
         updatedAt: 0
@@ -659,6 +661,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "0.2.3",
         permissions: [],
+        storageBytes: 0,
         state: "cached",
         createdAt: 0,
         updatedAt: 0

@@ -10,7 +10,7 @@ import {
     DownloadIndex,
     saveErrorDownloadIndex,
 } from "../backend"
-import {BackgroundFetchEvent, UpdateUIMethod} from "@/lib/types/serviceWorkers"
+import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
 
 type BackgroundFetchSuccessOptions= {
     fileCache: FileCache
@@ -25,10 +25,10 @@ export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
 
 export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOptions) => {
     const {fileCache, origin, log, type: eventType} = options
+    const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
     return async (
         event: BackgroundFetchHandlerEvent
     ) => {
-        const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
         const canonicalUrl = bgfetch.id

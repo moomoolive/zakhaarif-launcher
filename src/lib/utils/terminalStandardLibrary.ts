@@ -1,5 +1,5 @@
 import type {SetStateAction} from "react"
-import {initCommand} from "@/lib/terminalEngine/utility"
+import {initCommand} from "../terminalEngine/utility"
 
 type TerminalDependencies = {
     setShowTerminal: (val: SetStateAction<boolean>) => void

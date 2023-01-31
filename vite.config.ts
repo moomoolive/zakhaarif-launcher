@@ -1,6 +1,5 @@
 import { defineConfig, PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from "path"
 
 // taken from https://github.com/chaosprint/vite-plugin-cross-origin-isolation
 const allowSharedArrayBuffer = () => ({
@@ -47,9 +46,4 @@ export default defineConfig({
     target: "es2020",
     outDir: "dist/main"
   },
-  resolve: {
-    alias: {
-      "@": path.join(path.resolve(__dirname), "src"),
-    }
-  }
 })

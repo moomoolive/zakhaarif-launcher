@@ -217,6 +217,7 @@ export type CargoIndex = {
     version: string
     permissions: Permissions
     state: CargoState
+    storageBytes: number
     createdAt: number
     updatedAt: number
 }

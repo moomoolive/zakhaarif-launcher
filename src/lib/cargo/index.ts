@@ -1,5 +1,5 @@
-import {SemVer} from "@/lib/smallSemver/index"
-import {type} from "@/lib/utils/betterTypeof"
+import {SemVer} from "../smallSemver/index"
+import {type} from "../utils/betterTypeof"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
 export const MANIFEST_NAME = "cargo.json"

@@ -1,6 +1,6 @@
 import type {
     BackgroundFetchManager
-} from "@/lib/types/serviceWorkers"
+} from "../../../../lib/types/serviceWorkers"
 import type {DownloadManager} from "../../backend"
 
 type BackgroundFetchExtension = {

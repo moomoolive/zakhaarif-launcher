@@ -1,21 +1,21 @@
-import {ResultType, io} from "@/lib/monads/result"
-import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "@/lib/cargo/index"
+import {ResultType, io} from "../../lib/monads/result"
+import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "../../lib/cargo/index"
 import {
     validateManifest, 
     validateMiniCargo, 
     ValidatedMiniCargo,
     diffManifestFiles,
     Cargo
-} from "@/lib/cargo/index"
-import {SemVer} from "@/lib/smallSemver/index"
-import {urlToMime} from "@/lib/miniMime/index"
+} from "../../lib/cargo/index"
+import {SemVer} from "../../lib/smallSemver/index"
+import {urlToMime} from "../../lib/miniMime/index"
 import {
     FileCache, 
     FetchFunction,
     stringBytes,
     serviceWorkerPolicies,
 } from "./backend"
-import {resultJsonParse} from "@/lib/monads/utils/jsonParse"
+import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
 type RequestableResource = {
