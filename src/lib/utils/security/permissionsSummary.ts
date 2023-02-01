@@ -140,6 +140,14 @@ const permissionCleaners = {
 export const cleanPermissions = (permissions: GeneralPermissions) => {
     const candidates = permissions as PermissionsList<Permissions>
     const cleaned = [] as GeneralPermissions
+    const allowAllPermissionIndex = candidates.findIndex(
+        (permission) => permission.key === ALLOW_ALL_PERMISSIONS
+    )
+    if (allowAllPermissionIndex > -1) {
+        return [
+            {key: ALLOW_ALL_PERMISSIONS, value: []}
+        ] as PermissionsList<Permissions>
+    }
     for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i]
         const {key, value} = candidate
@@ -154,7 +162,10 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
             cleaned.push({key, value: []})
             continue
         }
-        if ((value as string[]).includes(ALLOW_ALL_PERMISSIONS)) {
+        if (
+            permissionsMeta[key].extendable
+            && (value as string[]).includes(ALLOW_ALL_PERMISSIONS)
+        ) {
             cleaned.push({key, value: [ALLOW_ALL_PERMISSIONS]})
             continue
         }
@@ -390,4 +401,95 @@ export const mergePermissionSummaries = (
     }
 
     return merged
+}
+
+const createPermissionMap = (permissions: GeneralPermissions) => {
+    const map = new Map<string, number>()
+    for (let i = 0; i < permissions.length; i++) {
+        const {key, value} = permissions[i]
+        map.set(key, 1)
+        for (let x = 0; x < value.length; x++) {
+            const element = value[x]
+            map.set(`${key}:${element}`, 1)
+        }
+    }
+    return map
+}
+
+export const diffPermissions = (
+    oldPermissions: GeneralPermissions,
+    newPermissions: GeneralPermissions
+) => {
+    const diff = [] as PermissionsList<Permissions>
+    if (oldPermissions.length < 1 && newPermissions.length < 1) {
+        return {removed: diff, added: diff}
+    }
+    const oldCleaned = cleanPermissions(oldPermissions)
+    const newCleaned = cleanPermissions(newPermissions)
+    
+    const newAllowAllIndex = newCleaned.findIndex(
+        (permission) => permission.key === ALLOW_ALL_PERMISSIONS
+    )
+    const newHasAllowAll = newAllowAllIndex > -1
+    const oldAllowAllIndex = oldCleaned.findIndex(
+        (permission) => permission.key === ALLOW_ALL_PERMISSIONS
+    )
+    const oldHasAllowAll = oldAllowAllIndex > -1
+    if (newHasAllowAll && !oldHasAllowAll) {
+        return {
+            added: newCleaned,
+            removed: diff
+        }
+    }
+    if (!newHasAllowAll && oldHasAllowAll) {
+        return {
+            added: diff,
+            removed: oldCleaned
+        }
+    }
+
+    const oldPermissionsMap = createPermissionMap(oldCleaned)
+    const newPermissionsMap = createPermissionMap(newCleaned)
+    
+    const removed = []
+    for (let i = 0; i < oldCleaned.length; i++) {
+        const element = oldCleaned[i]
+        const {key, value} = element
+        if (!newPermissionsMap.has(key)) {
+            removed.push(element)
+            continue
+        }
+        let removedValues = []
+        for (let x = 0; x < value.length; x++) {
+            const v = value[x]
+            if (!newPermissionsMap.has(`${key}:${v}`)) {
+                removedValues.push(v)
+            }
+        }
+        if (removedValues.length > 0) {
+            removed.push({key, value: removedValues})
+        }
+    }
+
+    const added = []
+    for (let i = 0; i < newCleaned.length; i++) {
+        const element = newCleaned[i]
+        const {key, value} = element
+        if (!oldPermissionsMap.has(key)) {
+            added.push(element)
+            continue
+        }
+        let addedValues = []
+        for (let x = 0; x < value.length; x++) {
+            const v = value[x]
+            if (!oldPermissionsMap.has(`${key}:${v}`)) {
+                addedValues.push(v)
+            }
+        }
+        if (addedValues.length > 0) {
+            added.push({key, value: addedValues})
+        }
+    }
+    
+    return {removed, added}
 }

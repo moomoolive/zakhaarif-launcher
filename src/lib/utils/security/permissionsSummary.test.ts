@@ -5,6 +5,7 @@ import {
     ContentSecurityPolicyConfig, 
     createContentSecurityPolicy, 
     CSP_CONSTANT_POLICY, 
+    diffPermissions, 
     GeneralPermissions, 
     generatePermissionsSummary, 
     hasUnsafePermissions, 
@@ -287,6 +288,35 @@ describe("permission filterer", () => {
             {key: "geoLocation", value: []}
         ])
         expect(cleaned.length).toBe(1)
+    })
+
+    it(`if "${ALLOW_ALL_PERMISSIONS}" permission is found in permissions, all other permisssion should be filtered out`, () => {
+        const cases = [
+            [
+                {key: "webRequest", value: ["https://my-cat.com"]},
+                {key: "geoLocation", value: []},
+                {key: "camera", value: []},
+                {key: "camera", value: []},
+            ],
+            [
+                {key: "fullScreen", value: []}
+            ],
+            [
+                {key: "pointerLock", value: []},
+                {key: "displayCapture", value: []},
+                {key: "embedExtensions", value: ["https://2.com"]},
+            ],
+        ]
+        for (const originalPermissions of cases) {
+            expect(cleanPermissions(originalPermissions).length).toBe(originalPermissions.length)
+            const allowAll = {key: ALLOW_ALL_PERMISSIONS, value: []}
+            const cleaned = cleanPermissions([
+                allowAll,
+                ...originalPermissions
+            ])
+            expect(cleaned.length).toBe(1)
+            expect(cleaned).toStrictEqual([allowAll])
+        }
     })
 })
 
@@ -833,6 +863,307 @@ describe("merging permission summaries", () => {
             const mergedCopy = structuredClone(mergedSummary)
             mergedCopy.webRequest.sort()
             expect(cleanedCopy).toStrictEqual(mergedCopy)
+        }
+    })
+})
+
+describe("diffing permissions", () => {
+    it("if no permission are found in old or new permissions, an empty array should be returned", () => {
+        expect(diffPermissions([], [])).toStrictEqual({added: [], removed: []})
+    })
+
+    it("if permission is present in old permissions but not new permissions, the return value of removed should reflect that", () => {
+        const cases = [
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                    {key: "geoLocation", value: []},
+                    {key: "pointerLock", value: []},
+                ],
+                newPermissions: [
+                    {key: "camera", value: []},
+                    {key: "pointerLock", value: []},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                    {key: "fullScreen", value: []},
+                    {key: "pointerLock", value: []},
+                ],
+                newPermissions: [
+                    {key: "camera", value: []},
+                    
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                ],
+                newPermissions: [
+                    {key: "camera", value: []},
+                    {key: "displayCapture", value: []}
+                ] 
+            },
+        ]
+        for (const {oldPermissions, newPermissions} of cases) {
+            const {removed} = diffPermissions(oldPermissions, newPermissions)
+            for (const {key} of oldPermissions) {
+                const foundInNewPermissions = newPermissions.find((permission) => {
+                    return permission.key === key
+                })
+                const existsInRemoved = !!(removed.find((permission) => permission.key === key))
+                if (!foundInNewPermissions) {
+                    expect(existsInRemoved).toBe(true)
+                } else {
+                    expect(existsInRemoved).toBe(false)
+                }
+            }
+        }
+    })
+
+    it("if permission value is present in old permissions but not new permissions, the return value of removed should reflect that", () => {
+        const cases = [
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://yes.com", "https://hi.com"]},
+                    {key: "embedExtensions", value: ["https://1.com", "https://2.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://yes.com"]},
+                    {key: "embedExtensions", value: ["https://2.com"]},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://hi.com"]},
+                    {key: "embedExtensions", value: ["https://1.com", "https://2.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://yes.com", "https://hi2.com"]},
+                    {key: "embedExtensions", value: ["https://2.com"]},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://hi.com", "https://no.com", "https://lets-decide-together.com"]},
+                    {key: "embedExtensions", value: ["https://1.com", "https://2.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://yes.com", "https://hi2.com"]},
+                    {key: "embedExtensions", value: ["https://2.com"]},
+                ] 
+            },
+        ]
+        for (const {oldPermissions, newPermissions} of cases) {
+            const {removed} = diffPermissions(oldPermissions, newPermissions)
+            for (const {key, value} of oldPermissions) {
+                const newPermissionTwin = newPermissions.find((permission) => {
+                    return permission.key === key
+                })
+                expect(newPermissionTwin).not.toBe(undefined)
+                for (const oldPermissionValue of value) {
+                    const valueExistsInNewPermissions = newPermissionTwin?.value
+                        .find((v) => v === oldPermissionValue)
+                    const removedPermissions = removed.find(
+                        (permission) => permission.key === key
+                    )
+                    expect(removedPermissions).not.toBe(undefined)
+                    const removedPermissionsValue = removedPermissions?.value
+                        .find((v) => v === oldPermissionValue)
+                    if (valueExistsInNewPermissions) {
+                        expect(removedPermissionsValue).toBe(undefined)
+                    } else {
+                        expect(removedPermissionsValue).not.toBe(undefined)
+                    }
+                }
+            }
+        }
+    })
+
+    it("if permission is added in new permissions, the return value of added should reflect that", () => {
+        const cases = [
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                ],
+                newPermissions: [
+                    {key: "camera", value: []},
+                    {key: "pointerLock", value: []},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                    {key: "fullScreen", value: []},
+                    
+                ],
+                newPermissions: [
+                    {key: "camera", value: []},
+                    {key: "pointerLock", value: []},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "camera", value: []},
+                ],
+                newPermissions: [
+                    {key: "geoLocation", value: []},
+                    {key: "displayCapture", value: []}
+                ] 
+            },
+        ]
+        for (const {oldPermissions, newPermissions} of cases) {
+            const {added} = diffPermissions(oldPermissions, newPermissions)
+            for (const {key} of newPermissions) {
+                const foundInOldPermissions = oldPermissions.find((permission) => {
+                    return permission.key === key
+                })
+                const existsInAdded = !!(added.find((permission) => permission.key === key))
+                if (!foundInOldPermissions) {
+                    expect(existsInAdded).toBe(true)
+                } else {
+                    expect(existsInAdded).toBe(false)
+                }
+            }
+        }
+    })
+
+    it("if permission value is present in new permissions but not old permissions, the return value of added should reflect that", () => {
+        const cases = [
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://yes.com"]},
+                    {key: "embedExtensions", value: ["https://1.com", "https://2.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://yes.com", "https://maybe.com"]},
+                    {key: "embedExtensions", value: ["https://2.com", "https://3.com", "https://4.com"]},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://no.com"]},
+                    {key: "embedExtensions", value: ["https://1.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://yes.com", "https://maybe.com"]},
+                    {key: "embedExtensions", value: ["https://2.com", "https://3.com", "https://4.com"]},
+                ] 
+            },
+            {
+                oldPermissions: [
+                    {key: "webRequest", value: ["https://yes.com"]},
+                    {key: "embedExtensions", value: ["https://1.com", "https://2.com"]},
+                ],
+                newPermissions: [
+                    {key: "webRequest", value: ["https://maybe.com"]},
+                    {key: "embedExtensions", value: ["https://3.com"]},
+                ] 
+            },
+        ]
+        for (const {oldPermissions, newPermissions} of cases) {
+            const {added} = diffPermissions(oldPermissions, newPermissions)
+            for (const {key, value} of newPermissions) {
+                const oldPermissionTwin = oldPermissions.find((permission) => {
+                    return permission.key === key
+                })
+                expect(oldPermissionTwin).not.toBe(undefined)
+                for (const newPermissionValue of value) {
+                    const valueExistsInOldPermissions = oldPermissionTwin?.value
+                        .find((v) => v === newPermissionValue)
+                    const addedPermissions = added.find(
+                        (permission) => permission.key === key
+                    )
+                    expect(addedPermissions).not.toBe(undefined)
+                    const addedPermissionsValue = addedPermissions?.value
+                        .find((v) => v === newPermissionValue)
+                    if (valueExistsInOldPermissions) {
+                        expect(addedPermissionsValue).toBe(undefined)
+                    } else {
+                        expect(addedPermissionsValue).not.toBe(undefined)
+                    }
+                }
+            }
+        }
+    })
+
+    it("if new permissions are the exact same as old permissions, the 'added' and 'removed' should be empty", () => {
+        const cases = [
+            [
+                {key: "webRequest", value: ["https://yes.com"]},
+                {key: "embedExtensions", value: ["https://1.com"]},
+            ],
+            [
+                {key: "camera", value: []},
+                {key: "geoLocation", value: []},
+            ],
+            [
+                {key: "pointerLock", value: []},
+                {key: "webRequest", value: ["https://yes.com", "https://no.com", "https://maybe.com"]},
+            ],
+            [],
+            [
+                {key: "fullScreen", value: []}
+            ],
+            [
+                {key: "gameSaves", value: ["read", "write"]},
+                {key: "files", value: ["read"]},
+            ]
+        ]
+        for (const c of cases) {
+            const {added, removed} = diffPermissions(c, c)
+            expect(added).toStrictEqual([])
+            expect(removed).toStrictEqual([])
+        }
+    })
+
+    it(`if new permissions include "${ALLOW_ALL_PERMISSIONS}" permission and old does not, return type of added should be an array with only the "${ALLOW_ALL_PERMISSIONS}" permission and removed should be an empty array`, () => {
+        const cases = [
+            [
+                {key: "camera", value: []},
+                {key: "geoLocation", value: []},
+            ],
+            [
+                {key: "webRequest", value: ["https://hey.com"]},
+                {key: "fullScreen", value: []},
+            ],
+            [
+                {key: "files", value: ["read"]},
+            ]
+        ]
+        for (const oldPermissions of cases) {
+            const newPermissions = [
+                {key: ALLOW_ALL_PERMISSIONS, value: []}
+            ]
+            const {added, removed} = diffPermissions(oldPermissions, newPermissions)
+            expect(added).toStrictEqual(newPermissions)
+            expect(removed).toStrictEqual([])
+        }
+    })
+
+
+    it(`if old permissions include "${ALLOW_ALL_PERMISSIONS}" permission and new does not, return type of added should be an empty array and removed should be an array with only the "${ALLOW_ALL_PERMISSIONS}" permission`, () => {
+        const cases = [
+            [
+                {key: "camera", value: []},
+                {key: "geoLocation", value: []},
+            ],
+            [
+                {key: "webRequest", value: ["https://hey.com"]},
+                {key: "fullScreen", value: []},
+            ],
+            [
+                {key: "files", value: ["read"]},
+            ]
+        ]
+        for (const newPermissions of cases) {
+            const oldPermissions = [
+                {key: ALLOW_ALL_PERMISSIONS, value: []}
+            ]
+            const {added, removed} = diffPermissions(oldPermissions, newPermissions)
+            expect(added).toStrictEqual([])
+            expect(removed).toStrictEqual(oldPermissions)
         }
     })
 })
