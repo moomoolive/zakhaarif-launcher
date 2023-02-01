@@ -28,17 +28,10 @@ import {
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {readableByteCount} from "../utils/storage/friendlyBytes"
-import {MANIFEST_NAME, PermissionsList} from "../cargo/index"
+import {MANIFEST_NAME} from "../cargo/index"
 import {Cargo} from "../cargo/index"
 import {resultJsonParse} from "../monads/utils/jsonParse"
-import {
-    cleanPermissions, 
-    hasUnsafePermissions, 
-    generatePermissionsSummary,
-    CleanedPermissions,
-    PermissionsSummary
-} from "../utils/security/permissionsSummary"
-import { Permissions } from "../types/permissions"
+import {GeneralPermissions} from "../utils/security/permissionsSummary"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import { DeepReadonly } from "../types/utility"
 
@@ -78,11 +71,6 @@ export type UpdateCheckResponse = DeepReadonly<{
         bytesToDelete: number
     }
     updateAvailable: boolean
-    permissions: {
-        permissionsSummary: PermissionsSummary | null
-        newPermissionsRequested: PermissionsList<Permissions>
-        cargoIsUnsafe: boolean
-    }
     diskInfo: {
         raw: {
             used: number
@@ -123,7 +111,8 @@ type ShabahProps = {
         fileCache: FileCache
         networkRequest: FetchFunction
         downloadManager: DownloadManager
-    }
+    },
+    permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
 export class Shabah {
@@ -144,16 +133,16 @@ export class Shabah {
         callback: onProgressCallback
     }>
     private progressListenerTimeoutId: string | number | NodeJS.Timeout
+    private permissionsCleaner: null | (
+        (permissions: GeneralPermissions) => GeneralPermissions
+    )
 
-    constructor({adaptors, origin}: ShabahProps) {
+    constructor({adaptors, origin, permissionsCleaner}: ShabahProps) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
         }
-        const {
-            networkRequest, 
-            fileCache, 
-            downloadManager
-        } = adaptors
+        const {networkRequest, fileCache, downloadManager} = adaptors
+        this.permissionsCleaner = permissionsCleaner || null
         this.networkRequest = networkRequest
         this.fileCache = fileCache
         this.downloadManager = downloadManager
@@ -191,12 +180,14 @@ export class Shabah {
         
         const response = await checkForUpdates({
             canonicalUrl: cargo.canonicalUrl,
-            oldResolvedUrl: !cargoIndex ? "" : cargoIndex.resolvedUrl,
+            oldResolvedUrl: cargoIndex?.resolvedUrl || "",
             name: cargo.id
         }, this.networkRequest, this.fileCache)
         
-        if (response.newCargo) {
+        if (response.newCargo && this.permissionsCleaner) {
             const permissions = response.newCargo.parsed.permissions
+            response.newCargo.parsed.permissions = this.permissionsCleaner(permissions)
+            /*
             const cleanedPermissions = cleanPermissions(permissions)
             response.newCargo.parsed.permissions = cleanedPermissions
             const httpPermissionIndex = cleanedPermissions.findIndex(
@@ -209,6 +200,7 @@ export class Shabah {
                     (http) => http !== resolvedUrl && http !== canonicalUrl
                 )
             }
+            */
         }
 
         const disk = await this.diskInfo()
@@ -229,54 +221,7 @@ export class Shabah {
             || Shabah.NO_PREVIOUS_INSTALLATION
         )
 
-       
-        let newPermissionsRequested = [] as CleanedPermissions
-        if (response.newCargo && response.previousCargo) {
-            const oldPermissions = cleanPermissions(response.previousCargo.permissions)
-            const oldPermissionsMap = new Map<string, number>()
-            for (let i = 0; i < oldPermissions.length; i++) {
-                const {key, value} = oldPermissions[i]
-                oldPermissionsMap.set(key, 1)
-                for (let x = 0; x < value.length; x++) {
-                    const current = value[x]
-                    oldPermissionsMap.set(`${key}:${current}`, 1)
-                }
-            }
-            const newPermissions = response.newCargo.parsed.permissions as CleanedPermissions
-            for (let i = 0; i < newPermissions.length; i++) {
-                const permission = newPermissions[i]
-                const {key, value} = newPermissions[i]
-                if (!oldPermissionsMap.has(key)) {
-                    newPermissionsRequested.push(permission)
-                    continue
-                }
-                const newValues = []
-                let newCount = 0
-                for (let x = 0; x < value.length; x++) {
-                    const current = value[x]
-                    if (oldPermissionsMap.has(`${key}:${current}`)) {
-                        continue
-                    }
-                    newCount += 1
-                    newValues.push(current)
-                }
-                if (newCount > 0) {
-                    newPermissionsRequested.push(
-                        {key, value: newValues} as typeof permission
-                    )
-                }
-            }
-        } else if (response.newCargo) {
-            newPermissionsRequested = response.newCargo.parsed.permissions as CleanedPermissions
-        }
-
         const friendlyBytes = readableByteCount(bytesNeededToDownload)
-        const permissionsSummary = response.newCargo
-            ? generatePermissionsSummary((response.newCargo.parsed as Cargo<Permissions>).permissions)
-            : null
-        const cargoIsUnsafe = permissionsSummary
-            ? hasUnsafePermissions(permissionsSummary)
-            : false
         const updateResponse: UpdateCheckResponse = {
             status: response.code,
             metadata: {
@@ -300,11 +245,6 @@ export class Shabah {
                 bytesToDelete: response.bytesToDelete
             },
             updateAvailable: !!response.newCargo,
-            permissions: {
-                permissionsSummary,
-                newPermissionsRequested,
-                cargoIsUnsafe,
-            },
             diskInfo: {
                 raw: disk,
                 usageAfterDownload: diskWithCargo,

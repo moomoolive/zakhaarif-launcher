@@ -8,7 +8,7 @@ import {wRpc} from "../lib/wRpc/simple"
 import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
 import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
-import {Cargo} from "../lib/cargo/index"
+import {Cargo, NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import rawCssExtension from "../index.css?url"
@@ -110,7 +110,15 @@ const ExtensionShellPage = () => {
             setLoading(false)
             setError(true)
             setErrorMessage("Invalid Extension")
-            console.warn(`Prevented extension "${entryUrl}" from running, as extension is not in cached on disk (current_state=${meta.state})`)
+            console.warn(`Prevented extension "${entryUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
+            return
+        }
+
+        if (meta.entry === CARGO_NULL_FIELD) {
+            setLoading(false)
+            setError(true)
+            setErrorMessage("Invalid Extension")
+            console.warn(`Prevented extension "${entryUrl}" from running because it does not have an entry url.`)
             return
         }
 

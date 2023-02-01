@@ -5,6 +5,7 @@ import {DownloadManager} from "./backend"
 import { Cargo, MANIFEST_MINI_NAME, MANIFEST_NAME, toMiniCargo } from "../cargo"
 import { Permissions } from "../types/permissions"
 import { SemVer } from "../smallSemver"
+import { cleanPermissions } from "../utils/security/permissionsSummary"
 
 type FileHandlers = Record<string, () => (Response | null)>
 type AccessLog = Readonly<{
@@ -188,7 +189,14 @@ const createClient = (
 ) => {
     const deps = dependencies(config)
     const {adaptors} = deps
-    return {...deps, client: new Shabah({origin, adaptors})}
+    return {
+        ...deps, 
+        client: new Shabah({
+            origin,
+            adaptors, 
+            permissionsCleaner: cleanPermissions
+        })
+    }
 }
 
 const badHttpResponse = (status = 0) => {
@@ -1011,6 +1019,318 @@ describe("checking for cargo updates", () => {
             expect(response.updateAvailable).toBe(true)
             expect(response.newCargo).not.toBe(null)
             expect(response.newCargo?.parsed.permissions.length).toBe(1)
+        }
+    })
+
+    it(`if previous cargo exists, downloadable resources should be returned as the difference between new and old cargo files`, async () => {
+        const origin = "https://my-mamas.com"
+        const cargoOrigin = "https://my-house.com"
+        const cases = [
+            {
+                oldFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+            {
+                oldFiles: [
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "yes.html", bytes: 399, invalidation: "default"},
+                    {name: "pic.png", bytes: 555, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+            {
+                oldFiles: [
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "yes.html", bytes: 399, invalidation: "default"},
+                    {name: "pic.png", bytes: 555, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "pic.png", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                    {name: "style1.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+        ]
+        for (const {oldFiles, newFiles} of cases) {
+
+            const oldCargo = structuredClone(mockCargo)
+            oldCargo.version = "0.1.0"
+            oldCargo.files = [...oldFiles] as typeof oldCargo.files
+            
+            const cacheFileBase = {
+                [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(oldCargo),
+                        {status: 200}
+                    )
+                },
+            }
+            const cacheFiles = oldCargo.files.reduce((total, next) => {
+                const {name, bytes} = next
+                total[`${cargoOrigin}/${name}`] = okResponse({
+                    status: 200,
+                    length: bytes
+                })
+                return total
+            }, cacheFileBase)
+
+            const newCargo = structuredClone(oldCargo)
+            newCargo.version = "1.0.0"
+            newCargo.files = [...newFiles] as typeof newCargo.files
+            
+            const networkFilesBase = {
+                [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(newCargo),
+                        {status: 200}
+                    )
+                },
+                [`${cargoOrigin}/${MANIFEST_MINI_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(toMiniCargo(newCargo)),
+                        {status: 200}
+                    )
+                }
+            }
+            const networkFiles = newCargo.files.reduce((total, next) => {
+                const {name, bytes} = next
+                total[`${cargoOrigin}/${name}`] = okResponse({
+                    status: 200,
+                    length: bytes
+                })
+                return total
+            }, networkFilesBase)
+
+            const {client} = createClient(origin, {
+                cacheFiles,
+                networkFiles
+            })
+            await client.putCargoIndex(
+                cargoToCargoIndex(cargoOrigin, oldCargo),
+                {persistChanges: true}
+            )
+            const response = await client.checkForCargoUpdates(
+                {canonicalUrl: cargoOrigin, id: "tmp"}
+            )
+            expect(response.updateAvailable).toBe(true)
+            expect(response.errorOccurred).toBe(false)
+            expect(response.download.downloadableResources.length).toBeGreaterThan(0)
+
+            const oldFileMap = new Map<string, number>()
+            for (const {name} of oldFiles) {
+                oldFileMap.set(`${cargoOrigin}/${name}`, 1)
+            }
+
+            const newFileMap = new Map<string, number>()
+            for (const {name} of newFiles) {
+                newFileMap.set(`${cargoOrigin}/${name}`, 1)
+            }
+
+            const filesToDownload = []
+            for (const {name} of newFiles) {
+                const url = `${cargoOrigin}/${name}`
+                if (!oldFileMap.has(`${cargoOrigin}/${name}`)) {
+                    filesToDownload.push(url)
+                }
+            }
+
+            expect(response.download.downloadableResources.length).toBe(filesToDownload.length)
+            for (const url of filesToDownload) {
+                const file = response
+                    .download
+                    .downloadableResources
+                    .find((file) => file.requestUrl === url)
+                expect(!!file).toBe(true)
+            }
+
+            const filesToDelete = []
+            for (const {name} of oldFiles) {
+                const url = `${cargoOrigin}/${name}`
+                if (!newFileMap.has(url)) {
+                    filesToDelete.push(url)
+                }
+            }
+            expect(response.download.resourcesToDelete.length).toBe(filesToDelete.length)
+            for (const url of filesToDelete) {
+                const file = response
+                    .download
+                    .resourcesToDelete
+                    .find((file) => file.requestUrl === url)
+                expect(!!file).toBe(true)
+            }
+        }
+    })
+
+    it(`downloadable resource url should be prepended with resolved url`, async () => {
+        const origin = "https://my-mamas.com"
+        const cargoOrigin = "https://my-house.com"
+        const redirectOrigin = "https://redirect.go"
+        const cases = [
+            {
+                oldFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+            {
+                oldFiles: [
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "yes.html", bytes: 399, invalidation: "default"},
+                    {name: "pic.png", bytes: 555, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+            {
+                oldFiles: [
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "yes.html", bytes: 399, invalidation: "default"},
+                    {name: "pic.png", bytes: 555, invalidation: "default"},
+                ], 
+                newFiles: [
+                    {name: "index.js", bytes: 100, invalidation: "default"},
+                    {name: "entry.js", bytes: 100, invalidation: "default"},
+                    {name: "pic.png", bytes: 100, invalidation: "default"},
+                    {name: "style.css", bytes: 200, invalidation: "default"},
+                    {name: "style1.css", bytes: 200, invalidation: "default"},
+                ],
+            },
+        ]
+        for (const {oldFiles, newFiles} of cases) {
+
+            const oldCargo = structuredClone(mockCargo)
+            oldCargo.version = "0.1.0"
+            oldCargo.files = [...oldFiles] as typeof oldCargo.files
+            
+            const cacheFileBase = {
+                [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(oldCargo),
+                        {status: 200}
+                    )
+                },
+            }
+            const cacheFiles = oldCargo.files.reduce((total, next) => {
+                const {name, bytes} = next
+                total[`${cargoOrigin}/${name}`] = okResponse({
+                    status: 200,
+                    length: bytes
+                })
+                return total
+            }, cacheFileBase)
+
+            const newCargo = structuredClone(oldCargo)
+            newCargo.version = "1.0.0"
+            newCargo.files = [...newFiles] as typeof newCargo.files
+            
+            const networkFilesBase = {
+                [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(newCargo),
+                        {status: 200}
+                    )
+                },
+                [`${cargoOrigin}/${MANIFEST_MINI_NAME}`]: () => {
+                    return new Response(
+                        JSON.stringify(toMiniCargo(newCargo)),
+                        {status: 200}
+                    )
+                },
+                [`${redirectOrigin}/${MANIFEST_NAME}`]: () => {
+                    return new Response(
+                        "",
+                        {status: 302, headers: {
+                            "location": `${cargoOrigin}/${MANIFEST_NAME}`
+                        }}
+                    )
+                }
+            }
+            const networkFiles = newCargo.files.reduce((total, next) => {
+                const {name, bytes} = next
+                total[`${cargoOrigin}/${name}`] = okResponse({
+                    status: 200,
+                    length: bytes
+                })
+                return total
+            }, networkFilesBase)
+
+            const {client} = createClient(origin, {
+                cacheFiles,
+                networkFiles
+            })
+            await client.putCargoIndex(
+                cargoToCargoIndex(redirectOrigin, oldCargo, {
+                    resolvedUrl: cargoOrigin
+                }),
+                {persistChanges: true}
+            )
+            const response = await client.checkForCargoUpdates(
+                {canonicalUrl: redirectOrigin, id: "tmp"}
+            )
+            expect(response.updateAvailable).toBe(true)
+            expect(response.errorOccurred).toBe(false)
+            expect(response.metadata.resolvedUrl).not.toBe(response.metadata.canonicalUrl)
+            expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
+            expect(response.download.downloadableResources.length).toBeGreaterThan(0)
+
+            const oldFileMap = new Map<string, number>()
+            for (const {name} of oldFiles) {
+                oldFileMap.set(`${cargoOrigin}/${name}`, 1)
+            }
+
+            const newFileMap = new Map<string, number>()
+            for (const {name} of newFiles) {
+                newFileMap.set(`${cargoOrigin}/${name}`, 1)
+            }
+
+            const filesToDownload = []
+            for (const {name} of newFiles) {
+                const url = `${cargoOrigin}/${name}`
+                if (!oldFileMap.has(`${cargoOrigin}/${name}`)) {
+                    filesToDownload.push(url)
+                }
+            }
+            
+            expect(response.download.downloadableResources.length).toBe(filesToDownload.length)
+            for (const url of filesToDownload) {
+                const file = response
+                    .download
+                    .downloadableResources
+                    .find((file) => file.requestUrl === url)
+                expect(!!file).toBe(true)
+            }
+
+            const filesToDelete = []
+            for (const {name} of oldFiles) {
+                const url = `${cargoOrigin}/${name}`
+                if (!newFileMap.has(url)) {
+                    filesToDelete.push(url)
+                }
+            }
+
+            expect(response.download.resourcesToDelete.length).toBe(filesToDelete.length)
+            for (const url of filesToDelete) {
+                const file = response
+                    .download
+                    .resourcesToDelete
+                    .find((file) => file.requestUrl === url)
+                expect(!!file).toBe(true)
+            }
         }
     })
 })

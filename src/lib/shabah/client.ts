@@ -422,7 +422,7 @@ export const checkForUpdates = async (
             } as RequestableResource
         })
         const bytesToDownload = filesToDownload.reduce(
-            (total, f) => total + f.bytes, 
+            (total, file) => total + file.bytes, 
             0
         )
         return downloadResponse({
@@ -498,7 +498,7 @@ export const checkForUpdates = async (
         0
     )
     const filesToDelete = diff.delete.map((file) => ({
-        requestUrl: requestRootUrl + stripRelativePath(file.name),
+        requestUrl: oldResolvedRootUrl + stripRelativePath(file.name),
         storageUrl: oldResolvedRootUrl + stripRelativePath(file.name),
         bytes: file.bytes
     }))

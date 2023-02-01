@@ -11,6 +11,7 @@ import type {TopLevelAppProps} from "./lib/types/globalState"
 import {Shabah} from "./lib/shabah/downloadClient"
 import {APP_CACHE} from "./config"
 import {webAdaptors} from "./lib/shabah/adaptors/web-preset"
+import { cleanPermissions } from './lib/utils/security/permissionsSummary'
 
 const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
@@ -37,7 +38,8 @@ const  App = () => {
     setTerminalVisibility: setShowTerminal,
     downloadClient: new Shabah({
       origin: location.origin,
-      adaptors: webAdaptors(APP_CACHE)
+      adaptors: webAdaptors(APP_CACHE),
+      permissionsCleaner: cleanPermissions
     }),
     sandboxInitializePromise: {
       resolve: () => {},
