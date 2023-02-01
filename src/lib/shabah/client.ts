@@ -25,13 +25,11 @@ export type RequestableResource = {
     bytes: number
 }
 
+export const ERROR_CODES_START = 100
+
 export const STATUS_CODES = {
     ok: 0,
-    updateNotEnoughDiskSpace: 1,
-    updateNotAvailable: 2,
     updateQueued: 3,
-    sameUpdateInProgress: 4,
-    updateAlreadyQueue: 5,
     cargoNotFound: 6,
     cargoNotInErrorState: 7,
     errorIndexNotFound: 8,
@@ -42,12 +40,17 @@ export const STATUS_CODES = {
     updateError: 13,
     cargoIsUpToDate: 14,
 
-    networkError: 100,
+    networkError: ERROR_CODES_START,
     badHttpCode: 101,
     encodingNotAcceptable: 102,
     invalidCargo: 103,
     invalidRedirect: 104,
     preflightVerificationFailed: 105,
+    updateImpossible: 106,
+    newCargoMissing: 107,
+    insufficentDiskSpace: 108,
+    updateAlreadyQueued: 109,
+    downloadManagerUnsyncedState: 110
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]

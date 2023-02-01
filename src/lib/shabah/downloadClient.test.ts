@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest"
 import {Shabah} from "./downloadClient"
 import {CargoIndex, CargoState, FileCache} from "./backend"
 import {DownloadManager} from "./backend"
-import { Cargo, MANIFEST_MINI_NAME, MANIFEST_NAME, toMiniCargo } from "../cargo"
+import { Cargo, MANIFEST_MINI_NAME, MANIFEST_NAME, NULL_FIELD, toMiniCargo } from "../cargo"
 import { Permissions } from "../types/permissions"
 import { SemVer } from "../smallSemver"
 import { cleanPermissions } from "../utils/security/permissionsSummary"
+import {UpdateCheckConfig, UpdateCheckResponse} from "./updateCheckStatus"
 
 type FileHandlers = Record<string, () => (Response | null)>
 type AccessLog = Readonly<{
@@ -47,6 +48,7 @@ class MockCache {
     }
 
     deleteFile(url: string) {
+        this.accessLog.push({url, action: "delete", time: Date.now()})
         this.cache[url] = () => null
     }
 
@@ -58,7 +60,8 @@ class MockCache {
 const dependencies = ({
     cacheFiles = {} as FileHandlers,
     cacheQuota = {usage: 0, quota: 0},
-    networkFiles = {} as FileHandlers
+    networkFiles = {} as FileHandlers,
+    downloadManagerState = new Map<string, number>()
 } = {}) => {
     
     const networkCache = new MockCache(networkFiles)
@@ -117,16 +120,40 @@ const dependencies = ({
         requestPersistence: async () => true
     }
 
+    const downloadState = {
+        queuedDownloads: [] as Array<{id: string, urls: string[], options: Record<string, unknown>}>
+    }
     const downloadManager: DownloadManager = {
-        queueDownload: async () => true,
-        getDownloadState: async () => null,
+        queueDownload: async (id, urls, options) => {
+            downloadState.queuedDownloads.push({
+                id,
+                urls,
+                options
+            })
+            return true
+        },
+        getDownloadState: async (id) => {
+            const exists = downloadManagerState.has(id)
+            if (!exists) {
+                return null
+            }
+            return {
+                id,
+                downloaded: 0,
+                total: 100,
+                failed: false,
+                finished: false,
+                failureReason: "none"
+            }
+        },
         cancelDownload: async () => true,
         currentDownloadIds: async () => []
     }
 
     return {
         adaptors: {networkRequest, fileCache, downloadManager},
-        caches: {networkCache, innerFileCache} 
+        caches: {networkCache, innerFileCache},
+        downloadState 
     }
 }
 
@@ -315,7 +342,7 @@ describe("checking for cargo updates", () => {
                 canonicalUrl: cargoOrigin,
                 id: "random"
             })
-            expect(response.errorOccurred).toBe(true)
+            expect(response.errorOccurred()).toBe(true)
             if (errorType === "network") {
                 expect(response.status).toBe(Shabah.STATUS.networkError)
             } else if (errorType === "bad-http") {
@@ -412,7 +439,7 @@ describe("checking for cargo updates", () => {
                 canonicalUrl: cargoOrigin,
                 id: "random"
             })
-            expect(response.errorOccurred).toBe(true)
+            expect(response.errorOccurred()).toBe(true)
             if (errorType === "bad-cargo") {
                 expect(response.status).toBe(Shabah.STATUS.invalidCargo)
             } else if (errorType === "json") {
@@ -476,7 +503,7 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
-            expect(response.errorOccurred).toBe(true)
+            expect(response.errorOccurred()).toBe(true)
             expect(response.status).toBe(Shabah.STATUS.preflightVerificationFailed)
         }
     })
@@ -508,7 +535,7 @@ describe("checking for cargo updates", () => {
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: cargoOrigin, id: "tmp"}
         )
-        expect(response.errorOccurred).toBe(false)
+        expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
         expect(response.newCargo?.text).toStrictEqual(
             JSON.stringify(testCargo)
@@ -542,7 +569,7 @@ describe("checking for cargo updates", () => {
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: redirectOrigin, id: "tmp"}
         )
-        expect(response.errorOccurred).toBe(false)
+        expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
         expect(response.newCargo?.text).toStrictEqual(
             JSON.stringify(mockCargo)
@@ -584,8 +611,8 @@ describe("checking for cargo updates", () => {
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: cargoOrigin, id: "tmp"}
         )
-        expect(response.enoughStorageForCargo).toBe(false)
-        expect(response.errorOccurred).toBe(false)
+        expect(response.enoughStorageForCargo()).toBe(false)
+        expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
         expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
         expect(response.newCargo?.resolvedUrl).toBe(cargoOrigin + "/")
@@ -618,11 +645,11 @@ describe("checking for cargo updates", () => {
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: cargoOrigin, id: "tmp"}
         )
-        expect(response.errorOccurred).toBe(false)
+        expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
         expect(response.previousCargo).toBe(null)
-        expect(response.versions.new).toBe(testCargo.version)
-        expect(response.versions.old).toBe(Shabah.NO_PREVIOUS_INSTALLATION)
+        expect(response.versions().new).toBe(testCargo.version)
+        expect(response.versions().old).toBe(Shabah.NO_PREVIOUS_INSTALLATION)
     })
 
     it(`if cargo was previously installed, previous cargo should not be null and previous cargo version should be a valid version`, async () => {
@@ -666,11 +693,11 @@ describe("checking for cargo updates", () => {
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: cargoOrigin, id: "tmp"}
         )
-        expect(response.errorOccurred).toBe(false)
+        expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
         expect(response.previousCargo).not.toBe(null)
-        expect(response.versions.new).toBe(newCargo.version)
-        expect(response.versions.old).toBe(oldCargo.version)
+        expect(response.versions().new).toBe(newCargo.version)
+        expect(response.versions().old).toBe(oldCargo.version)
     })
 
     it(`if fetched cargo is a greater version, update available should be true, other wise should be false`, async () => {
@@ -726,19 +753,19 @@ describe("checking for cargo updates", () => {
             const oldVersion = SemVer.fromString(oldCargo.version)!
             const newIsGreater = newVersion.isGreater(oldVersion)
             expect(newIsGreater).toBe(updateAvailable)
-            expect(response.updateAvailable).toBe(updateAvailable)
-            expect(response.errorOccurred).toBe(false)
+            expect(response.updateAvailable()).toBe(updateAvailable)
+            expect(response.errorOccurred()).toBe(false)
             
             if (newIsGreater) {
                 expect(response.newCargo).not.toBe(null)
-                expect(response.versions.new).toBe(newCargo.version)
+                expect(response.versions().new).toBe(newCargo.version)
                 expect(response.previousCargo).not.toBe(null)
-                expect(response.versions.old).toBe(oldCargo.version)
+                expect(response.versions().old).toBe(oldCargo.version)
             } else {
                 expect(response.newCargo).toBe(null)
-                expect(response.versions.new).toBe(Shabah.NO_PREVIOUS_INSTALLATION)
+                expect(response.versions().new).toBe(Shabah.NO_PREVIOUS_INSTALLATION)
                 expect(response.previousCargo).toBe(null)
-                expect(response.versions.old).toBe(Shabah.NO_PREVIOUS_INSTALLATION)   
+                expect(response.versions().old).toBe(Shabah.NO_PREVIOUS_INSTALLATION)   
             }
            
         }
@@ -797,8 +824,8 @@ describe("checking for cargo updates", () => {
             const oldVersion = SemVer.fromString(oldCargo.version)!
             const newIsGreater = newVersion.isGreater(oldVersion)
             expect(newIsGreater).toBe(updateAvailable)
-            expect(response.updateAvailable).toBe(updateAvailable)
-            expect(response.errorOccurred).toBe(false)
+            expect(response.updateAvailable()).toBe(updateAvailable)
+            expect(response.errorOccurred()).toBe(false)
             const miniRequestIndex = networkCache.accessLog.findIndex(
                 (log) => log.url.includes(MANIFEST_MINI_NAME)
             )
@@ -868,8 +895,8 @@ describe("checking for cargo updates", () => {
             const oldVersion = SemVer.fromString(oldCargo.version)!
             const newIsGreater = newVersion.isGreater(oldVersion)
             expect(newIsGreater).toBe(updateAvailable)
-            expect(response.updateAvailable).toBe(updateAvailable)
-            expect(response.errorOccurred).toBe(false)
+            expect(response.updateAvailable()).toBe(updateAvailable)
+            expect(response.errorOccurred()).toBe(false)
             const miniRequest = networkCache.accessLog.find(
                 (log) => log.url.includes(MANIFEST_MINI_NAME)
             )
@@ -927,8 +954,8 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
-            expect(response.updateAvailable).toBe(true)
-            expect(response.errorOccurred).toBe(false)
+            expect(response.updateAvailable()).toBe(true)
+            expect(response.errorOccurred()).toBe(false)
         }
     })
 
@@ -971,7 +998,7 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
-            expect(response.updateAvailable).toBe(true)
+            expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
             expect(response.newCargo?.parsed.permissions).toStrictEqual([])
         }
@@ -1016,7 +1043,7 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
-            expect(response.updateAvailable).toBe(true)
+            expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
             expect(response.newCargo?.parsed.permissions.length).toBe(1)
         }
@@ -1122,9 +1149,9 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
-            expect(response.updateAvailable).toBe(true)
-            expect(response.errorOccurred).toBe(false)
-            expect(response.download.downloadableResources.length).toBeGreaterThan(0)
+            expect(response.updateAvailable()).toBe(true)
+            expect(response.errorOccurred()).toBe(false)
+            expect(response.downloadMetadata().downloadableResources.length).toBeGreaterThan(0)
 
             const oldFileMap = new Map<string, number>()
             for (const {name} of oldFiles) {
@@ -1144,10 +1171,10 @@ describe("checking for cargo updates", () => {
                 }
             }
 
-            expect(response.download.downloadableResources.length).toBe(filesToDownload.length)
+            expect(response.downloadMetadata().downloadableResources.length).toBe(filesToDownload.length)
             for (const url of filesToDownload) {
                 const file = response
-                    .download
+                    .downloadMetadata()
                     .downloadableResources
                     .find((file) => file.requestUrl === url)
                 expect(!!file).toBe(true)
@@ -1160,10 +1187,10 @@ describe("checking for cargo updates", () => {
                     filesToDelete.push(url)
                 }
             }
-            expect(response.download.resourcesToDelete.length).toBe(filesToDelete.length)
+            expect(response.downloadMetadata().resourcesToDelete.length).toBe(filesToDelete.length)
             for (const url of filesToDelete) {
                 const file = response
-                    .download
+                    .downloadMetadata()
                     .resourcesToDelete
                     .find((file) => file.requestUrl === url)
                 expect(!!file).toBe(true)
@@ -1282,11 +1309,11 @@ describe("checking for cargo updates", () => {
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: redirectOrigin, id: "tmp"}
             )
-            expect(response.updateAvailable).toBe(true)
-            expect(response.errorOccurred).toBe(false)
+            expect(response.updateAvailable()).toBe(true)
+            expect(response.errorOccurred()).toBe(false)
             expect(response.metadata.resolvedUrl).not.toBe(response.metadata.canonicalUrl)
             expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
-            expect(response.download.downloadableResources.length).toBeGreaterThan(0)
+            expect(response.downloadMetadata().downloadableResources.length).toBeGreaterThan(0)
 
             const oldFileMap = new Map<string, number>()
             for (const {name} of oldFiles) {
@@ -1306,10 +1333,10 @@ describe("checking for cargo updates", () => {
                 }
             }
             
-            expect(response.download.downloadableResources.length).toBe(filesToDownload.length)
+            expect(response.downloadMetadata().downloadableResources.length).toBe(filesToDownload.length)
             for (const url of filesToDownload) {
                 const file = response
-                    .download
+                    .downloadMetadata()
                     .downloadableResources
                     .find((file) => file.requestUrl === url)
                 expect(!!file).toBe(true)
@@ -1323,13 +1350,655 @@ describe("checking for cargo updates", () => {
                 }
             }
 
-            expect(response.download.resourcesToDelete.length).toBe(filesToDelete.length)
+            expect(response.downloadMetadata().resourcesToDelete.length).toBe(filesToDelete.length)
             for (const url of filesToDelete) {
                 const file = response
-                    .download
+                    .downloadMetadata()
                     .resourcesToDelete
                     .find((file) => file.requestUrl === url)
                 expect(!!file).toBe(true)
+            }
+        }
+    })
+})
+
+const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
+    const {
+        status = Shabah.STATUS.ok,
+        metadata = {
+            id: "tmp",
+            originalResolvedUrl: "",
+            canonicalUrl: "",
+            resolvedUrl: ""
+        },
+        errors = [],
+        newCargo = null,
+        previousCargo = null,
+        previousVersionExists = true,
+        download = {
+            downloadableResources: [],
+            resourcesToDelete: []
+        },
+        diskInfo = {
+            raw: {used: 0, total: 0, left: 0},
+            cargoStorageBytes: 0
+        },
+    } = config
+    return new UpdateCheckResponse({
+        diskInfo,
+        download,
+        previousVersionExists,
+        previousCargo,
+        newCargo,
+        errors,
+        metadata,
+        status,
+    })
+}
+
+describe("executing updates", () => {
+    it("if update response returned an error code, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            Shabah.STATUS.networkError,
+            Shabah.STATUS.badHttpCode,
+            Shabah.STATUS.preflightVerificationFailed,
+            Shabah.STATUS.invalidCargo,
+        ] as const
+        for (const status of cases) {
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {}
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({status})
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateImpossible)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+        }
+    })
+
+    it("if update response returns a non-empty array of errors, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            ["err1"],
+            ["err1", "err2"],
+            ["err1", "err2", "err3"],
+        ] as const
+        for (const errors of cases) {
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {}
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                errors
+            })
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateImpossible)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+        }
+    })
+
+    it("if update response is ok but new cargo is missing, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const {client, downloadState} = createClient(origin, {
+            cacheFiles: {},
+            networkFiles: {}
+        })
+        expect(downloadState.queuedDownloads.length).toBe(0)
+        const updateResponse = createUpdateCheck({
+            status: Shabah.STATUS.ok,
+            newCargo: null
+        })
+        const queueResponse = await client.executeUpdates(
+            updateResponse,
+            "my update"
+        )
+        expect(queueResponse.ok).toBe(true)
+        expect(queueResponse.data).toBe(Shabah.STATUS.newCargoMissing)
+        expect(downloadState.queuedDownloads.length).toBe(0)
+        
+    })
+
+    it("if there is not enough disk storage for cargo, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 200, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ]
+            },
+            {
+                storage: {used: 100, total: 2_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 10, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {}
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo(),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl: origin + "/",
+                    resolvedUrl: origin + "/",
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.insufficentDiskSpace)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+        }
+    })
+
+    it("if same cargo is already downloading, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ]
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {}
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo(),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl: origin + "/",
+                    resolvedUrl: origin + "/",
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            await client.putDownloadIndex({
+                id: updateResponse.metadata.id,
+                bytes: 0,
+                map: {},
+                version: "0.2.0",
+                previousVersion: "0.1.0",
+                title: "update 1",
+                resolvedUrl: updateResponse.metadata.resolvedUrl,
+                canonicalUrl: updateResponse.metadata.canonicalUrl,
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(true)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateAlreadyQueued)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+        }
+    })
+
+    it("if same cargo is already downloading but download client isn't aware and download manager is, execute updates should not queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ]
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const canonicalUrl = origin + "/"
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {},
+                downloadManagerState: new Map([
+                    [canonicalUrl, 1]
+                ])
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                metadata: {
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl
+                },
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo(),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(false)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.downloadManagerUnsyncedState)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+        }
+    })
+
+    it("if update is valid, execute updates should queue download", async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ]
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const canonicalUrl = origin + "/"
+            const {client, downloadState} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                metadata: {
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl
+                },
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo(),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(false)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+            for (const {requestUrl} of downloadableResources) {
+                const found = downloadState
+                    .queuedDownloads[0]
+                    .urls
+                    .find((d) => d === requestUrl)
+                expect(!!found).toBe(true)
+            }
+        }
+    })
+
+    it("if update is valid, a download and cargo index should be created, and cargo.json should be cached", async () => {
+        const origin = "https://my-mamas-house.com"
+        const ENTRY_NAME = "index.js"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/${ENTRY_NAME}`, storageUrl: `${origin}/${ENTRY_NAME}`, bytes: 500}
+                ]
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/${ENTRY_NAME}`, storageUrl: `${origin}/${ENTRY_NAME}`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/${ENTRY_NAME}`, storageUrl: `${origin}/${ENTRY_NAME}`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const canonicalUrl = origin + "/"
+            const {client, downloadState, caches: {innerFileCache}} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                metadata: {
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl
+                },
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo({
+                        entry: "index.js"
+                    }),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(false)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(!!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))).toBe(true)
+            const cargoIndex = await client.getCargoMetaByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            )
+            expect(!!cargoIndex).toBe(true)
+            expect(cargoIndex?.state).toBe("updating")
+            expect(cargoIndex?.entry).toBe(updateResponse.metadata.resolvedUrl + ENTRY_NAME)
+            expect(!!(innerFileCache.getFile(
+                updateResponse.metadata.resolvedUrl + MANIFEST_NAME
+            ))).toBe(true)
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+        }
+    })
+
+    it(`if saved cargo has an entry of "${NULL_FIELD}", generated cargo index entry should also be "${NULL_FIELD}"`, async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ],
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources} of cases) {
+            const canonicalUrl = origin + "/"
+            const {client, downloadState, caches: {innerFileCache}} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                metadata: {
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl
+                },
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo({
+                        entry: NULL_FIELD
+                    }),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete: []
+                }
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(false)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            const cargoIndex = await client.getCargoMetaByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            )
+            expect(!!cargoIndex).toBe(true)
+            expect(cargoIndex?.state).toBe("updating")
+            expect(cargoIndex?.entry).toBe(NULL_FIELD)
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+        }
+    })
+
+    it(`files that are scheduled for deletion should be deleted`, async () => {
+        const origin = "https://my-mamas-house.com"
+        const cases = [
+            {
+                storage: {used: 100, total: 20_000, left: 100},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
+                ],
+                resourcesToDelete: [
+                    {requestUrl: `${origin}/delete1.js`, storageUrl: `${origin}/delete1.js`, bytes: 500},
+                ]
+            },
+            {
+                storage: {used: 100, total: 20_000, left: 1_900},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
+                ],
+                resourcesToDelete: [
+                    {requestUrl: `${origin}/delete1.js`, storageUrl: `${origin}/delete1.js`, bytes: 500},
+                    {requestUrl: `${origin}/delete2.css`, storageUrl: `${origin}/delete2.css`, bytes: 500},
+                ]
+            },
+            {
+                storage: {used: 0, total: 20_000, left: 10},
+                downloadableResources: [
+                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
+                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
+                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
+                ],
+                resourcesToDelete: [
+                    {requestUrl: `${origin}/delete1.js`, storageUrl: `${origin}/delete1.js`, bytes: 500},
+                    {requestUrl: `${origin}/delete2.css`, storageUrl: `${origin}/delete2.css`, bytes: 500},
+                    {requestUrl: `${origin}/delete3.png`, storageUrl: `${origin}/delete3.png`, bytes: 500},
+                ]
+            },
+        ]
+        for (const {storage, downloadableResources, resourcesToDelete} of cases) {
+            const canonicalUrl = origin + "/"
+            const {client, downloadState, caches: {innerFileCache}} = createClient(origin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponse = createUpdateCheck({
+                status: Shabah.STATUS.ok,
+                metadata: {
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl
+                },
+                diskInfo: {
+                    raw: storage,
+                    cargoStorageBytes: 0
+                },
+                newCargo: {
+                    parsed: new Cargo(),
+                    response: new Response(),
+                    text: "",
+                    canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                },
+                download: {
+                    downloadableResources,
+                    resourcesToDelete
+                }
+            })
+            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                updateResponse.metadata.canonicalUrl
+            ))
+            expect(downloadIndexExists).toBe(false)
+            const queueResponse = await client.executeUpdates(
+                updateResponse,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+            for (const {storageUrl} of resourcesToDelete) {
+                const found = innerFileCache.accessLog.find(
+                    (log) => log.action === "delete" && log.url === storageUrl
+                )
+                expect(!!found).toBe(true)
             }
         }
     })

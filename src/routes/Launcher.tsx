@@ -239,25 +239,25 @@ const LauncherRoot = () => {
     ] as const)
     const previousVersionExists = updateResponse.previousVersionExists
     setCheckedForUpdates(true)
-    if (previousVersionExists && !updateResponse.enoughStorageForCargo) {
-      const updateVersion = updateResponse.versions.new
-      setDownloadError(`Not enough disk space for update v${updateVersion} (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
+    if (previousVersionExists && !updateResponse.enoughStorageForCargo()) {
+      const updateVersion = updateResponse.versions().new
+      setDownloadError(`Not enough disk space for update v${updateVersion} (${updateResponse.readableBytesNeeded()} required)`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
-    } else if (previousVersionExists && updateResponse.errorOccurred) {
+    } else if (previousVersionExists && updateResponse.errorOccurred()) {
       setDownloadError(`Error occured when checking for updates`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
     } else if (
-      (!previousVersionExists && updateResponse.errorOccurred)
-      || (!previousVersionExists && !updateResponse.enoughStorageForCargo)
+      (!previousVersionExists && updateResponse.errorOccurred())
+      || (!previousVersionExists && !updateResponse.enoughStorageForCargo())
     ) {
-      if (!updateResponse.enoughStorageForCargo) {
-        setDownloadError(`Not enough disk space install (${updateResponse.diskInfo.bytesNeededToDownloadFriendly} required)`)
+      if (!updateResponse.enoughStorageForCargo()) {
+        setDownloadError(`Not enough disk space install (${updateResponse.readableBytesNeeded()} required)`)
       } else {
         setDownloadError("Couldn't contact update server")
       }
@@ -267,7 +267,7 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!updateResponse.updateAvailable && previousUpdateFailed) {
+    if (!updateResponse.updateAvailable() && previousUpdateFailed) {
       setProgressMsg("Updating...")
       document.title = "Updating..."
       setAppUpdateInProgress(true)
@@ -276,7 +276,7 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!updateResponse.updateAvailable) {
+    if (!updateResponse.updateAvailable()) {
       launchApp()
       return
     }
@@ -284,7 +284,7 @@ const LauncherRoot = () => {
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueResponse = await downloadClient.executeUpdates(
       updateResponse,
-      `core v${updateResponse.versions.new}`,
+      `core v${updateResponse.versions().new}`,
     )
     
     if (updateQueueResponse.data !== Shabah.STATUS.updateQueued) {
@@ -298,8 +298,8 @@ const LauncherRoot = () => {
     setProgressMsg("Updating...")
     document.title = "Updating..."
     setAppUpdateInProgress(true)
-    setCurrentAppVersion(updateResponse.versions.old)
-    setNextUpdateVersion(updateResponse.versions.new)
+    setCurrentAppVersion(updateResponse.versions().old)
+    setNextUpdateVersion(updateResponse.versions().new)
     addProgressListener()
   }
 
