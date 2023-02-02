@@ -164,7 +164,7 @@ const cargoToCargoIndex = (
         id = `id-${Math.trunc(Math.random() * 50_000)}`,
         resolvedUrl,
         bytes = 0,
-        state = "cache" as CargoState
+        state = "cached" as CargoState
     }: Partial<{
         id: string
         resolvedUrl: string
@@ -334,7 +334,7 @@ describe("checking for cargo updates", () => {
                         cargoOrigin,
                         await (cacheFiles[cargoUrl]()!).json(),
                     ),
-                    {persistChanges: true}
+    
                 )
                 expect(await client.getCargoMetaByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
@@ -349,7 +349,7 @@ describe("checking for cargo updates", () => {
                 expect(response.status).toBe(Shabah.STATUS.badHttpCode)
             }
             if (perviousCargoExists) {
-                expect(response.previousVersionExists).toBe(true)
+                expect(response.previousVersionExists()).toBe(true)
             }
         }
     })
@@ -431,7 +431,7 @@ describe("checking for cargo updates", () => {
                         cargoOrigin,
                         await (cacheFiles[cargoUrl]()!).json(),
                     ),
-                    {persistChanges: true}
+    
                 )
                 expect(await client.getCargoMetaByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
@@ -446,7 +446,7 @@ describe("checking for cargo updates", () => {
                 expect(response.status).toBe(Shabah.STATUS.encodingNotAcceptable)
             }
             if (perviousCargoExists) {
-                expect(response.previousVersionExists).toBe(true)
+                expect(response.previousVersionExists()).toBe(true)
             }
         }
     })
@@ -537,11 +537,10 @@ describe("checking for cargo updates", () => {
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
-        expect(response.newCargo?.text).toStrictEqual(
+        expect(await response.originalNewCargoResponse.text()).toStrictEqual(
             JSON.stringify(testCargo)
         )
-        expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
-        expect(response.newCargo?.resolvedUrl).toBe(cargoOrigin + "/")
+        expect(response.resolvedUrl).toBe(cargoOrigin + "/")
     })
 
     it("if cargo is fetched correct and encounter redirect, errorOccurred should be false and resolved url should be the url that was redirected to", async () => {
@@ -571,12 +570,11 @@ describe("checking for cargo updates", () => {
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
-        expect(response.newCargo?.text).toStrictEqual(
+        expect(await response.originalNewCargoResponse.text()).toStrictEqual(
             JSON.stringify(mockCargo)
         )
-        expect(response.metadata.canonicalUrl).toBe(redirectOrigin + "/")
-        expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
-        expect(response.newCargo?.resolvedUrl).toBe(cargoOrigin + "/")
+        expect(response.canonicalUrl).toBe(redirectOrigin + "/")
+        expect(response.resolvedUrl).toBe(cargoOrigin + "/")
     })
 
     it("if cargo is fetched correctly and there is not enough storage space for cargo, enoughStorageForCargo should be false", async () => {
@@ -614,8 +612,7 @@ describe("checking for cargo updates", () => {
         expect(response.enoughStorageForCargo()).toBe(false)
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
-        expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
-        expect(response.newCargo?.resolvedUrl).toBe(cargoOrigin + "/")
+        expect(response.resolvedUrl).toBe(cargoOrigin + "/")
     })
 
     it(`if cargo was not previously installed, previous cargo should be null and previous cargo version should be "${Shabah.NO_PREVIOUS_INSTALLATION}"`, async () => {
@@ -688,7 +685,6 @@ describe("checking for cargo updates", () => {
         })
         await client.putCargoIndex(
             cargoToCargoIndex(cargoOrigin, oldCargo),
-            {persistChanges: true}
         )
         const response = await client.checkForCargoUpdates(
             {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -744,7 +740,7 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -764,8 +760,8 @@ describe("checking for cargo updates", () => {
             } else {
                 expect(response.newCargo).toBe(null)
                 expect(response.versions().new).toBe(Shabah.NO_PREVIOUS_INSTALLATION)
-                expect(response.previousCargo).toBe(null)
-                expect(response.versions().old).toBe(Shabah.NO_PREVIOUS_INSTALLATION)   
+                expect(response.previousCargo).not.toBe(null)
+                expect(response.versions().old).toBe(oldV)   
             }
            
         }
@@ -815,7 +811,7 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -886,7 +882,7 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -949,7 +945,7 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -993,14 +989,14 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
-            expect(response.newCargo?.parsed.permissions).toStrictEqual([])
+            expect(response.newCargo?.permissions).toStrictEqual([])
         }
     })
 
@@ -1038,14 +1034,14 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
-            expect(response.newCargo?.parsed.permissions.length).toBe(1)
+            expect(response.newCargo?.permissions.length).toBe(1)
         }
     })
 
@@ -1144,7 +1140,7 @@ describe("checking for cargo updates", () => {
             })
             await client.putCargoIndex(
                 cargoToCargoIndex(cargoOrigin, oldCargo),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: cargoOrigin, id: "tmp"}
@@ -1304,15 +1300,15 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(redirectOrigin, oldCargo, {
                     resolvedUrl: cargoOrigin
                 }),
-                {persistChanges: true}
+
             )
             const response = await client.checkForCargoUpdates(
                 {canonicalUrl: redirectOrigin, id: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.errorOccurred()).toBe(false)
-            expect(response.metadata.resolvedUrl).not.toBe(response.metadata.canonicalUrl)
-            expect(response.metadata.resolvedUrl).toBe(cargoOrigin + "/")
+            expect(response.resolvedUrl).not.toBe(response.canonicalUrl)
+            expect(response.resolvedUrl).toBe(cargoOrigin + "/")
             expect(response.downloadMetadata().downloadableResources.length).toBeGreaterThan(0)
 
             const oldFileMap = new Map<string, number>()
@@ -1365,16 +1361,14 @@ describe("checking for cargo updates", () => {
 const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
     const {
         status = Shabah.STATUS.ok,
-        metadata = {
-            id: "tmp",
-            originalResolvedUrl: "",
-            canonicalUrl: "",
-            resolvedUrl: ""
-        },
+        id = "tmp",
+        originalResolvedUrl = "",
+        canonicalUrl = "",
+        resolvedUrl = "",
         errors = [],
         newCargo = null,
+        originalNewCargoResponse = new Response(),
         previousCargo = null,
-        previousVersionExists = true,
         download = {
             downloadableResources: [],
             resourcesToDelete: []
@@ -1387,11 +1381,14 @@ const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
     return new UpdateCheckResponse({
         diskInfo,
         download,
-        previousVersionExists,
         previousCargo,
         newCargo,
+        originalNewCargoResponse,
         errors,
-        metadata,
+        id,
+        originalResolvedUrl,
+        resolvedUrl,
+        canonicalUrl,
         status,
     })
 }
@@ -1507,13 +1504,8 @@ describe("executing updates", () => {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo(),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl: origin + "/",
-                    resolvedUrl: origin + "/",
-                },
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
@@ -1566,30 +1558,25 @@ describe("executing updates", () => {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo(),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl: origin + "/",
-                    resolvedUrl: origin + "/",
-                },
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
                 }
             })
             await client.putDownloadIndex({
-                id: updateResponse.metadata.id,
+                id: updateResponse.id,
                 bytes: 0,
                 map: {},
                 version: "0.2.0",
                 previousVersion: "0.1.0",
                 title: "update 1",
-                resolvedUrl: updateResponse.metadata.resolvedUrl,
-                canonicalUrl: updateResponse.metadata.canonicalUrl,
+                resolvedUrl: updateResponse.resolvedUrl,
+                canonicalUrl: updateResponse.canonicalUrl,
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(true)
             const queueResponse = await client.executeUpdates(
@@ -1639,30 +1626,23 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                metadata: {
-                    id: "tmp",
-                    originalResolvedUrl: canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                    canonicalUrl
-                },
+                id: "tmp",
+                originalResolvedUrl: canonicalUrl,
+                resolvedUrl: canonicalUrl,
+                canonicalUrl,
                 diskInfo: {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo(),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                },
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
                 }
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(false)
             const queueResponse = await client.executeUpdates(
@@ -1709,30 +1689,24 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                metadata: {
-                    id: "tmp",
-                    originalResolvedUrl: canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                    canonicalUrl
-                },
+                id: "tmp",
+                originalResolvedUrl: canonicalUrl,
+                resolvedUrl: canonicalUrl,
+                canonicalUrl,
+                
                 diskInfo: {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo(),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                },
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
                 }
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(false)
             const queueResponse = await client.executeUpdates(
@@ -1787,32 +1761,25 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                metadata: {
+                
                     id: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
-                    canonicalUrl
-                },
+                    canonicalUrl,
+                
                 diskInfo: {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo({
-                        entry: "index.js"
-                    }),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                },
+                newCargo: new Cargo({entry: "index.js"}),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
                 }
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(false)
             const queueResponse = await client.executeUpdates(
@@ -1820,16 +1787,16 @@ describe("executing updates", () => {
                 "my update"
             )
             expect(!!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))).toBe(true)
             const cargoIndex = await client.getCargoMetaByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
             expect(cargoIndex?.state).toBe("updating")
-            expect(cargoIndex?.entry).toBe(updateResponse.metadata.resolvedUrl + ENTRY_NAME)
+            expect(cargoIndex?.entry).toBe(updateResponse.resolvedUrl + ENTRY_NAME)
             expect(!!(innerFileCache.getFile(
-                updateResponse.metadata.resolvedUrl + MANIFEST_NAME
+                updateResponse.resolvedUrl + MANIFEST_NAME
             ))).toBe(true)
             expect(queueResponse.ok).toBe(true)
             expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
@@ -1871,32 +1838,25 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                metadata: {
+                
                     id: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
-                    canonicalUrl
-                },
+                    canonicalUrl,
+                
                 diskInfo: {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo({
-                        entry: NULL_FIELD
-                    }),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                },
+                newCargo: new Cargo({entry: NULL_FIELD}),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete: []
                 }
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(false)
             const queueResponse = await client.executeUpdates(
@@ -1904,7 +1864,7 @@ describe("executing updates", () => {
                 "my update"
             )
             const cargoIndex = await client.getCargoMetaByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
             expect(cargoIndex?.state).toBe("updating")
@@ -1961,30 +1921,25 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                metadata: {
+                
                     id: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
-                    canonicalUrl
-                },
+                    canonicalUrl,
+                
                 diskInfo: {
                     raw: storage,
                     cargoStorageBytes: 0
                 },
-                newCargo: {
-                    parsed: new Cargo(),
-                    response: new Response(),
-                    text: "",
-                    canonicalUrl,
-                    resolvedUrl: canonicalUrl,
-                },
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
                 download: {
                     downloadableResources,
                     resourcesToDelete
                 }
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.metadata.canonicalUrl
+                updateResponse.canonicalUrl
             ))
             expect(downloadIndexExists).toBe(false)
             const queueResponse = await client.executeUpdates(
@@ -2001,5 +1956,280 @@ describe("executing updates", () => {
                 expect(!!found).toBe(true)
             }
         }
+    })
+})
+
+describe("reading and updating cargo indexes", () => {
+    it("cargo index can be created", async () => {
+        const canonicalUrl = "https://mymamashouse.com"
+        const {client} = createClient(canonicalUrl)
+        const cargo = new Cargo<Permissions>({name: "my-cargo"})
+        const index = cargoToCargoIndex(canonicalUrl, cargo)
+        await client.putCargoIndex(
+            index,
+        )
+        const found = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!found).toBe(true)
+    })
+
+    it("calling put on an already existent index overwrites it", async () => {
+        const canonicalUrl = "https://mymamashouse.com"
+        const {client} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const index = cargoToCargoIndex(canonicalUrl, initial)
+        await client.putCargoIndex(
+            index,
+        )
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(foundInitial?.name).toBe(initial.name)
+        const updated =  cargoToCargoIndex(canonicalUrl, new Cargo({name: "cargo"}))
+        await client.putCargoIndex(
+            updated,
+        )
+        const foundUpdated = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(foundUpdated?.name).toBe(updated.name)
+    })
+
+    it("cargo indexes can be deleted", async () => {
+        const canonicalUrl = "https://mymamashouse.com"
+        const {client} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const index = cargoToCargoIndex(canonicalUrl, initial)
+        await client.putCargoIndex(
+            index,
+        )
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        const deleteReponse = await client.deleteCargoIndex(canonicalUrl)
+        expect(deleteReponse).toBe(Shabah.STATUS.ok)
+        const afterDelete = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(afterDelete).toBe(null)
+    })
+
+    it("attempting to delete a non-existent indexes does nothing", async () => {
+        const canonicalUrl = "https://mymamashouse.com"
+        const {client} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const index = cargoToCargoIndex(canonicalUrl, initial)
+        await client.putCargoIndex(
+            index,
+        )
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        const nonExistentUrl = "https://mygrandmashouse.com"
+        const deleteReponse = await client.deleteCargoIndex(nonExistentUrl)
+        expect(deleteReponse).toBe(Shabah.STATUS.notFound)
+        const afterDelete = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!afterDelete).toBe(true)
+    })
+
+    it("calling delete cargo on a particular cargo should delete cargo index and all associated files", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const files = [
+            {name: "index.js", bytes: 0, invalidation: "default"},
+            {name: "style.css", bytes: 0, invalidation: "default"},
+            {name: "pic.png", bytes: 0, invalidation: "default"},
+        ]
+        const cargoToDelete = new Cargo<Permissions>({
+            name: "my-cargo",
+            files: files as Cargo["files"]
+        })
+        const cacheFiles = files.reduce((total, next) => {
+            const {name, bytes} = next
+            total[`${origin}/${name}`] = () => {
+                return new Response("", {
+                    status: 200,
+                    headers: {"content-length": bytes.toString()}
+                })
+            }
+            return total
+        }, {
+            [`${origin}/${MANIFEST_NAME}`]: () => {
+                return new Response(JSON.stringify(cargoToDelete), {
+                    status: 200
+                })
+            }
+        })
+        const {client, caches} = createClient(canonicalUrl, {
+            cacheFiles
+        })
+        const {innerFileCache} = caches
+        const filesWithManifest = [
+            ...files,
+            {name: MANIFEST_NAME, bytes: 0, invalidation: "default"}
+        ]
+        for (const {name} of filesWithManifest) {
+            const url = `${origin}/${name}`
+            const inCache = innerFileCache.getFile(url)
+            expect(!!inCache).toBe(true)
+        }
+        const index = cargoToCargoIndex(
+            canonicalUrl, cargoToDelete, {
+                resolvedUrl: canonicalUrl
+            }
+        )
+        await client.putCargoIndex(index)
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        const deleteResponse = await client.deleteCargo(canonicalUrl)
+        expect(deleteResponse.ok).toBe(true)
+        expect(deleteResponse.data).toBe(Shabah.STATUS.ok)
+        for (const {name} of filesWithManifest) {
+            const url = `${origin}/${name}`
+            const inCache = innerFileCache.getFile(url)
+            expect(!!inCache).toBe(false)
+        }
+        const foundAfterDelete = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundAfterDelete).toBe(false)
+    })
+
+    it("calling archive cargo on a particular cargo should set cargo index to archived and delete all files", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const files = [
+            {name: "index.js", bytes: 0, invalidation: "default"},
+            {name: "style.css", bytes: 0, invalidation: "default"},
+            {name: "pic.png", bytes: 0, invalidation: "default"},
+        ]
+        const cargoToArchive = new Cargo<Permissions>({
+            name: "my-cargo",
+            files: files as Cargo["files"]
+        })
+        const cacheFiles = files.reduce((total, next) => {
+            const {name, bytes} = next
+            total[`${origin}/${name}`] = () => {
+                return new Response("", {
+                    status: 200,
+                    headers: {"content-length": bytes.toString()}
+                })
+            }
+            return total
+        }, {
+            [`${origin}/${MANIFEST_NAME}`]: () => {
+                return new Response(JSON.stringify(cargoToArchive), {
+                    status: 200
+                })
+            }
+        })
+        const {client, caches} = createClient(canonicalUrl, {
+            cacheFiles
+        })
+        const {innerFileCache} = caches
+        const filesWithManifest = [
+            ...files,
+            {name: MANIFEST_NAME, bytes: 0, invalidation: "default"}
+        ]
+        for (const {name} of filesWithManifest) {
+            const url = `${origin}/${name}`
+            const inCache = innerFileCache.getFile(url)
+            expect(!!inCache).toBe(true)
+        }
+        const index = cargoToCargoIndex(
+            canonicalUrl, cargoToArchive, {
+                resolvedUrl: canonicalUrl
+            }
+        )
+        await client.putCargoIndex(index)
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        const deleteResponse = await client.archiveCargo(canonicalUrl)
+        expect(deleteResponse.ok).toBe(true)
+        expect(deleteResponse.data).toBe(Shabah.STATUS.ok)
+        for (const {name} of filesWithManifest) {
+            const url = `${origin}/${name}`
+            const inCache = innerFileCache.getFile(url)
+            expect(!!inCache).toBe(false)
+        }
+        const foundAfterDelete = await client.getArchivedCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundAfterDelete).toBe(true)
+        expect(foundAfterDelete?.state).toBe("archived")
+    })
+
+    it("attempting to archive a non-existent indexes does nothing", async () => {
+        const canonicalUrl = "https://mymamashouse.com"
+        const {client} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const index = cargoToCargoIndex(canonicalUrl, initial)
+        await client.putCargoIndex(index)
+        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        const nonExistentUrl = "https://mygrandmashouse.com"
+        const archiveResponse = await client.archiveCargo(nonExistentUrl)
+        expect(archiveResponse.ok).toBe(true)
+        expect(archiveResponse.data).toBe(Shabah.STATUS.notFound)
+        const afterArchive = await client.getCargoMetaByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!afterArchive).toBe(true)
+        expect(afterArchive?.state).toBe("cached")
+    })
+})
+
+describe("reading and writing download indexes", () => {
+    it("can create download index", async () => {
+        const origin = "https://testing.org"
+        const canonicalUrl = origin + "/"
+        const {client} = createClient(origin)
+        await client.putDownloadIndex({
+            id: "tmp",
+            bytes: 0,
+            map: {},
+            version: "0.2.0",
+            previousVersion: "0.1.0",
+            title: "update 1",
+            resolvedUrl: canonicalUrl,
+            canonicalUrl,
+        })
+        const found = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!found).toBe(true)
+    })
+
+    it("calling put on existing index should overwrite it", async () => {
+        const origin = "https://testing.org"
+        const canonicalUrl = origin + "/"
+        const {client} = createClient(origin)
+        const initialVersion = "0.2.0"
+        await client.putDownloadIndex({
+            id: "tmp",
+            bytes: 0,
+            map: {},
+            version: initialVersion,
+            previousVersion: "0.1.0",
+            title: "update 1",
+            resolvedUrl: canonicalUrl,
+            canonicalUrl,
+        })
+        const found = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!found).toBe(true)
+        expect(found?.version).toBe(initialVersion)
     })
 })

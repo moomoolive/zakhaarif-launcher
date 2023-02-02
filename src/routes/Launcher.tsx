@@ -237,7 +237,7 @@ const LauncherRoot = () => {
       // should take at least 500ms
       sleep(500),
     ] as const)
-    const previousVersionExists = updateResponse.previousVersionExists
+    const previousVersionExists = updateResponse.previousVersionExists()
     setCheckedForUpdates(true)
     if (previousVersionExists && !updateResponse.enoughStorageForCargo()) {
       const updateVersion = updateResponse.versions().new

@@ -155,7 +155,9 @@ export const updateDownloadIndex = (
 ) => {
     const startedAt = Date.now()
     indices.updatedAt = startedAt
-    const existingIndex = indices.downloads.findIndex((download) => download.id === target.id)
+    const existingIndex = indices.downloads.findIndex(
+        (download) => download.canonicalUrl === target.canonicalUrl
+    )
     if (existingIndex < 0) {
         indices.downloads.push({...target, startedAt})
         indices.totalBytes += target.bytes
@@ -172,8 +174,13 @@ export const updateDownloadIndex = (
     return operationCodes.updatedExisting
 }
 
-export const removeDownloadIndex = (indices: DownloadIndexCollection, targetId: string) => {
-    const targetIndex = indices.downloads.findIndex((download) => download.id === targetId)
+export const removeDownloadIndex = (
+    indices: DownloadIndexCollection, 
+    canonicalUrl: string
+) => {
+    const targetIndex = indices.downloads.findIndex(
+        (download) => download.canonicalUrl === canonicalUrl
+    )
     if (targetIndex < 0) {
         return  operationCodes.notFound
     }

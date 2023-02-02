@@ -1011,7 +1011,7 @@ const AddOns = () => {
                                                         ...cargoIndex,
                                                         cargos: copy
                                                     })
-                                                    await downloadClient.archiveCargo(target.id)
+                                                    await downloadClient.archiveCargo(target.canonicalUrl)
                                                 }}
                                             >
                                                 <span className="mr-3">
@@ -1039,7 +1039,7 @@ const AddOns = () => {
                                                         ...cargoIndex,
                                                         cargos: copy
                                                     })
-                                                    await downloadClient.deleteCargo(target.id)
+                                                    await downloadClient.deleteCargo(target.canonicalUrl)
                                                 }}
                                             >
                                                 <span className="mr-3">

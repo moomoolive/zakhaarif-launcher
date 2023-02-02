@@ -118,55 +118,41 @@ describe("reading and writing to download index", () => {
         ).toEqual(JSON.stringify(index))
     })
 
-    it("if remove download index is called with an existing id, index with id should be removed and download collection bytes should be decremented by the amount of bytes in the removed index", () => {
+    it("if remove download index is called with an existing canonical url, index with id should be removed and download collection bytes should be decremented by the amount of bytes in the removed index", () => {
         const index = emptyDownloadIndex()
         expect(index.totalBytes).toBe(0)
+        const canonicalUrl1 = "https://hi.com"
+        const canonicalUrl2 = "https://hi2.com"
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            {id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            {id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
         )
         expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "pkg")
+        const res = removeDownloadIndex(index, canonicalUrl1)
         expect(index.totalBytes).toBe(50)
         expect(index.downloads.length).toBe(1)
         expect(res).toBe(operationCodes.removed)
     })
 
-    it("if remove download index is called with an non existing id, nothing should occur", () => {
+    it("if remove download index is called with an non existing canonical url, nothing should occur", () => {
         const index = emptyDownloadIndex()
         expect(index.totalBytes).toBe(0)
+        const canonicalUrl1 = "https://hi.com"
+        const canonicalUrl2 = "https://hi2.com"
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            {id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "random-pkg")
-        expect(index.totalBytes).toBe(70)
-        expect(index.downloads.length).toBe(2)
-        expect(res).toBe(operationCodes.notFound)
-    })
-
-    it("saved download indices should be able to be fetched with the getDownloadIndices function", () => {
-        const index = emptyDownloadIndex()
-        expect(index.totalBytes).toBe(0)
-        updateDownloadIndex(
-            index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
-        )
-        updateDownloadIndex(
-            index,
-            {id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            {id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
         )
         expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, "random-pkg")
+        const res = removeDownloadIndex(index, "https://rand.com")
         expect(index.totalBytes).toBe(70)
         expect(index.downloads.length).toBe(2)
         expect(res).toBe(operationCodes.notFound)

@@ -144,16 +144,14 @@ export class Shabah {
 
         const updateResponse = new UpdateCheckResponse({
             status: response.code,
-            metadata: {
-                id: cargoIndex?.id || cargo.id,
-                originalResolvedUrl: cargoIndex?.resolvedUrl || "",
-                resolvedUrl: response.newCargo?.resolvedUrl || "",
-                canonicalUrl: addSlashToEnd(cargo.canonicalUrl),
-            },
+            id: cargoIndex?.id || cargo.id,
+            originalResolvedUrl: cargoIndex?.resolvedUrl || "",
+            resolvedUrl: response.newCargo?.resolvedUrl || "",
+            canonicalUrl: addSlashToEnd(cargo.canonicalUrl),
             errors: response.errors,
-            newCargo: response.newCargo || null,
+            newCargo: response.newCargo?.parsed || null,
+            originalNewCargoResponse: response.newCargo?.response || new Response(),
             previousCargo: response.previousCargo || null,
-            previousVersionExists: response.previousVersionExists,
             download: {
                 downloadableResources: response.downloadableResources,
                 resourcesToDelete: response.resoucesToDelete,
@@ -217,15 +215,10 @@ export class Shabah {
 
     }
 
-    async putCargoIndex(
-        newIndex: CargoIndexWithoutMeta,
-        {persistChanges}: {persistChanges: boolean}
-    ) {
+    async putCargoIndex(newIndex: CargoIndexWithoutMeta) {
         const indices = await this.getCargoIndices()
         updateCargoIndex(indices, newIndex)
-        if (persistChanges) {
-            await this.persistCargoIndices(indices)
-        }
+        return await this.persistCargoIndices(indices)
     }
 
     async getDownloadIndexByCanonicalUrl(canonicalUrl: string) {
@@ -253,10 +246,10 @@ export class Shabah {
             return io.ok(STATUS_CODES.insufficentDiskSpace)
         }
 
-        const downloadId = details.metadata.canonicalUrl
+        const downloadId = details.canonicalUrl
 
         const [downloadIndex, managerResponse] = await Promise.all([
-            this.getDownloadIndexByCanonicalUrl(details.metadata.canonicalUrl),
+            this.getDownloadIndexByCanonicalUrl(details.canonicalUrl),
             this.downloadManager.getDownloadState(downloadId)
         ] as const)
 
@@ -275,43 +268,43 @@ export class Shabah {
         
         await Promise.all([
             this.putDownloadIndex({
-                id: details.metadata.id,
+                id: details.id,
                 bytes: details.downloadMetadata().bytesToDownload,
                 map: createResourceMap(details.downloadMetadata().downloadableResources),
                 version: details.versions().new,
                 previousVersion: details.versions().old,
                 title: updateTitle,
-                resolvedUrl: details.metadata.resolvedUrl,
-                canonicalUrl: details.metadata.canonicalUrl
+                resolvedUrl: details.resolvedUrl,
+                canonicalUrl: details.canonicalUrl
             }),
 
             this.fileCache.putFile(
-                details.newCargo.resolvedUrl + MANIFEST_NAME, 
-                new Response(JSON.stringify(details.newCargo.parsed), {
+                details.resolvedUrl + MANIFEST_NAME, 
+                new Response(JSON.stringify(details.newCargo), {
                     status: 200,
                     statusText: "OK",
                     headers: headers(
                         "application/json",
-                        stringBytes(details.newCargo.text)
+                        stringBytes(await details.originalNewCargoResponse.text())
                     )
                 })
             ),
 
             this.putCargoIndex({
-                name: details.newCargo.parsed.name,
-                id: details.metadata.id,
+                name: details.newCargo.name,
+                id: details.id,
                 state: "updating",
-                permissions: details.newCargo.parsed.permissions,
+                permissions: details.newCargo.permissions,
                 version: details.versions().new,
-                entry: details.newCargo.parsed.entry === NULL_FIELD
+                entry: details.newCargo.entry === NULL_FIELD
                     ? NULL_FIELD
-                    : details.metadata.resolvedUrl + details.newCargo.parsed.entry,
+                    : details.resolvedUrl + details.newCargo.entry,
                 bytes: details.downloadMetadata().cargoTotalBytes,
-                resolvedUrl: details.newCargo.resolvedUrl,
-                canonicalUrl: details.newCargo.canonicalUrl,
-                logoUrl: details.newCargo.parsed.crateLogoUrl,
+                resolvedUrl: details.resolvedUrl,
+                canonicalUrl: details.canonicalUrl,
+                logoUrl: details.newCargo.crateLogoUrl,
                 storageBytes: details.diskInfo.cargoStorageBytes
-            }, {persistChanges: true})
+            })
         ] as const)
         
         const self = this
@@ -504,10 +497,7 @@ export class Shabah {
         updateDownloadIndex(downloadsIndex, errDownloadIndex)
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
-            this.putCargoIndex(
-                {...cargoMeta, state: "updating"},
-                {persistChanges: true}
-            )
+            this.putCargoIndex({...cargoMeta, state: "updating"})
         ])
         const {title, bytes} = errDownloadIndex
         await this.downloadManager.queueDownload(
@@ -575,58 +565,73 @@ export class Shabah {
     }
 
     private async deleteAllCargoFiles(resolvedUrl: string) {
-        const fullCargo = await this.getCargoAtUrl(
-            resolvedUrl
-        )
+        const fullCargo = await this.getCargoAtUrl(resolvedUrl)
         if (!fullCargo.ok) {
             return io.err(`cargo does not exist in hard drive`)
         }
         const {pkg} = fullCargo.data
+        // add to cargo.json to files so that it 
+        // can be deleted along side it's files
         pkg.files.push({
             name: MANIFEST_NAME, 
             bytes: 0, 
             invalidation: "default"
         })
         const fileCache = this.fileCache
-        const deleteResponses = await Promise.all(pkg.files.map((file) => {
-            const url = `${resolvedUrl}${file.name}`
-            return fileCache.deleteFile(url)
-        }))
+        const deleteResponses = await Promise.all(pkg.files.map(
+            (file) => fileCache.deleteFile(`${resolvedUrl}${file.name}`)
+        ))
         return deleteResponses.reduce(
             (total, next) => total && next, true
         )
     }
 
-    async deleteCargo(id: string) {
-        const cargoIndex = await this.getCargoIndices()
-        const index = cargoIndex.cargos.findIndex((cargo) => cargo.id === id)
-        if (index < 0) {
-            return io.err(`package with id "${id}" does not exist`)
-        }
-        const targetCargo = cargoIndex.cargos[index]
-        await this.deleteAllCargoFiles(
-            targetCargo.resolvedUrl
+    async deleteCargoIndex(canonicalUrl: string) {
+        const indexes = await this.getCargoIndices()
+        const cargoIndex = indexes.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
         )
-        cargoIndex.cargos.splice(index, 1)
-        await this.persistCargoIndices(cargoIndex)
-        return io.ok(Shabah.STATUS.deleted)
+        if (cargoIndex < 0) {
+            return STATUS_CODES.notFound
+        }
+        indexes.cargos.splice(cargoIndex, 1)
+        await this.persistCargoIndices(indexes)
+        return STATUS_CODES.ok
     }
 
-    async archiveCargo(id: string) {
+    async deleteCargo(canonicalUrl: string) {
         const cargoIndex = await this.getCargoIndices()
-        const index = cargoIndex.cargos.findIndex((cargo) => cargo.id === id)
+        const index = cargoIndex.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
+        )
         if (index < 0) {
-            return io.err(`package with id "${id}" does not exist`)
+            return io.ok(STATUS_CODES.notFound)
         }
         const targetCargo = cargoIndex.cargos[index]
         await this.deleteAllCargoFiles(
             targetCargo.resolvedUrl
         )
-        cargoIndex.cargos.splice(index, 1, {
-            ...targetCargo,
-            state: "archived"
-        })
+        return io.ok(
+            await this.deleteCargoIndex(targetCargo.canonicalUrl)
+        )
+    }
+
+    getArchivedCargoIndexByCanonicalUrl = this.getCargoMetaByCanonicalUrl
+
+    async archiveCargo(canonicalUrl: string) {
+        const cargoIndex = await this.getCargoIndices()
+        const index = cargoIndex.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
+        )
+        if (index < 0) {
+            return io.ok(STATUS_CODES.notFound)
+        }
+        const targetCargo = cargoIndex.cargos[index]
+        await this.deleteAllCargoFiles(
+            targetCargo.resolvedUrl
+        )
+        targetCargo.state = "archived"
         await this.persistCargoIndices(cargoIndex)
-        return io.ok(Shabah.STATUS.archived)
+        return io.ok(STATUS_CODES.ok)
     }
 }

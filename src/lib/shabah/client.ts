@@ -29,14 +29,12 @@ export const ERROR_CODES_START = 100
 
 export const STATUS_CODES = {
     ok: 0,
-    updateQueued: 3,
+    updateQueued: 1,
     cargoNotFound: 6,
     cargoNotInErrorState: 7,
     errorIndexNotFound: 8,
     cacheIsFresh: 9,
     cached: 10,
-    deleted: 11,
-    archived: 12,
     updateError: 13,
     cargoIsUpToDate: 14,
 
@@ -50,7 +48,8 @@ export const STATUS_CODES = {
     newCargoMissing: 107,
     insufficentDiskSpace: 108,
     updateAlreadyQueued: 109,
-    downloadManagerUnsyncedState: 110
+    downloadManagerUnsyncedState: 110,
+    notFound: 111,
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
@@ -198,12 +197,23 @@ const downloadResponse = ({
 const downloadError = (
     msg: string,
     code: StatusCode,
-    previousVersionExists = true
+    previousVersionExists = true,
+    previousCargo = null as null | Cargo
 ) => {
-    return downloadResponse({errors: [msg], code, previousVersionExists})
+    return downloadResponse({
+        errors: [msg], 
+        code, 
+        previousVersionExists,
+        previousCargo
+    })
 }
 
-const versionUpToDate = () => downloadResponse({code: STATUS_CODES.cargoIsUpToDate})
+const versionUpToDate = ({
+    previousCargo = null as null | Cargo
+} = {}) => downloadResponse({
+    code: STATUS_CODES.cargoIsUpToDate,
+    previousCargo
+})
 
 const verifyAllRequestableFiles = async (
     fileUrls: string[], 
@@ -358,7 +368,7 @@ export const checkForUpdates = async (
         && (newMiniCargoPkg = validateMiniCargo(newMiniCargoJson.data)).errors.length < 1
         && !newMiniCargoPkg.semanticVersion.isGreater(oldCargo.semanticVersion)
     ) {
-        return versionUpToDate()
+        return versionUpToDate({previousCargo: oldCargoPkg})
     }
 
     const {
@@ -373,11 +383,16 @@ export const checkForUpdates = async (
     )
 
     if (!newCargoPkg || !response || error.length > 0) {
-        return downloadError(error, code)
+        return downloadError(
+            error, 
+            code,
+            true,
+            oldCargoPkg,
+        )
     }
 
     if (!newCargoPkg.semanticVersion.isGreater(oldCargo.semanticVersion)) {
-        return versionUpToDate()
+        return versionUpToDate({previousCargo: oldCargoPkg})
     }
 
     const newResolvedUrl = finalUrl
@@ -413,7 +428,8 @@ export const checkForUpdates = async (
             return downloadError(
                 `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
                 STATUS_CODES.preflightVerificationFailed,
-                false
+                true,
+                oldCargoPkg
             )
         }
         const filesToDelete = oldCargoPkg.files.map((file) => {
@@ -471,7 +487,8 @@ export const checkForUpdates = async (
         return downloadError(
             `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
             STATUS_CODES.preflightVerificationFailed,
-            false
+            true,
+            oldCargoPkg
         )
     }
     
