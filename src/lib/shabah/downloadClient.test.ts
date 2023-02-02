@@ -2231,5 +2231,97 @@ describe("reading and writing download indexes", () => {
         )
         expect(!!found).toBe(true)
         expect(found?.version).toBe(initialVersion)
+        const changedVersion = "0.2.0"
+        await client.putDownloadIndex({
+            id: "tmp",
+            bytes: 0,
+            map: {},
+            version: initialVersion,
+            previousVersion: "0.1.0",
+            title: "update 1",
+            resolvedUrl: changedVersion,
+            canonicalUrl,
+        })
+        const foundAfterMutation = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundAfterMutation).toBe(true)
+        expect(found?.version).toBe(changedVersion)
+    })
+
+    it("attempting to delete a non-existent download index should do nothing", async () => {
+        const origin = "https://testing.org"
+        const canonicalUrl = origin + "/"
+        const {client} = createClient(origin)
+        const initialVersion = "0.2.0"
+        await client.putDownloadIndex({
+            id: "tmp",
+            bytes: 0,
+            map: {},
+            version: initialVersion,
+            previousVersion: "0.1.0",
+            title: "update 1",
+            resolvedUrl: canonicalUrl,
+            canonicalUrl,
+        })
+        const found = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!found).toBe(true)
+        const randomIndex = "https://does-not-exist.com"
+        const response = await client.deleteDownloadIndex(
+            randomIndex
+        )
+        expect(response.ok).toBe(true)
+        expect(response.data).toBe(Shabah.STATUS.notFound)
+    })
+})
+
+describe("finding full cargos", () => {
+    it("if cargo is not found an error should be returned", async () => {
+        const origin = "https://a-new-website-.com"
+        const resolvedUrl = origin + "/"
+        const {client} = createClient(origin, {
+            cacheFiles: {}
+        })
+        const response = await client.getCargoAtUrl(resolvedUrl)
+        expect(response.ok).toBe(false)
+        expect(response.data).toBe(null)
+    })
+
+    it("if cargo is found but is not json encoded an error should be returned", async () => {
+        const origin = "https://a-new-website-.com"
+        const resolvedUrl = origin + "/"
+        const cargo = "{"
+        const {client} = createClient(origin, {
+            cacheFiles: {
+                [`${resolvedUrl}${MANIFEST_NAME}`]: () => {
+                    return new Response(cargo, {
+                        status: 200
+                    })
+                }
+            }
+        })
+        const response = await client.getCargoAtUrl(resolvedUrl)
+        expect(response.ok).toBe(false)
+        expect(response.data).toBe(null)
+    })
+
+    it("if cargo is found and is valid, a parsed version should be returned", async () => {
+        const origin = "https://a-new-website-.com"
+        const resolvedUrl = origin + "/"
+        const cargo = new Cargo({name: "good cargo"})
+        const {client} = createClient(origin, {
+            cacheFiles: {
+                [`${resolvedUrl}${MANIFEST_NAME}`]: () => {
+                    return new Response(JSON.stringify(cargo), {
+                        status: 200
+                    })
+                }
+            }
+        })
+        const response = await client.getCargoAtUrl(resolvedUrl)
+        expect(response.ok).toBe(true)
+        expect(response.data?.pkg).toStrictEqual(structuredClone(cargo))
     })
 })

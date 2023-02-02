@@ -24,6 +24,7 @@ import {
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
     DownloadIndex,
+    removeDownloadIndex,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {MANIFEST_NAME, NULL_FIELD} from "../cargo/index"
@@ -142,7 +143,7 @@ export class Shabah {
             response.newCargo.parsed.permissions = this.permissionsCleaner(permissions)
         }
 
-        const updateResponse = new UpdateCheckResponse({
+        return new UpdateCheckResponse({
             status: response.code,
             id: cargoIndex?.id || cargo.id,
             originalResolvedUrl: cargoIndex?.resolvedUrl || "",
@@ -161,7 +162,6 @@ export class Shabah {
                 cargoStorageBytes: cargoIndex?.storageBytes || 0
             },
         })
-        return updateResponse
     }
 
     private async refreshDownloadIndicies() {
@@ -632,6 +632,18 @@ export class Shabah {
         )
         targetCargo.state = "archived"
         await this.persistCargoIndices(cargoIndex)
+        return io.ok(STATUS_CODES.ok)
+    }
+
+    async deleteDownloadIndex(canonicalUrl: string) {
+        const target = await this.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        if (!target) {
+            return io.ok(STATUS_CODES.notFound)
+        }
+        const indexes = await this.getDownloadIndices()
+        removeDownloadIndex(indexes, canonicalUrl)
         return io.ok(STATUS_CODES.ok)
     }
 }

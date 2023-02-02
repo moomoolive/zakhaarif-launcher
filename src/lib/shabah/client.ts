@@ -50,6 +50,7 @@ export const STATUS_CODES = {
     updateAlreadyQueued: 109,
     downloadManagerUnsyncedState: 110,
     notFound: 111,
+    foundButContentIsEmpty: 112,
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
