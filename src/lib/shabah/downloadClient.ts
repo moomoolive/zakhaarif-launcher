@@ -1,9 +1,10 @@
 import {
     checkForUpdates,
     createResourceMap,
+    StatusCode,
     STATUS_CODES,
 } from "./client"
-import {io} from "../monads/result"
+import {io, Ok} from "../monads/result"
 import {
     CargoIndexWithoutMeta,
     CargoIndices,
@@ -26,6 +27,7 @@ import {
     DownloadIndex,
     removeDownloadIndex,
     NO_UPDATE_QUEUED,
+    DownloadSegment,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {MANIFEST_NAME, NULL_FIELD} from "../cargo/index"
@@ -126,7 +128,7 @@ export class Shabah {
     async checkForCargoUpdates(cargo: {
         canonicalUrl: string
         id: string
-    }) {
+    }): Promise<UpdateCheckResponse> {
         if (!cargo.canonicalUrl.startsWith("https://") && !cargo.canonicalUrl.startsWith("http://")) {
             throw new Error("cargo canonical url must be a full url, starting with https:// or http://")
         }
@@ -167,110 +169,128 @@ export class Shabah {
     }
 
     async executeUpdates(
-        details: UpdateCheckResponse,
-        updateTitle: string,
-    ) {
-        if (details.errorOccurred()) {
-            return io.ok(STATUS_CODES.updateImpossible)
-        }
-        if (!details.updateAvailable() || !details.newCargo) {
-            return io.ok(STATUS_CODES.newCargoMissing)
-        } 
-        if (!details.enoughStorageForCargo()) {
-            return io.ok(STATUS_CODES.insufficentDiskSpace)
-        }
-
-        const downloadIndex = await this.getDownloadIndexByCanonicalUrl(
-            details.canonicalUrl
-        )
-        const updateInProgress = !!downloadIndex
-        if (updateInProgress) {
-            return io.ok(STATUS_CODES.updateAlreadyQueued)
-        }
-
-        // in case there is a mismatch between the underlying
-        // download manager and the download client
-        // check that the download manager also doesn't
-        // have the same update queued
-        const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
-            details.canonicalUrl
-        )
-        const cargoIndexExists = !!updateCargoIndex
-        const updateQueued = updateCargoIndex?.downloadQueueId !== NO_UPDATE_QUEUED
-        const downloadManagerHasUpdateRecord = updateQueued
-            ? !!(await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || ""))
-            : false
-        if (
-            cargoIndexExists
-            && updateQueued
-            && downloadManagerHasUpdateRecord
-        ) {
-            return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+        updates: UpdateCheckResponse[],
+        title: string,
+    ): Promise<Ok<StatusCode>> {
+        for (const update of updates) {
+            if (update.errorOccurred()) {
+                return io.ok(STATUS_CODES.updateImpossible)
+            }
+            if (!update.updateAvailable() || !update.newCargo) {
+                return io.ok(STATUS_CODES.newCargoMissing)
+            } 
+            if (!update.enoughStorageForCargo()) {
+                return io.ok(STATUS_CODES.insufficentDiskSpace)
+            }
+    
+            const downloadIndex = await this.getDownloadIndexByCanonicalUrl(
+                update.canonicalUrl
+            )
+            const updateInProgress = !!downloadIndex
+            if (updateInProgress) {
+                return io.ok(STATUS_CODES.updateAlreadyQueued)
+            }
+    
+            // in case there is a mismatch between the underlying
+            // download manager and the download client
+            // check that the download manager also doesn't
+            // have the same update queued
+            const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
+                update.canonicalUrl
+            )
+            const cargoIndexExists = !!updateCargoIndex
+            const updateQueued = updateCargoIndex?.downloadQueueId !== NO_UPDATE_QUEUED
+            const downloadManagerHasUpdateRecord = updateQueued
+                ? !!(await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || ""))
+                : false
+            if (
+                cargoIndexExists
+                && updateQueued
+                && downloadManagerHasUpdateRecord
+            ) {
+                return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+            }
         }
 
         const downloadQueueId = nanoid(21)
+        const downloadIndex = {
+            id: downloadQueueId,
+            previousId: "",
+            bytes: 0,
+            segments: [] as DownloadSegment[],
+            title
+        }
         
-        await Promise.all([
-            this.putDownloadIndex({
-                id: downloadQueueId,
-                previousId: "",
-                bytes: details.downloadMetadata().bytesToDownload,
-                segments: [
-                    {
-                        map: createResourceMap(details.downloadMetadata().downloadableResources),
-                        version: details.versions().new,
-                        previousVersion: details.versions().old,
-                        resolvedUrl: details.resolvedUrl,
-                        canonicalUrl: details.canonicalUrl,
-                        bytes: details.downloadMetadata().bytesToDownload,
-                    }
-                ],
-                title: updateTitle,
-            }),
+        const promises: Promise<unknown>[] = []
+        for (const update of updates) {
+            downloadIndex.bytes += update.downloadMetadata().bytesToDownload
+            downloadIndex.segments.push({
+                map: createResourceMap(update.downloadMetadata().downloadableResources),
+                version: update.versions().new,
+                previousVersion: update.versions().old,
+                resolvedUrl: update.resolvedUrl,
+                canonicalUrl: update.canonicalUrl,
+                bytes: update.downloadMetadata().bytesToDownload,
+            })
 
-            this.fileCache.putFile(
-                details.resolvedUrl + MANIFEST_NAME, 
-                new Response(JSON.stringify(details.newCargo), {
+            promises.push(this.fileCache.putFile(
+                update.resolvedUrl + MANIFEST_NAME, 
+                new Response(JSON.stringify(update.newCargo), {
                     status: 200,
                     statusText: "OK",
                     headers: headers(
                         "application/json",
-                        stringBytes(await details.originalNewCargoResponse.text())
+                        stringBytes(await update.originalNewCargoResponse.text())
                     )
                 })
-            ),
-
-            this.putCargoIndex({
-                name: details.newCargo.name,
-                id: details.id,
+            ))
+            
+            promises.push(this.putCargoIndex({
+                name: update.newCargo?.name || "none",
+                id: update.id,
                 state: "updating",
-                permissions: details.newCargo.permissions,
-                version: details.versions().new,
-                entry: details.newCargo.entry === NULL_FIELD
+                permissions: update.newCargo?.permissions || [],
+                version: update.versions().new,
+                entry: update.newCargo?.entry === NULL_FIELD
                     ? NULL_FIELD
-                    : details.resolvedUrl + details.newCargo.entry,
-                bytes: details.downloadMetadata().cargoTotalBytes,
-                resolvedUrl: details.resolvedUrl,
-                canonicalUrl: details.canonicalUrl,
-                logoUrl: details.newCargo.crateLogoUrl,
-                storageBytes: details.diskInfo.cargoStorageBytes,
+                    : update.resolvedUrl + (update.newCargo?.entry || ""),
+                bytes: update.downloadMetadata().cargoTotalBytes,
+                resolvedUrl: update.resolvedUrl,
+                canonicalUrl: update.canonicalUrl,
+                logoUrl: update.newCargo?.crateLogoUrl || "",
+                storageBytes: update.diskInfo.cargoStorageBytes,
                 downloadQueueId: downloadQueueId,
-            })
-        ] as const)
+            }))
+        }
+
+        promises.push(this.putDownloadIndex(downloadIndex))
+        await Promise.all(promises)
+        
+        const filesToRequest = []
+        const filesToDelete = []
+        for (const update of updates) {
+            const metadata = update.downloadMetadata()
+            const removeFiles = metadata.resourcesToDelete.map(
+                (file) => file.storageUrl
+            )
+            filesToDelete.push(...removeFiles)
+            const addFiles = metadata.downloadableResources.map(
+                (file) => file.requestUrl
+            )
+            filesToRequest.push(...addFiles)
+        }
         
         const self = this
-        const filesToDelete = details.downloadMetadata().resourcesToDelete
         await Promise.all(filesToDelete.map(
-            (file) => self.fileCache.deleteFile(file.storageUrl)
+            (url) => self.fileCache.deleteFile(url)
         ))
 
-        const downloadFiles = details.downloadMetadata().downloadableResources
         await this.downloadManager.queueDownload(
             downloadQueueId,
-            downloadFiles.map((file) => file.requestUrl),
+            filesToRequest,
             {
-                title: updateTitle, 
-                downloadTotal: details.downloadMetadata().bytesToDownload
+                title,
+                downloadTotal: downloadIndex.bytes 
             }
         )
 
@@ -382,8 +402,10 @@ export class Shabah {
         }
     }
 
-    async retryFailedDownload(id: string) {
-        const cargoMeta = await this.getCargoIndexById(id)
+    async retryFailedDownload(canonicalUrl: string) {
+        const cargoMeta = await this.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
         if (!cargoMeta || cargoMeta.state === "archived") {
             return io.ok(STATUS_CODES.notFound)
         }
@@ -398,18 +420,15 @@ export class Shabah {
         if (!errDownloadIndexRes) {
             return io.ok(STATUS_CODES.errorIndexNotFound)
         }
-        const prevUpdateIndex = this.getDownloadIndexByCanonicalUrl(
+        const prevUpdateIndex = await this.getDownloadIndexByCanonicalUrl(
             cargoMeta.canonicalUrl
         )
-        //const downloadsIndex = await this.getDownloadIndices()
-        //const prevUpdateIndex = downloadsIndex.downloads.findIndex(
-        //    (index) => index.id === id
-        //)
         const updateInProgress = !!prevUpdateIndex
         if (updateInProgress) {
-            return io.ok(STATUS_CODES.updateAlreadyQueued)
+            return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
         }
-        const {index: errDownloadIndex} = errDownloadIndexRes
+
+        const {index: errDownloadIndex, url: errorUrl} = errDownloadIndexRes
         if (errDownloadIndex.segments.length < 1) {
             return io.ok(STATUS_CODES.noSegmentsFound)
         }
@@ -422,7 +441,8 @@ export class Shabah {
         updateDownloadIndex(downloadsIndex, errDownloadIndex)
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
-            this.putCargoIndex({...cargoMeta, state: "updating", downloadQueueId})
+            this.putCargoIndex({...cargoMeta, state: "updating", downloadQueueId}),
+            this.fileCache.deleteFile(errorUrl)
         ])
         const {title, bytes} = errDownloadIndex
         await this.downloadManager.queueDownload(
@@ -511,7 +531,7 @@ export class Shabah {
         )
     }
 
-    async deleteCargo(canonicalUrl: string) {
+    async deleteCargo(canonicalUrl: string): Promise<Ok<StatusCode>> {
         const cargoIndex = await this.getCargoIndices()
         const index = cargoIndex.cargos.findIndex(
             (cargo) => cargo.canonicalUrl === canonicalUrl
@@ -520,9 +540,14 @@ export class Shabah {
             return io.ok(STATUS_CODES.notFound)
         }
         const targetCargo = cargoIndex.cargos[index]
-        await this.deleteAllCargoFiles(
+        const promises = []
+        promises.push(this.deleteAllCargoFiles(
             targetCargo.resolvedUrl
-        )
+        ))
+        if (targetCargo.state === "updating") {
+
+        }
+        await Promise.all(promises)
         return io.ok(
             await this.deleteCargoIndex(targetCargo.canonicalUrl)
         )
@@ -616,7 +641,9 @@ export class Shabah {
     }
 
     // download index interfaces
-    async getDownloadIndexByCanonicalUrl(canonicalUrl: string) {
+    async getDownloadIndexByCanonicalUrl(
+        canonicalUrl: string
+    ): Promise<DownloadIndex | null> {
         const indexes = await this.getDownloadIndices()
         const targetIndex = indexes.downloads.findIndex((index) => {
             const {segments} = index

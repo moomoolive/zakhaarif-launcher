@@ -283,7 +283,7 @@ const LauncherRoot = () => {
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueResponse = await downloadClient.executeUpdates(
-      updateResponse,
+      [updateResponse],
       `core v${updateResponse.versions().new}`,
     )
     

@@ -2,7 +2,9 @@ import {resultifySync} from "./resultify/sync"
 import {resultifyAsync} from "./resultify/async"
 import {Result as BaseResult} from "./resultify/base"
 
-export type ResultType<T> = BaseResult<T, true> | BaseResult<null, false>
+export type Ok<T> = BaseResult<T, true>
+export type Err = BaseResult<null, false>
+export type ResultType<T> = Ok<T> | Err
 
 export class Result {
     static ok = BaseResult.ok
