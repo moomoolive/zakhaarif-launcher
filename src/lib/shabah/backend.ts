@@ -68,16 +68,22 @@ export type ResourceMeta = {
 
 export type ResourceMap = Record<string, ResourceMeta>
 
-export type DownloadIndex = {
-    id: string
+export type DownloadSegment = {
     map: ResourceMap
-    title: string
-    startedAt: number
     bytes: number
     version: string
     previousVersion: string
     canonicalUrl: string
     resolvedUrl: string
+}
+
+export type DownloadIndex = {
+    id: string
+    previousId: string
+    segments: DownloadSegment[]
+    title: string
+    startedAt: number
+    bytes: number
 }
 
 export const operationCodes = {
@@ -86,6 +92,8 @@ export const operationCodes = {
     notFound: 2,
     removed: 3,
     saved: 4,
+    tooManySegments: 5,
+    noSegmentsFound: 6
 } as const
 
 const errDownloadIndexUrl = (resolvedUrl: string) => `${removeSlashAtEnd(resolvedUrl)}/__err-download-index__.json`
@@ -112,6 +120,12 @@ export const saveErrorDownloadIndex = async (
 ) => {
     if (isRelativeUrl(resolvedUrl)) {
         throw new Error("error download indices storage url must be a full url and not a relative one. Got " + resolvedUrl)
+    }
+    if (index.segments.length > 1) {
+        return operationCodes.tooManySegments
+    }
+    if (index.segments.length < 1) {
+        return operationCodes.noSegmentsFound
     }
     const url = errDownloadIndexUrl(resolvedUrl)
     const text = JSON.stringify(index)
@@ -156,7 +170,7 @@ export const updateDownloadIndex = (
     const startedAt = Date.now()
     indices.updatedAt = startedAt
     const existingIndex = indices.downloads.findIndex(
-        (download) => download.canonicalUrl === target.canonicalUrl
+        (download) => download.id === target.id
     )
     if (existingIndex < 0) {
         indices.downloads.push({...target, startedAt})
@@ -176,10 +190,10 @@ export const updateDownloadIndex = (
 
 export const removeDownloadIndex = (
     indices: DownloadIndexCollection, 
-    canonicalUrl: string
+    id: string
 ) => {
     const targetIndex = indices.downloads.findIndex(
-        (download) => download.canonicalUrl === canonicalUrl
+        (download) => download.id === id
     )
     if (targetIndex < 0) {
         return  operationCodes.notFound
@@ -225,6 +239,7 @@ export type CargoIndex = {
     permissions: Permissions
     state: CargoState
     storageBytes: number
+    downloadQueueId: string
     createdAt: number
     updatedAt: number
 }
@@ -295,3 +310,5 @@ export const saveCargoIndices = async (
     }))
     return operationCodes.saved 
 }
+
+export const NO_UPDATE_QUEUED = ""

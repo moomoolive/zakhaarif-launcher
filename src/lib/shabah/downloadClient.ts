@@ -25,6 +25,7 @@ import {
     rootDocumentFallBackUrl,
     DownloadIndex,
     removeDownloadIndex,
+    NO_UPDATE_QUEUED,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {MANIFEST_NAME, NULL_FIELD} from "../cargo/index"
@@ -34,6 +35,7 @@ import {GeneralPermissions} from "../utils/security/permissionsSummary"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import { NO_INSTALLATION } from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
+import { nanoid } from "nanoid"
 
 export type {CargoIndex, CargoIndices, CargoState} from "./backend"
 export {emptyCargoIndices} from "./backend"
@@ -128,7 +130,7 @@ export class Shabah {
         if (!cargo.canonicalUrl.startsWith("https://") && !cargo.canonicalUrl.startsWith("http://")) {
             throw new Error("cargo canonical url must be a full url, starting with https:// or http://")
         }
-        const cargoIndex = await this.getCargoMetaByCanonicalUrl(
+        const cargoIndex = await this.getCargoIndexByCanonicalUrl(
             cargo.canonicalUrl
         )
         
@@ -164,74 +166,6 @@ export class Shabah {
         })
     }
 
-    private async refreshDownloadIndicies() {
-        const {origin, fileCache} = this
-        const indices = await getDownloadIndices(origin, fileCache)
-        this.downloadIndicesCache = indices
-        return indices
-    }
-
-    async getDownloadIndices() {
-        if (this.downloadIndicesCache) {
-            return this.downloadIndicesCache
-        }
-        return this.refreshDownloadIndicies()
-    }
-
-    private async persistDownloadIndices(indices: DownloadIndexCollection) {
-        const {origin, fileCache} = this
-        return await saveDownloadIndices(indices, origin, fileCache)
-    }
-
-    async getDownloadState(updateId: string) {
-        const downloadsIndex = await this.getDownloadIndices()
-        const updateIndex = downloadsIndex.downloads.findIndex((index) => {
-            return index.id === updateId
-        })
-        if (updateIndex < 0) {
-            return null
-        }
-        const targetUpdate =  downloadsIndex.downloads[updateIndex]
-        return {...targetUpdate}
-    }
-
-    private async refreshCargoIndices() {
-        const {origin, fileCache} = this
-        const cargos = await getCargoIndices(origin, fileCache)
-        this.cargoIndicesCache = cargos
-        return cargos
-    }
-
-    async getCargoIndices() {
-        if (this.cargoIndicesCache) {
-            return this.cargoIndicesCache
-        }
-        return this.refreshCargoIndices()
-    }
-
-    private async persistCargoIndices(indices: CargoIndices) {
-        const {origin, fileCache} = this
-        return await saveCargoIndices(indices, origin, fileCache)
-
-    }
-
-    async putCargoIndex(newIndex: CargoIndexWithoutMeta) {
-        const indices = await this.getCargoIndices()
-        updateCargoIndex(indices, newIndex)
-        return await this.persistCargoIndices(indices)
-    }
-
-    async getDownloadIndexByCanonicalUrl(canonicalUrl: string) {
-        const indexes = await this.getDownloadIndices()
-        const targetIndex = indexes.downloads.findIndex(
-            (index) => index.canonicalUrl === canonicalUrl
-        )
-        if (targetIndex < 0) {
-            return null
-        }
-        return indexes.downloads[targetIndex]
-    }
-
     async executeUpdates(
         details: UpdateCheckResponse,
         updateTitle: string,
@@ -246,13 +180,9 @@ export class Shabah {
             return io.ok(STATUS_CODES.insufficentDiskSpace)
         }
 
-        const downloadId = details.canonicalUrl
-
-        const [downloadIndex, managerResponse] = await Promise.all([
-            this.getDownloadIndexByCanonicalUrl(details.canonicalUrl),
-            this.downloadManager.getDownloadState(downloadId)
-        ] as const)
-
+        const downloadIndex = await this.getDownloadIndexByCanonicalUrl(
+            details.canonicalUrl
+        )
         const updateInProgress = !!downloadIndex
         if (updateInProgress) {
             return io.ok(STATUS_CODES.updateAlreadyQueued)
@@ -262,20 +192,40 @@ export class Shabah {
         // download manager and the download client
         // check that the download manager also doesn't
         // have the same update queued
-        if (!!managerResponse) {
+        const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
+            details.canonicalUrl
+        )
+        const cargoIndexExists = !!updateCargoIndex
+        const updateQueued = updateCargoIndex?.downloadQueueId !== NO_UPDATE_QUEUED
+        const downloadManagerHasUpdateRecord = updateQueued
+            ? !!(await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || ""))
+            : false
+        if (
+            cargoIndexExists
+            && updateQueued
+            && downloadManagerHasUpdateRecord
+        ) {
             return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
         }
+
+        const downloadQueueId = nanoid(21)
         
         await Promise.all([
             this.putDownloadIndex({
-                id: details.id,
+                id: downloadQueueId,
+                previousId: "",
                 bytes: details.downloadMetadata().bytesToDownload,
-                map: createResourceMap(details.downloadMetadata().downloadableResources),
-                version: details.versions().new,
-                previousVersion: details.versions().old,
+                segments: [
+                    {
+                        map: createResourceMap(details.downloadMetadata().downloadableResources),
+                        version: details.versions().new,
+                        previousVersion: details.versions().old,
+                        resolvedUrl: details.resolvedUrl,
+                        canonicalUrl: details.canonicalUrl,
+                        bytes: details.downloadMetadata().bytesToDownload,
+                    }
+                ],
                 title: updateTitle,
-                resolvedUrl: details.resolvedUrl,
-                canonicalUrl: details.canonicalUrl
             }),
 
             this.fileCache.putFile(
@@ -303,7 +253,8 @@ export class Shabah {
                 resolvedUrl: details.resolvedUrl,
                 canonicalUrl: details.canonicalUrl,
                 logoUrl: details.newCargo.crateLogoUrl,
-                storageBytes: details.diskInfo.cargoStorageBytes
+                storageBytes: details.diskInfo.cargoStorageBytes,
+                downloadQueueId: downloadQueueId,
             })
         ] as const)
         
@@ -315,7 +266,7 @@ export class Shabah {
 
         const downloadFiles = details.downloadMetadata().downloadableResources
         await this.downloadManager.queueDownload(
-            downloadId,
+            downloadQueueId,
             downloadFiles.map((file) => file.requestUrl),
             {
                 title: updateTitle, 
@@ -323,42 +274,7 @@ export class Shabah {
             }
         )
 
-        return io.ok(Shabah.STATUS.updateQueued)
-    }
-
-    async putDownloadIndex(
-        updatedIndex: Omit<DownloadIndex, "startedAt">
-    ) {
-        const downloadsIndex = await this.getDownloadIndices()
-        updateDownloadIndex(downloadsIndex, updatedIndex)
-        return this.persistDownloadIndices(downloadsIndex)
-    }
-
-    async getCargoMeta(cargoId: string) {
-        const indices = await this.getCargoIndices()
-        const index = indices.cargos.findIndex((cargo) => cargo.id === cargoId)
-        if (index < 0) {
-            return null
-        }
-        return indices.cargos[index]
-    }
-
-    async getCargoMetaByEntry(entryUrl: string) {
-        const indices = await this.getCargoIndices()
-        const index = indices.cargos.findIndex((cargo) => cargo.entry === entryUrl)
-        if (index < 0) {
-            return null
-        }
-        return indices.cargos[index]
-    }
-
-    async getCargoMetaByCanonicalUrl(canonicalUrl: string) {
-        const indices = await this.getCargoIndices()
-        const index = indices.cargos.findIndex((cargo) => cargo.canonicalUrl === canonicalUrl)
-        if (index < 0) {
-            return null
-        }
-        return indices.cargos[index]
+        return io.ok(STATUS_CODES.updateQueued)
     }
 
     addProgressListener(
@@ -402,7 +318,7 @@ export class Shabah {
                 }
                 const [downloadIndex, meta] = await Promise.all([
                     self.getDownloadState(id),
-                    self.getCargoMeta(id)
+                    self.getCargoIndexById(id)
                 ] as const)
                 const failed = (
                     meta?.state === "update-aborted"
@@ -467,45 +383,54 @@ export class Shabah {
     }
 
     async retryFailedDownload(id: string) {
-        const cargoMeta = await this.getCargoMeta(id)
-        if (!cargoMeta) {
-            return io.ok(Shabah.STATUS.cargoNotFound)
+        const cargoMeta = await this.getCargoIndexById(id)
+        if (!cargoMeta || cargoMeta.state === "archived") {
+            return io.ok(STATUS_CODES.notFound)
         }
         const {state} = cargoMeta
-        if (state === "archived") {
-            return io.ok(Shabah.STATUS.cargoNotInErrorState)
-        }
         if (state !== "update-aborted" && state !== "update-failed") {
-            return io.ok(Shabah.STATUS.cargoNotInErrorState)
+            return io.ok(STATUS_CODES.updateRetryImpossible)
         }
         const {resolvedUrl} = cargoMeta
         const errDownloadIndexRes = await getErrorDownloadIndex(
             resolvedUrl, this.fileCache
         )
         if (!errDownloadIndexRes) {
-            return io.ok(Shabah.STATUS.errorIndexNotFound)
+            return io.ok(STATUS_CODES.errorIndexNotFound)
         }
-        const downloadsIndex = await this.getDownloadIndices()
-        const prevUpdateIndex = downloadsIndex
-            .downloads
-            .findIndex((index) => index.id === id)
-        const updateInProgress = prevUpdateIndex > -1
+        const prevUpdateIndex = this.getDownloadIndexByCanonicalUrl(
+            cargoMeta.canonicalUrl
+        )
+        //const downloadsIndex = await this.getDownloadIndices()
+        //const prevUpdateIndex = downloadsIndex.downloads.findIndex(
+        //    (index) => index.id === id
+        //)
+        const updateInProgress = !!prevUpdateIndex
         if (updateInProgress) {
-            return io.ok(Shabah.STATUS.updateAlreadyQueued)
+            return io.ok(STATUS_CODES.updateAlreadyQueued)
         }
-        const {index: errDownloadIndex, url} = errDownloadIndexRes
+        const {index: errDownloadIndex} = errDownloadIndexRes
+        if (errDownloadIndex.segments.length < 1) {
+            return io.ok(STATUS_CODES.noSegmentsFound)
+        }
+        if (errDownloadIndex.segments.length > 1) {
+            return io.ok(STATUS_CODES.invalidErrorDownloadIndex)
+        }
+        const downloadQueueId = errDownloadIndex.id
+        const targetSegment = errDownloadIndex.segments[0]
+        const downloadsIndex = await this.getDownloadIndices()
         updateDownloadIndex(downloadsIndex, errDownloadIndex)
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
-            this.putCargoIndex({...cargoMeta, state: "updating"})
+            this.putCargoIndex({...cargoMeta, state: "updating", downloadQueueId})
         ])
         const {title, bytes} = errDownloadIndex
         await this.downloadManager.queueDownload(
-            id,
-            Object.keys(errDownloadIndex.map),
+            downloadQueueId,
+            Object.keys(targetSegment.map),
             {title, downloadTotal: bytes}
         )
-        return io.ok(Shabah.STATUS.updateQueued)
+        return io.ok(STATUS_CODES.updateRetryQueued)
     }
 
     async cacheRootDocumentFallback() {
@@ -529,7 +454,7 @@ export class Shabah {
             )
         }
         await fileCache.putFile(fallbackUrl, rootDocRequest.data)
-        return io.ok(Shabah.STATUS.cached)
+        return io.ok(STATUS_CODES.cached)
     }
 
     uninstallAllAssets() {
@@ -586,19 +511,6 @@ export class Shabah {
         )
     }
 
-    async deleteCargoIndex(canonicalUrl: string) {
-        const indexes = await this.getCargoIndices()
-        const cargoIndex = indexes.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        if (cargoIndex < 0) {
-            return STATUS_CODES.notFound
-        }
-        indexes.cargos.splice(cargoIndex, 1)
-        await this.persistCargoIndices(indexes)
-        return STATUS_CODES.ok
-    }
-
     async deleteCargo(canonicalUrl: string) {
         const cargoIndex = await this.getCargoIndices()
         const index = cargoIndex.cargos.findIndex(
@@ -615,8 +527,6 @@ export class Shabah {
             await this.deleteCargoIndex(targetCargo.canonicalUrl)
         )
     }
-
-    getArchivedCargoIndexByCanonicalUrl = this.getCargoMetaByCanonicalUrl
 
     async archiveCargo(canonicalUrl: string) {
         const cargoIndex = await this.getCargoIndices()
@@ -635,6 +545,100 @@ export class Shabah {
         return io.ok(STATUS_CODES.ok)
     }
 
+    // archived cargo index interfaces
+    getArchivedCargoIndexByCanonicalUrl = this.getCargoIndexByCanonicalUrl
+
+    // cargo index interfaces
+    async getCargoIndexById(cargoId: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.id === cargoId)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
+    }
+    
+    private async refreshCargoIndices() {
+        const {origin, fileCache} = this
+        const cargos = await getCargoIndices(origin, fileCache)
+        this.cargoIndicesCache = cargos
+        return cargos
+    }
+
+    async getCargoIndices() {
+        if (this.cargoIndicesCache) {
+            return this.cargoIndicesCache
+        }
+        return this.refreshCargoIndices()
+    }
+
+    private async persistCargoIndices(indices: CargoIndices) {
+        const {origin, fileCache} = this
+        return await saveCargoIndices(indices, origin, fileCache)
+
+    }
+
+    async putCargoIndex(newIndex: CargoIndexWithoutMeta) {
+        const indices = await this.getCargoIndices()
+        updateCargoIndex(indices, newIndex)
+        return await this.persistCargoIndices(indices)
+    }
+
+    async getCargoIndexByEntry(entryUrl: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.entry === entryUrl)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
+    }
+
+    async getCargoIndexByCanonicalUrl(canonicalUrl: string) {
+        const indices = await this.getCargoIndices()
+        const index = indices.cargos.findIndex((cargo) => cargo.canonicalUrl === canonicalUrl)
+        if (index < 0) {
+            return null
+        }
+        return indices.cargos[index]
+    }
+
+    async deleteCargoIndex(canonicalUrl: string) {
+        const indexes = await this.getCargoIndices()
+        const cargoIndex = indexes.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
+        )
+        if (cargoIndex < 0) {
+            return STATUS_CODES.notFound
+        }
+        indexes.cargos.splice(cargoIndex, 1)
+        await this.persistCargoIndices(indexes)
+        return STATUS_CODES.ok
+    }
+
+    // download index interfaces
+    async getDownloadIndexByCanonicalUrl(canonicalUrl: string) {
+        const indexes = await this.getDownloadIndices()
+        const targetIndex = indexes.downloads.findIndex((index) => {
+            const {segments} = index
+            const targetIndex = segments.findIndex(
+                (segment) => segment.canonicalUrl === canonicalUrl
+            )
+            return targetIndex > -1
+        })
+        if (targetIndex < 0) {
+            return null
+        }
+        return indexes.downloads[targetIndex]
+    }
+
+    async putDownloadIndex(
+        updatedIndex: Omit<DownloadIndex, "startedAt">
+    ) {
+        const downloadsIndex = await this.getDownloadIndices()
+        updateDownloadIndex(downloadsIndex, updatedIndex)
+        return this.persistDownloadIndices(downloadsIndex)
+    }
+
     async deleteDownloadIndex(canonicalUrl: string) {
         const target = await this.getDownloadIndexByCanonicalUrl(
             canonicalUrl
@@ -645,5 +649,49 @@ export class Shabah {
         const indexes = await this.getDownloadIndices()
         removeDownloadIndex(indexes, canonicalUrl)
         return io.ok(STATUS_CODES.ok)
+    }
+
+    async getDownloadIndices() {
+        if (this.downloadIndicesCache) {
+            return this.downloadIndicesCache
+        }
+        return this.refreshDownloadIndicies()
+    }
+
+    private async persistDownloadIndices(indices: DownloadIndexCollection) {
+        const {origin, fileCache} = this
+        return await saveDownloadIndices(indices, origin, fileCache)
+    }
+
+    async getDownloadState(canonicalUrl: string) {
+        const downloadsIndex = await this.getDownloadIndices()
+        const updateIndex = downloadsIndex.downloads.find((index) => {
+            const {segments} = index
+            const target = segments.findIndex(
+                (segment) => segment.canonicalUrl === canonicalUrl
+            )
+            return target
+        })
+        if (!updateIndex) {
+            return null
+        }
+        const {segments} = updateIndex
+        const targetSegmentIndex = segments.findIndex(
+            (segment) => segment.canonicalUrl === canonicalUrl
+        )
+        const targetSegment = segments[targetSegmentIndex]
+        return {
+            id: updateIndex.id,
+            title: updateIndex.title,
+            startedAt: updateIndex.startedAt,
+            ...targetSegment
+        }
+    }
+
+    private async refreshDownloadIndicies() {
+        const {origin, fileCache} = this
+        const indices = await getDownloadIndices(origin, fileCache)
+        this.downloadIndicesCache = indices
+        return indices
     }
 }

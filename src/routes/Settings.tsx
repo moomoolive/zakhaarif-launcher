@@ -369,7 +369,7 @@ const SettingsPage = () => {
     const navigate = useNavigate()
     const {downloadClient} = useAppShellContext()
 
-    const appVersion = usePromise(downloadClient.getCargoMeta(APP_CARGO_ID))
+    const appVersion = usePromise(downloadClient.getCargoIndexById(APP_CARGO_ID))
 
     const [clipboardActionId, setClipboardActionId] = useState("none")
     const [subpage, setSubpage] = useState<

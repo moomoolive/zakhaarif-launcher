@@ -195,7 +195,7 @@ const LauncherRoot = () => {
         setDownloadError("Update Failed...")
         setButtonElement(<>{"Retry"}</>)
         document.title = APP_TITLE
-        const meta = await downloadClient.getCargoMeta(APP_CARGO_ID)
+        const meta = await downloadClient.getCargoIndexById(APP_CARGO_ID)
         setCurrentAppVersion(meta?.version || Shabah.NO_PREVIOUS_INSTALLATION)
       } else if (finished) {
         setProgressMsg("Installing...")
@@ -305,7 +305,7 @@ const LauncherRoot = () => {
 
   useEffect(() => {
     (async () => {
-      const currentAppPkg = await downloadClient.getCargoMeta(APP_CARGO_ID)
+      const currentAppPkg = await downloadClient.getCargoIndexById(APP_CARGO_ID)
       if (!currentAppPkg || currentAppPkg.state === "archived") {
         setButtonElement(<>{"install"}</>)
         return

@@ -664,7 +664,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         storageBytes: 0,
         state: "cached",
         createdAt: 0,
-        updatedAt: 0
+        updatedAt: 0,
+        downloadQueueId: ""
     },
     {
         id: "random4",
@@ -679,7 +680,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         storageBytes: 0,
         state: "cached",
         createdAt: 0,
-        updatedAt: 0
+        updatedAt: 0,
+        downloadQueueId: ""
     },
     {
         id: "random3",
@@ -694,7 +696,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         storageBytes: 0,
         state: "cached",
         createdAt: 0,
-        updatedAt: 0
+        updatedAt: 0,
+        downloadQueueId: ""
     },
 ]
 

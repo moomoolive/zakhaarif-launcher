@@ -30,6 +30,7 @@ export const ERROR_CODES_START = 100
 export const STATUS_CODES = {
     ok: 0,
     updateQueued: 1,
+    updateRetryQueued: 2,
     cargoNotFound: 6,
     cargoNotInErrorState: 7,
     errorIndexNotFound: 8,
@@ -51,6 +52,9 @@ export const STATUS_CODES = {
     downloadManagerUnsyncedState: 110,
     notFound: 111,
     foundButContentIsEmpty: 112,
+    noSegmentsFound: 113,
+    invalidErrorDownloadIndex: 114,
+    updateRetryImpossible: 115
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]

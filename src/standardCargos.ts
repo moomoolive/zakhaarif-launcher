@@ -39,7 +39,8 @@ export const STANDARD_MOD_CARGO_INDEX: Readonly<CargoIndex> = {
     state: "cached",
     storageBytes: 0,
     createdAt: 0,
-    updatedAt: 0
+    updatedAt: 0,
+    downloadQueueId: ""
 }
 
 const GAME_ESTIMATED_BYTES = 2_000
@@ -78,7 +79,8 @@ export const GAME_CARGO_INDEX: Readonly<CargoIndex> = {
     state: "cached",
     storageBytes: 0,
     createdAt: 0,
-    updatedAt: 0
+    updatedAt: 0,
+    downloadQueueId: ""
 }
 
 export const addStandardCargosToCargoIndexes = (indexes: CargoIndex[]) => {

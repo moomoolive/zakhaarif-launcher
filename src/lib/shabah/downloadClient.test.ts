@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "./downloadClient"
-import {CargoIndex, CargoState, FileCache} from "./backend"
+import {CargoIndex, CargoState, FileCache, NO_UPDATE_QUEUED} from "./backend"
 import {DownloadManager} from "./backend"
 import { Cargo, MANIFEST_MINI_NAME, MANIFEST_NAME, NULL_FIELD, toMiniCargo } from "../cargo"
 import { Permissions } from "../types/permissions"
 import { SemVer } from "../smallSemver"
 import { cleanPermissions } from "../utils/security/permissionsSummary"
 import {UpdateCheckConfig, UpdateCheckResponse} from "./updateCheckStatus"
+import { nanoid } from "nanoid"
 
 type FileHandlers = Record<string, () => (Response | null)>
 type AccessLog = Readonly<{
@@ -164,12 +165,14 @@ const cargoToCargoIndex = (
         id = `id-${Math.trunc(Math.random() * 50_000)}`,
         resolvedUrl,
         bytes = 0,
-        state = "cached" as CargoState
+        state = "cached" as CargoState,
+        downloadQueueId = NO_UPDATE_QUEUED
     }: Partial<{
         id: string
         resolvedUrl: string
         bytes: number
-        state: CargoState
+        state: CargoState,
+        downloadQueueId: string
     }> = {}
 ) => {
     const index: CargoIndex = {
@@ -185,7 +188,8 @@ const cargoToCargoIndex = (
         state,
         storageBytes: 0,
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        downloadQueueId
     }
     return index
 }
@@ -336,7 +340,7 @@ describe("checking for cargo updates", () => {
                     ),
     
                 )
-                expect(await client.getCargoMetaByCanonicalUrl(cargoOrigin)).not.toBe(null)
+                expect(await client.getCargoIndexByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
             const response = await client.checkForCargoUpdates({
                 canonicalUrl: cargoOrigin,
@@ -433,7 +437,7 @@ describe("checking for cargo updates", () => {
                     ),
     
                 )
-                expect(await client.getCargoMetaByCanonicalUrl(cargoOrigin)).not.toBe(null)
+                expect(await client.getCargoIndexByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
             const response = await client.checkForCargoUpdates({
                 canonicalUrl: cargoOrigin,
@@ -1567,13 +1571,19 @@ describe("executing updates", () => {
             })
             await client.putDownloadIndex({
                 id: updateResponse.id,
+                previousId: "",
                 bytes: 0,
-                map: {},
-                version: "0.2.0",
-                previousVersion: "0.1.0",
                 title: "update 1",
-                resolvedUrl: updateResponse.resolvedUrl,
-                canonicalUrl: updateResponse.canonicalUrl,
+                segments: [
+                    {
+                        resolvedUrl: updateResponse.resolvedUrl,
+                        canonicalUrl: updateResponse.canonicalUrl,
+                        map: {},
+                        version: "0.2.0",
+                        previousVersion: "0.1.0",
+                        bytes: 0
+                    }
+                ]
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -1614,16 +1624,28 @@ describe("executing updates", () => {
                 ]
             },
         ]
+        const downloadQueueId = nanoid(21)
         for (const {storage, downloadableResources} of cases) {
             const canonicalUrl = origin + "/"
             const {client, downloadState} = createClient(origin, {
                 cacheFiles: {},
                 networkFiles: {},
                 downloadManagerState: new Map([
-                    [canonicalUrl, 1]
+                    [downloadQueueId, 1]
                 ])
             })
             expect(downloadState.queuedDownloads.length).toBe(0)
+            const newCargo = new Cargo({name: "test"})
+            const cargoIndex = cargoToCargoIndex(
+                canonicalUrl,
+                newCargo as Cargo<Permissions>,
+                {downloadQueueId}
+            )
+            await client.putCargoIndex(cargoIndex)
+            const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
+                canonicalUrl
+            )
+            expect(!!cargoIndexFound).toBe(true)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
                 id: "tmp",
@@ -1789,7 +1811,7 @@ describe("executing updates", () => {
             expect(!!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
             ))).toBe(true)
-            const cargoIndex = await client.getCargoMetaByCanonicalUrl(
+            const cargoIndex = await client.getCargoIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
@@ -1863,7 +1885,7 @@ describe("executing updates", () => {
                 updateResponse,
                 "my update"
             )
-            const cargoIndex = await client.getCargoMetaByCanonicalUrl(
+            const cargoIndex = await client.getCargoIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
@@ -1968,7 +1990,7 @@ describe("reading and updating cargo indexes", () => {
         await client.putCargoIndex(
             index,
         )
-        const found = await client.getCargoMetaByCanonicalUrl(
+        const found = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!found).toBe(true)
@@ -1982,7 +2004,7 @@ describe("reading and updating cargo indexes", () => {
         await client.putCargoIndex(
             index,
         )
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(foundInitial?.name).toBe(initial.name)
@@ -1990,7 +2012,7 @@ describe("reading and updating cargo indexes", () => {
         await client.putCargoIndex(
             updated,
         )
-        const foundUpdated = await client.getCargoMetaByCanonicalUrl(
+        const foundUpdated = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(foundUpdated?.name).toBe(updated.name)
@@ -2004,13 +2026,13 @@ describe("reading and updating cargo indexes", () => {
         await client.putCargoIndex(
             index,
         )
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundInitial).toBe(true)
         const deleteReponse = await client.deleteCargoIndex(canonicalUrl)
         expect(deleteReponse).toBe(Shabah.STATUS.ok)
-        const afterDelete = await client.getCargoMetaByCanonicalUrl(
+        const afterDelete = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(afterDelete).toBe(null)
@@ -2024,14 +2046,14 @@ describe("reading and updating cargo indexes", () => {
         await client.putCargoIndex(
             index,
         )
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundInitial).toBe(true)
         const nonExistentUrl = "https://mygrandmashouse.com"
         const deleteReponse = await client.deleteCargoIndex(nonExistentUrl)
         expect(deleteReponse).toBe(Shabah.STATUS.notFound)
-        const afterDelete = await client.getCargoMetaByCanonicalUrl(
+        const afterDelete = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!afterDelete).toBe(true)
@@ -2084,7 +2106,7 @@ describe("reading and updating cargo indexes", () => {
             }
         )
         await client.putCargoIndex(index)
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundInitial).toBe(true)
@@ -2096,7 +2118,7 @@ describe("reading and updating cargo indexes", () => {
             const inCache = innerFileCache.getFile(url)
             expect(!!inCache).toBe(false)
         }
-        const foundAfterDelete = await client.getCargoMetaByCanonicalUrl(
+        const foundAfterDelete = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundAfterDelete).toBe(false)
@@ -2149,7 +2171,7 @@ describe("reading and updating cargo indexes", () => {
             }
         )
         await client.putCargoIndex(index)
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundInitial).toBe(true)
@@ -2174,7 +2196,7 @@ describe("reading and updating cargo indexes", () => {
         const initial = new Cargo<Permissions>({name: "my-cargo"})
         const index = cargoToCargoIndex(canonicalUrl, initial)
         await client.putCargoIndex(index)
-        const foundInitial = await client.getCargoMetaByCanonicalUrl(
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundInitial).toBe(true)
@@ -2182,7 +2204,7 @@ describe("reading and updating cargo indexes", () => {
         const archiveResponse = await client.archiveCargo(nonExistentUrl)
         expect(archiveResponse.ok).toBe(true)
         expect(archiveResponse.data).toBe(Shabah.STATUS.notFound)
-        const afterArchive = await client.getCargoMetaByCanonicalUrl(
+        const afterArchive = await client.getCargoIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!afterArchive).toBe(true)
@@ -2197,13 +2219,20 @@ describe("reading and writing download indexes", () => {
         const {client} = createClient(origin)
         await client.putDownloadIndex({
             id: "tmp",
+            previousId: "",
             bytes: 0,
-            map: {},
-            version: "0.2.0",
-            previousVersion: "0.1.0",
             title: "update 1",
-            resolvedUrl: canonicalUrl,
-            canonicalUrl,
+            segments: [
+                {
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl,
+                    map: {},
+                    version: "0.2.0",
+                    previousVersion: "0.1.0",
+                    bytes: 0,
+                }
+            ]
+            
         })
         const found = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl
@@ -2218,35 +2247,47 @@ describe("reading and writing download indexes", () => {
         const initialVersion = "0.2.0"
         await client.putDownloadIndex({
             id: "tmp",
+            previousId: '',
             bytes: 0,
-            map: {},
-            version: initialVersion,
-            previousVersion: "0.1.0",
             title: "update 1",
-            resolvedUrl: canonicalUrl,
-            canonicalUrl,
+            segments: [
+                {
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl,
+                    map: {},
+                    version: initialVersion,
+                    previousVersion: "0.1.0",
+                    bytes: 0,
+                }
+            ]
         })
         const found = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!found).toBe(true)
-        expect(found?.version).toBe(initialVersion)
+        expect(found?.segments[0].version).toBe(initialVersion)
         const changedVersion = "0.2.0"
         await client.putDownloadIndex({
             id: "tmp",
+            previousId: "",
             bytes: 0,
-            map: {},
-            version: initialVersion,
-            previousVersion: "0.1.0",
             title: "update 1",
-            resolvedUrl: changedVersion,
-            canonicalUrl,
+            segments: [
+                {
+                    resolvedUrl: changedVersion,
+                    canonicalUrl,
+                    map: {},
+                    version: initialVersion,
+                    previousVersion: "0.1.0",
+                    bytes: 0,
+                }
+            ]
         })
         const foundAfterMutation = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl
         )
         expect(!!foundAfterMutation).toBe(true)
-        expect(found?.version).toBe(changedVersion)
+        expect(found?.segments[0].version).toBe(changedVersion)
     })
 
     it("attempting to delete a non-existent download index should do nothing", async () => {
@@ -2256,13 +2297,19 @@ describe("reading and writing download indexes", () => {
         const initialVersion = "0.2.0"
         await client.putDownloadIndex({
             id: "tmp",
+            previousId: "",
             bytes: 0,
-            map: {},
-            version: initialVersion,
-            previousVersion: "0.1.0",
             title: "update 1",
-            resolvedUrl: canonicalUrl,
-            canonicalUrl,
+            segments: [
+                {
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl,
+                    map: {},
+                    version: initialVersion,
+                    previousVersion: "0.1.0",
+                    bytes: 0
+                }
+            ]
         })
         const found = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl

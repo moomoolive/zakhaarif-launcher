@@ -1,5 +1,4 @@
 import {expect, describe, it} from "vitest"
-
 import {
     getDownloadIndices,
     updateDownloadIndex,
@@ -27,6 +26,34 @@ const createFileCache = (initFiles: Record<string, Response>) => {
     return cache
 }
 
+const createDownloadIndex = ({
+    id = "pkg", 
+    title = "none", 
+    bytes = 0, 
+    canonicalUrl = "", 
+    map = {}, 
+    version = "0.1.0", 
+    previousVersion = "none", 
+    resolvedUrl = "",
+    previousId = "",
+} = {}) => {
+    const putIndex = {
+        id, 
+        previousId,
+        title, 
+        bytes,
+        segments: [{
+            map, 
+            canonicalUrl, 
+            version, 
+            previousVersion, 
+            resolvedUrl,
+            bytes
+        }]
+    }
+    return putIndex
+}
+
 describe("reading and writing to download index", () => {
     it("if download index collection hasn't been created yet, should return empty index", async () => {
         const fileCache = createFileCache({})
@@ -44,7 +71,16 @@ describe("reading and writing to download index", () => {
         expect(index.downloads.length).toBe(0)
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({
+                id: "pkg", 
+                title: "none", 
+                bytes: 0, 
+                canonicalUrl: "", 
+                map: {}, 
+                version: "0.1.0", 
+                previousVersion: "none", 
+                resolvedUrl: ""
+            })
         )
         expect(index.downloads.length).toBe(1)
         expect(res).toBe(operationCodes.createdNew)
@@ -57,7 +93,16 @@ describe("reading and writing to download index", () => {
         const bytes = 10
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({
+                id: "pkg", 
+                title: "none", 
+                bytes,
+                map: {}, 
+                canonicalUrl: "", 
+                version: "0.1.0", 
+                previousVersion: "none", 
+                resolvedUrl: "",
+            })
         )
         expect(index.totalBytes).toBe(bytes)
         expect(index.downloads.length).toBe(1)
@@ -68,12 +113,21 @@ describe("reading and writing to download index", () => {
         const index = emptyDownloadIndex()
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 0, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({
+                id: "pkg", 
+                canonicalUrl: "", 
+                title: "none", 
+                map: {}, 
+                bytes: 0, 
+                version: "0.1.0", 
+                previousVersion: "none", 
+                resolvedUrl: ""
+            })
         )
         expect(index.downloads.length).toBe(1)
         const res = updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 1, version: "0.2.0", previousVersion: "0.1.0", resolvedUrl: ""})
         )
         expect(index.downloads.length).toBe(1)
         expect(index.downloads.find((d) => d.id === "pkg")?.bytes).toBe(1)
@@ -86,11 +140,20 @@ describe("reading and writing to download index", () => {
         const index = await getDownloadIndices(origin, fileCache)
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({
+                id: "pkg", 
+                canonicalUrl: "", 
+                title: "none", 
+                map: {}, 
+                bytes: 20, 
+                version: "0.1.0", 
+                previousVersion: "none", 
+                resolvedUrl: ""
+            })
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         const res = await saveDownloadIndices(index, origin, fileCache)
         expect(res).toBe(operationCodes.saved)
@@ -105,11 +168,11 @@ describe("reading and writing to download index", () => {
         const index = await getDownloadIndices(origin, fileCache)
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg", canonicalUrl: "", title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg-2", canonicalUrl: "", title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         const res = await saveDownloadIndices(index, origin, fileCache)
         expect(res).toBe(operationCodes.saved)
@@ -125,14 +188,14 @@ describe("reading and writing to download index", () => {
         const canonicalUrl2 = "https://hi2.com"
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         expect(index.totalBytes).toBe(70)
-        const res = removeDownloadIndex(index, canonicalUrl1)
+        const res = removeDownloadIndex(index, "pkg")
         expect(index.totalBytes).toBe(50)
         expect(index.downloads.length).toBe(1)
         expect(res).toBe(operationCodes.removed)
@@ -145,11 +208,11 @@ describe("reading and writing to download index", () => {
         const canonicalUrl2 = "https://hi2.com"
         updateDownloadIndex(
             index,
-            {id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg", canonicalUrl: canonicalUrl1, title: "none", map: {}, bytes: 20, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         updateDownloadIndex(
             index,
-            {id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""}
+            createDownloadIndex({id: "pkg-2", canonicalUrl: canonicalUrl2, title: "none", map: {}, bytes: 50, version: "0.1.0", previousVersion: "none", resolvedUrl: ""})
         )
         expect(index.totalBytes).toBe(70)
         const res = removeDownloadIndex(index, "https://rand.com")
@@ -195,6 +258,7 @@ describe("reading and writing to cargo indices", () => {
                 entry: "store/index.js",
                 resolvedUrl: "store/",
                 canonicalUrl: "store/",
+                downloadQueueId: "",
             }
         )
         expect(index.cargos.length).toBe(1)
@@ -215,6 +279,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store/",
             canonicalUrl: "store/",
+            downloadQueueId: "",
         } as const
         updateCargoIndex(index, first)
         expect(index.cargos.length).toBe(1)
@@ -230,6 +295,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store/",
             canonicalUrl: "store/",
+            downloadQueueId: "",
         } as const
         const res = updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(1)
@@ -253,6 +319,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-yeah/",
             canonicalUrl: "store1/",
+            downloadQueueId: ""
         } as const
         updateCargoIndex(index, first)
         const second = {
@@ -267,6 +334,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-cool/",
             canonicalUrl: "store2/",
+            downloadQueueId: ""
         } as const
         updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(2)
@@ -294,6 +362,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-1/",
             canonicalUrl: "store1/",
+            downloadQueueId: ""
         } as const
         updateCargoIndex(index, first)
         const second = {
@@ -308,6 +377,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-2/",
             canonicalUrl: "store2/",
+            downloadQueueId: ""
         } as const
         updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(2)
@@ -342,15 +412,21 @@ describe("reading and writing error download indices", () => {
         const resolvedUrl = `${origin}/potato/`
         const index = {
             id: "tmp",
-            map: {},
+            previousId: "",
             title: "none",
             startedAt: Date.now(),
             bytes: 0,
-            version: "0.1.0",
-            previousVersion: "0.1.0-beta",
-            resolvedUrl: "",
-            canonicalUrl: "",
-        } as const
+            segments: [
+                {
+                    version: "0.1.0",
+                    previousVersion: "0.1.0-beta",
+                    resolvedUrl: "",
+                    canonicalUrl: "",
+                    bytes: 0,
+                    map: {},
+                }
+            ]
+        }
         await saveErrorDownloadIndex(
             resolvedUrl, index, fileFetcher
         )
@@ -365,18 +441,84 @@ describe("reading and writing error download indices", () => {
         const resolvedUrl = `/potato/`
         const index = {
             id: "tmp",
-            map: {},
+            previousId: "",
             title: "none",
             startedAt: Date.now(),
             bytes: 0,
-            version: "0.1.0",
-            previousVersion: "0.1.0-beta",
-            resolvedUrl: "",
-            canonicalUrl: "",
-        } as const
-        
+            segments: [
+                {
+                    version: "0.1.0",
+                    previousVersion: "0.1.0-beta",
+                    resolvedUrl: "",
+                    canonicalUrl: "",
+                    map: {},
+                    bytes: 0,
+                }
+            ]
+        }
         expect(async () => await saveErrorDownloadIndex(
             resolvedUrl, index, fileFetcher
         )).rejects.toThrow()
+    })
+
+    it("if error index has more than more segment, error index should not be saved, and error code should be returned", async () => {
+        const fileFetcher = createFileCache({})
+        const origin = "https://potato-house.com"
+        const resolvedUrl = `${origin}/potato/`
+        const index = {
+            id: "tmp",
+            previousId: "",
+            title: "none",
+            startedAt: Date.now(),
+            bytes: 0,
+            segments: [
+                {
+                    version: "0.1.0",
+                    previousVersion: "0.1.0-beta",
+                    resolvedUrl: "",
+                    canonicalUrl: "",
+                    bytes: 0,
+                    map: {},
+                },
+                {
+                    version: "0.1.0",
+                    previousVersion: "0.1.0-beta",
+                    resolvedUrl: "",
+                    canonicalUrl: "",
+                    bytes: 0,
+                    map: {},
+                }
+            ]
+        }
+        const status = await saveErrorDownloadIndex(
+            resolvedUrl, index, fileFetcher
+        )
+        expect(status).toBe(operationCodes.tooManySegments)
+        const res = await getErrorDownloadIndex(
+            resolvedUrl, fileFetcher
+        )
+        expect(res).toBe(null)
+    })
+
+    it("if error index has no segments, error index should not be saved, and error code should be returned", async () => {
+        const fileFetcher = createFileCache({})
+        const origin = "https://potato-house.com"
+        const resolvedUrl = `${origin}/potato/`
+        const index = {
+            id: "tmp",
+            previousId: "",
+            title: "none",
+            startedAt: Date.now(),
+            bytes: 0,
+            segments: []
+        }
+        const status = await saveErrorDownloadIndex(
+            resolvedUrl, index, fileFetcher
+        )
+        expect(status).toBe(operationCodes.noSegmentsFound)
+        const res = await getErrorDownloadIndex(
+            resolvedUrl, fileFetcher
+        )
+        expect(res).toBe(null)
     })
 })

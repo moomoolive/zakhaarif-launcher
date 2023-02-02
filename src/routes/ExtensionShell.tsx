@@ -89,7 +89,7 @@ const ExtensionShellPage = () => {
             return
         }
 
-        const meta = await downloadClient.getCargoMetaByEntry(entryUrl)
+        const meta = await downloadClient.getCargoIndexByEntry(entryUrl)
         if (!meta) {
             console.warn(`extension "${entryUrl}" doesn't exist.`)
             setLoading(false)

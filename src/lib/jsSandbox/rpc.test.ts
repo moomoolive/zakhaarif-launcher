@@ -25,6 +25,7 @@ const mockSandboxDependencies: SandboxDependencies = {
         state: "cached",
         createdAt: 0,
         updatedAt: 0,
+        downloadQueueId: "",
         storageBytes: 0,
     },
     cargo: new Cargo(),
