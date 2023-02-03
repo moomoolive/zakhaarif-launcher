@@ -96,6 +96,8 @@ export const operationCodes = {
     noSegmentsFound: 6
 } as const
 
+export type BackendOpertionCode = typeof operationCodes[keyof typeof operationCodes]
+
 const errDownloadIndexUrl = (resolvedUrl: string) => `${removeSlashAtEnd(resolvedUrl)}/__err-download-index__.json`
 
 const isRelativeUrl = (url: string) => !url.startsWith("http://") && !url.startsWith("https://")
@@ -221,8 +223,7 @@ export const saveDownloadIndices = async (
 }
 
 export type CargoState = (
-    "updating" | "cached" | "archived" 
-    | "update-failed" | "update-aborted"
+    "updating" | "cached" | "update-failed" | "update-aborted"
 )
 
 export type Permissions = {key: string, value: string[]}[]
@@ -259,8 +260,14 @@ export type CargoIndices = ReturnType<typeof emptyCargoIndices>
 export const getCargoIndices = async (
     origin: string, 
     fileCache: FileCache
-) => {
-    const url = cargoIndicesUrl(origin)
+): Promise<CargoIndices> => {
+    return getCargoIndexesCore(fileCache, cargoIndicesUrl(origin))
+}
+
+export const getCargoIndexesCore = async (
+    fileCache: FileCache,
+    url: string
+): Promise<CargoIndices> => {
     const cacheRes = await fileCache.getFile(url)
     if (!cacheRes || !cacheRes.ok) {
         return emptyCargoIndices()
@@ -296,13 +303,24 @@ export const updateCargoIndex = (
 export const stringBytes = (str: string) => (new TextEncoder().encode(str)).length
 
 export const saveCargoIndices = async (
-    indices: CargoIndices,
+    indexes: CargoIndices,
     origin: string,
     cache: FileCache
-) => {
-    indices.savedAt = Date.now()
-    const text = JSON.stringify(indices)
-    const url = cargoIndicesUrl(origin)
+): Promise<BackendOpertionCode> => {
+    return saveCargoIndexesCore(
+        indexes,
+        cargoIndicesUrl(origin),
+        cache
+    )
+}
+
+export const saveCargoIndexesCore = async (
+    indexes: CargoIndices,
+    url: string,
+    cache: FileCache
+): Promise<BackendOpertionCode> => {
+    indexes.savedAt = Date.now()
+    const text = JSON.stringify(indexes)
     await cache.putFile(url, new Response(text, {
         status: 200,
         statusText: "OK",

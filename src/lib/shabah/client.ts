@@ -14,10 +14,12 @@ import {
     FetchFunction,
     stringBytes,
     serviceWorkerPolicies,
+    ResourceMap
 } from "./backend"
 import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
+import { isUrl } from "../utils/urls/isUrl"
 
 export type RequestableResource = {
     requestUrl: string
@@ -220,38 +222,60 @@ const versionUpToDate = ({
     previousCargo
 })
 
+
+const NO_ERROR_OCCURRED = ""
+
+type PreflightResponse = {url: string, reason: string}
+
+type PreflightErrorResponse = {
+    errorUrls: PreflightResponse[] 
+    filesWithBytes: Map<string, number>
+}
+
 const verifyAllRequestableFiles = async (
     fileUrls: string[], 
     fetchFn: FetchFunction
-) => {
+): Promise<PreflightErrorResponse> => {
     const filesWithBytes: Map<string, number> = new Map()
-    const preFlightResponses = await Promise.all(fileUrls.map(async (url) => {
+    const preFlightResponses: PreflightResponse[] = await Promise.all(fileUrls.map(async (url) => {
+        let latestFailMessage = ""
         for (let i = 0; i < 3; i++) {
+            if (!isUrl(url)) {
+                return {url, reason: "malformed url"}
+            }
             const response = await io.wrap(fetchFn(url, {method: "HEAD"}))
             if (!response.ok) {
+                latestFailMessage = "network error"
                 continue
             }
             if (response.data.status === 404) {
-                return url
+                return {url, reason: "resource does not exist"}
             }
             if (!response.data.ok) {
+                latestFailMessage = "bad http code"
                 continue
             }
             const contentLength = response.data.headers.get("content-length")
+            
+            if (contentLength === null) {
+                return {url, reason: "missing 'content-length' header"}
+            }
             const mime = response.data.headers.get("content-type")
-            if (contentLength === null || mime === null) {
-                return url
+            if (mime === null) {
+                return {url, reason: "missing 'content-type' header"}
             }
             const bytes = parseInt(contentLength, 10)
             if (isNaN(bytes)) {
-                return url 
+                return {url, reason: "'content-length' header returned an invalid number (NaN)"} 
             }
             filesWithBytes.set(url, bytes)
-            return ""
+            return {url: NO_ERROR_OCCURRED, reason: ""}
         }
-        return url
+        return {url, reason: latestFailMessage}
     }))
-    const errorUrls = preFlightResponses.filter((url) => url.length > 0)
+    const errorUrls = preFlightResponses.filter(
+        (response) => response.url.length > 0
+    )
     return {errorUrls, filesWithBytes}
 }
 
@@ -306,8 +330,12 @@ export const checkForUpdates = async (
             fetchFn
         )
         if (filePreflightResponses.errorUrls.length > 0) {
+            const preflightErrors = filePreflightResponses
+                .errorUrls
+                .map((response) => `${response.url} [${response.reason}]`)
+                .join(", ")
             return downloadError(
-                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+                `the following urls are invalid: ${preflightErrors}`,
                 STATUS_CODES.preflightVerificationFailed,
                 false
             )
@@ -430,8 +458,12 @@ export const checkForUpdates = async (
             file.bytes = bytes
         })
         if (filePreflightResponses.errorUrls.length > 0) {
+            const preflightErrors = filePreflightResponses
+                .errorUrls
+                .map((response) => `${response.url} [${response.reason}]`)
+                .join(", ")
             return downloadError(
-                `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+                `the following urls are invalid: ${preflightErrors}`,
                 STATUS_CODES.preflightVerificationFailed,
                 true,
                 oldCargoPkg
@@ -489,8 +521,12 @@ export const checkForUpdates = async (
         fetchFn
     )
     if (filePreflightResponses.errorUrls.length > 0) {
+        const preflightErrors = filePreflightResponses
+            .errorUrls
+            .map((response) => `${response.url} [${response.reason}]`)
+            .join(", ")
         return downloadError(
-            `the following urls are invalid: ${filePreflightResponses.errorUrls.join(", ")}`,
+            `the following urls are invalid: ${preflightErrors}`,
             STATUS_CODES.preflightVerificationFailed,
             true,
             oldCargoPkg
@@ -549,8 +585,6 @@ export const checkForUpdates = async (
         code: STATUS_CODES.ok,
     })
 }
-
-import {ResourceMap} from "./backend"
 
 export const createResourceMap = (resources: RequestableResource[]) => {
     const map = {} as ResourceMap

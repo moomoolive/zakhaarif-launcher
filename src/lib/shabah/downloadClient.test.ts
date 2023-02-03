@@ -2137,8 +2137,8 @@ describe("download retries", () => {
             for (const {origin} of testCase) {
                 const canonicalUrl = origin + "/"
                 expect(downloadState.queuedDownloads.length).toBe(0)
-                const queueResponse = await client.retryFailedDownload(
-                    canonicalUrl
+                const queueResponse = await client.retryFailedDownloads(
+                    [canonicalUrl], "retry"
                 )
                 expect(queueResponse.ok).toBe(true)
                 expect(queueResponse.data).toBe(Shabah.STATUS.notFound)
@@ -2201,8 +2201,8 @@ describe("download retries", () => {
                 expect(!!cargoIndexFound).toBe(true)
                 expect(cargoIndexFound?.state).toBe("cached")
                 expect(downloadState.queuedDownloads.length).toBe(0)
-                const queueResponse = await client.retryFailedDownload(
-                    canonicalUrl
+                const queueResponse = await client.retryFailedDownloads(
+                    [canonicalUrl], "retry"
                 )
                 expect(queueResponse.ok).toBe(true)
                 expect(queueResponse.data).toBe(Shabah.STATUS.updateRetryImpossible)
@@ -2266,8 +2266,8 @@ describe("download retries", () => {
                 expect(!!cargoIndexFound).toBe(true)
                 expect(cargoIndexFound?.state).toBe("update-failed")
                 expect(downloadState.queuedDownloads.length).toBe(0)
-                const queueResponse = await client.retryFailedDownload(
-                    canonicalUrl
+                const queueResponse = await client.retryFailedDownloads(
+                    [canonicalUrl], "retry"
                 )
                 expect(queueResponse.ok).toBe(true)
                 expect(queueResponse.data).toBe(Shabah.STATUS.errorIndexNotFound)
@@ -2276,7 +2276,7 @@ describe("download retries", () => {
         }
     })
 
-    it(`attempting to retry a cargo in an error state that has a malformed error download index should not queue a download`, async () => {
+    it(`attempting to retry a cargo in an error state that has a error download index, should queue a download`, async () => {
         const mainOrigin = "https://my-mamas-house.com"
         const origins = [
             "https://papashouse.com",
@@ -2372,8 +2372,8 @@ describe("download retries", () => {
                 )
                 expect(!!cargoIndexFound).toBe(true)
                 expect(cargoIndexFound?.state).toBe("update-failed")
-                const queueResponse = await client.retryFailedDownload(
-                    canonicalUrl
+                const queueResponse = await client.retryFailedDownloads(
+                    [canonicalUrl], "retry"
                 )
                 expect(queueResponse.ok).toBe(true)
                 expect(queueResponse.data).toBe(Shabah.STATUS.updateRetryQueued)
@@ -2394,6 +2394,119 @@ describe("download retries", () => {
                 )
                 expect(!!errorIndexAfterMutation).toBe(false)
             }
+        }
+    })
+
+    it(`can retry multiple failed downloads at once`, async () => {
+        const mainOrigin = "https://my-mamas-house.com"
+        const testCases = [
+            [
+                {origin: "https://papashouse.com"},
+                {origin: "https://cookie-monstar.com"},
+                {origin: "https://my-cookies.com"},
+            ],
+            [
+                {origin: "https://jsdownload.com"},
+                {origin: "https://js_er.com"},
+            ]
+        ]
+        for (const testCase of testCases) {
+            const downloadClient = createClient(mainOrigin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            const {client, downloadState, adaptors} = downloadClient
+            const queuedDownloads = []
+            for (const {origin} of testCase) {
+                const canonicalUrl = origin + "/"
+                const resolvedUrl = canonicalUrl
+                const files = ["index.js", "style.css"].map(
+                    (extension) => resolvedUrl + extension
+                )
+                queuedDownloads.push({
+                    origin,
+                    resolvedUrl,
+                    canonicalUrl,
+                    files
+                })
+                const resourceMap = files.reduce((total, next) => {
+                    total[next] = {
+                        bytes: 0,
+                        mime: "text/plain",
+                        statusText: "NOT FOUND",
+                        status: 404,
+                        storageUrl: next
+                    }
+                    return total
+                }, {} as ResourceMap)
+                const errorDownloadIndex = {
+                    id: "tmp",
+                    previousId: "",
+                    title: "none",
+                    startedAt: Date.now(),
+                    bytes: 0,
+                    segments: [
+                        {
+                            resolvedUrl,
+                            canonicalUrl,
+                            map: resourceMap,
+                            bytes: 0,
+                            version: "0.2.0",
+                            previousVersion: "0.1.0"
+                        }
+                    ] as DownloadSegment[]
+                }
+                await saveErrorDownloadIndex(
+                    resolvedUrl, 
+                    errorDownloadIndex, 
+                    adaptors.fileCache
+                )
+                const errorIndex = await getErrorDownloadIndex(
+                    resolvedUrl, adaptors.fileCache
+                )
+                expect(!!errorIndex).toBe(true)
+                const cargo = new Cargo({
+                    name: origin + "-cargo"
+                })
+                const cargoIndex = cargoToCargoIndex(
+                    canonicalUrl,
+                    cargo as Cargo<Permissions>,
+                    {state: "update-failed"}
+                )
+                await client.putCargoIndex(cargoIndex)
+                const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
+                    canonicalUrl
+                )
+                expect(!!cargoIndexFound).toBe(true)
+                expect(cargoIndexFound?.state).toBe("update-failed")
+            }
+
+            const canonicalUrls = testCase.map((test) => test.origin + "/")
+            const queueResponse = await client.retryFailedDownloads(
+                canonicalUrls, "retry"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateRetryQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+            
+            for (const {canonicalUrl, resolvedUrl, files} of queuedDownloads) {
+                for (const url of files) {
+                    const queued = downloadState.queuedDownloads[0].urls
+                    const found = queued.find((queuedUrl) => queuedUrl === url)
+                    expect(!!found).toBe(true)
+                    const cargoIndexFoundAfterMutation = await client.getCargoIndexByCanonicalUrl(
+                        canonicalUrl
+                    )
+                    expect(!!cargoIndexFoundAfterMutation).toBe(true)
+                    expect(cargoIndexFoundAfterMutation?.state).toBe("updating")
+                    expect(cargoIndexFoundAfterMutation?.downloadQueueId).toBe(downloadState.queuedDownloads[0].id)
+                    const errorIndexAfterMutation = await getErrorDownloadIndex(
+                        resolvedUrl, adaptors.fileCache
+                    )
+                    expect(!!errorIndexAfterMutation).toBe(false)
+                }
+            }
+            
         }
     })
 })
@@ -2665,221 +2778,6 @@ describe("reading and updating cargo indexes", () => {
             canonicalUrl
         )
         expect(!!foundAfterDelete).toBe(false)
-    })
-
-    it("calling archive cargo on a particular cargo should set cargo index to archived and delete all files", async () => {
-        const origin = "https://mymamashouse.com"
-        const canonicalUrl = origin + "/"
-        const files = [
-            {name: "index.js", bytes: 0, invalidation: "default"},
-            {name: "style.css", bytes: 0, invalidation: "default"},
-            {name: "pic.png", bytes: 0, invalidation: "default"},
-        ]
-        const cargoToArchive = new Cargo<Permissions>({
-            name: "my-cargo",
-            files: files as Cargo["files"]
-        })
-        const cacheFiles = files.reduce((total, next) => {
-            const {name, bytes} = next
-            total[`${origin}/${name}`] = () => {
-                return new Response("", {
-                    status: 200,
-                    headers: {"content-length": bytes.toString()}
-                })
-            }
-            return total
-        }, {
-            [`${origin}/${MANIFEST_NAME}`]: () => {
-                return new Response(JSON.stringify(cargoToArchive), {
-                    status: 200
-                })
-            }
-        })
-        const {client, caches} = createClient(canonicalUrl, {
-            cacheFiles
-        })
-        const {innerFileCache} = caches
-        const filesWithManifest = [
-            ...files,
-            {name: MANIFEST_NAME, bytes: 0, invalidation: "default"}
-        ]
-        for (const {name} of filesWithManifest) {
-            const url = `${origin}/${name}`
-            const inCache = innerFileCache.getFile(url)
-            expect(!!inCache).toBe(true)
-        }
-        const index = cargoToCargoIndex(
-            canonicalUrl, cargoToArchive, {
-                resolvedUrl: canonicalUrl
-            }
-        )
-        await client.putCargoIndex(index)
-        const foundInitial = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitial).toBe(true)
-        const deleteResponse = await client.archiveCargo(canonicalUrl)
-        expect(deleteResponse.ok).toBe(true)
-        expect(deleteResponse.data).toBe(Shabah.STATUS.ok)
-        for (const {name} of filesWithManifest) {
-            const url = `${origin}/${name}`
-            const inCache = innerFileCache.getFile(url)
-            expect(!!inCache).toBe(false)
-        }
-        const foundAfterDelete = await client.getArchivedCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundAfterDelete).toBe(true)
-        expect(foundAfterDelete?.state).toBe("archived")
-    })
-
-    it("attempting to archive a non-existent indexes does nothing", async () => {
-        const canonicalUrl = "https://mymamashouse.com"
-        const {client} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
-        const index = cargoToCargoIndex(canonicalUrl, initial)
-        await client.putCargoIndex(index)
-        const foundInitial = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitial).toBe(true)
-        const nonExistentUrl = "https://mygrandmashouse.com"
-        const archiveResponse = await client.archiveCargo(nonExistentUrl)
-        expect(archiveResponse.ok).toBe(true)
-        expect(archiveResponse.data).toBe(Shabah.STATUS.notFound)
-        const afterArchive = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!afterArchive).toBe(true)
-        expect(afterArchive?.state).toBe("cached")
-    })
-
-    it("if archive is called on cargo during update and cargo is one of many segements being updated, download should be not be canceled and segment should be yanked from download", async () => {
-        const origin = "https://mymamashouse.com"
-        const canonicalUrl = origin + "/"
-        const secondOrigin = "https://mydadashouse.com"
-        const secondCanonicalUrl = secondOrigin + "/"
-        const {client, canceledDownloads} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
-        const updateResponse = createUpdateCheck({
-            id: "tmp",
-            canonicalUrl,
-            resolvedUrl: canonicalUrl,
-            originalResolvedUrl: canonicalUrl,
-            newCargo: initial,
-            status: Shabah.STATUS.ok,
-            diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
-        })
-        const secondUpdate = createUpdateCheck({
-            id: "tmp",
-            canonicalUrl: secondCanonicalUrl,
-            resolvedUrl: secondCanonicalUrl,
-            originalResolvedUrl: secondCanonicalUrl,
-            newCargo: initial,
-            status: Shabah.STATUS.ok,
-            diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
-        })
-        await client.executeUpdates(
-            [updateResponse, secondUpdate], "update"
-        )
-        const foundInitial = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitial).toBe(true)
-        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
-        expect(foundInitial?.state).toBe("updating")
-
-        const foundInitialSecond = await client.getCargoIndexByCanonicalUrl(
-            secondCanonicalUrl
-        )
-        expect(!!foundInitialSecond).toBe(true)
-        expect(foundInitialSecond?.downloadQueueId || "none2").toBe(foundInitial?.downloadQueueId || "none1")
-        expect(foundInitialSecond?.state).toBe("updating")
-
-        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitialDownload).toBe(true)
-        expect(foundInitialDownload?.segments.length).toBe(2)
-        const deleteReponse = await client.archiveCargo(canonicalUrl)
-        expect(deleteReponse.ok).toBe(true)
-        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
-        const downloadId = foundInitialDownload?.id || "none"
-        expect(canceledDownloads.has(downloadId)).toBe(false)
-        const afterArchive = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!afterArchive).toBe(true)
-        expect(afterArchive?.state).toBe("archived")
-        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
-            secondCanonicalUrl
-        )
-        expect(!!foundDeleteDownload).toBe(true)
-        expect(foundDeleteDownload?.segments.length).toBe(1)
-    })
-
-    it("if archive is called on cargo during update and cargo is only segement being updated, download should be canceled", async () => {
-        const origin = "https://mymamashouse.com"
-        const canonicalUrl = origin + "/"
-        const {client, canceledDownloads} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
-        const updateResponse = createUpdateCheck({
-            id: "tmp",
-            canonicalUrl,
-            resolvedUrl: canonicalUrl,
-            originalResolvedUrl: canonicalUrl,
-            newCargo: initial,
-            status: Shabah.STATUS.ok,
-            diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
-        })
-        await client.executeUpdates([updateResponse], "update")
-        const foundInitial = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitial).toBe(true)
-        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
-        expect(foundInitial?.state).toBe("updating")
-        
-        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundInitialDownload).toBe(true)
-        const downloadId = foundInitialDownload?.id || "none"
-        expect(foundInitialDownload?.segments.length).toBe(1)
-        const deleteReponse = await client.archiveCargo(canonicalUrl)
-        expect(deleteReponse.ok).toBe(true)
-        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
-        expect(canceledDownloads.has(downloadId)).toBe(true)
-        const afterArchive = await client.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!afterArchive).toBe(true)
-        expect(afterArchive?.state).toBe("archived")
-        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        expect(!!foundDeleteDownload).toBe(false)
     })
 })
 

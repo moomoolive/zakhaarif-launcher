@@ -6,7 +6,11 @@ import {
     operationCodes,
     removeDownloadIndex,
     saveDownloadIndices,
-    Permissions
+    Permissions,
+    getCargoIndices,
+    emptyCargoIndices,
+    updateCargoIndex,
+    saveCargoIndices,
 } from "./backend"
 
 const createFileCache = (initFiles: Record<string, Response>) => {
@@ -221,13 +225,6 @@ describe("reading and writing to download index", () => {
         expect(res).toBe(operationCodes.notFound)
     })
 })
-
-import {
-    getCargoIndices,
-    emptyCargoIndices,
-    updateCargoIndex,
-    saveCargoIndices,
-} from "./backend"
 
 describe("reading and writing to cargo indices", () => {
     it("should return empty cargo indices if one is not found", async () => {

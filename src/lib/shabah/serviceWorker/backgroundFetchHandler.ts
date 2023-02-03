@@ -135,7 +135,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 id: nanoid(21),
                 previousId: targetDownloadIndex.id,
                 segments: [errorDownloadSegment],
-                title: `Retry ${updateTitle} (${cargoIndex.name})`,
+                title: `Failed ${updateTitle} (${cargoIndex.name})`,
                 bytes: 0,
                 startedAt: Date.now()
             }

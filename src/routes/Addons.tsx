@@ -381,9 +381,10 @@ const AddOns = () => {
         for (let i = 0; i < cargoIndex.cargos.length; i++) {
             const targetCargo = cargoIndex.cargos[i]
             if (
-                (getArchives && targetCargo.state !== "archived")
-                || (!getArchives && targetCargo.state === "archived") 
-                || !targetCargo.name.includes(searchText)
+                //(getArchives && targetCargo.state !== "archived")
+                //|| (!getArchives && targetCargo.state === "archived") 
+                //|| !targetCargo.name.includes(searchText)
+                !targetCargo.name.includes(searchText)
             ) {
                 continue
             }
@@ -989,36 +990,6 @@ const AddOns = () => {
                                                 </span>
                                                 Info
                                             </MenuItem>
-                                            <MenuItem
-                                                className="hover:text-yellow-500"
-                                                onClick={async () => {
-                                                    const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (isStandardCargo(target.id)) {
-                                                        confirm({title: `"${target.name}" is a core package and cannot be archived!`})
-                                                        return 
-                                                    }
-                                                    if (!await confirm({title: `Are you sure you want to archive ${target.name} add-on?`})) {
-                                                        setCargoOptionsElement(null)
-                                                        return
-                                                    }
-                                                    setViewingCargo("none")
-                                                    const copy = [...cargoIndex.cargos]
-                                                    copy.splice(viewingCargoIndex, 1, {
-                                                        ...target,
-                                                        state: "archived"
-                                                    })
-                                                    setCargoIndex({
-                                                        ...cargoIndex,
-                                                        cargos: copy
-                                                    })
-                                                    await downloadClient.archiveCargo(target.canonicalUrl)
-                                                }}
-                                            >
-                                                <span className="mr-3">
-                                                    <FontAwesomeIcon icon={faBoxArchive} />
-                                                </span>
-                                                Archive
-                                            </MenuItem>
 
                                             <MenuItem
                                                 className="hover:text-red-500"
@@ -1419,8 +1390,6 @@ const AddOns = () => {
                                                         return <span className="text-red-500">{"Failed"}</span>
                                                     case "updating":
                                                         return <span className="text-blue-500">{"Updating"}</span>
-                                                    case "archived":
-                                                        return <span>{"Archived"}</span>
                                                     default:
                                                         return <span>{"Saved"}</span>
                                                 }

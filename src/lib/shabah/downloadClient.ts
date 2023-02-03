@@ -28,6 +28,8 @@ import {
     removeDownloadIndex,
     NO_UPDATE_QUEUED,
     DownloadSegment,
+    removeSlashAtEnd,
+    getCargoIndexesCore,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {MANIFEST_NAME, NULL_FIELD} from "../cargo/index"
@@ -64,7 +66,7 @@ const defaultDownloadState = (id: string) => ({
     ready: false
 } as const)
 
-type ShabahProps = {
+export type ShabahConfig = {
     origin: string,
     adaptors: {
         fileCache: FileCache
@@ -74,16 +76,19 @@ type ShabahProps = {
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
+export const archivedCargoIndexesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__archived-cargo-indexes__.json`
+
 export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = NO_INSTALLATION
     static readonly POLICIES = serviceWorkerPolicies
     static readonly STATUS = STATUS_CODES
 
-    networkRequest: FetchFunction
-    fileCache: FileCache
-    downloadManager: DownloadManager
     readonly origin: string
 
+    private networkRequest: FetchFunction
+    private fileCache: FileCache
+    private downloadManager: DownloadManager
+    private archivedCargoIndexesCache: null | CargoIndices
     private cargoIndicesCache: null | CargoIndices
     private downloadIndicesCache: null | DownloadIndexCollection
     private progressListeners: Array<{
@@ -95,7 +100,7 @@ export class Shabah {
         (permissions: GeneralPermissions) => GeneralPermissions
     )
 
-    constructor({adaptors, origin, permissionsCleaner}: ShabahProps) {
+    constructor({adaptors, origin, permissionsCleaner}: ShabahConfig) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
         }
@@ -107,6 +112,7 @@ export class Shabah {
         this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
         this.cargoIndicesCache = null
         this.downloadIndicesCache = null
+        this.archivedCargoIndexesCache = null
         this.progressListeners = []
         this.progressListenerTimeoutId = INVALID_LISTENER_ID
     }
@@ -297,158 +303,82 @@ export class Shabah {
         return io.ok(STATUS_CODES.updateQueued)
     }
 
-    addProgressListener(
-        id: string, 
-        callback: onProgressCallback
-    ) {
-        const listenerIndex = this.progressListeners.findIndex(
-            (listener) => listener.id === id
-        )
-        const alreadyRegistered = listenerIndex > -1
-        if (alreadyRegistered) {
-            const target = this.progressListeners[listenerIndex]
-            target.callback = callback
-            return
-        }
-        this.progressListeners.push({id, callback})
-        const alreadySet = this.progressListenerTimeoutId !== INVALID_LISTENER_ID
-        if (alreadySet) {
-            return
-        }
-        const self = this
-        const globalListener = async () => {
-            const listeners = self.progressListeners
-            await Promise.all([
-                self.refreshCargoIndices(),
-                self.refreshDownloadIndicies()
-            ])
-            const KEEP_ON_QUEUE = -1
-            const indexesToRemove = await Promise.all(listeners.map(async (listener, index) => {
-                const {id, callback} = listener
-                const managerState = await self
-                    .downloadManager
-                    .getDownloadState(id)
-                const downloading = !!managerState
-                if (downloading) {
-                    callback({
-                        ...defaultDownloadState(id), 
-                        ...managerState
-                    })
-                    return KEEP_ON_QUEUE
-                }
-                const [downloadIndex, meta] = await Promise.all([
-                    self.getDownloadState(id),
-                    self.getCargoIndexById(id)
-                ] as const)
-                const failed = (
-                    meta?.state === "update-aborted"
-                    || meta?.state === "update-failed"
-                )
-                if (failed) {
-                    callback({
-                        ...defaultDownloadState(id),
-                        failed: true,
-                        failureReason: meta.state
-                    })
-                    return index
-                }
-                const installing = !!downloadIndex
-                if (installing) {
-                    callback({
-                        ...defaultDownloadState(id), 
-                        installing: true, 
-                        finished: true
-                    })
-                    return KEEP_ON_QUEUE
-                }
-
-                callback({
-                    ...defaultDownloadState(id), 
-                    finished: true, 
-                    ready: true
-                })
-                return index
-            }))
-            const validIndexes = indexesToRemove.filter((index) => index !== KEEP_ON_QUEUE)
-            
-            for (const index of validIndexes) {
-                listeners.splice(index, 1)
+    async retryFailedDownloads(
+        canonicalUrls: string[],
+        title: string
+    ): Promise<Ok<StatusCode>> {
+        const errorReports = []
+        for (const canonicalUrl of canonicalUrls) {
+            const cargoMeta = await this.getCargoIndexByCanonicalUrl(
+                canonicalUrl
+            )
+            if (!cargoMeta) {
+                return io.ok(STATUS_CODES.notFound)
             }
-
-            if (listeners.length < 1) {
-                clearInterval(self.progressListenerTimeoutId)
-                self.progressListenerTimeoutId = INVALID_LISTENER_ID
+            const {state} = cargoMeta
+            if (state !== "update-aborted" && state !== "update-failed") {
+                return io.ok(STATUS_CODES.updateRetryImpossible)
             }
-        }
-        const pollingMilliseconds = 2_000
-        const listenerId = setInterval(
-            globalListener, pollingMilliseconds
-        )
-        this.progressListenerTimeoutId = listenerId
-    }
-
-    removeProgressListener(id: string) {
-        const listeners = this.progressListeners
-        const listenerIndex = listeners
-            .findIndex((listener) => listener.id === id)
-        const notFound = listenerIndex < 0
-        if (notFound) {
-            return
-        }
-        listeners.splice(listenerIndex, 1)
-        if (listeners.length < 1) {
-            clearInterval(this.progressListenerTimeoutId)
-            this.progressListenerTimeoutId = INVALID_LISTENER_ID
-        }
-    }
-
-    async retryFailedDownload(canonicalUrl: string) {
-        const cargoMeta = await this.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        if (!cargoMeta || cargoMeta.state === "archived") {
-            return io.ok(STATUS_CODES.notFound)
-        }
-        const {state} = cargoMeta
-        if (state !== "update-aborted" && state !== "update-failed") {
-            return io.ok(STATUS_CODES.updateRetryImpossible)
-        }
-        const {resolvedUrl} = cargoMeta
-        const errDownloadIndexRes = await getErrorDownloadIndex(
-            resolvedUrl, this.fileCache
-        )
-        if (!errDownloadIndexRes) {
-            return io.ok(STATUS_CODES.errorIndexNotFound)
-        }
-        const prevUpdateIndex = await this.getDownloadIndexByCanonicalUrl(
-            cargoMeta.canonicalUrl
-        )
-        const updateInProgress = !!prevUpdateIndex
-        if (updateInProgress) {
-            return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+            const {resolvedUrl} = cargoMeta
+            const errDownloadIndexRes = await getErrorDownloadIndex(
+                resolvedUrl, this.fileCache
+            )
+            if (!errDownloadIndexRes) {
+                return io.ok(STATUS_CODES.errorIndexNotFound)
+            }
+            const prevUpdateIndex = await this.getDownloadIndexByCanonicalUrl(
+                cargoMeta.canonicalUrl
+            )
+            const updateInProgress = !!prevUpdateIndex
+            if (updateInProgress) {
+                return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+            }
+    
+            const errorReport = errDownloadIndexRes
+            const {index: errDownloadIndex} = errorReport
+            if (errDownloadIndex.segments.length < 1) {
+                return io.ok(STATUS_CODES.noSegmentsFound)
+            }
+            if (errDownloadIndex.segments.length > 1) {
+                return io.ok(STATUS_CODES.invalidErrorDownloadIndex)
+            }
+            errorReports.push({errorReport, cargoMeta})
         }
 
-        const {index: errDownloadIndex, url: errorUrl} = errDownloadIndexRes
-        if (errDownloadIndex.segments.length < 1) {
-            return io.ok(STATUS_CODES.noSegmentsFound)
-        }
-        if (errDownloadIndex.segments.length > 1) {
-            return io.ok(STATUS_CODES.invalidErrorDownloadIndex)
-        }
-        const downloadQueueId = errDownloadIndex.id
-        const targetSegment = errDownloadIndex.segments[0]
         const downloadsIndex = await this.getDownloadIndices()
-        updateDownloadIndex(downloadsIndex, errDownloadIndex)
+        const removeFileUrls = []
+        const requestFileUrls = []
+        const downloadQueueId = nanoid(21)
+        const retryDownloadIndex = {
+            id: downloadQueueId,
+            previousId: "",
+            bytes: 0,
+            segments: [] as DownloadSegment[],
+            title
+        }
+        for (const {errorReport, cargoMeta} of errorReports) {
+            const {index, url} = errorReport
+            removeFileUrls.push(url)
+            const [targetSegment] = index.segments
+            requestFileUrls.push(...Object.keys(targetSegment.map))
+            retryDownloadIndex.segments.push(targetSegment)
+            retryDownloadIndex.bytes += index.bytes
+            this.putCargoIndex({
+                ...cargoMeta, 
+                state: "updating", 
+                downloadQueueId
+            })
+        }
+        updateDownloadIndex(downloadsIndex, retryDownloadIndex)
+        const self = this
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
-            this.putCargoIndex({...cargoMeta, state: "updating", downloadQueueId}),
-            this.fileCache.deleteFile(errorUrl)
+            ...removeFileUrls.map((url) => self.fileCache.deleteFile(url))
         ])
-        const {title, bytes} = errDownloadIndex
         await this.downloadManager.queueDownload(
             downloadQueueId,
-            Object.keys(targetSegment.map),
-            {title, downloadTotal: bytes}
+            requestFileUrls,
+            {title, downloadTotal: retryDownloadIndex.bytes}
         )
         return io.ok(STATUS_CODES.updateRetryQueued)
     }
@@ -578,34 +508,6 @@ export class Shabah {
         )
     }
 
-    async archiveCargo(canonicalUrl: string) {
-        const cargoIndex = await this.getCargoIndices()
-        const index = cargoIndex.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        if (index < 0) {
-            return io.ok(STATUS_CODES.notFound)
-        }
-        const targetCargo = cargoIndex.cargos[index]
-        const promises = []
-        promises.push(this.deleteAllCargoFiles(
-            targetCargo.resolvedUrl
-        ))
-        if (
-            targetCargo.state === "updating" 
-            && targetCargo.downloadQueueId !== NO_UPDATE_QUEUED
-        ) {
-            promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
-        }
-        await Promise.all(promises)
-        targetCargo.state = "archived"
-        await this.persistCargoIndices(cargoIndex)
-        return io.ok(STATUS_CODES.ok)
-    }
-
-    // archived cargo index interfaces
-    getArchivedCargoIndexByCanonicalUrl = this.getCargoIndexByCanonicalUrl
-
     // cargo index interfaces
     async getCargoIndexById(cargoId: string) {
         const indices = await this.getCargoIndices()
@@ -653,7 +555,9 @@ export class Shabah {
 
     async getCargoIndexByCanonicalUrl(canonicalUrl: string) {
         const indices = await this.getCargoIndices()
-        const index = indices.cargos.findIndex((cargo) => cargo.canonicalUrl === canonicalUrl)
+        const index = indices.cargos.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
+        )
         if (index < 0) {
             return null
         }
@@ -754,5 +658,111 @@ export class Shabah {
         const indices = await getDownloadIndices(origin, fileCache)
         this.downloadIndicesCache = indices
         return indices
+    }
+
+    // progress listening interfaces
+    addProgressListener(
+        id: string, 
+        callback: onProgressCallback
+    ) {
+        const listenerIndex = this.progressListeners.findIndex(
+            (listener) => listener.id === id
+        )
+        const alreadyRegistered = listenerIndex > -1
+        if (alreadyRegistered) {
+            const target = this.progressListeners[listenerIndex]
+            target.callback = callback
+            return
+        }
+        this.progressListeners.push({id, callback})
+        const alreadySet = this.progressListenerTimeoutId !== INVALID_LISTENER_ID
+        if (alreadySet) {
+            return
+        }
+        const self = this
+        const globalListener = async () => {
+            const listeners = self.progressListeners
+            await Promise.all([
+                self.refreshCargoIndices(),
+                self.refreshDownloadIndicies()
+            ])
+            const KEEP_ON_QUEUE = -1
+            const indexesToRemove = await Promise.all(listeners.map(async (listener, index) => {
+                const {id, callback} = listener
+                const managerState = await self
+                    .downloadManager
+                    .getDownloadState(id)
+                const downloading = !!managerState
+                if (downloading) {
+                    callback({
+                        ...defaultDownloadState(id), 
+                        ...managerState
+                    })
+                    return KEEP_ON_QUEUE
+                }
+                const [downloadIndex, meta] = await Promise.all([
+                    self.getDownloadState(id),
+                    self.getCargoIndexById(id)
+                ] as const)
+                const failed = (
+                    meta?.state === "update-aborted"
+                    || meta?.state === "update-failed"
+                )
+                if (failed) {
+                    callback({
+                        ...defaultDownloadState(id),
+                        failed: true,
+                        failureReason: meta.state
+                    })
+                    return index
+                }
+                const installing = !!downloadIndex
+                if (installing) {
+                    callback({
+                        ...defaultDownloadState(id), 
+                        installing: true, 
+                        finished: true
+                    })
+                    return KEEP_ON_QUEUE
+                }
+
+                callback({
+                    ...defaultDownloadState(id), 
+                    finished: true, 
+                    ready: true
+                })
+                return index
+            }))
+            const validIndexes = indexesToRemove.filter((index) => index !== KEEP_ON_QUEUE)
+            
+            for (const index of validIndexes) {
+                listeners.splice(index, 1)
+            }
+
+            if (listeners.length < 1) {
+                clearInterval(self.progressListenerTimeoutId)
+                self.progressListenerTimeoutId = INVALID_LISTENER_ID
+            }
+        }
+        const pollingMilliseconds = 2_000
+        const listenerId = setInterval(
+            globalListener, pollingMilliseconds
+        )
+        this.progressListenerTimeoutId = listenerId
+    }
+
+    removeProgressListener(id: string) {
+        const listeners = this.progressListeners
+        const listenerIndex = listeners
+            .findIndex((listener) => listener.id === id)
+        const notFound = listenerIndex < 0
+        if (notFound) {
+            return
+        }
+        listeners.splice(listenerIndex, 1)
+        if (listeners.length < 1) {
+            clearInterval(this.progressListenerTimeoutId)
+            this.progressListenerTimeoutId = INVALID_LISTENER_ID
+        }
     }
 }

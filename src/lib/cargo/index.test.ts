@@ -3,7 +3,8 @@ import {
     cargoIsUpdatable, 
     Cargo, 
     NULL_MANIFEST_VERSION,
-    LATEST_CRATE_VERSION, NULL_FIELD
+    LATEST_CRATE_VERSION, NULL_FIELD,
+    InvalidationStrategy
 } from "./index"
 import {diffManifestFiles, validateManifest} from "./index"
 import {SemVer} from "../smallSemver/index"
@@ -14,7 +15,7 @@ const manifest = new Cargo({
     version: "0.1.0", 
     name: "test-pkg", 
     entry, 
-    files: [{name: entry, bytes: 1_000, invalidation: "default"}]
+    files: [{name: entry, bytes: 1_000, invalidation: "url-diff"}]
 })
 
 describe("cargo update detection function", () => {
@@ -103,8 +104,44 @@ describe("manifest file diffing function", () => {
         expect(updates.delete.length).toBe(0)
     })
 
+    it("by default entry files should be redownloaded every new version (defaults to 'purge' invalidation), unless invalidation prevents it", () => {
+        const testCases = [
+            {entry: "index.js", invalidation: "default"},
+            {entry: "index.js", invalidation: "purge"},
+            {entry: "index.js", invalidation: "url-diff"},
+        ] as const
+
+        const redownloadPolicies: InvalidationStrategy[] = [
+            "default", "purge"
+        ]
+
+        for (const {entry, invalidation} of testCases) {
+            const newCargo = structuredClone(manifest)
+            newCargo.entry = entry
+            newCargo.files = [
+                {name: entry, bytes: 0, invalidation}
+            ]
+            const oldCargo = structuredClone(newCargo)
+            const diffResult = diffManifestFiles(newCargo, oldCargo, "url-diff")
+            const redownloadEntry = diffResult.add.find(
+                (file) => file.name === entry
+            )
+            const deleteOldEntry = diffResult.delete.find(
+                (file) => file.name === entry
+            )
+            if (redownloadPolicies.includes(invalidation)) {
+                expect(!!redownloadEntry).toBe(true)
+                expect(!!deleteOldEntry).toBe(true)
+            } else {
+                expect(!!redownloadEntry).toBe(false)
+                expect(!!deleteOldEntry).toBe(false)
+            }
+        }
+    })
+
     it("should return all new package files as additions and all old package file as deletions if default strategy is 'purge'", () => {
         const oldPkg = structuredClone(manifest)
+        oldPkg.files = oldPkg.files.map((file) => ({...file, invalidation: "default"}))
         const addAssets = [
             {name: "new_asset.js", bytes: 0, invalidation: "default"},
             {name: "new_asset1.js", bytes: 0, invalidation: "default"},

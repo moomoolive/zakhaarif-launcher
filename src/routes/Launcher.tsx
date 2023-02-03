@@ -272,7 +272,9 @@ const LauncherRoot = () => {
       document.title = "Updating..."
       setAppUpdateInProgress(true)
       addProgressListener()
-      await downloadClient.retryFailedDownload(APP_CARGO_ID)
+      await downloadClient.retryFailedDownloads(
+        [APP_CARGO_ID], "retry"
+      )
       return
     }
 
@@ -306,7 +308,7 @@ const LauncherRoot = () => {
   useEffect(() => {
     (async () => {
       const currentAppPkg = await downloadClient.getCargoIndexById(APP_CARGO_ID)
-      if (!currentAppPkg || currentAppPkg.state === "archived") {
+      if (!currentAppPkg) {
         setButtonElement(<>{"install"}</>)
         return
       }

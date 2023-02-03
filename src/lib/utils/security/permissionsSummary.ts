@@ -6,6 +6,7 @@ import {
 } from "../../types/permissions"
 import {PermissionsList} from "../../cargo/index"
 import { CargoIndices } from "../../shabah/downloadClient"
+import { isUrl } from "../urls/isUrl"
 
 const permissionsSummary = (allowAll: boolean) => {
     const startValue = allowAll
@@ -114,11 +115,7 @@ const permissionCleaners = {
         if (isDangerousCspOrigin(value)) {
             return false
         }
-        try {
-            return !!(new URL(value))
-        } catch {
-            return false
-        }
+        return isUrl(value)
     },
     gameSaves: (value: string) => {
         switch (value) {

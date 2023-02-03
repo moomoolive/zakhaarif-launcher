@@ -89,7 +89,7 @@ const cargoPkg = new Cargo({
     version: "0.1.0", 
     name: "test-pkg", 
     entry: "index.js", 
-    files: [{name: "index.js", bytes: 1_000}]
+    files: [{name: "index.js", bytes: 1_000, invalidation: "url-diff"}]
 })
 
 describe("diff cargos function", () => {
@@ -229,6 +229,42 @@ describe("diff cargos function", () => {
             },
             "https://mywebsite.com/pkg/index.js": () => {
                 throw new Error("network error")
+            }
+        })
+        const res = await checkForUpdates(
+            {
+                canonicalUrl: "https://mywebsite.com/pkg", 
+                oldResolvedUrl: "https://mywebsite.com/pkg", 
+                name: "pkg"
+            }
+        , ...adaptors)
+        expect(res.errors.length).toBeGreaterThan(0)
+    })
+
+    it("if cargo has not been downloaded before and new cargo is found new cargo file urls return a bad http code, an error should be returned", async () => {
+        const manifest = structuredClone(cargoPkg)
+        const cargoString = JSON.stringify(manifest)
+        
+        const adaptors = fetchFnAndFileCache({}, {
+            "https://mywebsite.com/pkg/cargo.json": () => {
+                return io.ok(new Response(cargoString, {
+                    status: 200,
+                    statusText: "OK",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "application/json"
+                    }
+                }))
+            },
+            "https://mywebsite.com/pkg/index.js": () => {
+                return io.ok(new Response("", {
+                    status: 500,
+                    statusText: "INTERNAL SERVER ERROR",
+                    headers: {
+                        "Content-Length": "1",
+                        "Content-Type": "text/javascript"
+                    }
+                }))
             }
         })
         const res = await checkForUpdates(
@@ -974,7 +1010,7 @@ describe("diff cargos function", () => {
         expect(res.previousVersionExists).toBe(true)
     })
 
-    it("if previous cargo is found and new cargo version is greater, download links not found in previous cargo, download links that are expired, and no errors should be returned", async () => {
+    it("if previous cargo is found and new cargo version is greater, no errors should be returned and correct bytes to download should be calculated", async () => {
         const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
@@ -988,10 +1024,7 @@ describe("diff cargos function", () => {
             {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
         ] as const
         newCargo.files.push(...newResources)
-
-        const contentLengths = [
-            "20", "100"
-        ] as const
+        const contentLengths = ["20", "100"] as const
         const adaptors = fetchFnAndFileCache({
             "https://mywebsite.com/pkg/cargo.json": () => {
                 const pkg = JSON.stringify(oldCargo)

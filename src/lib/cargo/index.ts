@@ -465,7 +465,6 @@ export const diffManifestFiles = (
     const newFiles: Record<string, ValidDefaultStrategies> = {}
     for (let i = 0; i < newCargo.files.length; i++) {
         const {name, invalidation} = newCargo.files[i]
-        /*
         if (
             newCargo.entry !== NULL_FIELD 
             && name === newCargo.entry
@@ -474,7 +473,6 @@ export const diffManifestFiles = (
             newFiles[name] = "purge"
             continue
         }
-        */
         newFiles[name] = invalidation === "default"
             ? defaultInvalidation
             : invalidation
