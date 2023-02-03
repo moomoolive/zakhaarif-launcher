@@ -7,8 +7,8 @@ import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
 import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
-import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
-import {Cargo, NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/index"
+//import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
+import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import rawCssExtension from "../index.css?url"
@@ -19,6 +19,7 @@ import {
 } from "../lib/utils/security/permissionsSummary"
 import {UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
+import { CargoIndex } from "../lib/shabah/backend"
 
 export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
@@ -40,7 +41,22 @@ const ExtensionShellPage = () => {
     const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
     
     const extensionCargo = useRef(new Cargo<Permissions>())
-    const extensionCargoIndex = useRef(GAME_CARGO_INDEX)
+    const extensionCargoIndex = useRef<CargoIndex>({
+        id: "tmp",
+        name: "tmp",
+        downloadQueueId: "",
+        logoUrl: NULL_FIELD,
+        resolvedUrl: "",
+        canonicalUrl: "",
+        bytes: 0,
+        entry: NULL_FIELD,
+        version: "0.1.0",
+        permissions: [],
+        state: "cached",
+        storageBytes: 0,
+        createdAt: 0,
+        updatedAt: 0
+    })
     const sandbox = useRef<JsSandbox | null>(null)
     const cleanupExtension = useRef(() => {
         setShowRestartExtension(false)
@@ -78,14 +94,6 @@ const ExtensionShellPage = () => {
             setLoading(false)
             setError(true)
             setErrorMessage("Extension Not Found")
-            return
-        }
-
-        if (entryUrl === GAME_CARGO_INDEX.entry) {
-            await sandboxInitializePromise.promise
-            setExtensionEntry({url: GAME_CARGO_INDEX.entry, retry: 0})
-            extensionCargoIndex.current = GAME_CARGO_INDEX
-            extensionCargo.current = GAME_CARGO
             return
         }
 
@@ -164,7 +172,7 @@ const ExtensionShellPage = () => {
         const isUnsafe = (
             unsafePackagesDisallowed
             && hasUnsafePermissions(permissionsSummary)
-            && extensionCargoIndex.current.id !== GAME_CARGO_INDEX.id
+            && extensionCargoIndex.current.id !== GAME_EXTENSION_ID
         )
         if (isUnsafe) {
             setError(true)

@@ -20,7 +20,7 @@ import {roundDecimal} from "../lib/math/rounding"
 import {featureCheck} from "../lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {sleep} from "../lib/utils/sleep"
-import {APP_CARGO_ID} from "../config"
+import {APP_CARGO_ID, GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
 import {useAppShellContext} from "./store"
 import {useNavigate} from "react-router-dom"
 import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
@@ -152,6 +152,21 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
 
+const STANDARD_CARGOS = [
+  {
+    canonicalUrl: import.meta.env.VITE_APP_LAUNCHER_CARGO_URL, 
+    id: APP_CARGO_ID
+  },
+  {
+    canonicalUrl: import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL,
+    id: GAME_EXTENSION_ID
+  },
+  {
+    canonicalUrl: import.meta.env.VITE_APP_STANDARD_MOD_CARGO_URL,
+    id: STANDARD_MOD_ID
+  }
+] as const
+
 const LauncherRoot = () => {
   const confirm = useGlobalConfirm()
   const {setTerminalVisibility, downloadClient} = useAppShellContext()
@@ -231,33 +246,44 @@ const LauncherRoot = () => {
       </span>
     )
     setProgressMsg("Checking for Updates...")
-    const root = location.origin + "/"
-    const [updateResponse] = await Promise.all([
-      downloadClient.checkForCargoUpdates({canonicalUrl: root, id: APP_CARGO_ID}),
+    //const root = location.origin + "/"
+    const [
+      launcherResponse, 
+      gameExtensionResponse, 
+      standardModResponse
+    ] = await Promise.all([
+      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[0]),
+      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[1]),
+      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[2]),
       // should take at least 500ms
       sleep(500),
     ] as const)
-    const previousVersionExists = updateResponse.previousVersionExists()
+    console.log(
+      "launcher", launcherResponse,
+      "game-extension", gameExtensionResponse,
+      "std-mod", standardModResponse
+    )
+    const previousVersionExists = launcherResponse.previousVersionExists()
     setCheckedForUpdates(true)
-    if (previousVersionExists && !updateResponse.enoughStorageForCargo()) {
-      const updateVersion = updateResponse.versions().new
-      setDownloadError(`Not enough disk space for update v${updateVersion} (${updateResponse.readableBytesNeeded()} required)`)
+    if (previousVersionExists && !launcherResponse.enoughStorageForCargo()) {
+      const updateVersion = launcherResponse.versions().new
+      setDownloadError(`Not enough disk space for update v${updateVersion} (${launcherResponse.readableBytesNeeded()} required)`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
-    } else if (previousVersionExists && updateResponse.errorOccurred()) {
+    } else if (previousVersionExists && launcherResponse.errorOccurred()) {
       setDownloadError(`Error occured when checking for updates`)
       setButtonElement(<>{"Start Anyway"}</>)
       setAfterUpdateCheckAction(() => launchApp)
       setShowProgress(false)
       return
     } else if (
-      (!previousVersionExists && updateResponse.errorOccurred())
-      || (!previousVersionExists && !updateResponse.enoughStorageForCargo())
+      (!previousVersionExists && launcherResponse.errorOccurred())
+      || (!previousVersionExists && !launcherResponse.enoughStorageForCargo())
     ) {
-      if (!updateResponse.enoughStorageForCargo()) {
-        setDownloadError(`Not enough disk space install (${updateResponse.readableBytesNeeded()} required)`)
+      if (!launcherResponse.enoughStorageForCargo()) {
+        setDownloadError(`Not enough disk space install (${launcherResponse.readableBytesNeeded()} required)`)
       } else {
         setDownloadError("Couldn't contact update server")
       }
@@ -267,7 +293,7 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!updateResponse.updateAvailable() && previousUpdateFailed) {
+    if (!launcherResponse.updateAvailable() && previousUpdateFailed) {
       setProgressMsg("Updating...")
       document.title = "Updating..."
       setAppUpdateInProgress(true)
@@ -278,17 +304,17 @@ const LauncherRoot = () => {
       return
     }
 
-    if (!updateResponse.updateAvailable()) {
+    if (!launcherResponse.updateAvailable()) {
       launchApp()
       return
     }
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
     const updateQueueResponse = await downloadClient.executeUpdates(
-      [updateResponse],
-      `core v${updateResponse.versions().new}`,
+      [launcherResponse, gameExtensionResponse, standardModResponse],
+      `core v${launcherResponse.versions().new}`,
     )
-    
+    console.log("queue response", updateQueueResponse)
     if (updateQueueResponse.data !== Shabah.STATUS.updateQueued) {
       await sleep(2_000)
       setShowProgress(false)
@@ -300,8 +326,8 @@ const LauncherRoot = () => {
     setProgressMsg("Updating...")
     document.title = "Updating..."
     setAppUpdateInProgress(true)
-    setCurrentAppVersion(updateResponse.versions().old)
-    setNextUpdateVersion(updateResponse.versions().new)
+    setCurrentAppVersion(launcherResponse.versions().old)
+    setNextUpdateVersion(launcherResponse.versions().new)
     addProgressListener()
   }
 

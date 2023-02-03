@@ -58,8 +58,7 @@ type CargoPartial= Partial<
 export type CargoMeta = Record<string, string>
 
 type CargoOptions<
-    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>,
-    Metadata extends CargoMeta = Record<string, string>
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
 > = (
     CargoPartial & Partial<{
         authors: Array<Partial<{
@@ -74,15 +73,14 @@ type CargoOptions<
         }>>
         repo: Partial<{ type: RepoType, url: string }>
         permissions: PermissionsListOptions<Permissions>
-        metadata: Metadata
+        metadata: Record<string, string>
     }>
 )
 
 export const NULL_MANIFEST_VERSION = "0.0.0"
 
 export class Cargo<
-    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>,
-    Metadata extends CargoMeta = Record<string, string>
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
 > {
     // required fields
     crateVersion: CrateVersion
@@ -105,7 +103,7 @@ export class Cargo<
     repo: {type: RepoType, url: string}
     homepageUrl: string
     permissions: PermissionsList<Permissions>
-    metadata: Metadata
+    metadata: Record<string, string>
 
     constructor({
         crateVersion = "0.1.0",
@@ -124,8 +122,8 @@ export class Cargo<
         repo = {type: NULL_FIELD, url: NULL_FIELD},
         homepageUrl = NULL_FIELD,
         permissions = [],
-        metadata = {} as Metadata
-    }: CargoOptions<Permissions, Metadata> = {}) {
+        metadata = {}
+    }: CargoOptions<Permissions> = {}) {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
@@ -361,7 +359,7 @@ export const validateManifest = <T>(cargo: T) => {
         permissionsMap.set(permission.key, 1)
         pkg.permissions.push({
             key: permission.key, 
-            value: value.filter((val) => typeof val !== "string")
+            value: value.filter((val) => typeof val === "string")
         })
     }
 

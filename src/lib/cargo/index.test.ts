@@ -469,6 +469,50 @@ describe("manifest validation function", () => {
         expect(validateManifest(m).pkg.permissions.length).toBe(2)
     })
 
+    it("when filtering duplicate permissions, all string elements of value of permissions should be preserved", () => {
+        const testCases = [
+            [
+                {key: "hi", value: ["yes", "no"]},
+                "hi"
+            ],
+            [
+                {key: "no", value: ["maybe", "no"]},
+                "no"
+            ],
+        ]
+        for (const testCase of testCases) {
+            const [target] = testCase
+            const cargo = structuredClone(manifest)
+            cargo.permissions = testCase as typeof cargo.permissions
+            const {pkg, errors} = validateManifest(cargo)
+            expect(errors.length).toBe(0)
+            expect(pkg.permissions.length).toBe(1)
+            expect(pkg.permissions[0]).toStrictEqual(target)
+        }
+    })
+
+    it("should return error if metadata is not a record of strings", () => {
+        const test = <T>(value: T) => {
+            const m = structuredClone(manifest)
+            {(m.metadata as any) = value}
+            return validateManifest(m)
+        }
+        expect(test([]).errors.length).toBeGreaterThan(0)
+        expect(test(1).errors.length).toBeGreaterThan(0)
+        expect(test(true).errors.length).toBeGreaterThan(0)
+        expect(test(Symbol()).errors.length).toBeGreaterThan(0)
+        expect(test("hey there").errors.length).toBeGreaterThan(0)
+        expect(test({key: 2}).errors.length).toBeGreaterThan(0)
+        expect(test({key: false}).errors.length).toBeGreaterThan(0)
+        expect(test({key: Symbol()}).errors.length).toBeGreaterThan(0)
+        expect(test({key: {}}).errors.length).toBeGreaterThan(0)
+        expect(test({key: []}).errors.length).toBeGreaterThan(0)
+        expect(test({key: null}).errors.length).toBeGreaterThan(0)
+        expect(test({key: undefined}).errors.length).toBeGreaterThan(0)
+        expect(test({key: 0}).errors.length).toBeGreaterThan(0)
+        expect(test({key: 1n}).errors.length).toBeGreaterThan(0)
+    })
+
     it("should return error if metadata is not a record of strings", () => {
         const test = <T>(value: T) => {
             const m = structuredClone(manifest)

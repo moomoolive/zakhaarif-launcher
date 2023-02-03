@@ -1,6 +1,6 @@
 import {Button} from "@mui/material"
 import {Link} from "react-router-dom"
-import {GAME_CARGO_INDEX} from "../standardCargos"
+//import {GAME_CARGO_INDEX} from "../standardCargos"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { useRef, useState } from "react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
@@ -22,7 +22,7 @@ const StartMenuPage = () => {
                     {gameSaveExists.current ? <>
                         <div>
                             <Link 
-                                to={`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=-1`}
+                                to={`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=-1`}
                                 style={gameSaveExists.current 
                                     ? {}
                                     : {pointerEvents: "none"}

@@ -18,7 +18,6 @@ import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {useAppShellContext} from "../../routes/store"
 import {CargoIndices} from "../../lib/shabah/downloadClient"
 import {useEffectAsync} from "../../hooks/effectAsync"
-import {STANDARD_MOD_CARGO} from "../../standardCargos"
 import {NUMBER_OF_STANDARD_MODS, STANDARD_MOD_ID} from "../../config"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
@@ -32,11 +31,7 @@ const LinkableMod = ({mod, actionIcon}: LinkableModProps) => {
     const {downloadClient} = useAppShellContext()
     
     const [showInfo, setShowInfo] = useState(false)
-    const [modCargo, setModCargo] = useState(
-        mod.id === STANDARD_MOD_ID
-            ? STANDARD_MOD_CARGO
-            : new Cargo()
-    )
+    const [modCargo, setModCargo] = useState(new Cargo())
     const [cargoError, setCargoError] = useState(false)
 
     useEffectAsync(async () => {

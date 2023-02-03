@@ -206,14 +206,12 @@ export class Shabah {
             )
             const cargoIndexExists = !!updateCargoIndex
             const updateQueued = updateCargoIndex?.downloadQueueId !== NO_UPDATE_QUEUED
-            const downloadManagerHasUpdateRecord = updateQueued
-                ? !!(await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || ""))
-                : false
-            if (
-                cargoIndexExists
-                && updateQueued
-                && downloadManagerHasUpdateRecord
-            ) {
+            if (!cargoIndexExists || !updateQueued) {
+                continue
+            }
+
+            let downloadManagerHasUpdateRecord = !!await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || "")
+            if (downloadManagerHasUpdateRecord) {
                 return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
             }
         }

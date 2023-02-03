@@ -148,10 +148,12 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
     for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i]
         const {key, value} = candidate
+        if (!(key in permissionsMeta)) {
+            continue
+        }
         if (
-            !(key in permissionsMeta)
-            || permissionsMeta[key].extendable && value.length < 1
-            || permissionsMeta[key].fixedOptions && value.length < 1
+            (permissionsMeta[key].extendable && value.length < 1)
+            || (permissionsMeta[key].fixedOptions && value.length < 1)
         ) {
             continue
         }

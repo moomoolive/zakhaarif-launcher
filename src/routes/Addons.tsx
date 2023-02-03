@@ -54,12 +54,6 @@ import {MimeIcon} from "../components/cargo/FileOverlay"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
 import {isStandardCargo, isMod, isEmbeddedStandardCargo} from "../lib/utils/cargos"
-import {
-    addStandardCargosToCargoIndexes,
-    GAME_CARGO_INDEX,
-    GAME_CARGO,
-    STANDARD_MOD_CARGO
-} from "../standardCargos"
 import {GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
 import {MANIFEST_NAME} from "../lib/cargo/index"
 import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
@@ -300,6 +294,7 @@ const AddOns = () => {
             return
         }
         const targetCargoIndex = cargoIndex.cargos[index]
+        /*
         const cargo = await (async (rootUrl: string, id: string) => {
             switch (id) {
                 case STANDARD_MOD_ID:
@@ -323,6 +318,10 @@ const AddOns = () => {
                     return await downloadClient.getCargoAtUrl(rootUrl)
             }
         })(targetCargoIndex.resolvedUrl, viewingCargo)
+        */
+        const cargo = await downloadClient.getCargoAtUrl(
+            targetCargoIndex.resolvedUrl
+        )
         if (!cargo.ok) {
             setCargoFound(false)
             return
@@ -364,9 +363,7 @@ const AddOns = () => {
             setIsInErrorState(true)
             return
         }
-        const cargos = addStandardCargosToCargoIndexes(
-            cargoIndexRes.data.cargos
-        )
+        const cargos = cargoIndexRes.data.cargos//addStandardCargosToCargoIndexes(cargoIndexRes.data.cargos)
         setCargoIndex({...cargoIndexRes.data, cargos})
         setStorageUsage(clientStorageRes.data)
     }, [])
@@ -521,11 +518,7 @@ const AddOns = () => {
                     <CargoInfo
                         onClose={() => setShowCargoInfo(false)}
                         cargo={targetCargo}
-                        cargoIndex={
-                            viewingCargoIndex > (cargoIndex.cargos.length - 1) || viewingCargoIndex < 0
-                                ? GAME_CARGO_INDEX
-                                : cargoIndex.cargos[viewingCargoIndex]
-                        }
+                        cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
                     />
                 </> : <></>}
 

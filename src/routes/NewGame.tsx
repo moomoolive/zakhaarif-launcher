@@ -11,12 +11,12 @@ import {
     faPlus, 
 } from "@fortawesome/free-solid-svg-icons"
 import {Link, useNavigate} from "react-router-dom"
-import {GAME_CARGO_INDEX} from "../standardCargos"
+//import {GAME_CARGO_INDEX} from "../standardCargos"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppShellContext} from "./store"
 import {emptyCargoIndices} from "../lib/shabah/downloadClient"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {addStandardCargosToCargoIndexes} from "../standardCargos"
+//import {addStandardCargosToCargoIndexes} from "../standardCargos"
 import {MOD_CARGO_ID_PREFIX} from "../config"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
@@ -38,7 +38,7 @@ const NewGamePage = () => {
 
     useEffectAsync(async () => {
         const clientResponse = await downloadClient.getCargoIndices()
-        const allCargos = addStandardCargosToCargoIndexes(clientResponse.cargos)
+        const allCargos = clientResponse.cargos//addStandardCargosToCargoIndexes(clientResponse.cargos)
         const cargos = allCargos.filter((cargo) => cargo.id.startsWith(MOD_CARGO_ID_PREFIX))
         const standardMod = cargos[0]
         setLinkedMods([standardMod])
@@ -81,7 +81,7 @@ const NewGamePage = () => {
                     if (!await confirm({title: "Are you sure you want to create a new game?"})) {
                         return
                     }
-                    navigate(`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=-1`)
+                    navigate(`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=-1`)
                 }}
             >
                 <div className="mb-1">
@@ -131,7 +131,7 @@ const NewGamePage = () => {
                             })
                             setLoading(false)
                             window.localStorage.setItem(SAVE_EXISTS, "1")
-                            navigate(`/extension?entry=${encodeURIComponent(GAME_CARGO_INDEX.entry)}&state=${gameId}`)
+                            navigate(`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=${gameId}`)
                         }}
                         disabled={loading}
                     >

@@ -2,7 +2,7 @@ import {ALLOW_ALL_PERMISSIONS} from "../types/permissions"
 import {createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
 import {wRpc} from "../wRpc/simple"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
-import {addStandardCargosToCargoIndexes} from "../../standardCargos"
+//import {addStandardCargosToCargoIndexes} from "../../standardCargos"
 import {
     essentialRpcs, 
     embedAnyExtensionRpcs,
@@ -211,7 +211,7 @@ export class JsSandbox {
         } as const
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
-        const cargos = addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
+        const cargos = originalCargoIndexes.cargos//addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
         const merged = canonicalUrls.length < 1 
             ? configuredPermissions
             : mergePermissionSummaries(

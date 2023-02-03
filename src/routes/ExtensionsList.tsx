@@ -26,7 +26,7 @@ import {
 } from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
-import {addStandardCargosToCargoIndexes} from "../standardCargos"
+//import {addStandardCargosToCargoIndexes} from "../standardCargos"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
@@ -54,7 +54,7 @@ const ExtensionsListPage = () => {
             return
         }
         const {data} = indicesRes
-        const allCargos =  addStandardCargosToCargoIndexes(data.cargos)
+        const allCargos =  data.cargos//addStandardCargosToCargoIndexes(data.cargos)
         const cargos =  allCargos.filter((cargo) => cargo.id.startsWith(EXTENSION_CARGO_ID_PREFIX))
         setCargoIndex({...data, cargos})
         setLoading(false)
