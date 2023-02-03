@@ -531,6 +531,28 @@ export class Shabah {
         )
     }
 
+    private async removeCargoFromDownloadQueue(
+        canonicalUrl: string
+    ): Promise<StatusCode> {
+        const targetIndex = await this.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        if (!targetIndex) {
+            return STATUS_CODES.notFound
+        }
+        const targetSegmentIndex = targetIndex.segments.findIndex(
+            (segment) => segment.canonicalUrl === canonicalUrl
+        )
+        targetIndex.segments.splice(targetSegmentIndex, 1)
+        const indexes = await this.getDownloadIndices()
+        if (targetIndex.segments.length < 1) {
+            removeDownloadIndex(indexes, canonicalUrl)
+            this.downloadManager.cancelDownload(targetIndex.id)
+        }
+        this.persistDownloadIndices(indexes)
+        return STATUS_CODES.ok
+    }
+
     async deleteCargo(canonicalUrl: string): Promise<Ok<StatusCode>> {
         const cargoIndex = await this.getCargoIndices()
         const index = cargoIndex.cargos.findIndex(
@@ -544,8 +566,11 @@ export class Shabah {
         promises.push(this.deleteAllCargoFiles(
             targetCargo.resolvedUrl
         ))
-        if (targetCargo.state === "updating") {
-
+        if (
+            targetCargo.state === "updating" 
+            && targetCargo.downloadQueueId !== NO_UPDATE_QUEUED
+        ) {
+            promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
         }
         await Promise.all(promises)
         return io.ok(
@@ -562,9 +587,17 @@ export class Shabah {
             return io.ok(STATUS_CODES.notFound)
         }
         const targetCargo = cargoIndex.cargos[index]
-        await this.deleteAllCargoFiles(
+        const promises = []
+        promises.push(this.deleteAllCargoFiles(
             targetCargo.resolvedUrl
-        )
+        ))
+        if (
+            targetCargo.state === "updating" 
+            && targetCargo.downloadQueueId !== NO_UPDATE_QUEUED
+        ) {
+            promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
+        }
+        await Promise.all(promises)
         targetCargo.state = "archived"
         await this.persistCargoIndices(cargoIndex)
         return io.ok(STATUS_CODES.ok)
@@ -675,6 +708,7 @@ export class Shabah {
         }
         const indexes = await this.getDownloadIndices()
         removeDownloadIndex(indexes, canonicalUrl)
+        this.persistDownloadIndices(indexes)
         return io.ok(STATUS_CODES.ok)
     }
 

@@ -55,8 +55,11 @@ type CargoPartial= Partial<
     Omit<Cargo, "files" | "authors" | "repo" | "permissions">
 >
 
+export type CargoMeta = Record<string, string>
+
 type CargoOptions<
-    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>,
+    Metadata extends CargoMeta = Record<string, string>
 > = (
     CargoPartial & Partial<{
         authors: Array<Partial<{
@@ -69,15 +72,17 @@ type CargoOptions<
             bytes: number,
             invalidation: InvalidationStrategy
         }>>
-        repo: Partial<{ type: RepoType, url: string }>,
+        repo: Partial<{ type: RepoType, url: string }>
         permissions: PermissionsListOptions<Permissions>
+        metadata: Metadata
     }>
 )
 
 export const NULL_MANIFEST_VERSION = "0.0.0"
 
 export class Cargo<
-    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
+    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>,
+    Metadata extends CargoMeta = Record<string, string>
 > {
     // required fields
     crateVersion: CrateVersion
@@ -100,6 +105,7 @@ export class Cargo<
     repo: {type: RepoType, url: string}
     homepageUrl: string
     permissions: PermissionsList<Permissions>
+    metadata: Metadata
 
     constructor({
         crateVersion = "0.1.0",
@@ -117,8 +123,9 @@ export class Cargo<
         license = NULL_FIELD,
         repo = {type: NULL_FIELD, url: NULL_FIELD},
         homepageUrl = NULL_FIELD,
-        permissions = []
-    }: CargoOptions<Permissions> = {}) {
+        permissions = [],
+        metadata = {} as Metadata
+    }: CargoOptions<Permissions, Metadata> = {}) {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
@@ -168,14 +175,15 @@ export class Cargo<
             return permissionsArray
         }, [] as PermissionsList<Permissions>)
         this.permissions = noDuplicates
+        this.metadata = metadata
     }
 }
 
 export const toMiniCargo = <
     Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
->({version}: Cargo<Permissions>) => ({
+>({version}: Cargo<Permissions>): MiniCodeManifest => ({
     version
-} as MiniCodeManifest) 
+}) 
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
 
@@ -378,6 +386,26 @@ export const validateManifest = <T>(cargo: T) => {
     pkg.repo.type = orNull(c.repo?.type)
     pkg.repo.url = orNull(c.repo?.url)
     pkg.homepageUrl = orNull(c.homepageUrl)
+
+    c.metadata = c.metadata || {}
+    if (type(c.metadata) !== "object") {
+        errors.push(`metadata should be a record of strings, got "${type(c.metadata)}"`)
+        c.metadata = {}
+    }
+
+    const meta: Record<string, string> = {}
+    const candidate = c.metadata || {}
+    const metaKeys = Object.keys(c.metadata || {})
+    for (let i = 0; i < metaKeys.length; i++) {
+        const key = metaKeys[i]
+        const value = candidate[key]
+        if (typeof value !== "string") {
+            errors.push(`meta should be a record of strings, got type "${type(value)}" for property "${key}" of meta`)
+            continue
+        }
+        meta[key] = value
+    }
+
     return out
 }
 
@@ -437,6 +465,16 @@ export const diffManifestFiles = (
     const newFiles: Record<string, ValidDefaultStrategies> = {}
     for (let i = 0; i < newCargo.files.length; i++) {
         const {name, invalidation} = newCargo.files[i]
+        /*
+        if (
+            newCargo.entry !== NULL_FIELD 
+            && name === newCargo.entry
+            && invalidation === "default"
+        ) {
+            newFiles[name] = "purge"
+            continue
+        }
+        */
         newFiles[name] = invalidation === "default"
             ? defaultInvalidation
             : invalidation

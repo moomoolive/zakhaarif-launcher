@@ -5,6 +5,8 @@ import {
     NULL_MANIFEST_VERSION,
     LATEST_CRATE_VERSION, NULL_FIELD
 } from "./index"
+import {diffManifestFiles, validateManifest} from "./index"
+import {SemVer} from "../smallSemver/index"
 
 const entry = "index.js"
 const manifest = new Cargo({
@@ -12,7 +14,7 @@ const manifest = new Cargo({
     version: "0.1.0", 
     name: "test-pkg", 
     entry, 
-    files: [{name: entry, bytes: 1_000}]
+    files: [{name: entry, bytes: 1_000, invalidation: "default"}]
 })
 
 describe("cargo update detection function", () => {
@@ -71,8 +73,6 @@ describe("cargo update detection function", () => {
         }
     })
 })
-
-import {diffManifestFiles} from "./index"
 
 describe("manifest file diffing function", () => {
     it("should return 0 additions and deletions new and old manifest are identical if ", () => {
@@ -172,9 +172,6 @@ describe("manifest file diffing function", () => {
         })))
     })
 })
-
-import {validateManifest} from "./index"
-import {SemVer} from "../smallSemver/index"
 
 describe("manifest validation function", () => {
     it("should return error if inputted cargo is not an object", () => {
@@ -323,6 +320,7 @@ describe("manifest validation function", () => {
         expect(del("license").errors.length).toBe(0)
         expect(del("repo").errors.length).toBe(0)
         expect(del("homepageUrl").errors.length).toBe(0)
+        expect(del("metadata").errors.length).toBe(0)
     })
 
     it("non-string keywords should be filtered during validation", () => {
@@ -432,6 +430,28 @@ describe("manifest validation function", () => {
             {key: "another", value: ["val"]}
         ]}
         expect(validateManifest(m).pkg.permissions.length).toBe(2)
+    })
+
+    it("should return error if metadata is not a record of strings", () => {
+        const test = <T>(value: T) => {
+            const m = structuredClone(manifest)
+            {(m.metadata as any) = value}
+            return validateManifest(m)
+        }
+        expect(test([]).errors.length).toBeGreaterThan(0)
+        expect(test(1).errors.length).toBeGreaterThan(0)
+        expect(test(true).errors.length).toBeGreaterThan(0)
+        expect(test(Symbol()).errors.length).toBeGreaterThan(0)
+        expect(test("hey there").errors.length).toBeGreaterThan(0)
+        expect(test({key: 2}).errors.length).toBeGreaterThan(0)
+        expect(test({key: false}).errors.length).toBeGreaterThan(0)
+        expect(test({key: Symbol()}).errors.length).toBeGreaterThan(0)
+        expect(test({key: {}}).errors.length).toBeGreaterThan(0)
+        expect(test({key: []}).errors.length).toBeGreaterThan(0)
+        expect(test({key: null}).errors.length).toBeGreaterThan(0)
+        expect(test({key: undefined}).errors.length).toBeGreaterThan(0)
+        expect(test({key: 0}).errors.length).toBeGreaterThan(0)
+        expect(test({key: 1n}).errors.length).toBeGreaterThan(0)
     })
 })
 

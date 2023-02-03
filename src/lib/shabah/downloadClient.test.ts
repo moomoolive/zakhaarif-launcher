@@ -124,6 +124,8 @@ const dependencies = ({
     const downloadState = {
         queuedDownloads: [] as Array<{id: string, urls: string[], options: Record<string, unknown>}>
     }
+
+    const canceledDownloads = new Map<string, 1>()
     const downloadManager: DownloadManager = {
         queueDownload: async (id, urls, options) => {
             downloadState.queuedDownloads.push({
@@ -147,14 +149,18 @@ const dependencies = ({
                 failureReason: "none"
             }
         },
-        cancelDownload: async () => true,
+        cancelDownload: async (id) => {
+            canceledDownloads.set(id, 1)
+            return true
+        },
         currentDownloadIds: async () => []
     }
 
     return {
         adaptors: {networkRequest, fileCache, downloadManager},
         caches: {networkCache, innerFileCache},
-        downloadState 
+        downloadState,
+        canceledDownloads
     }
 }
 
@@ -2449,6 +2455,132 @@ describe("reading and updating cargo indexes", () => {
         expect(afterDelete).toBe(null)
     })
 
+    it("if cancel is called on cargo during update and cargo is only segement being update, download should be canceled", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const {client, canceledDownloads} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const updateResponse = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl,
+            resolvedUrl: canonicalUrl,
+            originalResolvedUrl: canonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        await client.executeUpdates([updateResponse], "update")
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
+        expect(foundInitial?.state).toBe("updating")
+        
+        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitialDownload).toBe(true)
+        const downloadId = foundInitialDownload?.id || "none"
+        expect(foundInitialDownload?.segments.length).toBe(1)
+        const deleteReponse = await client.deleteCargo(canonicalUrl)
+        expect(deleteReponse.ok).toBe(true)
+        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
+        expect(canceledDownloads.has(downloadId)).toBe(true)
+        const afterDelete = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(afterDelete).toBe(null)
+        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundDeleteDownload).toBe(false)
+    })
+
+    it("if cancel is called on cargo during update and cargo is one of many segements being updated, download should be not be canceled and segment should be yanked from download", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const secondOrigin = "https://mydadashouse.com"
+        const secondCanonicalUrl = secondOrigin + "/"
+        const {client, canceledDownloads} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const updateResponse = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl,
+            resolvedUrl: canonicalUrl,
+            originalResolvedUrl: canonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        const secondUpdate = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl: secondCanonicalUrl,
+            resolvedUrl: secondCanonicalUrl,
+            originalResolvedUrl: secondCanonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        await client.executeUpdates(
+            [updateResponse, secondUpdate], "update"
+        )
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
+        expect(foundInitial?.state).toBe("updating")
+
+        const foundInitialSecond = await client.getCargoIndexByCanonicalUrl(
+            secondCanonicalUrl
+        )
+        expect(!!foundInitialSecond).toBe(true)
+        expect(foundInitialSecond?.downloadQueueId || "none2").toBe(foundInitial?.downloadQueueId || "none1")
+        expect(foundInitialSecond?.state).toBe("updating")
+
+        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitialDownload).toBe(true)
+        expect(foundInitialDownload?.segments.length).toBe(2)
+        const deleteReponse = await client.deleteCargo(canonicalUrl)
+        expect(deleteReponse.ok).toBe(true)
+        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
+        const downloadId = foundInitialDownload?.id || "none"
+        expect(canceledDownloads.has(downloadId)).toBe(false)
+        const afterDelete = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(afterDelete).toBe(null)
+        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
+            secondCanonicalUrl
+        )
+        expect(!!foundDeleteDownload).toBe(true)
+        expect(foundDeleteDownload?.segments.length).toBe(1)
+    })
+
     it("attempting to delete a non-existent indexes does nothing", async () => {
         const canonicalUrl = "https://mymamashouse.com"
         const {client} = createClient(canonicalUrl)
@@ -2620,6 +2752,134 @@ describe("reading and updating cargo indexes", () => {
         )
         expect(!!afterArchive).toBe(true)
         expect(afterArchive?.state).toBe("cached")
+    })
+
+    it("if archive is called on cargo during update and cargo is one of many segements being updated, download should be not be canceled and segment should be yanked from download", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const secondOrigin = "https://mydadashouse.com"
+        const secondCanonicalUrl = secondOrigin + "/"
+        const {client, canceledDownloads} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const updateResponse = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl,
+            resolvedUrl: canonicalUrl,
+            originalResolvedUrl: canonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        const secondUpdate = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl: secondCanonicalUrl,
+            resolvedUrl: secondCanonicalUrl,
+            originalResolvedUrl: secondCanonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        await client.executeUpdates(
+            [updateResponse, secondUpdate], "update"
+        )
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
+        expect(foundInitial?.state).toBe("updating")
+
+        const foundInitialSecond = await client.getCargoIndexByCanonicalUrl(
+            secondCanonicalUrl
+        )
+        expect(!!foundInitialSecond).toBe(true)
+        expect(foundInitialSecond?.downloadQueueId || "none2").toBe(foundInitial?.downloadQueueId || "none1")
+        expect(foundInitialSecond?.state).toBe("updating")
+
+        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitialDownload).toBe(true)
+        expect(foundInitialDownload?.segments.length).toBe(2)
+        const deleteReponse = await client.archiveCargo(canonicalUrl)
+        expect(deleteReponse.ok).toBe(true)
+        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
+        const downloadId = foundInitialDownload?.id || "none"
+        expect(canceledDownloads.has(downloadId)).toBe(false)
+        const afterArchive = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!afterArchive).toBe(true)
+        expect(afterArchive?.state).toBe("archived")
+        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
+            secondCanonicalUrl
+        )
+        expect(!!foundDeleteDownload).toBe(true)
+        expect(foundDeleteDownload?.segments.length).toBe(1)
+    })
+
+    it("if archive is called on cargo during update and cargo is only segement being updated, download should be canceled", async () => {
+        const origin = "https://mymamashouse.com"
+        const canonicalUrl = origin + "/"
+        const {client, canceledDownloads} = createClient(canonicalUrl)
+        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const updateResponse = createUpdateCheck({
+            id: "tmp",
+            canonicalUrl,
+            resolvedUrl: canonicalUrl,
+            originalResolvedUrl: canonicalUrl,
+            newCargo: initial,
+            status: Shabah.STATUS.ok,
+            diskInfo: {
+                raw: {
+                    used: 0,
+                    total: 10_000,
+                    left: 10_000,
+                },
+                cargoStorageBytes: 100
+            }
+        })
+        await client.executeUpdates([updateResponse], "update")
+        const foundInitial = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitial).toBe(true)
+        expect(foundInitial?.downloadQueueId).not.toBe(NO_UPDATE_QUEUED)
+        expect(foundInitial?.state).toBe("updating")
+        
+        const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundInitialDownload).toBe(true)
+        const downloadId = foundInitialDownload?.id || "none"
+        expect(foundInitialDownload?.segments.length).toBe(1)
+        const deleteReponse = await client.archiveCargo(canonicalUrl)
+        expect(deleteReponse.ok).toBe(true)
+        expect(deleteReponse.data).toBe(Shabah.STATUS.ok)
+        expect(canceledDownloads.has(downloadId)).toBe(true)
+        const afterArchive = await client.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!afterArchive).toBe(true)
+        expect(afterArchive?.state).toBe("archived")
+        const foundDeleteDownload = await client.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        expect(!!foundDeleteDownload).toBe(false)
     })
 })
 
