@@ -122,28 +122,42 @@ const dependencies = ({
     }
 
     const downloadState = {
-        queuedDownloads: [] as Array<{id: string, urls: string[], options: Record<string, unknown>}>
+        queuedDownloads: [] as Array<{
+            id: string, urls: 
+            string[], 
+            options: {
+                title: string
+                downloadTotal: number
+            }
+        }>
     }
 
     const canceledDownloads = new Map<string, 1>()
+    const queuedDownloads = new Map<string, number>()
     const downloadManager: DownloadManager = {
-        queueDownload: async (id, urls, options) => {
+        queueDownload: async (id, urls, {title = "", downloadTotal}) => {
+            queuedDownloads.set(id, 1)
             downloadState.queuedDownloads.push({
                 id,
                 urls,
-                options
+                options: {title, downloadTotal}
             })
             return true
         },
         getDownloadState: async (id) => {
-            const exists = downloadManagerState.has(id)
+            const exists = queuedDownloads.has(id)
             if (!exists) {
                 return null
             }
+            const queueIndex = downloadState.queuedDownloads.findIndex(
+                (download) => download.id === id
+            )
             return {
                 id,
                 downloaded: 0,
-                total: 100,
+                total: queueIndex < 0
+                    ? 100
+                    : downloadState.queuedDownloads[queueIndex].options.downloadTotal,
                 failed: false,
                 finished: false,
                 failureReason: "none"
@@ -153,7 +167,11 @@ const dependencies = ({
             canceledDownloads.set(id, 1)
             return true
         },
-        currentDownloadIds: async () => []
+        currentDownloadIds: async () => {
+            return downloadState.queuedDownloads.map(
+                (download) => download.id
+            )
+        }
     }
 
     return {
@@ -1404,6 +1422,19 @@ const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
 }
 
 describe("executing updates", () => {
+    it("attempting to queue a download with an empty array does not queue a download", async () => {
+        const mainOrigin = "https://yo-mama.com"
+        const {client, downloadState} = createClient(mainOrigin, {
+            cacheFiles: {},
+            networkFiles: {},
+        })
+        expect(downloadState.queuedDownloads.length).toBe(0)
+        const response = await client.executeUpdates([], "none")
+        expect(response.ok).toBe(true)
+        expect(response.data).toBe(Shabah.STATUS.zeroUpdatesProvided)
+        expect(downloadState.queuedDownloads.length).toBe(0)
+    })
+
     it("if update response returned an error code, execute updates should not queue download", async () => {
         const origin = "https://my-mamas-house.com"
         const cases = [
@@ -1594,81 +1625,6 @@ describe("executing updates", () => {
             )
             expect(queueResponse.ok).toBe(true)
             expect(queueResponse.data).toBe(Shabah.STATUS.updateAlreadyQueued)
-            expect(downloadState.queuedDownloads.length).toBe(0)
-        }
-    })
-
-    it("if same cargo is already downloading but download client isn't aware and download manager is, execute updates should not queue download", async () => {
-        const origin = "https://my-mamas-house.com"
-        const cases = [
-            {
-                storage: {used: 100, total: 20_000, left: 100},
-                downloadableResources: [
-                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500}
-                ]
-            },
-            {
-                storage: {used: 100, total: 20_000, left: 1_900},
-                downloadableResources: [
-                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 500},
-                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 2_300},
-                ]
-            },
-            {
-                storage: {used: 0, total: 20_000, left: 10},
-                downloadableResources: [
-                    {requestUrl: `${origin}/index.js`, storageUrl: `${origin}/index.js`, bytes: 2},
-                    {requestUrl: `${origin}/style.css`, storageUrl: `${origin}/style.css`, bytes: 1},
-                    {requestUrl: `${origin}/pic.png`, storageUrl: `${origin}/pic.png`, bytes: 8},
-                ]
-            },
-        ]
-        const downloadQueueId = nanoid(21)
-        for (const {storage, downloadableResources} of cases) {
-            const canonicalUrl = origin + "/"
-            const {client, downloadState} = createClient(origin, {
-                cacheFiles: {},
-                networkFiles: {},
-                downloadManagerState: new Map([
-                    [downloadQueueId, 1]
-                ])
-            })
-            expect(downloadState.queuedDownloads.length).toBe(0)
-            const newCargo = new Cargo({name: "test"})
-            const cargoIndex = cargoToCargoIndex(
-                canonicalUrl,
-                newCargo as Cargo<Permissions>,
-                {downloadQueueId}
-            )
-            await client.putCargoIndex(cargoIndex)
-            const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
-                canonicalUrl
-            )
-            expect(!!cargoIndexFound).toBe(true)
-            const updateResponse = createUpdateCheck({
-                status: Shabah.STATUS.ok,
-                id: "tmp",
-                originalResolvedUrl: canonicalUrl,
-                resolvedUrl: canonicalUrl,
-                canonicalUrl,
-                diskInfo: storage,
-                newCargo: new Cargo(),
-                originalNewCargoResponse: new Response(),
-                
-                    downloadableResources,
-                    resourcesToDelete: []
-                
-            })
-            const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
-                updateResponse.canonicalUrl
-            ))
-            expect(downloadIndexExists).toBe(false)
-            const queueResponse = await client.executeUpdates(
-                [updateResponse],
-                "my update"
-            )
-            expect(queueResponse.ok).toBe(true)
-            expect(queueResponse.data).toBe(Shabah.STATUS.downloadManagerUnsyncedState)
             expect(downloadState.queuedDownloads.length).toBe(0)
         }
     })
@@ -2063,9 +2019,105 @@ describe("executing updates", () => {
             }
         }
     })
+
+    it(`if no downloadable resources are found, download should not be queued`, async () => {
+        const mainOrigin = "https://my-mamas-house.com"
+        const origins = [
+            "https://papashouse.com",
+            "https://mamashouse.com"
+        ] as const
+        const tests = [
+            [
+                {
+                    resourcesToDelete: [
+                        {requestUrl: `${origins[0]}/delete1.js`, storageUrl: `${origins[0]}/delete1.js`, bytes: 500},
+                    ],
+                    origin: origins[0]
+                },
+                {
+                    resourcesToDelete: [
+                        {requestUrl: `${origins[1]}/delete1.js`, storageUrl: `${origins[1]}/delete1.js`, bytes: 500},
+                        {requestUrl: `${origins[1]}/delete2.css`, storageUrl: `${origins[1]}/delete2.css`, bytes: 500},
+                    ],
+                    origin: origins[1]
+                },
+            ],
+        ]
+        for (const test of tests) {
+            const downloadClient = createClient(mainOrigin, {
+                cacheFiles: {},
+                networkFiles: {},
+            })
+            const {client, downloadState, caches: {innerFileCache}} = downloadClient
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const updateResponses = []
+            
+            for (const {origin, resourcesToDelete} of test) {
+                const canonicalUrl = origin + "/"
+                const response = createUpdateCheck({
+                    status: Shabah.STATUS.ok,
+                    id: "tmp",
+                    originalResolvedUrl: canonicalUrl,
+                    resolvedUrl: canonicalUrl,
+                    canonicalUrl,
+                    diskInfo: {used: 100, total: 20_000, left: 19_900},
+                    newCargo: new Cargo(),
+                    originalNewCargoResponse: new Response(),
+                    downloadableResources: [],
+                    resourcesToDelete
+                })
+                updateResponses.push(response)
+                const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
+                    response.canonicalUrl
+                ))
+                expect(downloadIndexExists).toBe(false)
+            }
+
+            const queueResponse = await client.executeUpdates(
+                updateResponses,
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.noDownloadbleResources)
+            expect(downloadState.queuedDownloads.length).toBe(0)
+
+            for (const {resourcesToDelete, origin} of test) {
+                const canonicalUrl = origin + "/"
+                const downloadIndex = await client.getDownloadIndexByCanonicalUrl(
+                    canonicalUrl
+                )
+                expect(downloadIndex).toBe(null)
+                const cargoIndex = await client.getCargoIndexByCanonicalUrl(
+                    canonicalUrl
+                )
+                expect(cargoIndex).not.toBe(null)
+                expect(cargoIndex?.downloadQueueId).toBe(NO_UPDATE_QUEUED)
+                
+                for (const {storageUrl} of resourcesToDelete) {
+                    const deleteRequest = innerFileCache.accessLog.find(
+                        (log) => log.action === "delete" && log.url === storageUrl
+                    )
+                    expect(!!deleteRequest).toBe(true)
+                }
+            }
+        }
+    })
 })
 
 describe("download retries", () => {
+    it("attempting to retry a download with an empty array does not queue a download", async () => {
+        const mainOrigin = "https://yo-mama.com"
+        const {client, downloadState} = createClient(mainOrigin, {
+            cacheFiles: {},
+            networkFiles: {},
+        })
+        expect(downloadState.queuedDownloads.length).toBe(0)
+        const response = await client.retryFailedDownloads([], "none")
+        expect(response.ok).toBe(true)
+        expect(response.data).toBe(Shabah.STATUS.zeroUpdatesProvided)
+        expect(downloadState.queuedDownloads.length).toBe(0)
+    })
+
     it(`attempting to retry a non existent cargo should not queue a download`, async () => {
         const mainOrigin = "https://my-mamas-house.com"
         const origins = [
@@ -2542,13 +2594,14 @@ describe("reading and updating cargo indexes", () => {
     it("if cancel is called on cargo during update and cargo is only segement being update, download should be canceled", async () => {
         const origin = "https://mymamashouse.com"
         const canonicalUrl = origin + "/"
+        const resolvedUrl = canonicalUrl
         const {client, canceledDownloads} = createClient(canonicalUrl)
         const initial = new Cargo<Permissions>({name: "my-cargo"})
         const updateResponse = createUpdateCheck({
             id: "tmp",
             canonicalUrl,
-            resolvedUrl: canonicalUrl,
-            originalResolvedUrl: canonicalUrl,
+            resolvedUrl,
+            originalResolvedUrl: resolvedUrl,
             newCargo: initial,
             status: Shabah.STATUS.ok,
             diskInfo: {
@@ -2556,6 +2609,9 @@ describe("reading and updating cargo indexes", () => {
                 total: 10_000,
                 left: 10_000,
             },
+            downloadableResources: [
+                {requestUrl: `${resolvedUrl}/index.js`, storageUrl: `${resolvedUrl}/index.js`, bytes: 10}
+            ],
             cargoStorageBytes: 100
         })
         await client.executeUpdates([updateResponse], "update")
@@ -2589,6 +2645,7 @@ describe("reading and updating cargo indexes", () => {
     it("if cancel is called on cargo during update and cargo is one of many segements being updated, download should be not be canceled and segment should be yanked from download", async () => {
         const origin = "https://mymamashouse.com"
         const canonicalUrl = origin + "/"
+        const resolvedUrl = canonicalUrl
         const secondOrigin = "https://mydadashouse.com"
         const secondCanonicalUrl = secondOrigin + "/"
         const {client, canceledDownloads} = createClient(canonicalUrl)
@@ -2596,8 +2653,8 @@ describe("reading and updating cargo indexes", () => {
         const updateResponse = createUpdateCheck({
             id: "tmp",
             canonicalUrl,
-            resolvedUrl: canonicalUrl,
-            originalResolvedUrl: canonicalUrl,
+            resolvedUrl,
+            originalResolvedUrl: resolvedUrl,
             newCargo: initial,
             status: Shabah.STATUS.ok,
             diskInfo: {
@@ -2605,6 +2662,9 @@ describe("reading and updating cargo indexes", () => {
                 total: 10_000,
                 left: 10_000,
             },
+            downloadableResources: [
+                {requestUrl: `${resolvedUrl}/index.js`, storageUrl: `${resolvedUrl}/index.js`, bytes: 10}
+            ],
             cargoStorageBytes: 100
         })
         const secondUpdate = createUpdateCheck({
@@ -2614,6 +2674,9 @@ describe("reading and updating cargo indexes", () => {
             originalResolvedUrl: secondCanonicalUrl,
             newCargo: initial,
             status: Shabah.STATUS.ok,
+            downloadableResources: [
+                {requestUrl: `${secondCanonicalUrl}/index.js`, storageUrl: `${secondCanonicalUrl}/index.js`, bytes: 10}
+            ],
             diskInfo: {
                 used: 0,
                 total: 10_000,
@@ -2908,5 +2971,96 @@ describe("finding full cargos", () => {
         const response = await client.getCargoAtUrl(resolvedUrl)
         expect(response.ok).toBe(true)
         expect(response.data?.pkg).toStrictEqual(structuredClone(cargo))
+    })
+})
+
+describe("querying download state", () => {
+    it("if cargo has been queued for download state should be queryable", async () => {
+        const mainOrigin = "https://my-mamas-house.com"
+        const origins = [
+            "https://1.com",
+            "https://2.com",
+            "https://3.com"
+        ] as const
+        const cases = [
+            {
+                downloadableResources: [
+                    {requestUrl: `${origins[0]}/index.js`, storageUrl: `${origins[0]}/index.js`, bytes: 500}
+                ],
+                origin: origins[0]
+            },
+            {
+                downloadableResources: [
+                    {requestUrl: `${origins[1]}/index.js`, storageUrl: `${origins[1]}/index.js`, bytes: 500},
+                    {requestUrl: `${origins[1]}/style.css`, storageUrl: `${origins[1]}/style.css`, bytes: 2_300},
+                ],
+                origin: origins[1]
+            },
+            {
+                downloadableResources: [
+                    {requestUrl: `${origins[2]}/index.js`, storageUrl: `${origins[2]}/index.js`, bytes: 2},
+                    {requestUrl: `${origins[2]}/style.css`, storageUrl: `${origins[2]}/style.css`, bytes: 1},
+                    {requestUrl: `${origins[2]}/pic.png`, storageUrl: `${origins[2]}/pic.png`, bytes: 8},
+                ],
+                origin: origins[2]
+            },
+        ]
+        for (const {downloadableResources, origin} of cases) {
+            const {client, downloadState} = createClient(mainOrigin, {
+                cacheFiles: {},
+                networkFiles: {}
+            })
+            expect(downloadState.queuedDownloads.length).toBe(0)
+            const canonicalUrl = origin + "/"
+            const resolvedUrl = canonicalUrl
+            const id = "dl-" + Math.trunc(Math.random() * 1_000)
+            const updateResponse = createUpdateCheck({
+                id,
+                resolvedUrl,
+                originalResolvedUrl: resolvedUrl,
+                canonicalUrl,
+                status: Shabah.STATUS.ok,
+                diskInfo: {used: 0, total: 10_000, left: 10_000},
+                newCargo: new Cargo(),
+                originalNewCargoResponse: new Response(),
+                downloadableResources,
+                resourcesToDelete: []
+            })
+            const queueResponse = await client.executeUpdates(
+                [updateResponse],
+                "my update"
+            )
+            expect(queueResponse.ok).toBe(true)
+            expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
+            expect(downloadState.queuedDownloads.length).toBe(1)
+            const cargoIndex = await client.getCargoIndexByCanonicalUrl(
+                canonicalUrl
+            ) 
+            expect(cargoIndex).not.toBe(null)
+            const state = await client.getDownloadState(
+                canonicalUrl
+            )
+            expect(state).not.toBe(null)
+            expect(state?.id || "1").toBe(cargoIndex?.downloadQueueId || "2")
+            const downloadTotal = downloadableResources.reduce(
+                (total, next) => total + next.bytes,
+                0
+            )
+            expect(state?.total).toBe(downloadTotal)
+        }
+    })
+
+    it("if cargo has not been queued for download, download state should return null", async () => {
+        const tests = [
+            "https://hi.com",
+            "https://no.com",
+            "https://sushi.org"
+        ]
+        for (const origin of tests) {
+            const {client} = createClient(origin, {})
+            const canonicalUrl = origin + "/"
+            const downloadState = await client.getDownloadState(canonicalUrl)
+            expect(downloadState).toBe(null)
+        }
     })
 })

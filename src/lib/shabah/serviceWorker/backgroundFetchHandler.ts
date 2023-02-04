@@ -11,17 +11,24 @@ import {
     saveErrorDownloadIndex,
     NO_UPDATE_QUEUED,
     DownloadSegment,
-    CargoIndex,
     CargoState
 } from "../backend"
-import {BackgroundFetchEvent, BackgroundFetchRecord, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
-import { nanoid } from "nanoid"
+import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
 
-type BackgroundFetchSuccessOptions= {
+export type BackgroundFetchEventName = "success" | "abort" | "fail"
+
+export type ProgressUpdateRecord = {
+    type: BackgroundFetchEventName | "install"
+    downloadId: string
+    canonicalUrls: string[]
+}
+
+export type BackgroundFetchSuccessOptions = {
     fileCache: FileCache
     origin: string,
     log: (...msgs: any[]) => void
-    type: "success" | "abort" | "fail"
+    type: BackgroundFetchEventName
+    onProgress?: (progressUpdate: ProgressUpdateRecord) => unknown
 }
 
 export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
@@ -29,7 +36,13 @@ export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
 }
 
 export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOptions) => {
-    const {fileCache, origin, log, type: eventType} = options
+    const {
+        fileCache, 
+        origin, 
+        log, 
+        type: eventType, 
+        onProgress = () => {}
+    } = options
     const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
     return async (
         event: BackgroundFetchHandlerEvent
@@ -37,18 +50,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
         const downloadQueueId = bgfetch.id
-        const fetchedResources = await bgfetch.matchAll()
-        log(
-            eventName,
-            "resources downloaded",
-            fetchedResources.map(
-                (resource) => resource.request.url
-            )
-        )
-        if (fetchedResources.length < 0) {
-            log(eventName, "no resources found, aborting operation")
-            return
-        }
         const [downloadIndices, cargoIndices] = await Promise.all([
             getDownloadIndices(origin, fileCache),
             getCargoIndices(origin, fileCache)
@@ -66,12 +67,27 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         }
         const targetDownloadIndex = downloadIndices.downloads[downloadIndexPosition]
         const downloadSegmentsLength = targetDownloadIndex.segments.length
-        if (downloadSegmentsLength < 1) {
-            log(
-                eventName, "fetch attempt has no segments! Ending handler"
+        const progressUpdater: ProgressUpdateRecord = {
+            type: "install",
+            downloadId: targetDownloadIndex.id,
+            canonicalUrls: targetDownloadIndex.segments.map(
+                (segment) => segment.canonicalUrl
             )
-            return
         }
+
+        if (eventType === "abort" || eventType === "fail") {
+            onProgress({...progressUpdater, type: eventType})
+        }
+        
+        const fetchedResources = await bgfetch.matchAll()
+        log(
+            eventName,
+            "resources downloaded",
+            fetchedResources.map(
+                (resource) => resource.request.url
+            )
+        )
+        
         const associatedCargos = cargoIndices.cargos.filter(
             (cargo) => cargo.downloadQueueId === downloadQueueId
         )
@@ -79,13 +95,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             eventName, 
             `download_segments=${downloadSegmentsLength}, associated_cargos=${associatedCargos.length}`
         )
-        if (downloadSegmentsLength !== associatedCargos.length) {
-            log(
-                eventName,
-                `There is a mismatch between segments and associated cargos. Ending handler!`
-            )
-            return
-        }
+
         const allAssociatedCargosAreInSegments = associatedCargos.every((cargo) => {
             const {canonicalUrl} = cargo
             const found = targetDownloadIndex.segments.find(
@@ -96,18 +106,32 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         if (!allAssociatedCargosAreInSegments) {
             log(
                 eventName,
-                `Some of associated cargos were not found in download index segment! Ending Handler!`,
+                `Some of associated cargos were not found in download index segment!`,
                 associatedCargos,
                 targetDownloadIndex.segments,
             )
-            return
         }
+
         const updateTitle = targetDownloadIndex.title
+        if (eventType === "success") {
+            onProgress({...progressUpdater, type: "install"})
+        }
+
+        let totalResources = fetchedResources.length
+        let resourcesProcessed = 0
+        let failCount = 0
         for (const cargoIndex of associatedCargos) {
             const {canonicalUrl} = cargoIndex
             const targetSegmentIndex = targetDownloadIndex.segments.findIndex(
                 (segment) => segment.canonicalUrl === canonicalUrl
             )
+            if (targetSegmentIndex < 0) {
+                log(
+                    eventName,
+                    `download segment "${canonicalUrl}" does not exist on download index ${downloadQueueId}`
+                )
+                continue
+            }
             const targetSegment = targetDownloadIndex.segments[targetSegmentIndex]
             const {map: urlMap} = targetSegment
             const len = fetchedResources.length
@@ -133,7 +157,10 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 resourcesToDelete: targetSegment.resourcesToDelete
             }
             const errorDownloadIndex: DownloadIndex = {
-                id: nanoid(21),
+                // once download client attempts to
+                // retry this segment, and valid id
+                // will be provisioned
+                id: "err",
                 previousId: targetDownloadIndex.id,
                 segments: [errorDownloadSegment],
                 title: `Failed ${updateTitle} (${cargoIndex.name})`,
@@ -185,13 +212,11 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                     })())
                 }
                 await Promise.all(promises)
+                resourcesProcessed += processingStats.resourcesProcessed
+                failCount += processingStats.failedResources
                 start += maxFileProcessed
                 end = Math.min(len, end + maxFileProcessed)
             }
-            log(
-                eventName,
-                `processed ${processingStats.resourcesProcessed} out of ${len}. orphan_count=${len - processingStats.resourcesProcessed}, fail_count=${processingStats.failedResources}`
-            )
             let state: CargoState = "cached"
             const resourcesFailed = processingStats.failedResources > 0
             if (eventType === "abort" && resourcesFailed) {
@@ -241,6 +266,12 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 log(eventName, "successfully saved error log")
             }
         }
+        
+        log(
+            eventName,
+            `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${totalResources - resourcesProcessed}, fail_count=${failCount}. Releasing orphans!`
+        )
+
         removeDownloadIndex(downloadIndices, downloadQueueId)
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         log(eventName, "successfully persisted changes")
@@ -250,11 +281,16 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             eventType === "fail" 
             || eventType === "success"
         )
+
         if (eventHasUiUpdate && event.updateUI) {
             const suffix = eventType === "fail"
                 ? "failed"
                 : "finished"
             await event.updateUI({title: `${updateTitle} ${suffix}!`})
+        }
+
+        if (eventType === "success") {
+            onProgress({...progressUpdater, type: eventType})
         }
     }
 }

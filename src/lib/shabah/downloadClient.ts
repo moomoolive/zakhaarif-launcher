@@ -29,7 +29,6 @@ import {
     NO_UPDATE_QUEUED,
     DownloadSegment,
     removeSlashAtEnd,
-    getCargoIndexesCore,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {MANIFEST_NAME, NULL_FIELD} from "../cargo/index"
@@ -172,11 +171,15 @@ export class Shabah {
         updates: UpdateCheckResponse[],
         title: string,
     ): Promise<Ok<StatusCode>> {
+        if (updates.length < 1) {
+            return io.ok(STATUS_CODES.zeroUpdatesProvided)
+        }
+
         for (const update of updates) {
             if (update.errorOccurred()) {
                 return io.ok(STATUS_CODES.updateImpossible)
             }
-            if (!update.updateAvailable() || !update.newCargo) {
+            if (!update.updateAvailable()) {
                 return io.ok(STATUS_CODES.newCargoMissing)
             } 
             if (!update.enoughStorageForCargo()) {
@@ -198,32 +201,25 @@ export class Shabah {
             const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
                 update.canonicalUrl
             )
-            const cargoIndexExists = !!updateCargoIndex
             const updateQueued = updateCargoIndex?.downloadQueueId !== NO_UPDATE_QUEUED
-            if (!cargoIndexExists || !updateQueued) {
+            if (!updateCargoIndex || !updateQueued) {
                 continue
             }
 
-            let downloadManagerHasUpdateRecord = !!await this.downloadManager.getDownloadState(updateCargoIndex?.downloadQueueId || "")
-            if (downloadManagerHasUpdateRecord) {
+            const downloadManagerResponse = await io.wrap(this.downloadManager.getDownloadState(updateCargoIndex.downloadQueueId))
+            if (
+                downloadManagerResponse.ok 
+                && !!downloadManagerResponse.data
+            ) {
                 return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
             }
-        }
-
-        const downloadQueueId = nanoid(21)
-        const downloadIndex = {
-            id: downloadQueueId,
-            previousId: "",
-            bytes: 0,
-            segments: [] as DownloadSegment[],
-            title
-        }
+        }        
         
-        const promises: Promise<unknown>[] = []
+        let byteCount = 0
         const filesToRequest = []
         const filesToDelete = []
         for (const update of updates) {
-            downloadIndex.bytes += update.downloadMetadata().bytesToDownload
+            byteCount += update.downloadMetadata().bytesToDownload
             
             const metadata = update.downloadMetadata()
             const removeFiles = metadata.resourcesToDelete.map(
@@ -234,17 +230,20 @@ export class Shabah {
                 (file) => file.requestUrl
             )
             filesToRequest.push(...addFiles)
-            
-            downloadIndex.segments.push({
-                map: createResourceMap(update.downloadableResources),
-                version: update.versions().new,
-                previousVersion: update.versions().old,
-                resolvedUrl: update.resolvedUrl,
-                canonicalUrl: update.canonicalUrl,
-                bytes: update.downloadMetadata().bytesToDownload,
-                resourcesToDelete: filesToDelete
-            })
+        }
 
+        const resourcesToRequest = filesToRequest.length > 0
+        const downloadQueueId = resourcesToRequest ? nanoid(21) : NO_UPDATE_QUEUED
+        const downloadIndex = {
+            id: downloadQueueId,
+            previousId: "",
+            bytes: byteCount,
+            segments: [] as DownloadSegment[],
+            title
+        }
+        const promises: Promise<unknown>[] = []
+        for (const update of updates) {
+            
             promises.push(this.fileCache.putFile(
                 update.resolvedUrl + MANIFEST_NAME, 
                 new Response(JSON.stringify(update.newCargo), {
@@ -273,16 +272,33 @@ export class Shabah {
                 storageBytes: update.cargoStorageBytes,
                 downloadQueueId: downloadQueueId,
             }))
+
+            if (downloadQueueId === NO_UPDATE_QUEUED) {
+                continue
+            }
+
+            downloadIndex.segments.push({
+                map: createResourceMap(update.downloadableResources),
+                version: update.versions().new,
+                previousVersion: update.versions().old,
+                resolvedUrl: update.resolvedUrl,
+                canonicalUrl: update.canonicalUrl,
+                bytes: update.downloadMetadata().bytesToDownload,
+                resourcesToDelete: filesToDelete
+            })
         }
 
-        promises.push(this.putDownloadIndex(downloadIndex))
-        await Promise.all(promises)
-        
-        const self = this
-        await Promise.all(filesToDelete.map(
-            (url) => self.fileCache.deleteFile(url)
-        ))
+        for (const url of filesToDelete) {
+            promises.push(this.fileCache.deleteFile(url))
+        }
 
+        await Promise.all(promises)
+
+        if (!resourcesToRequest) {
+            return io.ok(STATUS_CODES.noDownloadbleResources)
+        }
+
+        await this.putDownloadIndex(downloadIndex)
         await this.downloadManager.queueDownload(
             downloadQueueId,
             filesToRequest,
@@ -299,6 +315,11 @@ export class Shabah {
         canonicalUrls: string[],
         title: string
     ): Promise<Ok<StatusCode>> {
+
+        if (canonicalUrls.length < 1) {
+            return io.ok(STATUS_CODES.zeroUpdatesProvided)
+        }
+
         const errorReports = []
         for (const canonicalUrl of canonicalUrls) {
             const cargoMeta = await this.getCargoIndexByCanonicalUrl(
@@ -620,31 +641,6 @@ export class Shabah {
         return await saveDownloadIndices(indices, origin, fileCache)
     }
 
-    async getDownloadState(canonicalUrl: string) {
-        const downloadsIndex = await this.getDownloadIndices()
-        const updateIndex = downloadsIndex.downloads.find((index) => {
-            const {segments} = index
-            const target = segments.findIndex(
-                (segment) => segment.canonicalUrl === canonicalUrl
-            )
-            return target
-        })
-        if (!updateIndex) {
-            return null
-        }
-        const {segments} = updateIndex
-        const targetSegmentIndex = segments.findIndex(
-            (segment) => segment.canonicalUrl === canonicalUrl
-        )
-        const targetSegment = segments[targetSegmentIndex]
-        return {
-            id: updateIndex.id,
-            title: updateIndex.title,
-            startedAt: updateIndex.startedAt,
-            ...targetSegment
-        }
-    }
-
     private async refreshDownloadIndicies() {
         const {origin, fileCache} = this
         const indices = await getDownloadIndices(origin, fileCache)
@@ -653,6 +649,25 @@ export class Shabah {
     }
 
     // progress listening interfaces
+    async getDownloadState(canonicalUrl: string): Promise<null | DownloadState> {
+        const cargoIndex = await this.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        if (!cargoIndex) {
+            return null
+        }
+        if (cargoIndex.downloadQueueId === NO_UPDATE_QUEUED) {
+            return null
+        }
+        const managerResponse = await io.wrap(
+            this.downloadManager.getDownloadState(cargoIndex.downloadQueueId)
+        )
+        if (!managerResponse.ok) {
+            return null
+        }
+        return managerResponse.data
+    }
+
     addProgressListener(
         id: string, 
         callback: onProgressCallback
