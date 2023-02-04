@@ -120,6 +120,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         let totalResources = fetchedResources.length
         let resourcesProcessed = 0
         let failCount = 0
+        const orphanedResources = new Map<string, boolean>()
         for (const cargoIndex of associatedCargos) {
             const {canonicalUrl} = cargoIndex
             const targetSegmentIndex = targetDownloadIndex.segments.findIndex(
@@ -135,7 +136,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             const targetSegment = targetDownloadIndex.segments[targetSegmentIndex]
             const {map: urlMap} = targetSegment
             const len = fetchedResources.length
-            log(eventName, `processing download for pkg "${canonicalUrl}"`)
+            log(eventName, `processing download for cargo "${canonicalUrl}"`)
             // Don't want to use too much RAM
             // when inserting files, so limit the
             // amount of concurrent files processed
@@ -184,12 +185,19 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                             return `${removeSlashAtEnd(origin)}/${extension}`
                         })(resource.request.url)
                         const targetResource = urlMap[targetUrl]
+                        
                         if (!targetResource) {
-                            return log(
-                                eventName,
-                                `orphaned resource for "${cargoIndex.name}" found. url=${targetUrl}, couldn't map to resource`
-                            )
+                            const previousValue = orphanedResources.get(targetUrl)
+                            if (
+                                typeof previousValue === "undefined" 
+                                || previousValue
+                            ) {
+                                orphanedResources.set(targetUrl, true)
+                            }
+                            return
                         }
+
+                        orphanedResources.set(targetUrl, false)
                         processingStats.resourcesProcessed++
                         const {bytes} = targetResource
                         if (response.ok) {
@@ -198,6 +206,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                                 response
                             )
                         }
+
                         // stash for later for retry
                         errorDownloadSegment.map[targetUrl] = {
                             ...targetResource,
@@ -266,10 +275,22 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 log(eventName, "successfully saved error log")
             }
         }
+
+        orphanedResources.forEach((value, key) => {
+            if (!value) {
+                return
+            }
+            const targetUrl = key
+            log(
+                eventName,
+                `Orphaned resource found. url=${targetUrl}, couldn't map to resource.`
+            )
+        })
         
+        const orphanCount = totalResources - resourcesProcessed
         log(
             eventName,
-            `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${totalResources - resourcesProcessed}, fail_count=${failCount}. Releasing orphans!`
+            `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${orphanCount}, fail_count=${failCount}.${orphanCount > 0 ? " Releasing orphans!" : ""}`
         )
 
         removeDownloadIndex(downloadIndices, downloadQueueId)

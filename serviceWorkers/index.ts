@@ -1,13 +1,16 @@
 import {APP_CACHE} from "../src/config"
 import type {
-    InboundMessage,
     BackgroundFetchEventHandlerSetters
 } from "../src/lib/types/serviceWorkers"
 import { 
-    makeBackgroundFetchHandler
+    makeBackgroundFetchHandler,
+    ProgressUpdateRecord
 } from "../src/lib/shabah/serviceWorker/backgroundFetchHandler"
 import {makeFetchHandler} from "../src/lib/shabah/serviceWorker/fetchHandler"
 import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
+import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
+import {wRpc} from "../src/lib/wRpc/simple"
+import type {AppRpcs} from "../src/lib/utils/appRpc"
 
 const sw = globalThis.self as unknown as (
     ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
@@ -15,7 +18,7 @@ const sw = globalThis.self as unknown as (
 
 const CONFIG_URL =  `${sw.location.origin}/__sw-config__.json`
 
-let config = {
+let config: GlobalConfig = {
     version: 1,
     log: true,
     updatedAt: -1,
@@ -25,21 +28,21 @@ let config = {
 caches.open(APP_CACHE).then(async (cache) => {
     const file = await cache.match(CONFIG_URL)
     if (!file) {
-        return persistConfig()
+        return persistConfig(config)
     }
     const parsed = await file.json() as Partial<typeof config>
     config = {...config, ...parsed}
 })
 
-const persistConfig = async () => {
+const persistConfig = async (config: GlobalConfig) => {
     const cache = await caches.open(APP_CACHE)
     config.updatedAt = Date.now()
-    return cache.put(
+    await cache.put(
         CONFIG_URL, 
         new Response(JSON.stringify(config), {status: 200})
     )
+    return true
 }
-
 
 sw.oninstall = (event) => event.waitUntil(sw.skipWaiting())
 
@@ -69,11 +72,36 @@ const logger = (...msgs: any[]) => {
     }
 }
 
+const rpc = new wRpc<AppRpcs>({
+    responses: createServiceWorkerRpcs({
+        configRef: config,
+        persistConfig,
+    }),
+    messageInterceptor: {
+        addEventListener: (_, handler) => {
+            sw.onmessage = (event) => event.waitUntil(handler(event))
+        }
+    },
+    messageTarget: {
+        postMessage: async (data, transferables) => {
+            const clients = await sw.clients.matchAll()
+            for (const client of clients) {
+                client.postMessage(data, transferables)
+            }
+        }
+    }
+})
+
+const notifyDownloadProgress = async (update: ProgressUpdateRecord) => {
+    rpc.execute("notifyDownloadProgress", update)
+}
+
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
     fileCache,
     log: logger,
-    type: "success"
+    type: "success",
+    onProgress: notifyDownloadProgress
 })
 
 sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
@@ -84,7 +112,8 @@ const bgFetchAbortHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
     fileCache,
     log: logger,
-    type: "abort"
+    type: "abort",
+    onProgress: notifyDownloadProgress
 })
 
 sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
@@ -93,11 +122,13 @@ const bgFetchFailHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
     fileCache,
     log: logger,
-    type: "fail"
+    type: "fail",
+    onProgress: notifyDownloadProgress
 })
 
 sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))
 
+/*
 const unreachable = (_: never): never => { throw new Error("code path should never branch to here") }
 
 sw.onmessage = (event) => event.waitUntil((async () => {
@@ -130,3 +161,4 @@ sw.onmessage = (event) => event.waitUntil((async () => {
         console.info(`config changed, new config:`, config)
     }
 })())
+*/

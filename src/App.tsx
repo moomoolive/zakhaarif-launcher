@@ -7,11 +7,7 @@ import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
-import type {TopLevelAppProps} from "./lib/types/globalState"
-import {Shabah} from "./lib/shabah/downloadClient"
-import {APP_CACHE} from "./config"
-import {webAdaptors} from "./lib/shabah/adaptors/web-preset"
-import { cleanPermissions } from './lib/utils/security/permissionsSummary'
+import { initAppStore } from './lib/utils/initAppStore'
 
 const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
@@ -34,19 +30,9 @@ const  App = () => {
   const [showTerminal, setShowTerminal] = useState(false)
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
-  const {current: globalState} = useRef<TopLevelAppProps>({
-    setTerminalVisibility: setShowTerminal,
-    downloadClient: new Shabah({
-      origin: location.origin,
-      adaptors: webAdaptors(APP_CACHE),
-      permissionsCleaner: cleanPermissions
-    }),
-    sandboxInitializePromise: {
-      resolve: () => {},
-      reject: () => {},
-      promise: Promise.resolve(true)
-    }
-  })
+  const {current: globalState} = useRef(initAppStore({
+    setTerminalVisibility: setShowTerminal
+  }))
 
   const serviceWorkerInitialized = useRef(false)
   const {current: ALL_APIS_SUPPORTED} = useRef(featureCheck().every((feature) => feature.supported))
@@ -101,21 +87,6 @@ const  App = () => {
     }
     const swUrl = import.meta.env.DEV ? "dev-sw.compiled.js" : "sw.compiled.js"
     navigator.serviceWorker.register(swUrl)
-    const prefix = "[👷 service-worker]: "
-    navigator.serviceWorker.onmessage = (msg) => {
-      const {type, contents} = msg.data as ServiceWorkerMessage
-      const contentsWithPrefix = prefix + contents
-      switch (type) {
-        case "error":
-          console.error(contentsWithPrefix)
-          break
-        case "info":
-          console.info(contentsWithPrefix)
-          break
-        default:
-          console.warn("recieved message from service worker that is encoded incorrectly", msg.data)
-      }
-    }
     serviceWorkerInitialized.current = true
   }, [])
 

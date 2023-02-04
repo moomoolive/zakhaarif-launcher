@@ -162,7 +162,13 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         return new Promise((resolve, reject) => {
             const id = this.idCount
             self.queue.push({id, resolve, reject})
-            self.transferMessage(source, handle, OUTBOUND_MESSAGE, data, transferables)
+            self.transferMessage(
+                source, 
+                handle, 
+                OUTBOUND_MESSAGE, 
+                data, 
+                transferables
+            )
         })
     }
 
@@ -212,7 +218,6 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
             messageContainer, 
             transferables || emptyTransferArray
         )
-        messageContainer.data = null
         return id
     }
 

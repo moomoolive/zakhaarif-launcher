@@ -65,6 +65,11 @@ const defaultDownloadState = (id: string) => ({
     ready: false
 } as const)
 
+type DownloadStateSummary = DownloadState & {
+    previousVersion: string
+    version: string
+}
+
 export type ShabahConfig = {
     origin: string,
     adaptors: {
@@ -649,11 +654,12 @@ export class Shabah {
     }
 
     // progress listening interfaces
-    async getDownloadState(canonicalUrl: string): Promise<null | DownloadState> {
-        const cargoIndex = await this.getCargoIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        if (!cargoIndex) {
+    async getDownloadState(canonicalUrl: string): Promise<null | DownloadStateSummary> {
+        const [cargoIndex, downloadIndex] = await Promise.all([
+            this.getCargoIndexByCanonicalUrl(canonicalUrl),
+            this.getDownloadIndexByCanonicalUrl(canonicalUrl)
+        ] as const)
+        if (!cargoIndex || !downloadIndex) {
             return null
         }
         if (cargoIndex.downloadQueueId === NO_UPDATE_QUEUED) {
@@ -662,10 +668,15 @@ export class Shabah {
         const managerResponse = await io.wrap(
             this.downloadManager.getDownloadState(cargoIndex.downloadQueueId)
         )
-        if (!managerResponse.ok) {
+        if (!managerResponse.ok || !managerResponse.data) {
             return null
         }
-        return managerResponse.data
+        const response = managerResponse.data
+        const segmentIndex = downloadIndex.segments.findIndex(
+            (segment) => segment.canonicalUrl === canonicalUrl 
+        ) 
+        const {previousVersion, version} = downloadIndex.segments[segmentIndex]
+        return {...response, previousVersion, version}
     }
 
     addProgressListener(

@@ -169,7 +169,8 @@ const STANDARD_CARGOS = [
 
 const LauncherRoot = () => {
   const confirm = useGlobalConfirm()
-  const {setTerminalVisibility, downloadClient} = useAppShellContext()
+  const app = useAppShellContext()
+  const {setTerminalVisibility, downloadClient} = app
   const navigate = useNavigate()
 
 
@@ -310,6 +311,9 @@ const LauncherRoot = () => {
     }
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
+    app.addEventListener("downloadprogress", (progress) => {
+      console.log("got progress", progress)
+    })
     const updateQueueResponse = await downloadClient.executeUpdates(
       [launcherResponse, gameExtensionResponse, standardModResponse],
       `core v${launcherResponse.versions().new}`,
@@ -441,11 +445,6 @@ const LauncherRoot = () => {
                   <MenuItem 
                     className="hover:text-yellow-500"
                     onClick={async () => {
-                        if (currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION) {
-                          confirm({title: "App is not installed"})
-                          closeSettings()
-                          return
-                        }
                         if (!(await confirm({title: "Are you sure you want to uninstall all files?", confirmButtonColor: "error"}))) {
                           return
                         }
