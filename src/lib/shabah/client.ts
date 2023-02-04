@@ -586,7 +586,9 @@ export const checkForUpdates = async (
     })
 }
 
-export const createResourceMap = (resources: RequestableResource[]) => {
+export const createResourceMap = (
+    resources: ReadonlyArray<RequestableResource>
+): ResourceMap => {
     const map = {} as ResourceMap
     for (let i = 0; i < resources.length; i++) {
         const {storageUrl, requestUrl, bytes} = resources[i]

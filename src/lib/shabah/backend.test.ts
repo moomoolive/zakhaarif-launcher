@@ -35,7 +35,8 @@ const createDownloadIndex = ({
     title = "none", 
     bytes = 0, 
     canonicalUrl = "", 
-    map = {}, 
+    map = {},
+    resourcesToDelete = [],
     version = "0.1.0", 
     previousVersion = "none", 
     resolvedUrl = "",
@@ -52,6 +53,7 @@ const createDownloadIndex = ({
             version, 
             previousVersion, 
             resolvedUrl,
+            resourcesToDelete,
             bytes
         }]
     }
@@ -421,6 +423,7 @@ describe("reading and writing error download indices", () => {
                     canonicalUrl: "",
                     bytes: 0,
                     map: {},
+                    resourcesToDelete: [],
                 }
             ]
         }
@@ -450,6 +453,7 @@ describe("reading and writing error download indices", () => {
                     canonicalUrl: "",
                     map: {},
                     bytes: 0,
+                    resourcesToDelete: [],
                 }
             ]
         }
@@ -476,6 +480,7 @@ describe("reading and writing error download indices", () => {
                     canonicalUrl: "",
                     bytes: 0,
                     map: {},
+                    resourcesToDelete: [],
                 },
                 {
                     version: "0.1.0",
@@ -484,6 +489,7 @@ describe("reading and writing error download indices", () => {
                     canonicalUrl: "",
                     bytes: 0,
                     map: {},
+                    resourcesToDelete: [],
                 }
             ]
         }

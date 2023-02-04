@@ -73,6 +73,7 @@ export type DownloadSegment = {
     bytes: number
     version: string
     previousVersion: string
+    resourcesToDelete: string[]
     canonicalUrl: string
     resolvedUrl: string
 }

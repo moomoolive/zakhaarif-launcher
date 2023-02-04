@@ -4,18 +4,10 @@ import { NO_INSTALLATION } from "./utility"
 import { DeepReadonly } from "../types/utility"
 import {readableByteCount} from "../utils/storage/friendlyBytes"
 
-type DownloadMetadata = DeepReadonly<{
-    downloadableResources: RequestableResource[]
-    resourcesToDelete: RequestableResource[]
-}>
-
-type DiskMetadata = DeepReadonly<{
-    raw: {
-        used: number
-        total: number
-        left: number
-    }
-    cargoStorageBytes: number
+type RawDiskMetadata = Readonly<{
+    used: number
+    total: number
+    left: number
 }>
 
 export type UpdateCheckConfig = {
@@ -27,8 +19,10 @@ export type UpdateCheckConfig = {
     newCargo: DeepReadonly<Cargo> | null
     originalNewCargoResponse: Response
     previousCargo: DeepReadonly<Cargo> | null
-    download: DownloadMetadata
-    diskInfo: DiskMetadata
+    downloadableResources: ReadonlyArray<RequestableResource>
+    resourcesToDelete: ReadonlyArray<RequestableResource>
+    cargoStorageBytes: number
+    diskInfo: RawDiskMetadata
     status?: StatusCode
 }
 
@@ -41,10 +35,12 @@ export class UpdateCheckResponse {
     readonly originalNewCargoResponse: Response
     readonly errors: ReadonlyArray<string>
     readonly previousCargo: DeepReadonly<Cargo> | null
-    readonly diskInfo: DiskMetadata
     readonly status: StatusCode
-
-    private readonly _download: DownloadMetadata
+    readonly downloadableResources: ReadonlyArray<RequestableResource>
+    readonly resourcesToDelete: ReadonlyArray<RequestableResource>
+    readonly cargoStorageBytes: number
+    
+    private readonly diskInfo: RawDiskMetadata
 
     constructor(config: UpdateCheckConfig) {
         this.id = config.id
@@ -55,7 +51,9 @@ export class UpdateCheckResponse {
         this.newCargo = config.newCargo
         this.originalNewCargoResponse = config.originalNewCargoResponse
         this.previousCargo = config.previousCargo
-        this._download = config.download
+        this.downloadableResources = config.downloadableResources
+        this.resourcesToDelete = config.resourcesToDelete
+        this.cargoStorageBytes = config.cargoStorageBytes
         this.diskInfo = config.diskInfo
         this.status = config.status || STATUS_CODES.ok
     }
@@ -73,7 +71,7 @@ export class UpdateCheckResponse {
     }
 
     enoughStorageForCargo() {
-        const totalStorage = this.diskInfo.raw.total
+        const totalStorage = this.diskInfo.total
         if (totalStorage < 1) {
             return false
         }
@@ -93,14 +91,14 @@ export class UpdateCheckResponse {
     }
 
     bytesNeeded() {
-        const totalStorage = this.diskInfo.raw.total
+        const totalStorage = this.diskInfo.total
         return Math.max(
             0, (this.diskWithCargo() - totalStorage)
         )
     }
 
     private diskWithCargo() {
-        const totalStorage = this.diskInfo.raw.used
+        const totalStorage = this.diskInfo.used
         return totalStorage + this.bytesToDownload()
     }
 
@@ -111,16 +109,14 @@ export class UpdateCheckResponse {
     }
 
     bytesToDownload() {
-        const filesToDownload = this._download.downloadableResources
-        return filesToDownload.reduce(
+        return this.downloadableResources.reduce(
             (total, next) => total + next.bytes,
             0
         )
     }
 
     bytesToRemove() {
-        const filesToDelete = this._download.resourcesToDelete
-        return filesToDelete.reduce(
+        return this.resourcesToDelete.reduce(
             (total, file) => total + file.bytes,
             0
         )
@@ -140,8 +136,8 @@ export class UpdateCheckResponse {
         return {
             cargoTotalBytes: this.cargoTotalBytes(),
             bytesToDownload: this.bytesToDownload(),
-            downloadableResources: this._download.downloadableResources,
-            resourcesToDelete: this._download.resourcesToDelete,
+            downloadableResources: this.downloadableResources,
+            resourcesToDelete: this.resourcesToDelete,
             bytesToDelete: this.bytesToRemove()
         }
     }

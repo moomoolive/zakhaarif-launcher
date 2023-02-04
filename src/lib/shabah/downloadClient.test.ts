@@ -1379,18 +1379,18 @@ const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
         newCargo = null,
         originalNewCargoResponse = new Response(),
         previousCargo = null,
-        download = {
-            downloadableResources: [],
-            resourcesToDelete: []
-        },
-        diskInfo = {
-            raw: {used: 0, total: 0, left: 0},
-            cargoStorageBytes: 0
-        },
+        
+        downloadableResources = [],
+        resourcesToDelete = [],
+
+        diskInfo = {used: 0, total: 0, left: 0},
+        cargoStorageBytes = 0
     } = config
     return new UpdateCheckResponse({
         diskInfo,
-        download,
+        cargoStorageBytes,
+        downloadableResources,
+        resourcesToDelete,
         previousCargo,
         newCargo,
         originalNewCargoResponse,
@@ -1510,16 +1510,11 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo(),
                 originalNewCargoResponse: new Response(),
-                download: {
-                    downloadableResources,
-                    resourcesToDelete: []
-                }
+                downloadableResources,
+                resourcesToDelete: []
             })
             const queueResponse = await client.executeUpdates(
                 [updateResponse],
@@ -1564,16 +1559,13 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo(),
                 originalNewCargoResponse: new Response(),
-                download: {
+                
                     downloadableResources,
                     resourcesToDelete: []
-                }
+                
             })
             await client.putDownloadIndex({
                 id: updateResponse.id,
@@ -1587,7 +1579,8 @@ describe("executing updates", () => {
                         map: {},
                         version: "0.2.0",
                         previousVersion: "0.1.0",
-                        bytes: 0
+                        bytes: 0,
+                        resourcesToDelete: [],
                     }
                 ]
             })
@@ -1658,16 +1651,13 @@ describe("executing updates", () => {
                 originalResolvedUrl: canonicalUrl,
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo(),
                 originalNewCargoResponse: new Response(),
-                download: {
+                
                     downloadableResources,
                     resourcesToDelete: []
-                }
+                
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -1722,16 +1712,13 @@ describe("executing updates", () => {
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
                 
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo(),
                 originalNewCargoResponse: new Response(),
-                download: {
+                
                     downloadableResources,
                     resourcesToDelete: []
-                }
+                
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -1795,16 +1782,13 @@ describe("executing updates", () => {
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
                 
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo({entry: "index.js"}),
                 originalNewCargoResponse: new Response(),
-                download: {
+                
                     downloadableResources,
                     resourcesToDelete: []
-                }
+                
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -1872,16 +1856,13 @@ describe("executing updates", () => {
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
                 
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo({entry: NULL_FIELD}),
                 originalNewCargoResponse: new Response(),
-                download: {
+                
                     downloadableResources,
                     resourcesToDelete: []
-                }
+                
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -1953,16 +1934,11 @@ describe("executing updates", () => {
                 originalResolvedUrl: canonicalUrl,
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
-                diskInfo: {
-                    raw: storage,
-                    cargoStorageBytes: 0
-                },
+                diskInfo: storage,
                 newCargo: new Cargo(),
                 originalNewCargoResponse: new Response(),
-                download: {
-                    downloadableResources,
-                    resourcesToDelete
-                }
+                downloadableResources,
+                resourcesToDelete
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -2032,16 +2008,11 @@ describe("executing updates", () => {
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
-                    diskInfo: {
-                        raw: storage,
-                        cargoStorageBytes: 0
-                    },
+                    diskInfo: storage,
                     newCargo: new Cargo(),
                     originalNewCargoResponse: new Response(),
-                    download: {
-                        downloadableResources,
-                        resourcesToDelete
-                    }
+                    downloadableResources,
+                    resourcesToDelete
                 })
                 updateResponses.push(response)
                 const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
@@ -2581,13 +2552,11 @@ describe("reading and updating cargo indexes", () => {
             newCargo: initial,
             status: Shabah.STATUS.ok,
             diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
+                used: 0,
+                total: 10_000,
+                left: 10_000,
+            },
+            cargoStorageBytes: 100
         })
         await client.executeUpdates([updateResponse], "update")
         const foundInitial = await client.getCargoIndexByCanonicalUrl(
@@ -2632,13 +2601,11 @@ describe("reading and updating cargo indexes", () => {
             newCargo: initial,
             status: Shabah.STATUS.ok,
             diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
+                used: 0,
+                total: 10_000,
+                left: 10_000,
+            },
+            cargoStorageBytes: 100
         })
         const secondUpdate = createUpdateCheck({
             id: "tmp",
@@ -2648,13 +2615,11 @@ describe("reading and updating cargo indexes", () => {
             newCargo: initial,
             status: Shabah.STATUS.ok,
             diskInfo: {
-                raw: {
-                    used: 0,
-                    total: 10_000,
-                    left: 10_000,
-                },
-                cargoStorageBytes: 100
-            }
+                used: 0,
+                total: 10_000,
+                left: 10_000,
+            },
+            cargoStorageBytes: 100
         })
         await client.executeUpdates(
             [updateResponse, secondUpdate], "update"
@@ -2799,6 +2764,7 @@ describe("reading and writing download indexes", () => {
                     version: "0.2.0",
                     previousVersion: "0.1.0",
                     bytes: 0,
+                    resourcesToDelete: [],
                 }
             ]
             
@@ -2827,6 +2793,7 @@ describe("reading and writing download indexes", () => {
                     version: initialVersion,
                     previousVersion: "0.1.0",
                     bytes: 0,
+                    resourcesToDelete: [],
                 }
             ]
         })
@@ -2849,6 +2816,7 @@ describe("reading and writing download indexes", () => {
                     version: initialVersion,
                     previousVersion: "0.1.0",
                     bytes: 0,
+                    resourcesToDelete: [],
                 }
             ]
         })
@@ -2876,7 +2844,8 @@ describe("reading and writing download indexes", () => {
                     map: {},
                     version: initialVersion,
                     previousVersion: "0.1.0",
-                    bytes: 0
+                    bytes: 0,
+                    resourcesToDelete: [],
                 }
             ]
         })

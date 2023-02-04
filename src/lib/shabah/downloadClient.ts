@@ -88,7 +88,6 @@ export class Shabah {
     private networkRequest: FetchFunction
     private fileCache: FileCache
     private downloadManager: DownloadManager
-    private archivedCargoIndexesCache: null | CargoIndices
     private cargoIndicesCache: null | CargoIndices
     private downloadIndicesCache: null | DownloadIndexCollection
     private progressListeners: Array<{
@@ -112,7 +111,6 @@ export class Shabah {
         this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
         this.cargoIndicesCache = null
         this.downloadIndicesCache = null
-        this.archivedCargoIndexesCache = null
         this.progressListeners = []
         this.progressListenerTimeoutId = INVALID_LISTENER_ID
     }
@@ -163,14 +161,10 @@ export class Shabah {
             newCargo: response.newCargo?.parsed || null,
             originalNewCargoResponse: response.newCargo?.response || new Response(),
             previousCargo: response.previousCargo || null,
-            download: {
-                downloadableResources: response.downloadableResources,
-                resourcesToDelete: response.resoucesToDelete,
-            },
-            diskInfo: {
-                raw: await this.diskInfo(),
-                cargoStorageBytes: cargoIndex?.storageBytes || 0
-            },
+            downloadableResources: response.downloadableResources,
+            resourcesToDelete: response.resoucesToDelete,
+            diskInfo: await this.diskInfo(),
+            cargoStorageBytes: cargoIndex?.storageBytes || 0
         })
     }
 
@@ -226,15 +220,29 @@ export class Shabah {
         }
         
         const promises: Promise<unknown>[] = []
+        const filesToRequest = []
+        const filesToDelete = []
         for (const update of updates) {
             downloadIndex.bytes += update.downloadMetadata().bytesToDownload
+            
+            const metadata = update.downloadMetadata()
+            const removeFiles = metadata.resourcesToDelete.map(
+                (file) => file.storageUrl
+            )
+            filesToDelete.push(...removeFiles)
+            const addFiles = metadata.downloadableResources.map(
+                (file) => file.requestUrl
+            )
+            filesToRequest.push(...addFiles)
+            
             downloadIndex.segments.push({
-                map: createResourceMap(update.downloadMetadata().downloadableResources),
+                map: createResourceMap(update.downloadableResources),
                 version: update.versions().new,
                 previousVersion: update.versions().old,
                 resolvedUrl: update.resolvedUrl,
                 canonicalUrl: update.canonicalUrl,
                 bytes: update.downloadMetadata().bytesToDownload,
+                resourcesToDelete: filesToDelete
             })
 
             promises.push(this.fileCache.putFile(
@@ -262,27 +270,13 @@ export class Shabah {
                 resolvedUrl: update.resolvedUrl,
                 canonicalUrl: update.canonicalUrl,
                 logoUrl: update.newCargo?.crateLogoUrl || "",
-                storageBytes: update.diskInfo.cargoStorageBytes,
+                storageBytes: update.cargoStorageBytes,
                 downloadQueueId: downloadQueueId,
             }))
         }
 
         promises.push(this.putDownloadIndex(downloadIndex))
         await Promise.all(promises)
-        
-        const filesToRequest = []
-        const filesToDelete = []
-        for (const update of updates) {
-            const metadata = update.downloadMetadata()
-            const removeFiles = metadata.resourcesToDelete.map(
-                (file) => file.storageUrl
-            )
-            filesToDelete.push(...removeFiles)
-            const addFiles = metadata.downloadableResources.map(
-                (file) => file.requestUrl
-            )
-            filesToRequest.push(...addFiles)
-        }
         
         const self = this
         await Promise.all(filesToDelete.map(

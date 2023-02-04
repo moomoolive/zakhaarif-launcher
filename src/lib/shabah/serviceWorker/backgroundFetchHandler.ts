@@ -129,7 +129,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 version: targetSegment.version,
                 previousVersion: targetSegment.previousVersion,
                 canonicalUrl: targetSegment.canonicalUrl,
-                resolvedUrl: targetSegment.resolvedUrl
+                resolvedUrl: targetSegment.resolvedUrl,
+                resourcesToDelete: targetSegment.resourcesToDelete
             }
             const errorDownloadIndex: DownloadIndex = {
                 id: nanoid(21),

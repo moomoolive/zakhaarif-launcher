@@ -82,7 +82,8 @@ const createDownloadIndex = ({
     bytes = 0, 
     canonicalUrl = "", 
     map = {}, 
-    version = "0.1.0", 
+    version = "0.1.0",
+    resourcesToDelete = [],
     previousVersion = "none", 
     resolvedUrl = "",
     previousId = ""
@@ -98,7 +99,8 @@ const createDownloadIndex = ({
             version, 
             previousVersion, 
             resolvedUrl,
-            bytes
+            bytes,
+            resourcesToDelete
         }]
     }
     return putIndex
@@ -531,7 +533,8 @@ describe("background fetch success handler", () => {
                     resolvedUrl: "",
                     canonicalUrl,
                     map: resourceMap,
-                    bytes: 0
+                    bytes: 0,
+                    resourcesToDelete: []
                 })
                 updateCargoIndex(cargoIndices, {
                     id: cargoId,
@@ -1125,7 +1128,8 @@ describe("background fetch fail handler (abort/fail)", () => {
                     resolvedUrl,
                     canonicalUrl,
                     map: resourceMap,
-                    bytes: 0
+                    bytes: 0,
+                    resourcesToDelete: []
                 })
                 updateCargoIndex(cargoIndices, {
                     id: id,
