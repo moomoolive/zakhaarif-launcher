@@ -7,8 +7,8 @@ import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
 import { initAppStore } from "./lib/utils/initAppStore"
-import {AppRouter} from "./routes/Router"
 
+const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })

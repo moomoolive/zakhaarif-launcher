@@ -9,22 +9,21 @@ import {
 import SettingsIcon from "@mui/icons-material/Settings"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
-  faTimes, faCheck, faBox, faCodeBranch,
+  faTimes, faCheck, faCodeBranch,
   faLink, faTerminal, faFolderMinus
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import {BYTES_PER_GB} from "../lib/utils/consts/storage"
 import {Shabah} from "../lib/shabah/downloadClient"
-import {roundDecimal} from "../lib/math/rounding"
 import {featureCheck} from "../lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
-import {sleep} from "../lib/utils/sleep"
-import {APP_CARGO_ID, GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
+import {STANDARD_CARGOS} from "../standardCargos"
 import {useAppShellContext} from "./store"
 import {useNavigate} from "react-router-dom"
 import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
 import { useEffectAsync } from '../hooks/effectAsync'
 import LoadingIcon from '../components/LoadingIcon'
+import { UpdateCheckResponse } from '../lib/shabah/updateCheckStatus'
+import { sleep } from '../lib/utils/sleep'
 
 const UnsupportedFeatures = (): JSX.Element => {
   const {current: features} = useRef(featureCheck() as ReadonlyArray<{name: string, supported: boolean, hardwareRelated?: boolean}>)
@@ -54,9 +53,7 @@ const UnsupportedFeatures = (): JSX.Element => {
       {softwareRequirementsNotMet ? <>
         {"Try using the latest version of Chrome"}
         <span className="ml-2">
-          <FontAwesomeIcon 
-            icon={faChrome}
-          />
+          <FontAwesomeIcon icon={faChrome}/>
         </span>
       </> : ""}
     </div>
@@ -109,35 +106,6 @@ const UnsupportedFeatures = (): JSX.Element => {
   </>
 }
 
-const toGigabytes = (number: number) => {
-  const decimal = number / BYTES_PER_GB
-  const rounded = roundDecimal(decimal, 2)
-  return Math.max(rounded, 0.01)
-}
-
-const toPercent = (fraction: number, decimals: number) => {
-  return roundDecimal(fraction * 100, decimals)
-}
-
-const progressIndicator = (downloaded: number, total: number) => {
-  return <div>
-    <div>Updating App...</div>
-      <div className="mt-1.5 flex items-center justify-center text-xs text-neutral-400">
-        <div className="mr-2 text-blue-500 animate-bounce">
-          <FontAwesomeIcon
-            icon={faBox}
-          />
-        </div>
-        <div>
-          {toGigabytes(downloaded)} GB / {toGigabytes(total)} GB 
-        </div>
-        <div className="ml-2 text-blue-500">
-          <span></span>{`(${toPercent(downloaded / total, 1)}%)`}
-        </div>
-      </div>
-  </div>
-}
-
 type PwaInstallPrompt = {
   prompt: () => void
   userChoice: () => Promise<"accepted" | "dismissed">
@@ -148,21 +116,6 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
 
-const STANDARD_CARGOS = [
-  {
-    canonicalUrl: import.meta.env.VITE_APP_LAUNCHER_CARGO_URL, 
-    id: APP_CARGO_ID
-  },
-  {
-    canonicalUrl: import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL,
-    id: GAME_EXTENSION_ID
-  },
-  {
-    canonicalUrl: import.meta.env.VITE_APP_STANDARD_MOD_CARGO_URL,
-    id: STANDARD_MOD_ID
-  }
-] as const
-
 const NO_LISTENER = -1
 
 type LauncherState = (
@@ -170,9 +123,10 @@ type LauncherState = (
   | "cached"
   | "error"
   | "loading"
+  | "ignorable-error"
 )
 
-const LauncherRoot = () => {
+const LauncherRoot = (): JSX.Element => {
   const confirm = useGlobalConfirm()
   const app = useAppShellContext()
   const {setTerminalVisibility, downloadClient} = app
@@ -182,14 +136,10 @@ const LauncherRoot = () => {
   const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
   const [downloadError, setDownloadError] = useState("")
   const [currentAppVersion, setCurrentAppVersion] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
-  const [corePackagesStatus, setCorePackagesStatus] = useState([
-    {id: "launcher", installed: false, upToDate: true},
-    {id: "game-extension", installed: false, upToDate: true},
-    {id: "standard-mod", installed: false, upToDate: true},
-  ])
   const [launcherState, setLauncherState] = useState<LauncherState>("uninstalled")
   const [startButtonText, setStartButtonText] = useState("Install") 
-  
+
+  const updatingCorePackages = useRef<string[]>([])
   const {current: launchApp} = useRef(() => {
     sessionStorage.setItem(APP_LAUNCHED, "1")
     navigate("/launch")
@@ -201,23 +151,57 @@ const LauncherRoot = () => {
 
   const closeSettings = () => setSettingsMenuElement(null)
 
-  const gatherAssets = async () => {
-    if (
-      import.meta.env.PROD 
-      && !!sessionStorage.getItem(APP_LAUNCHED)
-    ) {
+  const retryFailedDownloads = async (): Promise<void> => {
+    const standardCargos = await Promise.all(STANDARD_CARGOS.map(
+      (cargo) => downloadClient.getCargoIndexByCanonicalUrl(cargo.canonicalUrl)
+    ))
+    const errorPackages = standardCargos.filter((cargo) => (
+      cargo?.state === "update-aborted" 
+      || cargo?.state === "update-failed"
+    ))
+    const urls = errorPackages
+      .map((cargo) => cargo?.canonicalUrl || "")
+      .filter((url) => url.length > 0)
+    if (urls.length < 1) {
       launchApp()
       return
     }
+    updatingCorePackages.current = urls
+    const retryResponse = await downloadClient.retryFailedDownloads(
+      urls,
+      "game core retry"
+    )
+    setProgressMsg("Retrying...")
+    if (retryResponse.data !== Shabah.STATUS.updateRetryQueued) {
+      setLauncherState("error")
+      setDownloadError("Retry failed")
+    } else {
+      setProgressMsg("Updating...")
+      document.title = "Updating..."
+    }
+  }
+
+  const gatherAssets = async (): Promise<void> => {
+    if (import.meta.env.PROD && !!sessionStorage.getItem(APP_LAUNCHED)) {
+      launchApp()
+      return
+    }
+  
     setDownloadError("")
     setLauncherState("loading")
-    setProgressMsg("Checking for Updates...")
+    if (launcherState === "error") {
+      retryFailedDownloads()
+      return
+    }
 
-    const updates = await Promise.all([
+    setProgressMsg("Checking for Updates...")
+    const updateCheck = Promise.all([
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[0]),
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[1]),
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[2]),
     ] as const)
+    // update ui should take a least a second
+    const [updates] = await Promise.all([updateCheck, sleep(1_000)] as const)
     const [launcher, gameExtension, standardMod] = updates 
     console.log(
       "launcher", launcher,
@@ -225,42 +209,122 @@ const LauncherRoot = () => {
       "std-mod", standardMod
     )
 
-    if (!launcher.updateAvailable()) {
+    const updatesAvailable = updates.filter((update) => update.updateAvailable())
+    const errors = updates.filter((update) => update.errorOccurred())
+    
+    const enoughStorage = UpdateCheckResponse.enoughStorageForAllUpdates(updatesAvailable)
+    const previousVersionsExist = updates.every((update) => update.previousVersionExists())
+    const errorOccurred = errors.length > 0
+    const updateAvailable = updatesAvailable.length > 0
+
+    console.log(
+      "updates available", updateAvailable,
+      "errors", errorOccurred,
+      "previous exists", previousVersionsExist,
+      "enough space", enoughStorage
+    )
+
+    if (errorOccurred && previousVersionsExist) {
+      setLauncherState("ignorable-error")
+      setDownloadError("Couldn't fetch update")
+      return
+    }
+
+    if (errorOccurred && !previousVersionsExist) {
+      setLauncherState("uninstalled")
+      setDownloadError("Couldn't fetch files")
+      return
+    }
+
+    if (!enoughStorage && previousVersionsExist) {
+      setLauncherState("ignorable-error")
+      setDownloadError("Not enough storage for update")
+      return
+    }
+
+    if (!enoughStorage && !previousVersionsExist) {
+      setLauncherState("uninstalled")
+      setDownloadError("Not enough storage to install")
+      return
+    }
+    
+    if (!updateAvailable) {
       launchApp()
       return
     }
 
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
-    const listenerId = app.addEventListener("downloadprogress", (progress) => {
-      console.log("got progress", progress)
-    })
-    updateListener.current = listenerId
+    updatingCorePackages.current = updatesAvailable.map(
+      (update) => update.canonicalUrl
+    )
     const queueResponse = await downloadClient.executeUpdates(
-      updates,
-      `game core`,
+      updatesAvailable,
+      "game core",
     )
 
-    if (queueResponse.data !== Shabah.STATUS.updateQueued) {
+    console.log("queue response", queueResponse)
+
+    if (queueResponse.data === Shabah.STATUS.noDownloadbleResources) {
+      setProgressMsg("Installing...")
+      window.setTimeout(launchApp, 3_000)
+      return
+    }
+
+    const updateQueued = queueResponse.data === Shabah.STATUS.updateQueued
+    if (!updateQueued && !previousVersionsExist) {
       setLauncherState("error")
       setDownloadError("Couldn't Queue Update")
       setStartButtonText("Retry")
-      app.removeEventListener("downloadprogress", listenerId)
+      updatingCorePackages.current = []
       return
     }
+
+    if (!updateQueued && previousVersionsExist) {
+      setLauncherState("ignorable-error")
+      setDownloadError("Couldn't Queue Update")
+      setStartButtonText("Retry")
+      return
+    }
+
     setProgressMsg("Updating...")
     document.title = "Updating..."
     setCurrentAppVersion(launcher.versions().old)
   }
 
   useEffect(() => {
-    return () => {
-      if (updateListener.current === NO_LISTENER) {
+    updateListener.current = app.addEventListener("downloadprogress", (progress) => {
+      console.log("got progress", progress)
+      const {type, canonicalUrls} = progress
+      const packages = updatingCorePackages.current
+      const relatedToCorePackages = canonicalUrls.some(
+        (url) => packages.includes(url)
+      )
+      if (!relatedToCorePackages) {
         return
       }
+      
+      if (type === "install") {
+        document.title = "Installing..."
+        setProgressMsg("Installing...")
+      }
+  
+      if (type === "success") {
+        window.setTimeout(launchApp, 3_000)
+      }
+  
+      if (type === "abort" || type === "fail") {
+        setLauncherState("error")
+      }
+
+      downloadClient.refreshCargoIndices()
+    })
+
+    return () => {
+      document.title = APP_TITLE
       app.removeEventListener("downloadprogress", updateListener.current)
     }
-  })
+  }, [])
 
   useEffectAsync(async () => {
     const statuses = await Promise.all([
@@ -269,21 +333,30 @@ const LauncherRoot = () => {
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[2].canonicalUrl),
     ] as const)
     const [launcherStatus] = statuses
+
+    console.log("statuses", statuses)
     
     const notInstalled = statuses.some((cargo) => !cargo)
+    const isUpdating = statuses.some((cargo) => cargo?.state === "updating")
+    const errorOccurred = statuses.some(
+      (cargo) => cargo?.state === "update-aborted" || cargo?.state === "update-failed"
+    )
+
+    console.log(
+      "from init",
+      "not installed", notInstalled,
+      "error", errorOccurred,
+      "updating", isUpdating
+    )
+
     if (!launcherStatus || notInstalled) {
-      setCorePackagesStatus(corePackagesStatus.map(
-        (status) => ({...status, installed: false})
-      ))
       setStartButtonText("Install")
       setLauncherState("uninstalled")
       return
     }
 
     setCurrentAppVersion(launcherStatus.version)
-    const errorOccurred = statuses.some(
-      (cargo) => cargo?.state === "update-aborted" || cargo?.state === "update-failed"
-    )
+    
     if (errorOccurred) {
       setDownloadError("Update Failed...")
       setLauncherState("error")
@@ -291,20 +364,21 @@ const LauncherRoot = () => {
       return
     }
 
-    const isUpdating = statuses.some(
-      (cargo) => cargo?.state === "updating"
-    )
+
     if (isUpdating) {
       setLauncherState("loading")
+      updatingCorePackages.current = statuses
+        .map((cargo) => cargo?.canonicalUrl || "")
+        .filter((url) => url.length > 0)
       return
     }
 
-    
-    if (launcherStatus.state === "cached") {
-      setLauncherState("cached")
-      setStartButtonText("Start")
-      return
-    }
+    // At this point we are sure
+    // that none of the core packages
+    // are in an error/loading/uninstalled
+    // state. So assume that they are cached
+    setLauncherState("cached")
+    setStartButtonText("Start")
   }, [])
 
   return (
@@ -312,7 +386,7 @@ const LauncherRoot = () => {
       id="launcher-root"
       className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
     >
-        <div className="relative z-0">
+        <div className="relative w-full z-0">
             <div id="launcher-menu" className="fixed top-2 left-0">
               <Tooltip title="Settings">
                   <Button
@@ -385,19 +459,16 @@ const LauncherRoot = () => {
                         await Promise.all([
                           import("../lib/database/AppDatabase").then((mod) => new mod.AppDatabase().clear()),
                           downloadClient.uninstallAllAssets(),
+                          sleep(3_000)
                         ])
-                        window.setTimeout(() => {
-                          location.reload()
-                        }, 100)
-                        
+                        location.reload()
                     }}
                   >
                     <div className="text-sm w-full">
                       <span className="mr-2 text-xs">
-                          <FontAwesomeIcon
-                            icon={faFolderMinus}
-                          />
+                        <FontAwesomeIcon icon={faFolderMinus}/>
                       </span>
+
                       Uninstall
                     </div>
                   </MenuItem>
@@ -417,21 +488,36 @@ const LauncherRoot = () => {
                         ? <span className="text-lg animate-spin">
                             <LoadingIcon/>
                           </span>  
-                        : startButtonText}
+                        : startButtonText
+                      }
                   </Button>
-                </div>
-
-                <Collapse in={downloadError.length > 0}>
-                    <div className="text-yellow-500 mt-4 text-sm">
-                      {downloadError}
+                  
+                  <Collapse in={launcherState === "ignorable-error"}>
+                    <div className="mt-4">
+                      <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={launchApp}
+                      >
+                        {"Start"}
+                      </Button>
                     </div>
-                </Collapse>
+                  </Collapse>
+                </div>
+                
+                <div className="w-full">
+                  <Collapse in={downloadError.length > 0}>
+                      <div className="text-yellow-500 mt-4 text-sm">
+                        {downloadError}
+                      </div>
+                  </Collapse>
 
-                <Collapse in={launcherState === "loading" && progressMsg.length > 0}>
-                  <div className="mt-4 w-4/5 mx-auto text-sm">
-                    {progressMsg}
-                  </div>
-                </Collapse>
+                  <Collapse in={launcherState === "loading" && progressMsg.length > 0}>
+                    <div className="mt-4 w-4/5 mx-auto text-sm">
+                      {progressMsg}
+                    </div>
+                  </Collapse>
+                </div>
             </>}
             
             

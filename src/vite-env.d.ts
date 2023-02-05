@@ -9,6 +9,5 @@ interface ImportMetaEnv {
     // standard cargos
     readonly VITE_APP_LAUNCHER_CARGO_URL: string
     readonly VITE_APP_GAME_EXTENSION_CARGO_URL: string
-    readonly VITE_APP_GAME_EXTENSION_ENTRY_URL: string
     readonly VITE_APP_STANDARD_MOD_CARGO_URL: string
   }

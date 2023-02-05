@@ -7,3 +7,5 @@ export const NUMBER_OF_STANDARD_MODS = 1
 export const EXTENSION_CARGO_ID_PREFIX = "ext-"
 export const APP_CARGO_ID = "ext-std"
 export const GAME_EXTENSION_ID = "ext-game"
+
+export const EXTENSION_QUERY_PARAM = "canonical_url"

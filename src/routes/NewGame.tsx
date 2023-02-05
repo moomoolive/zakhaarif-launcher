@@ -11,13 +11,11 @@ import {
     faPlus, 
 } from "@fortawesome/free-solid-svg-icons"
 import {Link, useNavigate} from "react-router-dom"
-//import {GAME_CARGO_INDEX} from "../standardCargos"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppShellContext} from "./store"
 import {emptyCargoIndices} from "../lib/shabah/downloadClient"
 import {useEffectAsync} from "../hooks/effectAsync"
-//import {addStandardCargosToCargoIndexes} from "../standardCargos"
-import {MOD_CARGO_ID_PREFIX} from "../config"
+import {EXTENSION_QUERY_PARAM, MOD_CARGO_ID_PREFIX} from "../config"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
 import {AppDatabase} from "../lib/database/AppDatabase"
@@ -81,7 +79,7 @@ const NewGamePage = () => {
                     if (!await confirm({title: "Are you sure you want to create a new game?"})) {
                         return
                     }
-                    navigate(`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=-1`)
+                    navigate(`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`)
                 }}
             >
                 <div className="mb-1">
@@ -131,7 +129,7 @@ const NewGamePage = () => {
                             })
                             setLoading(false)
                             window.localStorage.setItem(SAVE_EXISTS, "1")
-                            navigate(`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=${gameId}`)
+                            navigate(`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
                         }}
                         disabled={loading}
                     >

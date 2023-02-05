@@ -2,7 +2,7 @@ import {ReactNode, useEffect, useMemo, useState, useRef} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
 import {usePromise} from "../hooks/promise"
-import {APP_CARGO_ID} from "../config"
+import {STANDARD_CARGOS} from "../standardCargos"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faCodeBranch, 
@@ -369,7 +369,12 @@ const SettingsPage = () => {
     const navigate = useNavigate()
     const {downloadClient} = useAppShellContext()
 
-    const appVersion = usePromise(downloadClient.getCargoIndexById(APP_CARGO_ID))
+    const appVersion = usePromise(
+        downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl)
+    )
+    const gameVersion = usePromise(
+        downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl)
+    )
 
     const [clipboardActionId, setClipboardActionId] = useState("none")
     const [subpage, setSubpage] = useState<

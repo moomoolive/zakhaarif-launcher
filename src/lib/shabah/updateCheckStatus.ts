@@ -27,6 +27,26 @@ export type UpdateCheckConfig = {
 }
 
 export class UpdateCheckResponse {
+    static enoughStorageForAllUpdates(updates: UpdateCheckResponse[]): boolean {
+        if (updates.length < 1) {
+            return true
+        }
+
+        const updateBytes = updates.reduce(
+            (total, next) => total + next.bytesToDownload(),
+            0
+        )
+        const deleteBytes = updates.reduce(
+            (total, next) => total + next.bytesToRemove(),
+            0
+        )
+        const diskInfo = updates[0].diskInfo
+        const difference = updateBytes - deleteBytes
+        const bytesAfterAllUpdates = diskInfo.used + difference
+        const normalized = Math.max(0, bytesAfterAllUpdates)
+        return normalized <= diskInfo.total
+    }
+
     readonly id: string
     readonly originalResolvedUrl: string
     readonly resolvedUrl: string
@@ -108,14 +128,14 @@ export class UpdateCheckResponse {
         return `${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`
     }
 
-    bytesToDownload() {
+    bytesToDownload(): number {
         return this.downloadableResources.reduce(
             (total, next) => total + next.bytes,
             0
         )
     }
 
-    bytesToRemove() {
+    bytesToRemove(): number {
         return this.resourcesToDelete.reduce(
             (total, file) => total + file.bytes,
             0

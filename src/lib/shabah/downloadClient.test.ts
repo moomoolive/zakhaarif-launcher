@@ -2970,7 +2970,7 @@ describe("finding full cargos", () => {
         })
         const response = await client.getCargoAtUrl(resolvedUrl)
         expect(response.ok).toBe(true)
-        expect(response.data?.pkg).toStrictEqual(structuredClone(cargo))
+        expect(structuredClone(response.data?.pkg)).toStrictEqual(structuredClone(cargo))
     })
 })
 

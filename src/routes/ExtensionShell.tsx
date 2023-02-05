@@ -5,7 +5,7 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
-import {GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
+import {EXTENSION_QUERY_PARAM, GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
 import {useAppShellContext} from "./store"
 //import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
 import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
@@ -25,7 +25,7 @@ export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
 
 const EXTENSION_IFRAME_ID = "extension-frame"
-const NO_EXTENSION_ENTRY = ""
+const NO_EXTENSION_URL = ""
 const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
@@ -86,10 +86,10 @@ const ExtensionShellPage = () => {
     }
 
     useEffectAsync(async () => {
-        const entry = searchParams.get("entry") || NO_EXTENSION_ENTRY
-        const entryUrl = decodeURIComponent(entry)
+        const url = searchParams.get(EXTENSION_QUERY_PARAM) || NO_EXTENSION_URL
+        const canonicalUrl = decodeURIComponent(url)
 
-        if (entryUrl.length < 1) {
+        if (canonicalUrl.length < 1) {
             console.warn(`a query parameter "entry" must be included in url to run an extension.`)
             setLoading(false)
             setError(true)
@@ -97,9 +97,11 @@ const ExtensionShellPage = () => {
             return
         }
 
-        const meta = await downloadClient.getCargoIndexByEntry(entryUrl)
+        const meta = await downloadClient.getCargoIndexByCanonicalUrl(
+            canonicalUrl
+        )
         if (!meta) {
-            console.warn(`extension "${entryUrl}" doesn't exist.`)
+            console.warn(`extension "${canonicalUrl}" doesn't exist.`)
             setLoading(false)
             setError(true)
             setErrorMessage("Extension Not Found")
@@ -110,23 +112,15 @@ const ExtensionShellPage = () => {
             setLoading(false)
             setError(true)
             setErrorMessage("Invalid Extension")
-            console.warn(`Prevented mod "${entryUrl}" from running. Mods cannot be run as standalone extensions and only run when embedded in the game extension (id="${GAME_EXTENSION_ID}")`)
+            console.warn(`Prevented mod "${canonicalUrl}" from running. Mods cannot be run as standalone extensions and only run when embedded in the game extension (id="${GAME_EXTENSION_ID}")`)
             return
         }
 
-        if (meta.state !== "cached") {
+        if (meta.state !== "cached" || meta.entry === CARGO_NULL_FIELD) {
             setLoading(false)
             setError(true)
             setErrorMessage("Invalid Extension")
-            console.warn(`Prevented extension "${entryUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
-            return
-        }
-
-        if (meta.entry === CARGO_NULL_FIELD) {
-            setLoading(false)
-            setError(true)
-            setErrorMessage("Invalid Extension")
-            console.warn(`Prevented extension "${entryUrl}" from running because it does not have an entry url.`)
+            console.warn(`Prevented extension "${canonicalUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
             return
         }
 

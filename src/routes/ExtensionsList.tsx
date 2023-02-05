@@ -22,6 +22,7 @@ import {
 import {
     APP_CARGO_ID,
     EXTENSION_CARGO_ID_PREFIX,
+    EXTENSION_QUERY_PARAM,
     GAME_EXTENSION_ID
 } from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
@@ -203,9 +204,9 @@ const ExtensionsListPage = () => {
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
                                                 }
-                                                return `/extension?entry=${encodeURIComponent(entry)}&state=-1`
+                                                return `/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(entry)}&state=-1`
                                             default:
-                                                return `/extension?entry=${encodeURIComponent(entry)}`
+                                                return `/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(entry)}`
                                         }
                                     })(id)}
                                 >

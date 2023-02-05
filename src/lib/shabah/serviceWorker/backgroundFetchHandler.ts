@@ -67,17 +67,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         }
         const targetDownloadIndex = downloadIndices.downloads[downloadIndexPosition]
         const downloadSegmentsLength = targetDownloadIndex.segments.length
-        const progressUpdater: ProgressUpdateRecord = {
-            type: "install",
-            downloadId: targetDownloadIndex.id,
-            canonicalUrls: targetDownloadIndex.segments.map(
-                (segment) => segment.canonicalUrl
-            )
-        }
-
-        if (eventType === "abort" || eventType === "fail") {
-            onProgress({...progressUpdater, type: eventType})
-        }
         
         const fetchedResources = await bgfetch.matchAll()
         log(
@@ -103,6 +92,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             )
             return !!found
         })
+
         if (!allAssociatedCargosAreInSegments) {
             log(
                 eventName,
@@ -112,11 +102,18 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             )
         }
 
-        const updateTitle = targetDownloadIndex.title
+        const progressUpdater: ProgressUpdateRecord = {
+            type: "install",
+            downloadId: targetDownloadIndex.id,
+            canonicalUrls: targetDownloadIndex.segments.map(
+                (segment) => segment.canonicalUrl
+            )
+        }
         if (eventType === "success") {
-            onProgress({...progressUpdater, type: "install"})
+            onProgress(progressUpdater)
         }
 
+        const updateTitle = targetDownloadIndex.title
         let totalResources = fetchedResources.length
         let resourcesProcessed = 0
         let failCount = 0
@@ -234,46 +231,53 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             if (eventType === "fail" && resourcesFailed) {
                 state = "update-failed"
             }
+            log(
+                eventName, 
+                `saving cargo ${cargoIndex.name} with state "${state}"`
+            )
             updateCargoIndex(cargoIndices, {
                 ...cargoIndex,
                 state,
                 downloadQueueId: NO_UPDATE_QUEUED
             })
-            await saveCargoIndices(cargoIndices, origin, fileCache)
+            
             const isErrorEvent = (
                 eventType === "abort" 
                 || eventType === "fail"
             )
-            if (isErrorEvent && resourcesFailed) {
-                const originalUrl = cargoIndex.resolvedUrl
-                let targetUrl = originalUrl
-                if (
-                    !targetUrl.startsWith("https://") 
-                    && !targetUrl.startsWith("http://")
-                ) {
-                    const base = removeSlashAtEnd(origin)
-                    const extension = ((str: string) => {
-                        if (str.startsWith("./")) {
-                            return str.slice(2)
-                        } else if (str.startsWith("/")) {
-                            return str.slice(1)
-                        } else {
-                            return str
-                        }
-                    })(targetUrl)
-                    targetUrl = `${base}/${extension}`
-                    log(
-                        eventName,
-                        `detected storage root url as a relative url - full url is required. Adding origin to url original=${originalUrl}, new=${targetUrl}`
-                    )
-                }
-                await saveErrorDownloadIndex(
-                    targetUrl,
-                    errorDownloadIndex,
-                    fileCache
-                )
-                log(eventName, "successfully saved error log")
+            
+            if (!isErrorEvent || !resourcesFailed) {
+                continue
             }
+
+            const originalUrl = cargoIndex.resolvedUrl
+            let targetUrl = originalUrl
+            if (
+                !targetUrl.startsWith("https://") 
+                && !targetUrl.startsWith("http://")
+            ) {
+                const base = removeSlashAtEnd(origin)
+                const extension = ((str: string) => {
+                    if (str.startsWith("./")) {
+                        return str.slice(2)
+                    } else if (str.startsWith("/")) {
+                        return str.slice(1)
+                    } else {
+                        return str
+                    }
+                })(targetUrl)
+                targetUrl = `${base}/${extension}`
+                log(
+                    eventName,
+                    `detected storage root url as a relative url - full url is required. Adding origin to url original=${originalUrl}, new=${targetUrl}`
+                )
+            }
+            await saveErrorDownloadIndex(
+                targetUrl,
+                errorDownloadIndex,
+                fileCache
+            )
+            log(eventName, "successfully saved error log")
         }
 
         orphanedResources.forEach((value, key) => {
@@ -292,7 +296,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             eventName,
             `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${orphanCount}, fail_count=${failCount}.${orphanCount > 0 ? " Releasing orphans!" : ""}`
         )
-
+        
+        await saveCargoIndices(cargoIndices, origin, fileCache)
         removeDownloadIndex(downloadIndices, downloadQueueId)
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         log(eventName, "successfully persisted changes")
@@ -310,8 +315,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             await event.updateUI({title: `${updateTitle} ${suffix}!`})
         }
 
-        if (eventType === "success") {
-            onProgress({...progressUpdater, type: eventType})
-        }
+        onProgress({...progressUpdater, type: eventType})
     }
 }

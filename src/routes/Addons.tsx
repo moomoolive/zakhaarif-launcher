@@ -54,7 +54,6 @@ import {MimeIcon} from "../components/cargo/FileOverlay"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
 import {isStandardCargo, isMod, isEmbeddedStandardCargo} from "../lib/utils/cargos"
-import {GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
 import {MANIFEST_NAME} from "../lib/cargo/index"
 import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
 import type {Permissions} from "../lib/types/permissions"
@@ -66,6 +65,11 @@ const FileOverlay = lazyComponent(
 
 const CargoInfo = lazyComponent(
     async () => (await import("../components/cargo/CargoInfo")).CargoInfo,
+    {loadingElement: FullScreenOverlayLoading}
+)
+
+const Installer = lazyComponent(
+    async () => (await import("../components/cargo/Installer")).Installer,
     {loadingElement: FullScreenOverlayLoading}
 )
 
@@ -223,14 +227,9 @@ const AddOns = () => {
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
     
-    const [
-        loadingInitialData, 
-        setLoadingInitialData
-    ] = useState(true)
+    const [loadingInitialData, setLoadingInitialData] = useState(true)
     const [isInErrorState, setIsInErrorState] = useState(false)
-    const [cargoIndex, setCargoIndex] = useState(
-        emptyCargoIndices()
-    )
+    const [cargoIndex, setCargoIndex] = useState(emptyCargoIndices())
     const [storageUsage, setStorageUsage] = useState({
         used: 0, total: 0, left: 0
     })
@@ -238,14 +237,10 @@ const AddOns = () => {
     const [filter, setFilter] = useState<typeof filterOptions[number]>("updatedAt")
     const [order, setOrder] = useState<FilterOrder>("descending")
     const [viewingCargo, setViewingCargo] = useState("none")
-    const [targetCargo, setTargetCargo] = useState(
-        new Cargo<Permissions>()
-    )
+    const [targetCargo, setTargetCargo] = useState(new Cargo<Permissions>())
     const [cargoFound, setCargoFound] = useState(false)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
-    const [directoryPath, setDirectoryPath] = useState(
-        [] as CargoDirectory[]
-    )
+    const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
     const [showFileOverlay, setShowFileOverlay] = useState(false)
     const [fileDetails, setFileDetails] = useState({
         name: "",
@@ -254,22 +249,12 @@ const AddOns = () => {
         fileResponse: new Response("", {status: 200}),
         bytes: 0
     })
-    const [
-        cargoOptionsElement, 
-        setCargoOptionsElement
-    ] = useState<null | HTMLButtonElement>(null)
-    const [
-        allCargosOptionsElement,
-        setAllCargosOptionsElement
-    ] = useState<null | HTMLButtonElement>(null)
-    const [
-        mobileMainMenuElement,
-        setMobileMainMenuElement,
-    ] = useState<null | HTMLButtonElement>(null)
-    const [
-        showCargoInfo,
-        setShowCargoInfo
-    ] = useState(false)
+    const [cargoOptionsElement, setCargoOptionsElement] = useState<null | HTMLButtonElement>(null)
+    const [allCargosOptionsElement, setAllCargosOptionsElement] = useState<null | HTMLButtonElement>(null)
+    const [mobileMainMenuElement, setMobileMainMenuElement] = useState<null | HTMLButtonElement>(null)
+    const [showCargoInfo, setShowCargoInfo] = useState(false)
+    const [showInstaller, setShowInstaller] = useState(true)
+    
     const cargoDirectoryRef = useRef<CargoDirectory>({
         path: ROOT_DIRECTORY_PATH,
         contentBytes: 0,
@@ -294,31 +279,6 @@ const AddOns = () => {
             return
         }
         const targetCargoIndex = cargoIndex.cargos[index]
-        /*
-        const cargo = await (async (rootUrl: string, id: string) => {
-            switch (id) {
-                case STANDARD_MOD_ID:
-                case GAME_EXTENSION_ID: {
-                    const targetCargo = ((cargoId: string) => {
-                        switch (cargoId) {
-                            case GAME_EXTENSION_ID:
-                                return GAME_CARGO
-                            case STANDARD_MOD_ID:
-                            default:
-                                return STANDARD_MOD_CARGO
-                        } 
-                    })(id)
-                    return io.ok({
-                        pkg: targetCargo,
-                        name: MANIFEST_NAME,
-                        bytes: JSON.stringify(targetCargo).length
-                    })
-                }
-                default:
-                    return await downloadClient.getCargoAtUrl(rootUrl)
-            }
-        })(targetCargoIndex.resolvedUrl, viewingCargo)
-        */
         const cargo = await downloadClient.getCargoAtUrl(
             targetCargoIndex.resolvedUrl
         )
@@ -374,15 +334,9 @@ const AddOns = () => {
         }
         const orderFactor = order === "ascending" ? 1 : -1
         const copy = []
-        const getArchives = searchParams.has("archive")
         for (let i = 0; i < cargoIndex.cargos.length; i++) {
             const targetCargo = cargoIndex.cargos[i]
-            if (
-                //(getArchives && targetCargo.state !== "archived")
-                //|| (!getArchives && targetCargo.state === "archived") 
-                //|| !targetCargo.name.includes(searchText)
-                !targetCargo.name.includes(searchText)
-            ) {
+            if (!targetCargo.name.includes(searchText)) {
                 continue
             }
             copy.push({...targetCargo})
@@ -481,10 +435,6 @@ const AddOns = () => {
         console.log("unarchive package")
     }
 
-    const onNewPackage = () => {
-        console.info("new pkg")
-    }
-
     const onStats = () => {
         console.info("show stats")
     }
@@ -519,6 +469,12 @@ const AddOns = () => {
                         onClose={() => setShowCargoInfo(false)}
                         cargo={targetCargo}
                         cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
+                    />
+                </> : <></>}
+
+                {showInstaller ? <>
+                    <Installer
+                        onClose={() => setShowInstaller(false)}
                     />
                 </> : <></>}
 
@@ -661,10 +617,10 @@ const AddOns = () => {
                 <div className="w-full relative z-0 h-10/12 sm:h-11/12 flex items-center justify-center">
                     <Divider className="bg-neutral-200"/>
 
-                    <div className="absolute z-20 bottom-0 right-5 sm:hidden">
-                        <Fab
-                            disabled
-                            onClick={onNewPackage}
+                    <div className="absolute z-20 bottom-2 right-4 sm:hidden">
+                        <Fab 
+                            onClick={() => setShowInstaller(true)}
+                            color="primary"
                         >
                             <FontAwesomeIcon 
                                 icon={faPlus}
@@ -692,8 +648,7 @@ const AddOns = () => {
                                     <Fab 
                                         variant="extended" 
                                         sx={{zIndex: "10"}}
-                                        disabled
-                                        onClick={onNewPackage}
+                                        onClick={() => setShowInstaller(true)}
                                     >
                                         <div className="flex items-center justify-center">
                                             <div className="mr-2">
@@ -1319,7 +1274,6 @@ const AddOns = () => {
                                 <div className="w-full h-5/6 overflow-y-scroll animate-fade-in-left">
                                     {filteredCargos.map((cargo, index) => {
                                         const {name, bytes, updatedAt, id, state} = cargo
-                                        
                                         const isAMod = isMod(id)
                                         return <AddonListItem
                                             key={`cargo-index-${index}`}

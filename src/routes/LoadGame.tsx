@@ -10,7 +10,7 @@ import { useGlobalConfirm } from "../hooks/globalConfirm"
 import { ModLinker } from "../components/mods/ModLinker"
 import { useAppShellContext } from "./store"
 import { emptyCargoIndices } from "../lib/shabah/downloadClient"
-import { MOD_CARGO_ID_PREFIX } from "../config"
+import { EXTENSION_QUERY_PARAM, MOD_CARGO_ID_PREFIX } from "../config"
 import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
 import { FilterChevron, FilterOrder } from "../components/FilterChevron"
 import { useNavigate } from "react-router-dom"
@@ -206,7 +206,7 @@ const LoadGamePage = () => {
                         <div className="w-full h-5/6 overflow-y-scroll overflow-x-clip px-2">
                             {filteredSaves.map((save, index) => {
                                 const {name, type, updatedAt, id} = save
-                                const openGame = () => navigate(`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=${id.toString()}`)
+                                const openGame = () => navigate(`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${id.toString()}`)
                                 return <div
                                     key={`save-${index}`}
                                     className="w-full text-left bg-neutral-900 cursor-pointer hover:bg-neutral-900/60 mb-2 rounded shadow-2xl border-l-4 border-solid border-blue-500"

@@ -6,6 +6,7 @@ import { useRef, useState } from "react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faAngleDown, faAngleUp } from "@fortawesome/free-solid-svg-icons"
 import { FadeIn } from "../components/FadeIn"
+import { EXTENSION_QUERY_PARAM } from "../config"
 
 const StartMenuPage = () => {
     const gameSaveExists = useRef(Boolean(window.localStorage.getItem(SAVE_EXISTS)))
@@ -22,7 +23,7 @@ const StartMenuPage = () => {
                     {gameSaveExists.current ? <>
                         <div>
                             <Link 
-                                to={`/extension?entry=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_ENTRY_URL)}&state=-1`}
+                                to={`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`}
                                 style={gameSaveExists.current 
                                     ? {}
                                     : {pointerEvents: "none"}
