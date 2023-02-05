@@ -6,7 +6,6 @@ export class EventListenerRecord<
     Listener extends Function
 > {
     private listenerRecords: ListenerRecord<Listener>[] = []
-    private listenerMap: Map<Listener, Id> = new Map()
     private idCounter = 0
 
     private createNewId(): Id {
@@ -19,25 +18,24 @@ export class EventListenerRecord<
         )
     }
 
-    addEventListener(listener: Listener): void {
+    addEventListener(listener: Listener): number {
         const id = this.createNewId()
         const record = {id, callback: listener}
         this.listenerRecords.push(record)
-        this.listenerMap.set(listener, id)
+        return id
     }
 
-    removeEventListener(listener: Listener): void {
-        if (!this.listenerMap.has(listener)) {
-            return
+    removeEventListener(id: Id): boolean {
+        if (this.listenerRecords.length < 1) {
+            return false
         }
-        const id = this.listenerMap.get(listener) || 0
         const index = this.listenerRecords.findIndex(
             (record) => record.id === id
         )
         if (index < 0) {
-            return
+            return false
         }
         this.listenerRecords.splice(index, 1)
-        this.listenerMap.delete(listener)
+        return true
     }
 }

@@ -1,13 +1,17 @@
-import wasmSupport from "wasm-check"
+import wasm from "wasm-check"
+
+const feature = (name: string, supported: boolean, hardwareRelated = false) => {
+  return {name, supported, hardwareRelated}
+}
 
 export const featureCheck = () => {
-    return [
-      {name: "service-worker", supported: ('serviceWorker' in navigator)},
-      {name: "background-fetch", supported: ("BackgroundFetchManager" in self)},
-      {name: "storage-estimate", supported: typeof navigator?.storage?.estimate !== "undefined"},
-      {name: "shared-array-buffer", supported: typeof SharedArrayBuffer !== "undefined"},
-      {name: "multiple-cores", supported: navigator.hardwareConcurrency > 1, hardwareRelated: true},
-      {name: "web-assembly-v1", supported: wasmSupport.support(1)},
-      {name: "web-assembly-simd", supported: wasmSupport.feature.simd},
-    ] as const
+  return [
+    feature("service-worker", ('serviceWorker' in navigator)),
+    feature("background-fetch", ("BackgroundFetchManager" in self)),
+    feature("storage-estimate", typeof navigator?.storage?.estimate !== "undefined"),
+    feature("shared-array-buffer", typeof SharedArrayBuffer !== "undefined"),
+    feature("multiple-cores", navigator.hardwareConcurrency > 1, true),
+    feature("web-assembly-v1", wasm.support(1)),
+    feature("web-assembly-simd", wasm.feature.simd),
+  ] as const
 }

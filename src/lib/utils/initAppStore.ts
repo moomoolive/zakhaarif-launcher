@@ -60,10 +60,10 @@ export const initAppStore = (config: AppStoreConfig): TopLevelAppProps => {
             }
         }),
         addEventListener: (name, handler) => {
-            listeners[name].addEventListener(handler)
+            return listeners[name].addEventListener(handler)
         },
-        removeEventListener: (name, handler) => {
-            listeners[name].removeEventListener(handler)
+        removeEventListener: (name, handlerId) => {
+            return listeners[name].removeEventListener(handlerId)
         }
     }
     cached = values

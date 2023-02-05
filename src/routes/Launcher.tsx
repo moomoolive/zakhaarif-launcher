@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Button, 
   Menu,
@@ -7,7 +7,6 @@ import {
   Collapse,
 } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
-import LoadingIconGlobal from "../components/LoadingIcon"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
   faTimes, faCheck, faBox, faCodeBranch,
@@ -24,14 +23,11 @@ import {APP_CARGO_ID, GAME_EXTENSION_ID, STANDARD_MOD_ID} from "../config"
 import {useAppShellContext} from "./store"
 import {useNavigate} from "react-router-dom"
 import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
+import { useEffectAsync } from '../hooks/effectAsync'
+import LoadingIcon from '../components/LoadingIcon'
 
-const LoadingIcon = () => <span className="text-lg animate-spin">
-  <LoadingIconGlobal/>
-</span>
-
-const UnsupportedFeatures = ({features}: {
-  features: {name: string, supported: boolean, hardwareRelated?: boolean}[]
-}) => {
+const UnsupportedFeatures = (): JSX.Element => {
+  const {current: features} = useRef(featureCheck() as ReadonlyArray<{name: string, supported: boolean, hardwareRelated?: boolean}>)
   const [showFeatureDetails, setShowFeatureDetails] = useState(false)
 
   const hardwareRequirementNotMet = features.some((feature) => {
@@ -167,223 +163,154 @@ const STANDARD_CARGOS = [
   }
 ] as const
 
+const NO_LISTENER = -1
+
+type LauncherState = (
+  "uninstalled"
+  | "cached"
+  | "error"
+  | "loading"
+)
+
 const LauncherRoot = () => {
   const confirm = useGlobalConfirm()
   const app = useAppShellContext()
   const {setTerminalVisibility, downloadClient} = app
   const navigate = useNavigate()
 
-
+  const [progressMsg, setProgressMsg] = useState("")
+  const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
+  const [downloadError, setDownloadError] = useState("")
+  const [currentAppVersion, setCurrentAppVersion] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
+  const [corePackagesStatus, setCorePackagesStatus] = useState([
+    {id: "launcher", installed: false, upToDate: true},
+    {id: "game-extension", installed: false, upToDate: true},
+    {id: "standard-mod", installed: false, upToDate: true},
+  ])
+  const [launcherState, setLauncherState] = useState<LauncherState>("uninstalled")
+  const [startButtonText, setStartButtonText] = useState("Install") 
+  
   const {current: launchApp} = useRef(() => {
     sessionStorage.setItem(APP_LAUNCHED, "1")
     navigate("/launch")
   })
-
-  const [showProgress, setShowProgress] = useState(false)
-  const [progressMsg, setProgressMsg] = useState<ReactNode>("")
-  const [settingsMenuElement, setSettingsMenuElement] = useState<null | HTMLElement>(null)
-  const [supportedFeatures] = useState(featureCheck())
-  const [downloadError, setDownloadError] = useState("")
-  const [previousUpdateFailed, setPreviousUpdateFailed] = useState(false)
-  const [buttonElement, setButtonElement] = useState(<>{"start"}</>)
-  const [
-    afterUpdateCheckAction, 
-    setAfterUpdateCheckAction
-  ] = useState<null | Function>(null)
-  const [checkedForUpdates, setCheckedForUpdates] = useState(false)
-  const [appUpdateInProgress, setAppUpdateInProgress] = useState(false)
-  const [nextUpdateVersion, setNextUpdateVersion] = useState("none")
-  const [
-    currentAppVersion, 
-    setCurrentAppVersion
-  ] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
-  const allFeaturesSupported = supportedFeatures.every((feature) => feature.supported)
+  const updateListener = useRef(NO_LISTENER)
+  const {current: allFeaturesSupported} = useRef(
+    featureCheck().every((feature) => feature.supported)
+  )
 
   const closeSettings = () => setSettingsMenuElement(null)
 
-  const addProgressListener = () => {
-    downloadClient.addProgressListener(APP_CARGO_ID, async (progress) => {
-      const {finished, installing, total, downloaded, failed} = progress
-      if (failed) {
-        setShowProgress(false)
-        setAppUpdateInProgress(false)
-        setPreviousUpdateFailed(true)
-        setDownloadError("Update Failed...")
-        setButtonElement(<>{"Retry"}</>)
-        document.title = APP_TITLE
-        const meta = await downloadClient.getCargoIndexById(APP_CARGO_ID)
-        setCurrentAppVersion(meta?.version || Shabah.NO_PREVIOUS_INSTALLATION)
-      } else if (finished) {
-        setProgressMsg("Installing...")
-        document.title = "Installing..."
-        await sleep(2_000)
-        document.title = APP_TITLE
-        launchApp()
-      } else if (installing) {
-        setProgressMsg("Installing...")
-        document.title = "Installing..."
-      } else {
-        const percent = toPercent(downloaded / total, 1)
-        console.log("p", percent)
-        document.title = `(${percent}%) Updating...`
-        setProgressMsg(progressIndicator(downloaded, total))
-      }
-    })
-  }
-
   const gatherAssets = async () => {
-    if (import.meta.env.PROD && !!sessionStorage.getItem(APP_LAUNCHED)) {
+    if (
+      import.meta.env.PROD 
+      && !!sessionStorage.getItem(APP_LAUNCHED)
+    ) {
       launchApp()
       return
     }
-    if (checkedForUpdates && afterUpdateCheckAction) {
-      return afterUpdateCheckAction()
-    }
     setDownloadError("")
-    setShowProgress(true)
-    setButtonElement(
-      <span className='animate-spin'>
-        <LoadingIcon/>
-      </span>
-    )
+    setLauncherState("loading")
     setProgressMsg("Checking for Updates...")
-    //const root = location.origin + "/"
-    const [
-      launcherResponse, 
-      gameExtensionResponse, 
-      standardModResponse
-    ] = await Promise.all([
+
+    const updates = await Promise.all([
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[0]),
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[1]),
       downloadClient.checkForCargoUpdates(STANDARD_CARGOS[2]),
-      // should take at least 500ms
-      sleep(500),
     ] as const)
+    const [launcher, gameExtension, standardMod] = updates 
     console.log(
-      "launcher", launcherResponse,
-      "game-extension", gameExtensionResponse,
-      "std-mod", standardModResponse
+      "launcher", launcher,
+      "game-extension", gameExtension,
+      "std-mod", standardMod
     )
-    const previousVersionExists = launcherResponse.previousVersionExists()
-    setCheckedForUpdates(true)
-    if (previousVersionExists && !launcherResponse.enoughStorageForCargo()) {
-      const updateVersion = launcherResponse.versions().new
-      setDownloadError(`Not enough disk space for update v${updateVersion} (${launcherResponse.readableBytesNeeded()} required)`)
-      setButtonElement(<>{"Start Anyway"}</>)
-      setAfterUpdateCheckAction(() => launchApp)
-      setShowProgress(false)
-      return
-    } else if (previousVersionExists && launcherResponse.errorOccurred()) {
-      setDownloadError(`Error occured when checking for updates`)
-      setButtonElement(<>{"Start Anyway"}</>)
-      setAfterUpdateCheckAction(() => launchApp)
-      setShowProgress(false)
-      return
-    } else if (
-      (!previousVersionExists && launcherResponse.errorOccurred())
-      || (!previousVersionExists && !launcherResponse.enoughStorageForCargo())
-    ) {
-      if (!launcherResponse.enoughStorageForCargo()) {
-        setDownloadError(`Not enough disk space install (${launcherResponse.readableBytesNeeded()} required)`)
-      } else {
-        setDownloadError("Couldn't contact update server")
-      }
-      setAfterUpdateCheckAction(null)
-      setButtonElement(<>{"Retry"}</>)
-      setShowProgress(false)
-      return
-    }
 
-    if (!launcherResponse.updateAvailable() && previousUpdateFailed) {
-      setProgressMsg("Updating...")
-      document.title = "Updating..."
-      setAppUpdateInProgress(true)
-      addProgressListener()
-      await downloadClient.retryFailedDownloads(
-        [APP_CARGO_ID], "retry"
-      )
-      return
-    }
-
-    if (!launcherResponse.updateAvailable()) {
+    if (!launcher.updateAvailable()) {
       launchApp()
       return
     }
+
     await downloadClient.cacheRootDocumentFallback()
     setProgressMsg(`Update Found! Queuing...`)
-    app.addEventListener("downloadprogress", (progress) => {
+    const listenerId = app.addEventListener("downloadprogress", (progress) => {
       console.log("got progress", progress)
     })
-    const updateQueueResponse = await downloadClient.executeUpdates(
-      [launcherResponse, gameExtensionResponse, standardModResponse],
-      `core v${launcherResponse.versions().new}`,
+    updateListener.current = listenerId
+    const queueResponse = await downloadClient.executeUpdates(
+      updates,
+      `game core`,
     )
-    console.log("queue response", updateQueueResponse)
-    if (updateQueueResponse.data !== Shabah.STATUS.updateQueued) {
-      await sleep(2_000)
-      setShowProgress(false)
+
+    if (queueResponse.data !== Shabah.STATUS.updateQueued) {
+      setLauncherState("error")
       setDownloadError("Couldn't Queue Update")
-      setButtonElement(<>{"Retry"}</>)
+      setStartButtonText("Retry")
+      app.removeEventListener("downloadprogress", listenerId)
       return
     }
-    await sleep(1_000)
     setProgressMsg("Updating...")
     document.title = "Updating..."
-    setAppUpdateInProgress(true)
-    setCurrentAppVersion(launcherResponse.versions().old)
-    setNextUpdateVersion(launcherResponse.versions().new)
-    addProgressListener()
+    setCurrentAppVersion(launcher.versions().old)
   }
 
   useEffect(() => {
-    (async () => {
-      const currentAppPkg = await downloadClient.getCargoIndexById(APP_CARGO_ID)
-      if (!currentAppPkg) {
-        setButtonElement(<>{"install"}</>)
+    return () => {
+      if (updateListener.current === NO_LISTENER) {
         return
       }
-      const {state} = currentAppPkg
-      if (state === "cached") {
-        setCurrentAppVersion(currentAppPkg.version)
-        return 
-      }
-      if (state === "update-aborted" || state === "update-failed") {
-        setPreviousUpdateFailed(true)
-        setCurrentAppVersion(currentAppPkg.version)
-        if (state === "update-aborted") {
-          setDownloadError("Update Aborted...")
-          setButtonElement(<>{"Resume"}</>)
-        } else {
-          setDownloadError("Update Failed...")
-          setButtonElement(<>{"Retry"}</>)
-        }
-        return
-      }
-      const updateInfo = await downloadClient.getDownloadState(APP_CARGO_ID)
-      if (!updateInfo) {
-        return
-      }
-      const {previousVersion, version} = updateInfo
-      setCurrentAppVersion(previousVersion)
-      setButtonElement(
-        <span className='animate-spin'>
-          <LoadingIcon/>
-        </span>
-      )
-      setAppUpdateInProgress(true)
-      setShowProgress(true)
-      setProgressMsg(`Updating...`)
-      document.title = "Updating..."
-      setNextUpdateVersion(version)
-      addProgressListener()
-    })()
-    return () => downloadClient.removeProgressListener(APP_CARGO_ID)
+      app.removeEventListener("downloadprogress", updateListener.current)
+    }
+  })
+
+  useEffectAsync(async () => {
+    const statuses = await Promise.all([
+      downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl),
+      downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl),
+      downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[2].canonicalUrl),
+    ] as const)
+    const [launcherStatus] = statuses
+    
+    const notInstalled = statuses.some((cargo) => !cargo)
+    if (!launcherStatus || notInstalled) {
+      setCorePackagesStatus(corePackagesStatus.map(
+        (status) => ({...status, installed: false})
+      ))
+      setStartButtonText("Install")
+      setLauncherState("uninstalled")
+      return
+    }
+
+    setCurrentAppVersion(launcherStatus.version)
+    const errorOccurred = statuses.some(
+      (cargo) => cargo?.state === "update-aborted" || cargo?.state === "update-failed"
+    )
+    if (errorOccurred) {
+      setDownloadError("Update Failed...")
+      setLauncherState("error")
+      setStartButtonText("Retry")
+      return
+    }
+
+    const isUpdating = statuses.some(
+      (cargo) => cargo?.state === "updating"
+    )
+    if (isUpdating) {
+      setLauncherState("loading")
+      return
+    }
+
+    
+    if (launcherStatus.state === "cached") {
+      setLauncherState("cached")
+      setStartButtonText("Start")
+      return
+    }
   }, [])
 
   return (
     <div 
       id="launcher-root"
-      className="relative text-center animate-fade-in-left z-0 w-screen h-screen flex justify-center items-center"
+      className="relative text-center z-0 w-screen h-screen flex justify-center items-center"
     >
         <div className="relative z-0">
             <div id="launcher-menu" className="fixed top-2 left-0">
@@ -391,11 +318,11 @@ const LauncherRoot = () => {
                   <Button
                   variant="text"
                   size="small"
-                  onClick={(e) => {
+                  onClick={(event) => {
                       if (settingsMenuElement) {
-                      closeSettings()
+                        closeSettings()
                       } else {
-                      setSettingsMenuElement(e.currentTarget)
+                        setSettingsMenuElement(event.currentTarget)
                       }
                   }}
                   >
@@ -448,12 +375,7 @@ const LauncherRoot = () => {
                         if (!(await confirm({title: "Are you sure you want to uninstall all files?", confirmButtonColor: "error"}))) {
                           return
                         }
-                        setShowProgress(true)
-                        setButtonElement(
-                          <span className='animate-spin'>
-                            <LoadingIcon/>
-                          </span>
-                        )
+                        setLauncherState("loading")
                         const message = "Uninstalling..."
                         document.title = message
                         setProgressMsg(message)
@@ -463,9 +385,11 @@ const LauncherRoot = () => {
                         await Promise.all([
                           import("../lib/database/AppDatabase").then((mod) => new mod.AppDatabase().clear()),
                           downloadClient.uninstallAllAssets(),
-                          sleep(3_000),
                         ])
-                        location.reload()
+                        window.setTimeout(() => {
+                          location.reload()
+                        }, 100)
+                        
                     }}
                   >
                     <div className="text-sm w-full">
@@ -480,71 +404,60 @@ const LauncherRoot = () => {
               </Menu>
             </div>
 
-            <div className="flex w-screen items-center flex-wrap justify-center">
-              <div>
+            {!allFeaturesSupported ? <>
+              <UnsupportedFeatures/>
+            </> : <>
+                <div>
                   <Button
                       variant="contained"
                       onClick={gatherAssets}
-                      disabled={
-                        !allFeaturesSupported 
-                        || showProgress
-                        || appUpdateInProgress
-                      }
+                      disabled={launcherState === "loading"}
                   >
-                      {buttonElement}
+                      {launcherState === "loading" 
+                        ? <span className="text-lg animate-spin">
+                            <LoadingIcon/>
+                          </span>  
+                        : startButtonText}
                   </Button>
-              </div>
-            </div>
+                </div>
 
-            {!allFeaturesSupported ? <>
-              <UnsupportedFeatures 
-                features={supportedFeatures.slice(0, -1)}
-              />
-            </> : <></>}
+                <Collapse in={downloadError.length > 0}>
+                    <div className="text-yellow-500 mt-4 text-sm">
+                      {downloadError}
+                    </div>
+                </Collapse>
+
+                <Collapse in={launcherState === "loading" && progressMsg.length > 0}>
+                  <div className="mt-4 w-4/5 mx-auto text-sm">
+                    {progressMsg}
+                  </div>
+                </Collapse>
+            </>}
             
-            <Collapse in={showProgress}>
-                <div className="mt-4 w-4/5 mx-auto text-sm">
-                  {progressMsg}
-                </div>
-            </Collapse>
-
-            <Collapse in={downloadError.length > 0}>
-                <div className="text-yellow-500 mt-4 text-sm">
-                  {downloadError}
-                </div>
-            </Collapse>
+            
 
            <Tooltip
             placement="top"
             title={
               currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION 
                 ? "Not installed yet"
-                : `Release Notes`
+                : "Launcher Version"
             }
            >
               <div className="fixed z-10 text-xs bottom-0 left-0 text-neutral-500 rounded">
-                <button
-                  className="hover:bg-neutral-900 p-2"
-                >
-                  <span className={`mr-1.5 ${previousUpdateFailed ? "text-yellow-400" : "text-blue-400"}`}>
+                <button className={`hover:bg-neutral-900 p-2 ${launcherState === "loading" ? "animate-pulse" : ""}`}>
+                  <span className={`mr-1.5 ${launcherState === "error" ? "text-yellow-400" : "text-blue-400"}`}>
                       <FontAwesomeIcon 
                         icon={faCodeBranch}
                       />
                   </span>
-                  {currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION ? "not installed" : "v" + currentAppVersion}
-                  {appUpdateInProgress && !previousUpdateFailed ? <>
-                    <span className="ml-1 text-blue-500">
-                      {"=>"}
-                    </span>
-                    <span className="ml-1 text-green-700 animate-pulse">
-                      {nextUpdateVersion}
-                    </span> 
-                  </> : <></>}
+                  {currentAppVersion === Shabah.NO_PREVIOUS_INSTALLATION 
+                    ? "not installed" 
+                    : "v" + currentAppVersion
+                  }
                 </button>
               </div>
             </Tooltip>
-            
-            
         </div>
     </div>
   )

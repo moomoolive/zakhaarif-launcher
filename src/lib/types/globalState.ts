@@ -18,6 +18,6 @@ export type TopLevelAppProps = {
         promise: Promise<boolean>
     },
     serviceWorkerTerminal: wRpc<ServiceWorkerRpcs>
-    addEventListener: <Name extends EventName>(name: Name, handler: EventMap[Name]) => void
-    removeEventListener: <Name extends EventName>(name: Name, handler: EventMap[Name]) => void
+    addEventListener: <Name extends EventName>(name: Name, handler: EventMap[Name]) => number
+    removeEventListener: (name: EventName, handlerId: number) => boolean
 }

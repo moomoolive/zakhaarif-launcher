@@ -1,15 +1,14 @@
 import {useState, useEffect, useRef} from 'react'
 import {createTheme, ThemeProvider} from "@mui/material"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import type {OutboundMessage as ServiceWorkerMessage} from "./lib/types/serviceWorkers"
 import {featureCheck} from "./lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
-import { initAppStore } from './lib/utils/initAppStore'
+import { initAppStore } from "./lib/utils/initAppStore"
+import {AppRouter} from "./routes/Router"
 
-const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })
@@ -39,7 +38,6 @@ const  App = () => {
   const {current: terminalState} = useRef({
     onBackTick: () => {}
   })
-
 
   terminalState.onBackTick = () => {
     if (!showTerminal) {
@@ -103,7 +101,7 @@ const  App = () => {
 
           <AppRouter globalState={globalState}/>
 
-          </ConfirmProvider>
+        </ConfirmProvider>
       </ThemeProvider>
     </main>
   )
