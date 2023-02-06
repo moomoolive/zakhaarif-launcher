@@ -100,16 +100,6 @@ export const hasUnsafePermissions = (summary: PermissionsSummary) => {
     )
 }
 
-export const hasRootLevelPermissions = (summary: PermissionsSummary) => {
-    if (summary.allowAll) {
-        return true
-    }
-    return (
-        summary.embedExtensions.length > 0 
-        && summary.embedExtensions[0] === ALLOW_ALL_PERMISSIONS
-    )
-}
-
 const permissionCleaners = {
     webRequest: (value: string) => {
         if (isDangerousCspOrigin(value)) {

@@ -196,9 +196,9 @@ const LauncherRoot = (): JSX.Element => {
 
     setProgressMsg("Checking for Updates...")
     const updateCheck = Promise.all([
-      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[0]),
-      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[1]),
-      downloadClient.checkForCargoUpdates(STANDARD_CARGOS[2]),
+      downloadClient.checkForUpdates(STANDARD_CARGOS[0]),
+      downloadClient.checkForUpdates(STANDARD_CARGOS[1]),
+      downloadClient.checkForUpdates(STANDARD_CARGOS[2]),
     ] as const)
     // update ui should take a least a second
     const [updates] = await Promise.all([updateCheck, sleep(1_000)] as const)

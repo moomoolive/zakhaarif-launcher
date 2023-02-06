@@ -186,13 +186,13 @@ const cargoToCargoIndex = (
     canonicalUrl: string,
     cargo: Cargo<Permissions>, 
     {
-        id = `id-${Math.trunc(Math.random() * 50_000)}`,
+        tag = `id-${Math.trunc(Math.random() * 50_000)}`,
         resolvedUrl,
         bytes = 0,
         state = "cached" as CargoState,
         downloadQueueId = NO_UPDATE_QUEUED
     }: Partial<{
-        id: string
+        tag: string
         resolvedUrl: string
         bytes: number
         state: CargoState,
@@ -200,7 +200,7 @@ const cargoToCargoIndex = (
     }> = {}
 ) => {
     const index: CargoIndex = {
-        id,
+        tag,
         name: cargo.name,
         logoUrl: cargo.crateLogoUrl,
         resolvedUrl: resolvedUrl || canonicalUrl,
@@ -275,13 +275,13 @@ describe("checking for cargo updates", () => {
         const origin = "https://my-house.org"
         const {client} = createClient(origin, {})
         const cases = [
-            {canonicalUrl: "", id: "rand-2"},
-            {canonicalUrl: "data:svg+xml:asdfasf", id: "rand-2"},
-            {canonicalUrl: "/yes", id: "rand-2"},
-            {canonicalUrl: "./relative", id: "rand-2"},
+            {canonicalUrl: "", tag: "rand-2"},
+            {canonicalUrl: "data:svg+xml:asdfasf", tag: "rand-2"},
+            {canonicalUrl: "/yes", tag: "rand-2"},
+            {canonicalUrl: "./relative", tag: "rand-2"},
         ] as const
         for (const c of cases) {
-            expect(() => client.checkForCargoUpdates(c)).rejects.toThrow()
+            expect(() => client.checkForUpdates(c)).rejects.toThrow()
         }
     })
 
@@ -366,9 +366,9 @@ describe("checking for cargo updates", () => {
                 )
                 expect(await client.getCargoIndexByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
-            const response = await client.checkForCargoUpdates({
+            const response = await client.checkForUpdates({
                 canonicalUrl: cargoOrigin,
-                id: "random"
+                tag: "random"
             })
             expect(response.errorOccurred()).toBe(true)
             if (errorType === "network") {
@@ -463,9 +463,9 @@ describe("checking for cargo updates", () => {
                 )
                 expect(await client.getCargoIndexByCanonicalUrl(cargoOrigin)).not.toBe(null)
             }
-            const response = await client.checkForCargoUpdates({
+            const response = await client.checkForUpdates({
                 canonicalUrl: cargoOrigin,
-                id: "random"
+                tag: "random"
             })
             expect(response.errorOccurred()).toBe(true)
             if (errorType === "bad-cargo") {
@@ -528,8 +528,8 @@ describe("checking for cargo updates", () => {
                     [`${cargoOrigin}/${testFile2}`]: file2
                 }
             })
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             expect(response.errorOccurred()).toBe(true)
             expect(response.status).toBe(Shabah.STATUS.preflightVerificationFailed)
@@ -560,8 +560,8 @@ describe("checking for cargo updates", () => {
                 }
             }
         })
-        const response = await client.checkForCargoUpdates(
-            {canonicalUrl: cargoOrigin, id: "tmp"}
+        const response = await client.checkForUpdates(
+            {canonicalUrl: cargoOrigin, tag: "tmp"}
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
@@ -593,8 +593,8 @@ describe("checking for cargo updates", () => {
                 }
             }
         })
-        const response = await client.checkForCargoUpdates(
-            {canonicalUrl: redirectOrigin, id: "tmp"}
+        const response = await client.checkForUpdates(
+            {canonicalUrl: redirectOrigin, tag: "tmp"}
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
@@ -634,8 +634,8 @@ describe("checking for cargo updates", () => {
                 }
             }
         })
-        const response = await client.checkForCargoUpdates(
-            {canonicalUrl: cargoOrigin, id: "tmp"}
+        const response = await client.checkForUpdates(
+            {canonicalUrl: cargoOrigin, tag: "tmp"}
         )
         expect(response.enoughStorageForCargo()).toBe(false)
         expect(response.errorOccurred()).toBe(false)
@@ -667,8 +667,8 @@ describe("checking for cargo updates", () => {
                 }
             }
         })
-        const response = await client.checkForCargoUpdates(
-            {canonicalUrl: cargoOrigin, id: "tmp"}
+        const response = await client.checkForUpdates(
+            {canonicalUrl: cargoOrigin, tag: "tmp"}
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
@@ -714,8 +714,8 @@ describe("checking for cargo updates", () => {
         await client.putCargoIndex(
             cargoToCargoIndex(cargoOrigin, oldCargo),
         )
-        const response = await client.checkForCargoUpdates(
-            {canonicalUrl: cargoOrigin, id: "tmp"}
+        const response = await client.checkForUpdates(
+            {canonicalUrl: cargoOrigin, tag: "tmp"}
         )
         expect(response.errorOccurred()).toBe(false)
         expect(response.newCargo).not.toBe(null)
@@ -770,8 +770,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             const newVersion = SemVer.fromString(newCargo.version)!
             const oldVersion = SemVer.fromString(oldCargo.version)!
@@ -841,8 +841,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             const newVersion = SemVer.fromString(newCargo.version)!
             const oldVersion = SemVer.fromString(oldCargo.version)!
@@ -912,8 +912,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             const newVersion = SemVer.fromString(newCargo.version)!
             const oldVersion = SemVer.fromString(oldCargo.version)!
@@ -975,8 +975,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.errorOccurred()).toBe(false)
@@ -1019,8 +1019,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
@@ -1064,8 +1064,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.newCargo).not.toBe(null)
@@ -1170,8 +1170,8 @@ describe("checking for cargo updates", () => {
                 cargoToCargoIndex(cargoOrigin, oldCargo),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: cargoOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: cargoOrigin, tag: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.errorOccurred()).toBe(false)
@@ -1330,8 +1330,8 @@ describe("checking for cargo updates", () => {
                 }),
 
             )
-            const response = await client.checkForCargoUpdates(
-                {canonicalUrl: redirectOrigin, id: "tmp"}
+            const response = await client.checkForUpdates(
+                {canonicalUrl: redirectOrigin, tag: "tmp"}
             )
             expect(response.updateAvailable()).toBe(true)
             expect(response.errorOccurred()).toBe(false)
@@ -1389,7 +1389,7 @@ describe("checking for cargo updates", () => {
 const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
     const {
         status = Shabah.STATUS.ok,
-        id = "tmp",
+        tag = "tmp",
         originalResolvedUrl = "",
         canonicalUrl = "",
         resolvedUrl = "",
@@ -1413,7 +1413,7 @@ const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
         newCargo,
         originalNewCargoResponse,
         errors,
-        id,
+        tag,
         originalResolvedUrl,
         resolvedUrl,
         canonicalUrl,
@@ -1599,7 +1599,7 @@ describe("executing updates", () => {
                 
             })
             await client.putDownloadIndex({
-                id: updateResponse.id,
+                id: "tmp",
                 previousId: "",
                 bytes: 0,
                 title: "update 1",
@@ -1663,7 +1663,7 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                id: "tmp",
+                tag: "tmp",
                 originalResolvedUrl: canonicalUrl,
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
@@ -1733,7 +1733,7 @@ describe("executing updates", () => {
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
                 
-                    id: "tmp",
+                    tag: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
@@ -1807,7 +1807,7 @@ describe("executing updates", () => {
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
                 
-                    id: "tmp",
+                    tag: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
@@ -1886,7 +1886,7 @@ describe("executing updates", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
-                id: "tmp",
+                tag: "tmp",
                 originalResolvedUrl: canonicalUrl,
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
@@ -1960,7 +1960,7 @@ describe("executing updates", () => {
                 const canonicalUrl = origin + "/"
                 const response = createUpdateCheck({
                     status: Shabah.STATUS.ok,
-                    id: "tmp",
+                    tag: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
@@ -2056,7 +2056,7 @@ describe("executing updates", () => {
                 const canonicalUrl = origin + "/"
                 const response = createUpdateCheck({
                     status: Shabah.STATUS.ok,
-                    id: "tmp",
+                    tag: "tmp",
                     originalResolvedUrl: canonicalUrl,
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
@@ -2598,7 +2598,7 @@ describe("reading and updating cargo indexes", () => {
         const {client, canceledDownloads} = createClient(canonicalUrl)
         const initial = new Cargo<Permissions>({name: "my-cargo"})
         const updateResponse = createUpdateCheck({
-            id: "tmp",
+            tag: "tmp",
             canonicalUrl,
             resolvedUrl,
             originalResolvedUrl: resolvedUrl,
@@ -2651,7 +2651,7 @@ describe("reading and updating cargo indexes", () => {
         const {client, canceledDownloads} = createClient(canonicalUrl)
         const initial = new Cargo<Permissions>({name: "my-cargo"})
         const updateResponse = createUpdateCheck({
-            id: "tmp",
+            tag: "tmp",
             canonicalUrl,
             resolvedUrl,
             originalResolvedUrl: resolvedUrl,
@@ -2668,7 +2668,7 @@ describe("reading and updating cargo indexes", () => {
             cargoStorageBytes: 100
         })
         const secondUpdate = createUpdateCheck({
-            id: "tmp",
+            tag: "tmp",
             canonicalUrl: secondCanonicalUrl,
             resolvedUrl: secondCanonicalUrl,
             originalResolvedUrl: secondCanonicalUrl,
@@ -3013,9 +3013,9 @@ describe("querying download state", () => {
             expect(downloadState.queuedDownloads.length).toBe(0)
             const canonicalUrl = origin + "/"
             const resolvedUrl = canonicalUrl
-            const id = "dl-" + Math.trunc(Math.random() * 1_000)
+            const tag = "dl-" + Math.trunc(Math.random() * 1_000)
             const updateResponse = createUpdateCheck({
-                id,
+                tag,
                 resolvedUrl,
                 originalResolvedUrl: resolvedUrl,
                 canonicalUrl,

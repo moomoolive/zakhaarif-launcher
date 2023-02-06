@@ -1,16 +1,16 @@
-import {APP_CARGO_ID, GAME_EXTENSION_ID, STANDARD_MOD_ID} from "./config"
+import {MOD_CARGO_TAG, EXTENSION_CARGO_TAG} from "./config"
 
 export const STANDARD_CARGOS = [
     {
       canonicalUrl: import.meta.env.VITE_APP_LAUNCHER_CARGO_URL, 
-      id: APP_CARGO_ID
+      tag: EXTENSION_CARGO_TAG
     },
     {
       canonicalUrl: import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL,
-      id: GAME_EXTENSION_ID
+      tag: EXTENSION_CARGO_TAG
     },
     {
       canonicalUrl: import.meta.env.VITE_APP_STANDARD_MOD_CARGO_URL,
-      id: STANDARD_MOD_ID
+      tag: MOD_CARGO_TAG
     }
 ] as const

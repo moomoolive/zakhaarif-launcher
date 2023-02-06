@@ -13,7 +13,7 @@ const mockSandboxDependencies: SandboxDependencies = {
     createFatalErrorMessage: () => {},
     confirmExtensionExit: async () => {},
     cargoIndex: {
-        id: "none",
+        tag: "none",
         name: "none",
         logoUrl: "none",
         resolvedUrl: "",

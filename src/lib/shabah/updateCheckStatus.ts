@@ -11,7 +11,7 @@ type RawDiskMetadata = Readonly<{
 }>
 
 export type UpdateCheckConfig = {
-    id: string
+    tag: string
     originalResolvedUrl: string
     resolvedUrl: string
     canonicalUrl: string
@@ -47,7 +47,7 @@ export class UpdateCheckResponse {
         return normalized <= diskInfo.total
     }
 
-    readonly id: string
+    tag: string
     readonly originalResolvedUrl: string
     readonly resolvedUrl: string
     readonly canonicalUrl: string
@@ -63,7 +63,7 @@ export class UpdateCheckResponse {
     private readonly diskInfo: RawDiskMetadata
 
     constructor(config: UpdateCheckConfig) {
-        this.id = config.id
+        this.tag = config.tag
         this.canonicalUrl = config.canonicalUrl
         this.resolvedUrl = config.resolvedUrl
         this.originalResolvedUrl = config.originalResolvedUrl

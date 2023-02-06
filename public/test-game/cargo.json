@@ -19,5 +19,8 @@
         "allowUnsafeEval",
         {"key": "gameSaves", "value": ["read", "write"]},
         {"key": "embedExtensions", "value": ["allowAll"]}
-    ]
+    ],
+    "metadata": {
+        "is-extension": "true"
+    }
 }

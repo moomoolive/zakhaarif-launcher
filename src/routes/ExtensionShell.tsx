@@ -5,9 +5,8 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
-import {EXTENSION_QUERY_PARAM, GAME_EXTENSION_ID, MOD_CARGO_ID_PREFIX} from "../config"
+import {EXTENSION_QUERY_PARAM} from "../config"
 import {useAppShellContext} from "./store"
-//import {GAME_CARGO, GAME_CARGO_INDEX} from "../standardCargos"
 import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
@@ -42,7 +41,7 @@ const ExtensionShellPage = () => {
     
     const extensionCargo = useRef(new Cargo<Permissions>())
     const extensionCargoIndex = useRef<CargoIndex>({
-        id: "tmp",
+        tag: "tmp",
         name: "tmp",
         downloadQueueId: "",
         logoUrl: NULL_FIELD,
@@ -108,14 +107,6 @@ const ExtensionShellPage = () => {
             return
         }
 
-        if (meta.id.startsWith(MOD_CARGO_ID_PREFIX)) {
-            setLoading(false)
-            setError(true)
-            setErrorMessage("Invalid Extension")
-            console.warn(`Prevented mod "${canonicalUrl}" from running. Mods cannot be run as standalone extensions and only run when embedded in the game extension (id="${GAME_EXTENSION_ID}")`)
-            return
-        }
-
         if (meta.state !== "cached" || meta.entry === CARGO_NULL_FIELD) {
             setLoading(false)
             setError(true)
@@ -166,7 +157,7 @@ const ExtensionShellPage = () => {
         const isUnsafe = (
             unsafePackagesDisallowed
             && hasUnsafePermissions(permissionsSummary)
-            && extensionCargoIndex.current.id !== GAME_EXTENSION_ID
+            && extensionCargoIndex.current.canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
         )
         if (isUnsafe) {
             setError(true)

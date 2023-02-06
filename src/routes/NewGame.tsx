@@ -15,11 +15,12 @@ import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppShellContext} from "./store"
 import {emptyCargoIndices} from "../lib/shabah/downloadClient"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {EXTENSION_QUERY_PARAM, MOD_CARGO_ID_PREFIX} from "../config"
+import {EXTENSION_QUERY_PARAM, MOD_CARGO_TAG} from "../config"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
 import {AppDatabase} from "../lib/database/AppDatabase"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
+import { isMod } from "../lib/utils/cargos"
 
 const NewGamePage = () => {
     const navigate = useNavigate()
@@ -36,8 +37,8 @@ const NewGamePage = () => {
 
     useEffectAsync(async () => {
         const clientResponse = await downloadClient.getCargoIndices()
-        const allCargos = clientResponse.cargos//addStandardCargosToCargoIndexes(clientResponse.cargos)
-        const cargos = allCargos.filter((cargo) => cargo.id.startsWith(MOD_CARGO_ID_PREFIX))
+        const allCargos = clientResponse.cargos
+        const cargos = allCargos.filter((cargo) => isMod(cargo))
         const standardMod = cargos[0]
         setLinkedMods([standardMod])
         setCargoIndices({...clientResponse, cargos})

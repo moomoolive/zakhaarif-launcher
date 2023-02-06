@@ -246,7 +246,7 @@ describe("reading and writing to cargo indices", () => {
         const res = updateCargoIndex(
             index,
             {
-                id: "pkg",
+                tag: "pkg",
                 logoUrl: "",
                 storageBytes: 0,
                 permissions: [] as Permissions,
@@ -267,7 +267,7 @@ describe("reading and writing to cargo indices", () => {
     it("if cargo index is not in index collection new index should be created", () => {
         const index = emptyCargoIndices()
         const first = {
-            id: "pkg",
+            tag: "pkg",
             name: "pkg",
             logoUrl: "",
             storageBytes: 0,
@@ -283,7 +283,7 @@ describe("reading and writing to cargo indices", () => {
         updateCargoIndex(index, first)
         expect(index.cargos.length).toBe(1)
         const second = {
-            id: "pkg",
+            tag: "pkg",
             name: "pkg",
             logoUrl: "",
             storageBytes: 0,
@@ -307,7 +307,7 @@ describe("reading and writing to cargo indices", () => {
         const origin = "https://myhouse.com"
         const index = await getCargoIndices(origin, fileCache)
         const first = {
-            id: "pkg",
+            tag: "pkg",
             name: "pkg",
             logoUrl: "",
             storageBytes: 0,
@@ -322,7 +322,7 @@ describe("reading and writing to cargo indices", () => {
         } as const
         updateCargoIndex(index, first)
         const second = {
-            id: "pkg-2",
+            tag: "pkg-2",
             name: "pkg",
             state: "cached",
             logoUrl: "",
@@ -350,7 +350,7 @@ describe("reading and writing to cargo indices", () => {
         const origin = "https://myhouse.com/"
         const index = await getCargoIndices(origin, fileCache)
         const first = {
-            id: "pkg",
+            tag: "pkg",
             name: "pkg",
             state: "updating",
             logoUrl: "",
@@ -365,7 +365,7 @@ describe("reading and writing to cargo indices", () => {
         } as const
         updateCargoIndex(index, first)
         const second = {
-            id: "pkg-2",
+            tag: "pkg-2",
             name: "pkg",
             state: "cached",
             permissions: [] as Permissions,

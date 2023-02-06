@@ -1,6 +1,7 @@
 import {
     checkForUpdates,
     createResourceMap,
+    ERROR_CODES_START,
     StatusCode,
     STATUS_CODES,
 } from "./client"
@@ -39,6 +40,7 @@ import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import { NO_INSTALLATION } from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
 import { nanoid } from "nanoid"
+import { DeepReadonly } from "../types/utility"
 
 export type {CargoIndex, CargoIndices, CargoState} from "./backend"
 export {emptyCargoIndices} from "./backend"
@@ -66,6 +68,7 @@ export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = NO_INSTALLATION
     static readonly POLICIES = serviceWorkerPolicies
     static readonly STATUS = STATUS_CODES
+    static readonly ERROR_CODES_START = ERROR_CODES_START
 
     readonly origin: string
 
@@ -106,9 +109,9 @@ export class Shabah {
         return {used, total, left}
     }
 
-    async checkForCargoUpdates(cargo: {
+    async checkForUpdates(cargo: {
         canonicalUrl: string
-        id: string
+        tag: string
     }): Promise<UpdateCheckResponse> {
         if (!cargo.canonicalUrl.startsWith("https://") && !cargo.canonicalUrl.startsWith("http://")) {
             throw new Error("cargo canonical url must be a full url, starting with https:// or http://")
@@ -116,11 +119,9 @@ export class Shabah {
         const cargoIndex = await this.getCargoIndexByCanonicalUrl(
             cargo.canonicalUrl
         )
-        
         const response = await checkForUpdates({
             canonicalUrl: cargo.canonicalUrl,
             oldResolvedUrl: cargoIndex?.resolvedUrl || "",
-            name: cargo.id
         }, this.networkRequest, this.fileCache)
         
         if (response.newCargo && this.permissionsCleaner) {
@@ -130,7 +131,7 @@ export class Shabah {
 
         return new UpdateCheckResponse({
             status: response.code,
-            id: cargoIndex?.id || cargo.id,
+            tag: cargo.tag,
             originalResolvedUrl: cargoIndex?.resolvedUrl || "",
             resolvedUrl: response.newCargo?.resolvedUrl || "",
             canonicalUrl: addSlashToEnd(cargo.canonicalUrl),
@@ -236,7 +237,7 @@ export class Shabah {
             
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
-                id: update.id,
+                tag: update.tag,
                 state: "updating",
                 permissions: update.newCargo?.permissions || [],
                 version: update.versions().new,
@@ -518,7 +519,7 @@ export class Shabah {
         return cargos
     }
 
-    async getCargoIndices() {
+    async getCargoIndices(): Promise<DeepReadonly<CargoIndices>> {
         if (this.cargoIndicesCache) {
             return this.cargoIndicesCache
         }

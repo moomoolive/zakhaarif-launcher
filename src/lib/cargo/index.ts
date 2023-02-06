@@ -403,7 +403,7 @@ export const validateManifest = <T>(cargo: T) => {
         }
         meta[key] = value
     }
-
+    pkg.metadata = meta
     return out
 }
 

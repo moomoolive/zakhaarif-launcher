@@ -1,4 +1,4 @@
-import {useState, useMemo, useRef} from "react"
+import {useState, useMemo, useRef, useEffect} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
 import {ErrorOverlay} from "../components/ErrorOverlay"
@@ -21,7 +21,6 @@ import {
     faArrowLeft,
     faPlus,
     faCaretDown,
-    faBoxArchive,
     faGear,
     faMagnifyingGlass,
     faBoxesStacked,
@@ -36,12 +35,11 @@ import {reactiveDate} from "../lib/utils/dates"
 import {
     Divider, 
     LinearProgress,
-    Collapse,
     IconButton
 } from "@mui/material"
 import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
-import {emptyCargoIndices, CargoState} from "../lib/shabah/downloadClient"
+import {emptyCargoIndices, CargoState, Shabah, CargoIndices} from "../lib/shabah/downloadClient"
 import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
@@ -53,10 +51,9 @@ import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {MimeIcon} from "../components/cargo/FileOverlay"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
-import {isStandardCargo, isMod, isEmbeddedStandardCargo} from "../lib/utils/cargos"
-import {MANIFEST_NAME} from "../lib/cargo/index"
-import {VIRTUAL_FILE_HEADER} from "../lib/utils/consts/files"
+import {isStandardCargo, isMod} from "../lib/utils/cargos"
 import type {Permissions} from "../lib/types/permissions"
+import { DeepReadonly } from "../lib/types/utility"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -222,6 +219,7 @@ const AddonListItem = ({
 const ROOT_DIRECTORY_PATH = "#"
 
 const AddOns = () => {
+    const app = useAppShellContext()
     const {downloadClient} = useAppShellContext()
     const [searchParams, setSearchParams] = useSearchParams()
     const confirm = useGlobalConfirm()
@@ -229,7 +227,7 @@ const AddOns = () => {
     
     const [loadingInitialData, setLoadingInitialData] = useState(true)
     const [isInErrorState, setIsInErrorState] = useState(false)
-    const [cargoIndex, setCargoIndex] = useState(emptyCargoIndices())
+    const [cargoIndex, setCargoIndex] = useState<DeepReadonly<CargoIndices>>(emptyCargoIndices())
     const [storageUsage, setStorageUsage] = useState({
         used: 0, total: 0, left: 0
     })
@@ -253,7 +251,7 @@ const AddOns = () => {
     const [allCargosOptionsElement, setAllCargosOptionsElement] = useState<null | HTMLButtonElement>(null)
     const [mobileMainMenuElement, setMobileMainMenuElement] = useState<null | HTMLButtonElement>(null)
     const [showCargoInfo, setShowCargoInfo] = useState(false)
-    const [showInstaller, setShowInstaller] = useState(true)
+    const [showInstaller, setShowInstaller] = useState(false)
     
     const cargoDirectoryRef = useRef<CargoDirectory>({
         path: ROOT_DIRECTORY_PATH,
@@ -272,7 +270,7 @@ const AddOns = () => {
             return
         }
         const index = cargoIndex.cargos.findIndex(
-            (cargo) => cargo.id === viewingCargo
+            (cargo) => cargo.canonicalUrl === viewingCargo
         )
         if (index < 0) {
             setCargoFound(false)
@@ -323,8 +321,7 @@ const AddOns = () => {
             setIsInErrorState(true)
             return
         }
-        const cargos = cargoIndexRes.data.cargos//addStandardCargosToCargoIndexes(cargoIndexRes.data.cargos)
-        setCargoIndex({...cargoIndexRes.data, cargos})
+        setCargoIndex({...cargoIndexRes.data})
         setStorageUsage(clientStorageRes.data)
     }, [])
 
@@ -361,7 +358,7 @@ const AddOns = () => {
                 })
             case "addon-type":
                 return copy.sort((a, b) => {
-                    const order = isMod(a.id) && !isMod(b.id)
+                    const order = isMod(a) && !isMod(b)
                         ? 1
                         : -1
                     return order * orderFactor
@@ -428,12 +425,34 @@ const AddOns = () => {
         }
     }
 
-    const archiveClick = async (_id: string) => {
-        if (!await confirm({title: "Are you sure you want to unarchived this add-on?"})) {
-            return
-        }
-        console.log("unarchive package")
-    }
+    useEffect(() => {
+        const handerId = app.addEventListener("downloadprogress", (progress) => {
+            const {type} = progress
+            if (type === "install") {
+                return
+            }
+            let nextState: CargoState = "cached"
+            if (type === "abort") {
+                nextState = "update-aborted"
+            }
+            if (type === "fail") {
+                nextState = "update-failed"
+            }
+            const copy = {...cargoIndex}
+            const targetIndexes = progress.canonicalUrls
+                .map((url) => copy.cargos.findIndex((cargo) => cargo.canonicalUrl === url))
+                .filter((index) => index > -1)
+            const {cargos} = copy
+            for (const index of targetIndexes) {
+                cargos.splice(index, 1, {
+                    ...cargos[index], 
+                    state: nextState
+                })
+            }
+            setCargoIndex(copy)
+        })
+        return () => { app.removeEventListener("downloadprogress", handerId) }
+    })
 
     const onStats = () => {
         console.info("show stats")
@@ -475,6 +494,17 @@ const AddOns = () => {
                 {showInstaller ? <>
                     <Installer
                         onClose={() => setShowInstaller(false)}
+                        onInstallCargo={async (update, title) => {
+                            const status = await downloadClient.executeUpdates(
+                                [update],
+                                title
+                            )
+                            console.log("dl status", status)
+                            const indexes = await downloadClient.getCargoIndices()
+                            setCargoIndex({...indexes})
+                            const ok = !(status.data >= Shabah.ERROR_CODES_START)
+                            return ok 
+                        }}
                     />
                 </> : <></>}
 
@@ -539,30 +569,13 @@ const AddOns = () => {
                                 >
                                     <MenuItem
                                         onClick={() => {
-                                            if (searchParams.has("archive")) {
-                                                searchParams.delete("archive")
-                                                setSearchParams(searchParams)
-                                            } else {
-                                                setSearchParams({archive: "true"})
-                                            }
-                                            setMobileMainMenuElement(null)
+                                            console.log("clicked")
                                         }}
                                     >
-                                        {searchParams.has("archive") ? <>
-                                            <span className="mr-4">
-                                                <FontAwesomeIcon
-                                                    icon={faBoxesStacked}
-                                                />
-                                            </span>
-                                            Installed
-                                        </> : <>
-                                            <span className="mr-4">
-                                                <FontAwesomeIcon 
-                                                    icon={faBoxArchive}
-                                                />
-                                            </span>
-                                            Archives
-                                        </>}
+                                        <span className="mr-4">
+                                            <FontAwesomeIcon icon={faBoxesStacked}/>
+                                        </span>
+                                        Installed
                                     </MenuItem>
                                 </Menu>
                             </div>
@@ -618,14 +631,16 @@ const AddOns = () => {
                     <Divider className="bg-neutral-200"/>
 
                     <div className="absolute z-20 bottom-2 right-4 sm:hidden">
-                        <Fab 
-                            onClick={() => setShowInstaller(true)}
-                            color="primary"
-                        >
-                            <FontAwesomeIcon 
-                                icon={faPlus}
-                            />
-                        </Fab>
+                        <Tooltip title="New Package" placement="left">
+                            <Fab 
+                                onClick={() => setShowInstaller(true)}
+                                color="primary"
+                            >
+                                <FontAwesomeIcon 
+                                    icon={faPlus}
+                                />
+                            </Fab>
+                        </Tooltip>
                     </div>
 
                     <div className="hidden sm:block w-60 h-full text-sm">
@@ -649,6 +664,7 @@ const AddOns = () => {
                                         variant="extended" 
                                         sx={{zIndex: "10"}}
                                         onClick={() => setShowInstaller(true)}
+                                        color="primary"
                                     >
                                         <div className="flex items-center justify-center">
                                             <div className="mr-2">
@@ -682,49 +698,6 @@ const AddOns = () => {
                                     Stats
                                 </div>
                             </Button>
-
-                            <Collapse in={!isViewingCargo}>
-                                {searchParams.has("archive") ? <>
-                                    <Tooltip title="Back To Installed" placement="right">
-                                        <Button 
-                                            fullWidth
-                                            color="success"
-                                            onClick={() => {
-                                                searchParams.delete("archive")
-                                                setSearchParams(searchParams)
-                                            }}
-                                        >
-                                            <div className="w-full pl-4 py-1 text-left">
-                                                <span className="mr-4">
-                                                    <FontAwesomeIcon
-                                                        icon={faBoxesStacked}
-                                                    />
-                                                </span>
-                                                Installed
-                                                
-                                            </div>
-                                        </Button>
-                                    </Tooltip>
-                                </> : <>
-                                    <Tooltip title="View Archives" placement="right">
-                                        <Button 
-                                            fullWidth
-                                            onClick={() => setSearchParams({archive: "true"})}
-                                        >
-                                            <div className="w-full pl-4 py-1 text-left">
-                                                <span className="mr-4">
-                                                    <FontAwesomeIcon 
-                                                        icon={faBoxArchive}
-                                                    />
-                                                </span>
-                                                Archives
-                                            </div>
-                                        </Button>
-                                    </Tooltip>
-                                </>}
-                            </Collapse>
-                            
-                            
 
                             <Button 
                                 fullWidth 
@@ -788,7 +761,7 @@ const AddOns = () => {
                             </div>
 
                             <div className="text-xs text-neutral-400">
-                                1 packages
+                                {`${cargoIndex.cargos.length} packages`}
                             </div>
                         </div>
 
@@ -943,11 +916,11 @@ const AddOns = () => {
                                                 className="hover:text-red-500"
                                                 onClick={async () => {
                                                     const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (isStandardCargo(target.id)) {
+                                                    if (isStandardCargo(target)) {
                                                         confirm({title: `"${target.name}" is a standard package and cannot be deleted!`})
                                                         return 
                                                     }
-                                                    if (!await confirm({title: `Are you sure you want to delete "${target.name}" add-on?`})) {
+                                                    if (!await confirm({title: `Are you sure you want to delete "${target.name}" add-on?`, confirmButtonColor: "error"})) {
                                                         setCargoOptionsElement(null)
                                                         return
                                                     }
@@ -1223,26 +1196,7 @@ const AddOns = () => {
                                                                 ? path.slice(1)
                                                                 : cleanedPathEnd
                                                             const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                                                            const {id} = targetIndex
-                                                            const fileResponse = await (async (cargoId: string, url: string) => {
-                                                                if (
-                                                                    !url.includes(MANIFEST_NAME)
-                                                                    || !isEmbeddedStandardCargo(cargoId)
-                                                                ) {
-                                                                    return await downloadClient.getCachedFile(url)
-                                                                }
-                                                                return new Response(
-                                                                    JSON.stringify(targetCargo), {
-                                                                        status: 200,
-                                                                        statusText: "OK",
-                                                                        headers: {
-                                                                            "content-type": "application/json",
-                                                                            "content-length": file.bytes.toString(),
-                                                                            [VIRTUAL_FILE_HEADER]: "1"
-                                                                        }
-                                                                    }
-                                                                )
-                                                            })(id, fullPath)
+                                                            const fileResponse = await downloadClient.getCachedFile(fullPath)
                                                             if (!fileResponse) {
                                                                 console.error(`file ${fullPath} was not found although it should be cached!`)
                                                                 await confirm({title: "An error occurred when fetching file!"})
@@ -1273,18 +1227,11 @@ const AddOns = () => {
                             </> : <>
                                 <div className="w-full h-5/6 overflow-y-scroll animate-fade-in-left">
                                     {filteredCargos.map((cargo, index) => {
-                                        const {name, bytes, updatedAt, id, state} = cargo
-                                        const isAMod = isMod(id)
+                                        const isAMod = isMod(cargo)
                                         return <AddonListItem
                                             key={`cargo-index-${index}`}
-                                            onClick={() => {
-                                                if (searchParams.has("archive")) {
-                                                    archiveClick(id)
-                                                } else {
-                                                    setViewingCargo(id)
-                                                }
-                                            }}
-                                            icon={((addonState: typeof state, mod: boolean) => {
+                                            onClick={() => setViewingCargo(cargo.canonicalUrl)}
+                                            icon={((addonState: CargoState, mod: boolean) => {
                                                 switch (addonState) {
                                                     case "update-aborted":
                                                     case "update-failed":
@@ -1293,9 +1240,6 @@ const AddOns = () => {
                                                             <FontAwesomeIcon 
                                                                 icon={faFolder}
                                                             />
-                                                        </span>
-                                                        <span>
-                                                            {name}
                                                         </span>
                                                         <div className="absolute z-10 bottom-0 left-0 text-red-500">
                                                             <FailedAddonIcon
@@ -1306,12 +1250,7 @@ const AddOns = () => {
                                                     case "updating":
                                                         return <>
                                                             <span className={"mr-3 text-blue-500"}>
-                                                                <FontAwesomeIcon 
-                                                                    icon={faFolder}
-                                                                />
-                                                            </span>
-                                                            <span>
-                                                                {name}
+                                                                <FontAwesomeIcon icon={faFolder}/>
                                                             </span>
                                                             <div className="absolute z-10 bottom-0 left-0 animate-spin">
                                                                 <UpdatingAddonIcon
@@ -1328,22 +1267,26 @@ const AddOns = () => {
                                                             </span>
                                                         </>
                                                 }
-                                            })(state, isAMod)}
-                                            name={name}
-                                            status={((addonState: typeof state) => {
+                                            })(cargo.state, isAMod)}
+                                            name={cargo.name}
+                                            status={((addonState: CargoState) => {
                                                 switch (addonState) {
                                                     case "update-aborted":
                                                     case "update-failed":
-                                                        return <span className="text-red-500">{"Failed"}</span>
+                                                        return <span className="text-red-500">
+                                                            {"Failed"}
+                                                        </span>
                                                     case "updating":
-                                                        return <span className="text-blue-500">{"Updating"}</span>
+                                                        return <span className="text-blue-500">
+                                                            {"Updating"}
+                                                        </span>
                                                     default:
                                                         return <span>{"Saved"}</span>
                                                 }
-                                            })(state)}
+                                            })(cargo.state)}
                                             type={isAMod ? "mod" : "extension"}
-                                            updatedAt={updatedAt}
-                                            byteCount={bytes}
+                                            updatedAt={cargo.updatedAt}
+                                            byteCount={cargo.bytes}
                                             showModifiedOnSmallScreen
                                         />
                                     })}

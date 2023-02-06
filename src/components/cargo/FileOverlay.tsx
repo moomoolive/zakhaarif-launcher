@@ -16,7 +16,6 @@ import {
 import {faJs, faCss3, faHtml5} from "@fortawesome/free-brands-svg-icons"
 import {Tooltip, IconButton, Divider} from "@mui/material"
 import {BYTES_PER_MB} from "../../lib/utils/consts/storage"
-import {VIRTUAL_FILE_HEADER} from "../../lib/utils/consts/files"
 
 export type MimeIconProps = {
     mime: Mime,
@@ -135,7 +134,7 @@ export const FileOverlay = ({
         <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
             <div className="absolute z-30 top-1 left-1 w-full flex">
                 <div className="w-1/2 overflow-x-clip text-ellipsis whitespace-nowrap">
-                    <Tooltip title="Back">
+                    <Tooltip title="Close">
                         <IconButton
                             onClick={onClose}
                         >
@@ -212,7 +211,7 @@ export const FileOverlay = ({
                             >
                                 <div className={`text-sm ${fileResponse.status > 399 ? "text-red-500" : "text-green-500"} mb-1`}>
                                     <span className="text-neutral-400">
-                                        {`request url${fileResponse.headers.has(VIRTUAL_FILE_HEADER) ? " (virtual)" : ""}:`}
+                                        {`request url:`}
                                     </span>
                                     
                                     <span className="ml-1">
@@ -275,10 +274,13 @@ export const FileOverlay = ({
                         />
                     } else if (bytes < BYTES_PER_MB * 3) {
                         return <div 
-                            className="p-4 w-full overflow-scroll bg-neutral-800 rounded whitespace-pre-wrap flex"
-                            style={{maxHeight: "96rem"}}
+                            className="p-4 bg-neutral-800 rounded whitespace-pre-wrap flex"
+                            
                         >
-                            <div>
+                            <div 
+                                className="w-full overflow-y-scroll"
+                                style={{maxHeight: "300px"}}
+                            >
                                 {fileText}
                             </div>
                         </div>

@@ -103,7 +103,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -124,7 +124,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -146,7 +146,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -168,7 +168,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -206,7 +206,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -235,7 +235,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -271,7 +271,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -307,7 +307,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -344,7 +344,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
@@ -386,7 +386,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
@@ -433,7 +433,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "", 
-                name: "pkg"
+                
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
@@ -488,7 +488,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -538,7 +538,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
@@ -584,7 +584,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(requestRecord.newCargoMini).toBeGreaterThan(0)
@@ -619,7 +619,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -653,7 +653,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -688,7 +688,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -722,7 +722,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -756,7 +756,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -812,7 +812,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -873,7 +873,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -934,7 +934,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -995,7 +995,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -1066,7 +1066,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "https://mywebsite.com/pkg", 
-                name: "pkg"
+                
             }
         , ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -1177,7 +1177,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl: "https://mywebsite.com/pkg", 
             oldResolvedUrl: "https://mywebsite.com/pkg", 
-            name: "pkg"
+            
         }, ...adaptors)
         expect(res.errors.length).toBe(0)
         expect(res.downloadableResources.length).toBe(
@@ -1250,7 +1250,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
                 canonicalUrl: "https://mywebsite.com/pkg", 
                 oldResolvedUrl: "", 
-                name: "pkg"
+                
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.downloadableResources).toEqual(

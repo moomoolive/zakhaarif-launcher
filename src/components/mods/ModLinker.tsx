@@ -18,9 +18,10 @@ import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {useAppShellContext} from "../../routes/store"
 import {CargoIndices} from "../../lib/shabah/downloadClient"
 import {useEffectAsync} from "../../hooks/effectAsync"
-import {NUMBER_OF_STANDARD_MODS, STANDARD_MOD_ID} from "../../config"
+import {STANDARD_CARGOS} from "../../standardCargos"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
+import { MOD_CARGO_TAG } from "../../config"
 
 type LinkableModProps = {
     mod: CargoIndex
@@ -125,6 +126,8 @@ export type ModLinkerProps = {
     setLinkedMods: (newMods: CargoIndex[]) => void
 }
 
+const STANDARD_MOD_COUNT = STANDARD_CARGOS.filter((cargo) => cargo.tag === MOD_CARGO_TAG).length
+
 export const ModLinker = ({
     onClose,
     modIndexes,
@@ -149,13 +152,13 @@ export const ModLinker = ({
         const linkMap = new Map<string, number>()
         for (let index = 0; index < linkedMods.length; index++) {
             const element = linkedMods[index]
-            linkMap.set(element.id, 1)
+            linkMap.set(element.canonicalUrl, 1)
         }
         const allMods = modIndexes.cargos
         const unlinked = []
         for (let index = 0; index < allMods.length; index++) {
             const element = allMods[index]
-            if (linkMap.has(element.id)) {
+            if (linkMap.has(element.canonicalUrl)) {
                 continue
             }
             unlinked.push({...element})
@@ -206,7 +209,7 @@ export const ModLinker = ({
                                                 <button
                                                     className="text-red-500 pt-1 text-base"
                                                     onClick={() => {
-                                                        if (mod.id === STANDARD_MOD_ID) {
+                                                        if (mod.canonicalUrl === import.meta.env.VITE_APP_STANDARD_MOD_CARGO_URL) {
                                                             confirm({title: `Mod "${mod.name}" cannot be unlinked!`})
                                                             return
                                                         }
@@ -242,7 +245,7 @@ export const ModLinker = ({
                             </span>
                             {"No Mods to Link"}
                         </div>
-                        {linkedMods.length <= NUMBER_OF_STANDARD_MODS ? <>
+                        {linkedMods.length <= STANDARD_MOD_COUNT ? <>
                             <div>
                                 <Button 
                                     size="small"

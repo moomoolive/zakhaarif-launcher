@@ -534,6 +534,24 @@ describe("manifest validation function", () => {
         expect(test({key: 0}).errors.length).toBeGreaterThan(0)
         expect(test({key: 1n}).errors.length).toBeGreaterThan(0)
     })
+
+    it("valid metadata should be preserved", () => {
+        const tests: Record<string, string>[] = [
+            {key: "hi"},
+            {key1: "lol", key2: "heyyyy"},
+            {option: "non", kalb: "yesss"},
+            {},
+            {"cool-key": "hi"}
+        ]
+        for (const metadata of tests) {
+            const m = structuredClone(manifest)
+            m.metadata = metadata
+            const validated = validateManifest(m)
+            expect(validated.errors.length).toBe(0)
+            const {pkg} = validated
+            expect(pkg.metadata).toStrictEqual(metadata)
+        }
+    })
 })
 
 import {validateMiniCargo} from "./index"

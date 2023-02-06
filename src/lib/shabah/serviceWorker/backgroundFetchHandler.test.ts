@@ -132,7 +132,7 @@ describe("background fetch success handler", () => {
         const cargoIndices = emptyCargoIndices()
         const downloadQueueId = nanoid(21)
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: origin + "/pkg-store",
             entry: "index.js",
             logoUrl: "",
@@ -165,7 +165,6 @@ describe("background fetch success handler", () => {
     it("successful fetches should not cache responses not found in download index map", async () => {
         const origin = "https://cool-potatos.com"
         const remoteOrigin = "https://remote-origin.site"
-        const cargoId = "pkg"
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
         const canonicalUrl = remoteOrigin
@@ -183,7 +182,7 @@ describe("background fetch success handler", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: "tmp",
             resolvedUrl: origin + "/pkg-store",
             entry: "index.js",
             logoUrl: "",
@@ -226,7 +225,7 @@ describe("background fetch success handler", () => {
         expect(
             (await getCargoIndices(origin, fileCache))
                 .cargos
-                .find((cargo) => cargo.id === cargoId)?.state
+                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
         ).toBe("cached")
     })
 
@@ -247,7 +246,6 @@ describe("background fetch success handler", () => {
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain"
         }) as const)
-        const cargoId = "pkg"
         const canonicalUrl = remoteOrigin
         const {fileCache, internalRecord} = createFileCache({})
         const downloadIndices = emptyDownloadIndex()
@@ -275,7 +273,7 @@ describe("background fetch success handler", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: "",
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             logoUrl: "",
@@ -313,7 +311,7 @@ describe("background fetch success handler", () => {
         expect(!!output.ui.state).toBe(true)
         expect(
             (await getCargoIndices(origin, fileCache)).cargos.find(
-                (cargo) => cargo.id === cargoId
+                (cargo) => cargo.canonicalUrl === canonicalUrl
             )?.state
         ).toBe("cached")
     })
@@ -363,7 +361,7 @@ describe("background fetch success handler", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             logoUrl: "",
@@ -401,7 +399,7 @@ describe("background fetch success handler", () => {
         expect(!!output.ui.state).toBe(true)
         const indexes = await getCargoIndices(origin, fileCache)
         const targetCargo = indexes.cargos.find(
-            (cargo) => cargo.id === cargoId
+            (cargo) => cargo.canonicalUrl === canonicalUrl
         )
         expect(!!targetCargo).toBe(true)
         expect(targetCargo?.state).toBe("cached")
@@ -504,7 +502,7 @@ describe("background fetch success handler", () => {
                     resourcesToDelete: []
                 })
                 updateCargoIndex(cargoIndices, {
-                    id: cargoId,
+                    tag: cargoId,
                     resolvedUrl: resolvedUrl,
                     entry: "index.js",
                     logoUrl: "",
@@ -617,7 +615,7 @@ describe("background fetch success handler", () => {
         const cargoIndices = emptyCargoIndices()
         const cargoId = "pkg"
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             logoUrl: "",
@@ -657,7 +655,7 @@ describe("background fetch success handler", () => {
         expect(!!output.ui.state).toBe(true)
         const indexes = await getCargoIndices(origin, fileCache)
         const targetCargo = indexes.cargos.find(
-            (cargo) => cargo.id === cargoId
+            (cargo) => cargo.canonicalUrl === canonicalUrl
         )
         expect(!!targetCargo).toBe(true)
         expect(targetCargo?.state).toBe("cached")
@@ -718,7 +716,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
@@ -760,7 +758,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         expect(
             (await getCargoIndices(origin, fileCache))
                 .cargos
-                .find((cargo) => cargo.id === cargoId)?.state
+                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
         ).toBe("update-failed")
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
@@ -814,7 +812,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
@@ -859,7 +857,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         expect(
             (await getCargoIndices(origin, fileCache))
                 .cargos
-                .find((cargo) => cargo.id === cargoId)?.state
+                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
         ).toBe("update-failed")
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
@@ -913,7 +911,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
@@ -957,7 +955,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         )
         const indexesAfterUpdate = await getCargoIndices(origin, fileCache)
         const target = indexesAfterUpdate.cargos.find(
-            (cargo) => cargo.id === cargoId 
+            (cargo) => cargo.canonicalUrl === canonicalUrl 
         )
         expect(!!target).toBe(true)
         expect(target?.downloadQueueId).toBe(NO_UPDATE_QUEUED)
@@ -1072,7 +1070,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                     resourcesToDelete: []
                 })
                 updateCargoIndex(cargoIndices, {
-                    id: id,
+                    tag: id,
                     resolvedUrl: resolvedUrl,
                     entry: "index.js",
                     name: "pkg-name",
@@ -1213,7 +1211,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         const cargoIndices = emptyCargoIndices()
         updateCargoIndex(cargoIndices, {
-            id: cargoId,
+            tag: cargoId,
             resolvedUrl: resolvedUrl,
             entry: "index.js",
             name: "pkg-name",
@@ -1256,7 +1254,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         expect(
             (await getCargoIndices(origin, fileCache))
                 .cargos
-                .find((cargo) => cargo.id === cargoId)?.state
+                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
         ).toBe("update-aborted")
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
@@ -1312,7 +1310,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             await saveDownloadIndices(downloadIndices, origin, fileCache)
             const cargoIndices = emptyCargoIndices()
             updateCargoIndex(cargoIndices, {
-                id: "pkg-" + Math.trunc(Math.random() * 5),
+                tag: "pkg-" + Math.trunc(Math.random() * 5),
                 resolvedUrl: resolvedUrl,
                 entry: "index.js",
                 name: "pkg-name",

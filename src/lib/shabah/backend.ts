@@ -231,7 +231,7 @@ export type Permissions = {key: string, value: string[]}[]
 
 export type CargoIndex = {
     name: string
-    id: string
+    tag: string
     logoUrl: string
     resolvedUrl: string
     canonicalUrl: string

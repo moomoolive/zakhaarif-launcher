@@ -652,7 +652,7 @@ describe("unsafe permissions detector", () => {
 
 const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
     {
-        id: "random1",
+        tag: "random1",
         name: "cool1",
         logoUrl: NULL_FIELD,
         resolvedUrl: `https://my-mamas-house.com/pkg/`,
@@ -668,7 +668,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         downloadQueueId: ""
     },
     {
-        id: "random4",
+        tag: "random4",
         name: "cool2",
         logoUrl: NULL_FIELD,
         resolvedUrl: `https://my-dadas-house.com/pkg/`,
@@ -684,7 +684,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         downloadQueueId: ""
     },
     {
-        id: "random3",
+        tag: "random3",
         name: "cool12",
         logoUrl: NULL_FIELD,
         resolvedUrl: `https://my-aunties-house.com/pkg/`,

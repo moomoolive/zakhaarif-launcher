@@ -22,5 +22,8 @@
     "homepageUrl": "https://github.com",
     "repo": {"type": "git", "url": "https://github.com"},
     "crateLogoUrl": "bg-fetch-test/bird-svgrepo.svg",
-    "permissions": ["allowAll"]
+    "permissions": ["allowAll"],
+    "metadata": {
+        "is-extension": "true"
+    }
 }

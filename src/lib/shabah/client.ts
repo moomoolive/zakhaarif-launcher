@@ -284,11 +284,10 @@ const verifyAllRequestableFiles = async (
 type CargoReference = {
     canonicalUrl: string
     oldResolvedUrl: string
-    name: string
 }
 
 export const checkForUpdates = async (
-    {oldResolvedUrl, canonicalUrl, name}: CargoReference, 
+    {oldResolvedUrl, canonicalUrl}: CargoReference, 
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
@@ -299,7 +298,7 @@ export const checkForUpdates = async (
     const storedCargoRes = await fileCache.getFile(cargoUrl)
     const newCargoUrl = requestRootUrl + MANIFEST_NAME
     if (
-        oldResolvedUrl.length < 0 
+        oldResolvedUrl.length < 1
         || !storedCargoRes 
         || storedCargoRes.status === 404
     ) {
@@ -311,7 +310,7 @@ export const checkForUpdates = async (
             resolvedUrl: finalUrl,
             code
         } = await fetchCargo(
-            newCargoUrl, name, fetchFn
+            newCargoUrl, canonicalUrl, fetchFn
         )
         if (!newCargoPkg || !response || error.length > 0) {
             return downloadError(
@@ -414,7 +413,7 @@ export const checkForUpdates = async (
         resolvedUrl: finalUrl,
         code
     } = await fetchCargo(
-        newCargoUrl, name, fetchFn
+        newCargoUrl, canonicalUrl, fetchFn
     )
 
     if (!newCargoPkg || !response || error.length > 0) {

@@ -10,10 +10,11 @@ import { useGlobalConfirm } from "../hooks/globalConfirm"
 import { ModLinker } from "../components/mods/ModLinker"
 import { useAppShellContext } from "./store"
 import { emptyCargoIndices } from "../lib/shabah/downloadClient"
-import { EXTENSION_QUERY_PARAM, MOD_CARGO_ID_PREFIX } from "../config"
+import { EXTENSION_QUERY_PARAM, MOD_CARGO_TAG } from "../config"
 import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
 import { FilterChevron, FilterOrder } from "../components/FilterChevron"
 import { useNavigate } from "react-router-dom"
+import { isMod } from "../lib/utils/cargos"
 
 const DO_NOT_SHOW_LINKER = -1
 
@@ -135,8 +136,8 @@ const LoadGamePage = () => {
             downloadClient.getCargoIndices()
         ] as const)
         setSaves(saves)
-        const allCargos = cargoIndexesResponse.cargos//addStandardCargosToCargoIndexes(cargoIndexesResponse.cargos)
-        const cargos = allCargos.filter((cargo) => cargo.id.startsWith(MOD_CARGO_ID_PREFIX))
+        const allCargos = cargoIndexesResponse.cargos
+        const cargos = allCargos.filter((cargo) => isMod(cargo))
         setModIndexes({...cargoIndexesResponse, cargos})
         setLoading(false)
     }, [])

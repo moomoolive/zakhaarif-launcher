@@ -1,5 +1,5 @@
 import {useAppShellContext} from "./store"
-import {emptyCargoIndices} from "../lib/shabah/downloadClient"
+import {CargoIndex, emptyCargoIndices} from "../lib/shabah/downloadClient"
 import { useEffect, useMemo, useState, useRef } from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {io} from "../lib/monads/result"
@@ -14,21 +14,15 @@ import {
     TextField,
 } from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
+import {faArrowLeft, faMagnifyingGlass} from "@fortawesome/free-solid-svg-icons"
 import {
-    faArrowLeft,
-    faPuzzlePiece, 
-    faMagnifyingGlass,
-} from "@fortawesome/free-solid-svg-icons"
-import {
-    APP_CARGO_ID,
-    EXTENSION_CARGO_ID_PREFIX,
+    EXTENSION_CARGO_TAG,
     EXTENSION_QUERY_PARAM,
-    GAME_EXTENSION_ID
 } from "../config"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
-//import {addStandardCargosToCargoIndexes} from "../standardCargos"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
+import { isExtension } from "../lib/utils/cargos"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
 
@@ -55,8 +49,8 @@ const ExtensionsListPage = () => {
             return
         }
         const {data} = indicesRes
-        const allCargos =  data.cargos//addStandardCargosToCargoIndexes(data.cargos)
-        const cargos =  allCargos.filter((cargo) => cargo.id.startsWith(EXTENSION_CARGO_ID_PREFIX))
+        const allCargos =  data.cargos
+        const cargos =  allCargos.filter((cargo) => isExtension(cargo))
         setCargoIndex({...data, cargos})
         setLoading(false)
     }, [])
@@ -69,7 +63,7 @@ const ExtensionsListPage = () => {
         const results = []
         for (let i = 0; i < cargos.length; i++) {
             const cargo = cargos[i]
-            if (cargo.id.includes(searchText)) {
+            if (cargo.name.includes(searchText)) {
                 results.push({...cargo})
             }
         }
@@ -190,17 +184,18 @@ const ExtensionsListPage = () => {
                         style={{maxHeight: "80%"}}
                     >
                         {filteredCargos.map((cargo, index) => {
-                            const {logoUrl, resolvedUrl, name, id, entry} = cargo
+                            const {logoUrl, resolvedUrl, name} = cargo
                             return <div
                                 key={`extension-${index}`}
                                 className="mr-5 sm:mr-8 mb-1"
                             >
                                 <Link 
-                                    to={((extensionId: string) => {
-                                        switch (extensionId) {
-                                            case APP_CARGO_ID:
+                                    to={((cargoIndex: CargoIndex) => {
+                                        const entry = cargoIndex.canonicalUrl
+                                        switch (cargoIndex.canonicalUrl) {
+                                            case import.meta.env.VITE_APP_LAUNCHER_CARGO_URL:
                                                 return "/"
-                                            case GAME_EXTENSION_ID:
+                                            case import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL:
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
                                                 }
@@ -208,7 +203,7 @@ const ExtensionsListPage = () => {
                                             default:
                                                 return `/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(entry)}`
                                         }
-                                    })(id)}
+                                    })(cargo)}
                                 >
                                     <button className="text-neutral-300 hover:text-blue-500">
                                         <div className="mb-3">
