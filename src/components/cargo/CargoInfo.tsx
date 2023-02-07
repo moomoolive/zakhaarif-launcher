@@ -89,7 +89,7 @@ const defaultPermission = (key: PermissionsArray[number]["key"]) => {
     }
 }
 
-const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
+export const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
     const [showDetails, setShowDetails] = useState(false)
     
     return <div className="text-sm">
@@ -446,9 +446,9 @@ export const CargoSummary = ({
                         </div>
                         <div className="text-sm mb-1">
                             <div>
-                                {`${fileCount} file${fileCount > 1 ? "s" : ""}`}
+                                {`${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`}
                                 <span className="ml-1 text-neutral-500 text-xs">
-                                    {`(${friendlyBytes.count} ${friendlyBytes.metric})`}
+                                    {`(${fileCount} file${fileCount > 1 ? "s" : ""})`}
                                 </span>
                             </div>
 

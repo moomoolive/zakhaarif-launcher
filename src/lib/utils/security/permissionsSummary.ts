@@ -46,6 +46,8 @@ export const isDangerousCspOrigin = (cspValue: string) => {
 
 export type GeneralPermissions = {key: string, value: string[]}[]
 
+type AppPermissions = PermissionsList<Permissions>
+
 export const generatePermissionsSummary = (
     permissions: GeneralPermissions
 ) => {
@@ -55,7 +57,7 @@ export const generatePermissionsSummary = (
         if (!(k in summary)) {
             continue
         }
-        const key = k as PermissionsList<Permissions>[number]["key"]
+        const key = k as AppPermissions[number]["key"]
         switch (key) {
             case ALLOW_ALL_PERMISSIONS:
                 return permissionsSummary(true)
@@ -124,16 +126,18 @@ const permissionCleaners = {
     }
 } as const
 
-export const cleanPermissions = (permissions: GeneralPermissions) => {
-    const candidates = permissions as PermissionsList<Permissions>
-    const cleaned = [] as GeneralPermissions
+export const cleanPermissions = (
+    permissions: GeneralPermissions
+): AppPermissions => {
+    const candidates = permissions as AppPermissions
+    const cleaned: GeneralPermissions = []
     const allowAllPermissionIndex = candidates.findIndex(
         (permission) => permission.key === ALLOW_ALL_PERMISSIONS
     )
     if (allowAllPermissionIndex > -1) {
         return [
             {key: ALLOW_ALL_PERMISSIONS, value: []}
-        ] as PermissionsList<Permissions>
+        ] as AppPermissions
     }
     for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i]
@@ -183,7 +187,7 @@ export const cleanPermissions = (permissions: GeneralPermissions) => {
         }
         cleaned.push({key, value: newValues})
     }
-    return cleaned as PermissionsList<Permissions>
+    return cleaned as AppPermissions
 }
 
 export type CleanedPermissions = ReturnType<typeof cleanPermissions>
@@ -230,7 +234,7 @@ export const REQUIRED_DEFAULT_SRC_CSP = SAME_ORIGIN_CSP_KEYWORD
 export const createContentSecurityPolicy = (
     permissions: PermissionsSummary,
     config: ContentSecurityPolicyConfig
-) => {
+): string => {
     if (
         permissions.allowAll 
         || (permissions.webRequest.length > 0 && permissions.webRequest[0] === ALLOW_ALL_PERMISSIONS)
@@ -278,7 +282,9 @@ export const createContentSecurityPolicy = (
     return `default-src ${REQUIRED_DEFAULT_SRC_CSP}${unsafeDirectives.length > 0 ? " " + unsafeDirectives.join(" ") : ""}${allowedOrigins.length > 0 ? " " + allowedOrigins.join(" ") : ""};frame-src ${iframe};worker-src ${worker};${CSP_CONSTANT_POLICY}`
 }
 
-export const iframeAllowlist = (permissions: PermissionsSummary) => {
+export const iframeAllowlist = (
+    permissions: PermissionsSummary
+): string => {
     let allowList = []
     if (permissions.camera) {
         allowList.push(`camera ${SAME_ORIGIN_CSP_KEYWORD};`)
@@ -300,7 +306,9 @@ export const iframeAllowlist = (permissions: PermissionsSummary) => {
 
 export const REQUIRED_SANDBOX_ATTRIBUTES = "allow-scripts allow-same-origin"
 
-export const iframeSandbox = (permissions: PermissionsSummary) => {
+export const iframeSandbox = (
+    permissions: PermissionsSummary
+): string => {
     const base = REQUIRED_SANDBOX_ATTRIBUTES
     if (permissions.pointerLock) {
         return base + " allow-pointer-lock"
@@ -311,7 +319,7 @@ export const iframeSandbox = (permissions: PermissionsSummary) => {
 export const mergePermissionSummaries = (
     originalPermissions: PermissionsSummary,
     cargoIndexes: CargoIndices
-) => {
+): PermissionsSummary => {
     if (
         originalPermissions.embedExtensions.length < 1
         || originalPermissions.embedExtensions[0] === ALLOW_ALL_PERMISSIONS
@@ -392,7 +400,7 @@ export const mergePermissionSummaries = (
     return merged
 }
 
-const createPermissionMap = (permissions: GeneralPermissions) => {
+const createPermissionMap = (permissions: GeneralPermissions): Map<string, number> => {
     const map = new Map<string, number>()
     for (let i = 0; i < permissions.length; i++) {
         const {key, value} = permissions[i]
@@ -405,11 +413,16 @@ const createPermissionMap = (permissions: GeneralPermissions) => {
     return map
 }
 
+export type PermissionsDifference = {
+    added: AppPermissions
+    removed: AppPermissions
+}
+
 export const diffPermissions = (
     oldPermissions: GeneralPermissions,
     newPermissions: GeneralPermissions
-) => {
-    const diff = [] as PermissionsList<Permissions>
+): PermissionsDifference => {
+    const diff: AppPermissions = []
     if (oldPermissions.length < 1 && newPermissions.length < 1) {
         return {removed: diff, added: diff}
     }
@@ -440,7 +453,7 @@ export const diffPermissions = (
     const oldPermissionsMap = createPermissionMap(oldCleaned)
     const newPermissionsMap = createPermissionMap(newCleaned)
     
-    const removed = []
+    const removed: AppPermissions = []
     for (let i = 0; i < oldCleaned.length; i++) {
         const element = oldCleaned[i]
         const {key, value} = element
@@ -456,11 +469,11 @@ export const diffPermissions = (
             }
         }
         if (removedValues.length > 0) {
-            removed.push({key, value: removedValues})
+            removed.push({key, value: removedValues} as AppPermissions[number])
         }
     }
 
-    const added = []
+    const added: AppPermissions = []
     for (let i = 0; i < newCleaned.length; i++) {
         const element = newCleaned[i]
         const {key, value} = element
@@ -476,7 +489,7 @@ export const diffPermissions = (
             }
         }
         if (addedValues.length > 0) {
-            added.push({key, value: addedValues})
+            added.push({key, value: addedValues} as AppPermissions[number])
         }
     }
     

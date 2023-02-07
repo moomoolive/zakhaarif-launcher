@@ -238,7 +238,7 @@ export class Shabah {
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
                 tag: update.tag,
-                state: "updating",
+                state: !resourcesToRequest ? "cached" : "updating",
                 permissions: update.newCargo?.permissions || [],
                 version: update.versions().new,
                 entry: update.newCargo?.entry === NULL_FIELD

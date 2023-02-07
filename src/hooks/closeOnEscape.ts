@@ -3,7 +3,7 @@ import { useEffect } from "react"
 export const useCloseOnEscape = (onClose: () => void) => {
     useEffect(() => {
         const handler = (event: KeyboardEvent) => {
-            const {key} = event
+            const {key = ""} = event
             if (key.toLowerCase() === "escape") {
                 onClose()
             }

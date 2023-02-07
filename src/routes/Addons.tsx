@@ -29,6 +29,7 @@ import {
     faTrash,
     faBars,
     faInfoCircle,
+    faRotate,
 } from "@fortawesome/free-solid-svg-icons"
 import {readableByteCount, toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "../lib/utils/dates"
@@ -48,13 +49,14 @@ import {urlToMime, Mime} from "../lib/miniMime/index"
 import {NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/index"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
-import {MimeIcon} from "../components/cargo/FileOverlay"
+import {MimeIcon} from "../components/cargo/MimeIcon"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
 import {isStandardCargo, isMod} from "../lib/utils/cargos"
 import type {Permissions} from "../lib/types/permissions"
 import { DeepReadonly } from "../lib/types/utility"
 import { sleep } from "../lib/utils/sleep"
+import type { FileDetails } from "../components/cargo/CargoFileSystem"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -73,6 +75,16 @@ const Installer = lazyComponent(
 
 const StatusAlert = lazyComponent(
     async () => (await import("../components/StatusAlert")).StatusAlert
+)
+
+const CargoUpdater = lazyComponent(
+    async () => (await import("../components/cargo/Updater")).CargoUpdater,
+    {loadingElement: FullScreenOverlayLoading}
+)
+
+const CargoFileSystem = lazyComponent(
+    async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
+    {}
 )
 
 const filterOptions = ["updatedAt", "bytes", "state", "addon-type", "name"] as const
@@ -244,14 +256,9 @@ const AddOns = () => {
     const [cargoFound, setCargoFound] = useState(false)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
-    const [showFileOverlay, setShowFileOverlay] = useState(false)
-    const [fileDetails, setFileDetails] = useState({
-        name: "",
-        mime: "text/javascript" as Mime,
-        url: "",
-        fileResponse: new Response("", {status: 200}),
-        bytes: 0
-    })
+    
+    const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
+
     const [cargoOptionsElement, setCargoOptionsElement] = useState<null | HTMLButtonElement>(null)
     const [allCargosOptionsElement, setAllCargosOptionsElement] = useState<null | HTMLButtonElement>(null)
     const [mobileMainMenuElement, setMobileMainMenuElement] = useState<null | HTMLButtonElement>(null)
@@ -260,6 +267,7 @@ const AddOns = () => {
     const [showStatusAlert, setShowStatusAlert] = useState(false)
     const [statusAlertContent, setStatusAlertContent] = useState<ReactNode>("hello world")
     const [statusAlertType, setStatusAlertType] = useState<"info" | "error" | "success" | "warning">("info")
+    const [showCargoUpdater, setShowCargoUpdater] = useState(false)
 
     const cargoDirectoryRef = useRef<CargoDirectory>({
         path: ROOT_DIRECTORY_PATH,
@@ -267,9 +275,17 @@ const AddOns = () => {
         files: [],
         directories: []
     })
+    const viewingCargoBytes = useRef(0)
     
     const cargoDirectory = cargoDirectoryRef.current
     const isViewingCargo = viewingCargo !== "none"
+
+    const totalStorageBytes = useMemo(() => {
+        return cargoIndex.cargos.reduce(
+            (total, next) => total + next.bytes, 
+            0
+        )
+    }, [cargoIndex])
 
     useEffectAsync(async () => {
         if (!isViewingCargo) {
@@ -307,6 +323,7 @@ const AddOns = () => {
             name: cargo.data.name,
             bytes: cargo.data.bytes
         })
+        viewingCargoBytes.current = cargo.data.bytes
         calculateDirectorySize(rootDirectory)
         cargoDirectoryRef.current = rootDirectory
         setDirectoryPath([rootDirectory])
@@ -439,6 +456,7 @@ const AddOns = () => {
             if (type === "install") {
                 return
             }
+            console.log("got progress", progress)
             let nextState: CargoState = "cached"
             if (type === "abort") {
                 nextState = "update-aborted"
@@ -485,9 +503,9 @@ const AddOns = () => {
             </Link>
         </ErrorOverlay> : <>
             <div className="fixed z-0 w-screen h-screen overflow-clip">
-                {showFileOverlay ? <>
+                {fileDetails ? <>
                     <FileOverlay 
-                        onClose={() => setShowFileOverlay(false)}
+                        onClose={() => setFileDetails(null)}
                         {...fileDetails}
                     />
                 </> : <></>}
@@ -529,6 +547,42 @@ const AddOns = () => {
                     content={statusAlertContent}
                     className="fixed left-2 z-20 w-52"
                     style={{top: "91vh"}}
+                /> : <></>}
+
+                {isViewingCargo && showCargoUpdater ? <CargoUpdater
+                    onClose={() => setShowCargoUpdater(false)}
+                    cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
+                    cargo={targetCargo}
+                    createAlert={(message) => {
+                        setStatusAlertContent(message)
+                        setStatusAlertType("success")
+                        setShowStatusAlert(true)
+                    }}
+                    onUpdateCargo={async (update, title) => {
+                        const status = await downloadClient.executeUpdates(
+                            [update],
+                            title
+                        )
+                        console.log("update queue status", status)
+                        const ok = !(status.data >= Shabah.ERROR_CODES_START)
+                        if (!ok) {
+                            return false
+                        }
+                        const indexes = await downloadClient.getCargoIndices()
+                        const copy = {...indexes}
+                        const targetIndex = copy.cargos.findIndex(
+                            (cargo) => cargo.canonicalUrl === cargoIndex.cargos[viewingCargoIndex].canonicalUrl
+                        )
+                        if (targetIndex < 0) {
+                            return true
+                        }
+                        indexes.cargos.splice(targetIndex, 1, {
+                            ...copy.cargos[targetIndex],
+                            state: "updating"
+                        })
+                        setCargoIndex(copy)
+                        return true
+                    }}
                 /> : <></>}
 
                 <div className="w-full relative z-0 sm:h-1/12 flex items-center justify-center">
@@ -759,11 +813,8 @@ const AddOns = () => {
                                     variant="determinate" 
                                     value={
                                         loadingInitialData || isInErrorState
-                                            ? 3
-                                            : Math.max(
-                                                3,
-                                                storageUsage.used / storageUsage.total 
-                                            ) 
+                                            ? 3.0
+                                            : Math.max(3.0, storageUsage.used / storageUsage.total) 
                                     } 
                                 />
                             </div>
@@ -933,6 +984,19 @@ const AddOns = () => {
                                                     <FontAwesomeIcon icon={faInfoCircle} />
                                                 </span>
                                                 Info
+                                            </MenuItem>
+
+                                            <MenuItem
+                                                className="hover:text-blue-500"
+                                                onClick={() => {
+                                                    setShowCargoUpdater(true)
+                                                    setCargoOptionsElement(null)
+                                                }}
+                                            >
+                                                <span className="mr-2.5">
+                                                    <FontAwesomeIcon icon={faRotate} />
+                                                </span>
+                                                Update
                                             </MenuItem>
 
                                             <MenuItem
@@ -1107,7 +1171,7 @@ const AddOns = () => {
                                                     icon={faPuzzlePiece}
                                                 />
                                             </span>
-                                            Add-on not found
+                                            {"Package not found"}
                                         </div>
                                         <div>
                                             <Button 
@@ -1118,133 +1182,18 @@ const AddOns = () => {
                                             </Button>
                                         </div>
                                     </> : <>
-                                        <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
-                                            {cargoDirectory.files.length < 1 && cargoDirectory.directories.length < 1 ? <>
-                                                <div className="text-yellow-500 mt-16 mb-3">
-                                                    <span className="mr-2">
-                                                        <FontAwesomeIcon
-                                                            icon={faPuzzlePiece}
-                                                        />
-                                                    </span>
-                                                    No content in found
-                                                </div>
-                                                <div>
-                                                    <Button 
-                                                        onClick={() => setViewingCargo("none")}
-                                                        size="large"
-                                                    >
-                                                        Back
-                                                    </Button>
-                                                </div>
-                                            </> : <>
-                                                {directoryPath.length > 0 ? <>
-                                                    <Tooltip title="Back To Parent Folder" placement="top">
-                                                        <div>
-                                                            <AddonListItem 
-                                                                onClick={() => {
-                                                                    if (directoryPath.length < 2) {
-                                                                        setViewingCargo("none")
-                                                                    } else {
-                                                                        setDirectoryPath(directoryPath.slice(0, -1))
-                                                                    }
-                                                                }}
-                                                                icon={<span className={"mr-3 text-amber-300"}>
-                                                                <FontAwesomeIcon 
-                                                                        icon={faFolderTree}
-                                                                    />
-                                                                </span>
-                                                                }
-                                                                name={(() => {
-                                                                    if (directoryPath.length < 2) {
-                                                                        return "My Add-ons"
-                                                                    }
-                                                                    const lastPath = directoryPath[directoryPath.length - 2]
-                                                                    if (lastPath.path === ROOT_DIRECTORY_PATH) {
-                                                                        return targetCargo.name
-                                                                    }
-                                                                    return lastPath.path
-                                                                })()}
-                                                                type="parent folder"
-                                                                updatedAt={
-                                                                    directoryPath.length < 2 
-                                                                        ? cargoIndex.updatedAt
-                                                                        : cargoIndex.cargos[viewingCargoIndex].updatedAt}
-                                                                byteCount={
-                                                                    directoryPath.length < 2
-                                                                        ? cargoIndex.cargos.reduce((total, next) => total + next.bytes, 0)
-                                                                        : directoryPath[directoryPath.length - 2].contentBytes
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </Tooltip>
-                                                </> : <></>}
-
-                                                {filteredDirectory.directories.map((directory, index) => {
-                                                    const targetIndex = cargoIndex.cargos[viewingCargoIndex]
-                                                    return <AddonListItem
-                                                        key={`cargo-directory-${index}`}
-                                                        onClick={() => {
-                                                            setDirectoryPath([
-                                                                ...directoryPath, directory
-                                                            ])
-                                                        }}
-                                                        icon={<span className={"mr-3 text-amber-300"}>
-                                                            <FontAwesomeIcon icon={faFolder}/>
-                                                        </span>
-                                                        }
-                                                        name={directory.path}
-                                                        type="folder"
-                                                        updatedAt={targetIndex.updatedAt}
-                                                        byteCount={directory.contentBytes}
-                                                        typeTooltip
-                                                    />
-                                                })}
-                                                {filteredDirectory.files.map((file, index) => {
-                                                    const targetIndex = cargoIndex.cargos[viewingCargoIndex]
-                                                    const mime = urlToMime(file.name) || "text/plain"
-                                                    return <AddonListItem
-                                                        key={`cargo-file-${index}`}
-                                                        onClick={async () => {
-                                                            const basePath = targetIndex.resolvedUrl
-                                                            const path = directoryPath
-                                                                .slice(1)
-                                                                .reduce((total, next) => `${total}/${next.path}`, "")
-                                                            const cleanedBase = basePath.endsWith("/") 
-                                                                ? basePath.slice(0, -1) 
-                                                                : basePath
-                                                            const cleanedPathEnd = path.endsWith("/")
-                                                                ? path.slice(0, -1) 
-                                                                : path
-                                                            const cleanedPath = cleanedPathEnd.startsWith("/")
-                                                                ? path.slice(1)
-                                                                : cleanedPathEnd
-                                                            const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                                                            const fileResponse = await downloadClient.getCachedFile(fullPath)
-                                                            if (!fileResponse) {
-                                                                console.error(`file ${fullPath} was not found although it should be cached!`)
-                                                                await confirm({title: "An error occurred when fetching file!"})
-                                                                return
-                                                            }
-                                                            setFileDetails({
-                                                                name: file.name,
-                                                                mime,
-                                                                url: fullPath,
-                                                                fileResponse,
-                                                                bytes: file.bytes,
-                                                            })
-                                                            setShowFileOverlay(true)
-                                                        }}
-                                                        icon={<MimeIcon mime={mime} className="mr-3"/>}
-                                                        name={file.name}
-                                                        type={mime}
-                                                        updatedAt={targetIndex.updatedAt}
-                                                        byteCount={file.bytes}
-                                                        typeTooltip
-                                                    />
-                                                })}
-                                            </>}
-                                        </div>
-                                        
+                                        <CargoFileSystem 
+                                            cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
+                                            cargo={targetCargo}
+                                            searchText={searchText}
+                                            cargoBytes={viewingCargoBytes.current}
+                                            lastPackageUpdate={cargoIndex.updatedAt}
+                                            totalStorageBytes={totalStorageBytes}
+                                            filter={filter}
+                                            order={order}
+                                            onOpenFileModal={setFileDetails}
+                                            onBackToPackages={() => setViewingCargo("none")}
+                                        /> 
                                     </>}
                                 </div>
                             </> : <>

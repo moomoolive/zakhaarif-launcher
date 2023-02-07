@@ -2091,6 +2091,7 @@ describe("executing updates", () => {
                     canonicalUrl
                 )
                 expect(cargoIndex).not.toBe(null)
+                expect(cargoIndex?.state).toBe("cached")
                 expect(cargoIndex?.downloadQueueId).toBe(NO_UPDATE_QUEUED)
                 
                 for (const {storageUrl} of resourcesToDelete) {

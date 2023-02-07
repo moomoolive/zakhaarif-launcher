@@ -331,10 +331,10 @@ const SubPageList = {
                             event.target.checked 
                             && (await confirm({title: "Are you sure you want to allow unsafe packages?", description: "This should only be used for development purposes. Use this option at your own risk!", confirmButtonColor: "error"}))
                         ) {
-                            setUnsafePermissions(event.target.checked)
-                            localStorage.setItem(ALLOW_UNSAFE_PACKAGES, "allow")
+                            setUnsafePermissions(true)
+                            localStorage.setItem(ALLOW_UNSAFE_PACKAGES, "true")
                         } else {
-                            setUnsafePermissions(event.target.checked)
+                            setUnsafePermissions(false)
                             localStorage.removeItem(ALLOW_UNSAFE_PACKAGES)
                         } 
                     }}

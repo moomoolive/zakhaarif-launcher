@@ -1,7 +1,6 @@
 import {
     Tooltip, 
     IconButton, 
-    ClickAwayListener, 
     TextField, 
     Button,
     Collapse
@@ -29,6 +28,7 @@ import { sleep } from "../../lib/utils/sleep"
 import { EXTENSION_METADATA_KEY } from "../../lib/utils/cargos"
 import { ALLOW_UNSAFE_PACKAGES } from "../../lib/utils/localStorageKeys"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
+import {CargoRequestError, cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
 
 const toCargoIndex = (
     canonicalUrl: string,
@@ -54,18 +54,6 @@ const toCargoIndex = (
         downloadQueueId: ""
     }
 }
-
-type InvalidType = (
-    | "insufficent-storage"
-    | "invalid-encoding"
-    | "package-has-invalid-resource"
-    | "network-error"
-    | "catch-all-error"
-    | "not-found"
-    | "malformed-url"
-    | "analyzing"
-    | "none"
-)
 
 type InstallResponse = {
     checkResponse: UpdateCheckResponse
@@ -94,7 +82,7 @@ export const Installer = ({
     useCloseOnEscape(onClose)
 
     const [url, setUrl] = useState("")
-    const [invalidation, setInvalidation] = useState<InvalidType>("none")
+    const [invalidation, setInvalidation] = useState<CargoRequestError>("none")
     const [ioOperation, setIoOperation] = useState(false)
     const [installResponse, setInstallResponse] = useState<null | InstallResponse>(null)
     const [cacheError, setCacheError] = useState("")
@@ -113,26 +101,7 @@ export const Installer = ({
     })
 
     const packageHelperText = useMemo(() => {
-        switch (invalidation) {
-            case "insufficent-storage":
-                return <>{"Insufficent disk space"}</>
-            case "invalid-encoding":
-                return <>{"Package is encoded incorrectly"}</>
-            case "package-has-invalid-resource":
-                return <>{"Package has unreachable files"}</>
-            case "network-error":
-                return <>{"Server could not provide package"}</>
-            case "not-found":
-                return <>{"Package does not exist"}</>
-            case "malformed-url":
-                return <>{"Invalid url"}</>
-            case "analyzing":
-                return <span className="animate-pulse">{"Loading..."}</span>
-            case "catch-all-error":
-                return <>{"Couldn't add package"}</>
-            default:
-                return <></>
-        }
+        return cargoErrorToText(invalidation)
     }, [invalidation])
 
     const showCargo = !!installResponse?.checkResponse.newCargo
@@ -142,42 +111,42 @@ export const Installer = ({
     const submitText = showCargo ? installText : "Fetch"
 
     const onDownload = async () => {
-        const updateRepsonse = await downloadClient.checkForUpdates({
+        const updateResponse = await downloadClient.checkForUpdates({
             tag: "",
             canonicalUrl: url
         })
-        console.log("response", updateRepsonse)
-        if (updateRepsonse.status === Shabah.STATUS.notFound) {
+        console.log("response", updateResponse)
+        if (updateResponse.status === Shabah.STATUS.notFound) {
             setInvalidation("not-found")
             return
         }
-        if (updateRepsonse.status === Shabah.STATUS.badHttpCode) {
+        if (updateResponse.status === Shabah.STATUS.badHttpCode) {
             setInvalidation("network-error")
             return
         }
-        if (updateRepsonse.status === Shabah.STATUS.preflightVerificationFailed) {
+        if (updateResponse.status === Shabah.STATUS.preflightVerificationFailed) {
             setInvalidation("package-has-invalid-resource")
             return
         }
         if (
-            updateRepsonse.status === Shabah.STATUS.invalidCargo
-            || updateRepsonse.status === Shabah.STATUS.encodingNotAcceptable
-            || updateRepsonse.status === Shabah.STATUS.invalidRedirect
+            updateResponse.status === Shabah.STATUS.invalidCargo
+            || updateResponse.status === Shabah.STATUS.encodingNotAcceptable
+            || updateResponse.status === Shabah.STATUS.invalidRedirect
         ) {
             setInvalidation("invalid-encoding")
             return
         }
-        if (updateRepsonse.errorOccurred()) {
+        if (updateResponse.errorOccurred()) {
             setInvalidation("catch-all-error")
             return
         }
 
-        if (!updateRepsonse.enoughStorageForCargo()) {
+        if (!updateResponse.enoughStorageForCargo()) {
             setInvalidation("insufficent-storage")
             return
         }
         const permissionsSummary = generatePermissionsSummary(
-            updateRepsonse.newCargo?.permissions || []
+            updateResponse.newCargo?.permissions || []
         )
         const isUnsafe = hasUnsafePermissions(permissionsSummary)
         if (
@@ -190,14 +159,14 @@ export const Installer = ({
             setInvalidation("catch-all-error")
             return
         }
-        const isExtension = updateRepsonse.newCargo?.metadata[EXTENSION_METADATA_KEY] === "true"
+        const isExtension = updateResponse.newCargo?.metadata[EXTENSION_METADATA_KEY] === "true"
         if (isExtension) {
-            updateRepsonse.tag = EXTENSION_CARGO_TAG
+            updateResponse.tag = EXTENSION_CARGO_TAG
         } else {
-            updateRepsonse.tag = MOD_CARGO_TAG
+            updateResponse.tag = MOD_CARGO_TAG
         }
         setInstallResponse({
-            checkResponse: updateRepsonse,
+            checkResponse: updateResponse,
             permissions: {
                 summary: permissionsSummary,
                 isUnsafe: isUnsafe
@@ -210,16 +179,17 @@ export const Installer = ({
         if (!installResponse || !installResponse.checkResponse.newCargo) {
             return
         }
-        if (!await confirm({title: "Are you sure you want to install this package?", confirmButtonColor: "warning"})) {
+        const {isUnsafe} = installResponse.permissions
+        if (!await confirm({title: `Are you sure you want to install this ${isUnsafe ? "unsafe ": ""} package?`, confirmButtonColor: isUnsafe ? "error" : "warning"})) {
             return
         }
         setIoOperation(true)
-        
+        setCacheError("")
         const {newCargo} = installResponse.checkResponse
         const updateTitle = `${newCargo.name} v${newCargo.version}`
         const [ok] = await Promise.all([
             onInstallCargo(installResponse.checkResponse, updateTitle),
-            sleep(2_000)
+            sleep(1_000)
         ] as const)
         if (ok) {
             createAlert("Queued Download")
@@ -302,7 +272,12 @@ export const Installer = ({
                                 && invalidation !== "analyzing"
                             }
                             onChange={(event) => updateUrl(event.target.value)}
-                            helperText={packageHelperText}
+                            helperText={invalidation === "analyzing"
+                                ? <span className="animate-pulse">
+                                    {packageHelperText}
+                                </span>
+                                : <>{packageHelperText}</>
+                            }
                         />
                     </div>
                 </>}
