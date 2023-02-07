@@ -16,7 +16,7 @@ import {
     generatePermissionsSummary, 
     hasUnsafePermissions
 } from "../lib/utils/security/permissionsSummary"
-import {UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
+import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 import { CargoIndex } from "../lib/shabah/backend"
 
@@ -150,7 +150,7 @@ const ExtensionShellPage = () => {
             console.warn("Sandbox refused to load because another extension sandbox already exists")
             return
         }
-        const unsafePackagesDisallowed = !localStorage.getItem(UNSAFE_PACKAGE_PERMISSIONS)
+        const unsafePackagesDisallowed = !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         const permissionsSummary = generatePermissionsSummary(
             extensionCargo.current.permissions
         )

@@ -114,8 +114,11 @@ const fetchCargo = async (
     }
     const newCargoRes = newCargoFetch.data
     if (!newCargoRes.ok) {
+        const code = newCargoRes.status === 404
+            ? STATUS_CODES.notFound
+            : STATUS_CODES.badHttpCode
         return new CargoFetchResponse({
-            code: STATUS_CODES.badHttpCode,
+            code,
             error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
         })
     }

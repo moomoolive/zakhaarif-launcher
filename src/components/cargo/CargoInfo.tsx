@@ -32,6 +32,7 @@ import {MOD_CARGO_TAG, EXTENSION_CARGO_TAG} from "../../config"
 import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
 import { cleanPermissions } from "../../lib/utils/security/permissionsSummary"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
+import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 
 type PermissionsArray = Cargo<Permissions>["permissions"]
 
@@ -534,16 +535,7 @@ export const CargoInfo = ({
     cargoIndex
 }: CargoInfoProps): JSX.Element => {
 
-    useEffect(() => {
-        const handler = (event: KeyboardEvent) => {
-            const {key} = event
-            if (key.toLowerCase() === "escape") {
-                onClose()
-            }
-        }
-        window.addEventListener("keyup", handler)
-        return () => window.removeEventListener("keyup", handler)
-    }, [])
+    useCloseOnEscape(onClose)
 
     return <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">
         <div className="absolute top-0 left-0">

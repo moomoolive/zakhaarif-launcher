@@ -1,4 +1,4 @@
-import {useState, useMemo, useRef, useEffect} from "react"
+import {useState, useMemo, useRef, useEffect, ReactNode} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
 import {ErrorOverlay} from "../components/ErrorOverlay"
@@ -54,6 +54,7 @@ import {lazyComponent} from "../components/Lazy"
 import {isStandardCargo, isMod} from "../lib/utils/cargos"
 import type {Permissions} from "../lib/types/permissions"
 import { DeepReadonly } from "../lib/types/utility"
+import { sleep } from "../lib/utils/sleep"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -68,6 +69,10 @@ const CargoInfo = lazyComponent(
 const Installer = lazyComponent(
     async () => (await import("../components/cargo/Installer")).Installer,
     {loadingElement: FullScreenOverlayLoading}
+)
+
+const StatusAlert = lazyComponent(
+    async () => (await import("../components/StatusAlert")).StatusAlert
 )
 
 const filterOptions = ["updatedAt", "bytes", "state", "addon-type", "name"] as const
@@ -252,7 +257,10 @@ const AddOns = () => {
     const [mobileMainMenuElement, setMobileMainMenuElement] = useState<null | HTMLButtonElement>(null)
     const [showCargoInfo, setShowCargoInfo] = useState(false)
     const [showInstaller, setShowInstaller] = useState(false)
-    
+    const [showStatusAlert, setShowStatusAlert] = useState(false)
+    const [statusAlertContent, setStatusAlertContent] = useState<ReactNode>("hello world")
+    const [statusAlertType, setStatusAlertType] = useState<"info" | "error" | "success" | "warning">("info")
+
     const cargoDirectoryRef = useRef<CargoDirectory>({
         path: ROOT_DIRECTORY_PATH,
         contentBytes: 0,
@@ -426,7 +434,7 @@ const AddOns = () => {
     }
 
     useEffect(() => {
-        const handerId = app.addEventListener("downloadprogress", (progress) => {
+        const handerId = app.addEventListener("downloadprogress", async (progress) => {
             const {type} = progress
             if (type === "install") {
                 return
@@ -449,6 +457,7 @@ const AddOns = () => {
                     state: nextState
                 })
             }
+            await sleep(5_000)
             setCargoIndex(copy)
         })
         return () => { app.removeEventListener("downloadprogress", handerId) }
@@ -505,8 +514,22 @@ const AddOns = () => {
                             const ok = !(status.data >= Shabah.ERROR_CODES_START)
                             return ok 
                         }}
+                        createAlert={(message) => {
+                            setStatusAlertContent(message)
+                            setStatusAlertType("success")
+                            setShowStatusAlert(true)
+                        }}
                     />
                 </> : <></>}
+
+                {showStatusAlert ? <StatusAlert
+                    onClose={() => setShowStatusAlert(false)}
+                    autoClose={4_000}
+                    color={statusAlertType}
+                    content={statusAlertContent}
+                    className="fixed left-2 z-20 w-52"
+                    style={{top: "91vh"}}
+                /> : <></>}
 
                 <div className="w-full relative z-0 sm:h-1/12 flex items-center justify-center">
 
@@ -913,14 +936,11 @@ const AddOns = () => {
                                             </MenuItem>
 
                                             <MenuItem
-                                                className="hover:text-red-500"
+                                                disabled={isStandardCargo(cargoIndex.cargos[viewingCargoIndex])}
+                                                className={isStandardCargo(cargoIndex.cargos[viewingCargoIndex]) ? "" : "hover:text-red-500"}
                                                 onClick={async () => {
                                                     const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (isStandardCargo(target)) {
-                                                        confirm({title: `"${target.name}" is a standard package and cannot be deleted!`})
-                                                        return 
-                                                    }
-                                                    if (!await confirm({title: `Are you sure you want to delete "${target.name}" add-on?`, confirmButtonColor: "error"})) {
+                                                    if (!await confirm({title: `Are you sure you want to delete this package?`, confirmButtonColor: "error"})) {
                                                         setCargoOptionsElement(null)
                                                         return
                                                     }
@@ -932,6 +952,9 @@ const AddOns = () => {
                                                         cargos: copy
                                                     })
                                                     await downloadClient.deleteCargo(target.canonicalUrl)
+                                                    setStatusAlertContent("Deleted Successfully")
+                                                    setStatusAlertType("success")
+                                                    setShowStatusAlert(true)
                                                 }}
                                             >
                                                 <span className="mr-3">

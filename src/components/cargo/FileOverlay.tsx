@@ -16,6 +16,7 @@ import {
 import {faJs, faCss3, faHtml5} from "@fortawesome/free-brands-svg-icons"
 import {Tooltip, IconButton, Divider} from "@mui/material"
 import {BYTES_PER_MB} from "../../lib/utils/consts/storage"
+import {useCloseOnEscape} from "../../hooks/closeOnEscape"
 
 export type MimeIconProps = {
     mime: Mime,
@@ -119,16 +120,7 @@ export const FileOverlay = ({
         setFileText(textResponse.data)
     }, [])
 
-    useEffect(() => {
-        const handler = (event: KeyboardEvent) => {
-            const {key} = event
-            if (key.toLowerCase() === "escape") {
-                onClose()
-            }
-        }
-        window.addEventListener("keyup", handler)
-        return () => window.removeEventListener("keyup", handler)
-    }, [])
+    useCloseOnEscape(onClose)
     
     return <>
         <div className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center">

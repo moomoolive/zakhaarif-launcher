@@ -3,11 +3,12 @@ import {
     IconButton, 
     ClickAwayListener, 
     TextField, 
-    Button
+    Button,
+    Collapse
 } from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft} from "@fortawesome/free-solid-svg-icons"
-import { useMemo, useRef, useState } from "react"
+import { ReactNode, useMemo, useRef, useState } from "react"
 import { useDebounce } from "../../hooks/debounce"
 import { isUrl } from "../../lib/utils/urls/isUrl"
 import {useAppShellContext} from "../../routes/store"
@@ -21,27 +22,13 @@ import {
 import { CargoSummary } from "./CargoInfo"
 import type {Cargo} from "../../lib/cargo"
 import type {Permissions} from "../../lib/types/permissions"
-import type {CargoIndex} from "../../lib/shabah/downloadClient"
+import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
 import { MOD_CARGO_TAG, EXTENSION_CARGO_TAG } from "../../config"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import { sleep } from "../../lib/utils/sleep"
 import { EXTENSION_METADATA_KEY } from "../../lib/utils/cargos"
-
-
-type InvalidType = (
-    "malformed-url"
-    | "analyzing"
-    | "none"
-)
-
-type InstallResponse = {
-    checkResponse: UpdateCheckResponse
-    permissions: {
-        isUnsafe: boolean
-        summary: PermissionsSummary
-    }
-    isExtension: boolean
-}
+import { ALLOW_UNSAFE_PACKAGES } from "../../lib/utils/localStorageKeys"
+import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 
 const toCargoIndex = (
     canonicalUrl: string,
@@ -68,23 +55,49 @@ const toCargoIndex = (
     }
 }
 
+type InvalidType = (
+    | "insufficent-storage"
+    | "invalid-encoding"
+    | "package-has-invalid-resource"
+    | "network-error"
+    | "catch-all-error"
+    | "not-found"
+    | "malformed-url"
+    | "analyzing"
+    | "none"
+)
+
+type InstallResponse = {
+    checkResponse: UpdateCheckResponse
+    permissions: {
+        isUnsafe: boolean
+        summary: PermissionsSummary
+    }
+    isExtension: boolean
+}
+
+
 export type InstallerProps = {
     onClose: () => void
     onInstallCargo: (update: UpdateCheckResponse, title: string) => Promise<boolean>
+    createAlert: (message: ReactNode) => void
 }
 
 export const Installer = ({
     onClose,
-    onInstallCargo
+    onInstallCargo,
+    createAlert
 }: InstallerProps): JSX.Element => {
     const urlCheck = useDebounce(1_000)
     const {downloadClient} = useAppShellContext()
     const confirm = useGlobalConfirm()
+    useCloseOnEscape(onClose)
 
     const [url, setUrl] = useState("")
     const [invalidation, setInvalidation] = useState<InvalidType>("none")
     const [ioOperation, setIoOperation] = useState(false)
     const [installResponse, setInstallResponse] = useState<null | InstallResponse>(null)
+    const [cacheError, setCacheError] = useState("")
 
     const {current: updateUrl} = useRef((nextUrl: string) => {
         setUrl(nextUrl)
@@ -101,29 +114,82 @@ export const Installer = ({
 
     const packageHelperText = useMemo(() => {
         switch (invalidation) {
+            case "insufficent-storage":
+                return <>{"Insufficent disk space"}</>
+            case "invalid-encoding":
+                return <>{"Package is encoded incorrectly"}</>
+            case "package-has-invalid-resource":
+                return <>{"Package has unreachable files"}</>
+            case "network-error":
+                return <>{"Server could not provide package"}</>
+            case "not-found":
+                return <>{"Package does not exist"}</>
             case "malformed-url":
                 return <>{"Invalid url"}</>
             case "analyzing":
                 return <span className="animate-pulse">{"Loading..."}</span>
+            case "catch-all-error":
+                return <>{"Couldn't add package"}</>
             default:
                 return <></>
         }
     }, [invalidation])
 
     const showCargo = !!installResponse?.checkResponse.newCargo
+    const installText = cacheError.length > 0
+        ? "Retry"
+        : "Install"
+    const submitText = showCargo ? installText : "Fetch"
 
     const onDownload = async () => {
-        setIoOperation(true)
         const updateRepsonse = await downloadClient.checkForUpdates({
             tag: "",
             canonicalUrl: url
         })
         console.log("response", updateRepsonse)
+        if (updateRepsonse.status === Shabah.STATUS.notFound) {
+            setInvalidation("not-found")
+            return
+        }
+        if (updateRepsonse.status === Shabah.STATUS.badHttpCode) {
+            setInvalidation("network-error")
+            return
+        }
+        if (updateRepsonse.status === Shabah.STATUS.preflightVerificationFailed) {
+            setInvalidation("package-has-invalid-resource")
+            return
+        }
+        if (
+            updateRepsonse.status === Shabah.STATUS.invalidCargo
+            || updateRepsonse.status === Shabah.STATUS.encodingNotAcceptable
+            || updateRepsonse.status === Shabah.STATUS.invalidRedirect
+        ) {
+            setInvalidation("invalid-encoding")
+            return
+        }
+        if (updateRepsonse.errorOccurred()) {
+            setInvalidation("catch-all-error")
+            return
+        }
+
+        if (!updateRepsonse.enoughStorageForCargo()) {
+            setInvalidation("insufficent-storage")
+            return
+        }
         const permissionsSummary = generatePermissionsSummary(
             updateRepsonse.newCargo?.permissions || []
         )
-        const unsafe = hasUnsafePermissions(permissionsSummary)
-        console.log("meta", updateRepsonse.newCargo?.metadata)
+        const isUnsafe = hasUnsafePermissions(permissionsSummary)
+        if (
+            isUnsafe
+            && url !== import.meta.env.VITE_APP_LAUNCHER_CARGO_URL
+            && url !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
+            && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
+        ) {
+            console.warn(`prevented unsafe package from being added. Url=${url}`)
+            setInvalidation("catch-all-error")
+            return
+        }
         const isExtension = updateRepsonse.newCargo?.metadata[EXTENSION_METADATA_KEY] === "true"
         if (isExtension) {
             updateRepsonse.tag = EXTENSION_CARGO_TAG
@@ -134,11 +200,10 @@ export const Installer = ({
             checkResponse: updateRepsonse,
             permissions: {
                 summary: permissionsSummary,
-                isUnsafe: unsafe
+                isUnsafe: isUnsafe
             },
             isExtension
         })
-        setIoOperation(false)
     }
 
     const onCacheCargo = async () => {
@@ -149,25 +214,27 @@ export const Installer = ({
             return
         }
         setIoOperation(true)
-        await sleep(2_000)
+        
         const {newCargo} = installResponse.checkResponse
         const updateTitle = `${newCargo.name} v${newCargo.version}`
-        const ok = await onInstallCargo(
-            installResponse.checkResponse,
-            updateTitle
-        )
-        console.log("install response", ok)
+        const [ok] = await Promise.all([
+            onInstallCargo(installResponse.checkResponse, updateTitle),
+            sleep(2_000)
+        ] as const)
         if (ok) {
+            createAlert("Queued Download")
             onClose()
             return
         }
         setIoOperation(false)
+        setCacheError("An error occurred")
     }
 
     const onSubmit = async () => {
-        
         if (!showCargo) {
+            setIoOperation(true)
             await onDownload()
+            setIoOperation(false)
         } else {
             await onCacheCargo()
         }
@@ -176,7 +243,7 @@ export const Installer = ({
     const onCancel = () => {
         if (showCargo) {
             setInstallResponse(null)
-            setUrl("")
+            setCacheError("")
         } else {
             onClose()
         }
@@ -202,6 +269,12 @@ export const Installer = ({
                 className="pb-1"
             >
                 {showCargo ? <div className="w-full animate-fade-in-left">
+                    <Collapse in={cacheError.length > 0}>
+                        <div className="w-full text-sm text-center text-red-500 mb-1">
+                            {cacheError}
+                        </div>
+                    </Collapse>
+                    
                     <CargoSummary 
                         cargo={installResponse.checkResponse.newCargo as Cargo<Permissions>}
                         cargoIndex={toCargoIndex(
@@ -249,7 +322,7 @@ export const Installer = ({
                             ? <span className="text-lg animate-spin">
                                 <LoadingIcon/>
                             </span> 
-                            : showCargo ? "Install" : "Fetch"
+                            : submitText
                         }
                     </Button>
 

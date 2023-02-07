@@ -22,6 +22,7 @@ import {STANDARD_CARGOS} from "../../standardCargos"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
 import { MOD_CARGO_TAG } from "../../config"
+import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 
 type LinkableModProps = {
     mod: CargoIndex
@@ -136,17 +137,7 @@ export const ModLinker = ({
 }: ModLinkerProps) => {
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
-    
-    useEffect(() => {
-        const listener = (event: KeyboardEvent) => {
-            const {key} = event
-            if (key.toLowerCase() === "escape") {
-                onClose()
-            }
-        }
-        window.addEventListener("keyup", listener)
-        return () => window.removeEventListener("keyup", listener)
-    }, [])
+    useCloseOnEscape(onClose)
 
     const unlinkedMods = useMemo(() => {
         const linkMap = new Map<string, number>()

@@ -21,7 +21,7 @@ import {
     faHeartBroken
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
-import {PROFILE_NAME, UNSAFE_PACKAGE_PERMISSIONS} from "../lib/utils/localStorageKeys"
+import {PROFILE_NAME, ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import { useDebounce } from "../hooks/debounce"
 import { useGlobalConfirm } from "../hooks/globalConfirm"
 import LoadingIcon from "../components/LoadingIcon"
@@ -316,7 +316,7 @@ const SubPageList = {
         const confirm = useGlobalConfirm()
         
         const [unsafePermissions, setUnsafePermissions] = useState(
-            !!localStorage.getItem(UNSAFE_PACKAGE_PERMISSIONS)
+            !!localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         )
 
         return <div>
@@ -332,10 +332,10 @@ const SubPageList = {
                             && (await confirm({title: "Are you sure you want to allow unsafe packages?", description: "This should only be used for development purposes. Use this option at your own risk!", confirmButtonColor: "error"}))
                         ) {
                             setUnsafePermissions(event.target.checked)
-                            localStorage.setItem(UNSAFE_PACKAGE_PERMISSIONS, "allow")
+                            localStorage.setItem(ALLOW_UNSAFE_PACKAGES, "allow")
                         } else {
                             setUnsafePermissions(event.target.checked)
-                            localStorage.removeItem(UNSAFE_PACKAGE_PERMISSIONS)
+                            localStorage.removeItem(ALLOW_UNSAFE_PACKAGES)
                         } 
                     }}
                     inputProps={{'aria-label': 'controlled'}}
@@ -398,7 +398,7 @@ const SettingsPage = () => {
     const versionText = appVersion.loading || !appVersion.data.ok
         ? "unknown"
         : appVersion.data.data?.version || "not installed"
-
+    
     useEffect(() => {
         const handler = (event: KeyboardEvent) => {
             const {key} = event
