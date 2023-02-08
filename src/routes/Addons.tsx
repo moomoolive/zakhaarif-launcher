@@ -14,25 +14,17 @@ import {
 import {Link, useSearchParams, useNavigate} from "react-router-dom"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
-    faFolder, 
     faPuzzlePiece, 
     faHardDrive,
     faSignal,
     faArrowLeft,
     faPlus,
-    faCaretDown,
     faGear,
     faMagnifyingGlass,
     faBoxesStacked,
-    faAngleRight,
-    faFolderTree,
-    faTrash,
     faBars,
-    faInfoCircle,
-    faRotate,
 } from "@fortawesome/free-solid-svg-icons"
-import {readableByteCount, toGigabytesString} from "../lib/utils/storage/friendlyBytes"
-import {reactiveDate} from "../lib/utils/dates"
+import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {
     Divider, 
     LinearProgress,
@@ -41,205 +33,52 @@ import {
 import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
 import {emptyCargoIndices, CargoState, Shabah, CargoIndices} from "../lib/shabah/downloadClient"
-import UpdatingAddonIcon from "@mui/icons-material/Sync"
-import FailedAddonIcon from "@mui/icons-material/ReportProblem"
-import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {Cargo} from "../lib/cargo/index"
-import {urlToMime, Mime} from "../lib/miniMime/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "../lib/cargo/index"
-import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
-import {MimeIcon} from "../components/cargo/MimeIcon"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
-import {isStandardCargo, isMod} from "../lib/utils/cargos"
+import {isMod} from "../lib/utils/cargos"
 import type {Permissions} from "../lib/types/permissions"
 import { DeepReadonly } from "../lib/types/utility"
 import { sleep } from "../lib/utils/sleep"
 import type { FileDetails } from "../components/cargo/CargoFileSystem"
+import { FileSystemBreadcrumbs } from "../components/cargo/FileSystemBreadcrumbs"
+import type {CargoDirectory} from "../components/cargo/CargoFileSystem"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
     {loadingElement: FullScreenOverlayLoading}
 )
-
 const CargoInfo = lazyComponent(
     async () => (await import("../components/cargo/CargoInfo")).CargoInfo,
     {loadingElement: FullScreenOverlayLoading}
 )
-
 const Installer = lazyComponent(
     async () => (await import("../components/cargo/Installer")).Installer,
     {loadingElement: FullScreenOverlayLoading}
 )
-
 const StatusAlert = lazyComponent(
     async () => (await import("../components/StatusAlert")).StatusAlert
 )
-
 const CargoUpdater = lazyComponent(
     async () => (await import("../components/cargo/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
-
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
+    {}
+)
+const CargoList = lazyComponent(
+    async () => (await import("../components/cargo/CargoList")).CargoList,
     {}
 )
 
 const filterOptions = ["updatedAt", "bytes", "state", "addon-type", "name"] as const
 
-const cargoStateToNumber = (state: CargoState) => {
-    switch (state) {
-        case "update-aborted":
-        case "update-failed":
-            return 3
-        case "updating":
-            return 2
-        case "cached":
-            return 1
-        default:
-            return 0
-    }
-}
-
-type FileMeta = {name: string, bytes: number}
-
-type CargoDirectory = {
-    path: string,
-    contentBytes: number
-    files: FileMeta[]
-    directories: CargoDirectory[]
-}
-
-const addFileToDirectory = (
-    directory: CargoDirectory,
-    file: Readonly<FileMeta>
-) => {
-    const splitPath = file.name.split("/")
-    if (splitPath.length < 0) {
-        return 
-    }
-    const isFile = splitPath.length === 1
-    const {bytes} = file
-    if (isFile) {
-        const name = splitPath.at(-1)!
-        directory.files.push({name, bytes})
-        return
-    }
-    const [nextPath] = splitPath
-    const directoryIndex = directory.directories.findIndex(
-        (directory) => directory.path === nextPath
-    )
-    const name = splitPath.slice(1).join("/")
-    if (directoryIndex > -1) {
-        const targetDirectory = directory.directories[directoryIndex]
-        addFileToDirectory(targetDirectory, {name, bytes})
-        return 
-    }
-    const targetDirectory: CargoDirectory = {
-        path: nextPath,
-        contentBytes: 0,
-        files: [],
-        directories: []
-    }
-    directory.directories.push(targetDirectory)
-    addFileToDirectory(targetDirectory, {name, bytes})
-}
-
-const calculateDirectorySize = (directory: CargoDirectory) => {
-    let sizeOfFilesInDirectory = 0
-    for (let i = 0; i < directory.files.length; i++) {
-        sizeOfFilesInDirectory += directory.files[i].bytes
-    }
-    if (directory.directories.length < 1) {
-        directory.contentBytes = sizeOfFilesInDirectory
-        return
-    }
-    for (let i = 0; i < directory.directories.length; i++) {
-        const target = directory.directories[i]
-        calculateDirectorySize(target)
-    }
-    let sizeOfFoldersInDirectory = 0
-    for (let i = 0; i < directory.directories.length; i++) {
-        const target = directory.directories[i]
-        sizeOfFoldersInDirectory += target.contentBytes
-    }
-    directory.contentBytes = sizeOfFilesInDirectory + sizeOfFoldersInDirectory
-}
-
-type AddonListItemProps = {
-    onClick: () => void | Promise<void>
-    icon: JSX.Element
-    name: string
-    type: string
-    updatedAt: number
-    byteCount: number
-    typeTooltip?: boolean
-    status?: JSX.Element | null
-    showModifiedOnSmallScreen?: boolean
-}
-
-const AddonListItem = ({
-    onClick, 
-    icon, 
-    name,
-    type,
-    updatedAt,
-    byteCount,
-    typeTooltip = false,
-    status = null,
-    showModifiedOnSmallScreen = false
-}: AddonListItemProps) => {
-    const friendlyBytes = readableByteCount(byteCount)
-    const showStatus = !!status
-
-    return <button
-        className="p-4 w-full text-left flex justify-center items-center hover:bg-neutral-900"
-        onClick={onClick}
-    >
-        
-        <div className={`relative z-0 ${showStatus ? "w-1/2 lg:w-1/3" : "w-1/2"} whitespace-nowrap text-ellipsis overflow-clip`}>
-            {icon}
-            {name}
-        </div>
-        
-
-        {showStatus ? <>
-            <div className="hidden lg:block w-1/6 text-center text-xs text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip">
-                {status}
-            </div>
-        </> : <></>}
-
-        {typeTooltip ? <>
-            <Tooltip title={type}>
-                <div className={`${showModifiedOnSmallScreen ? "w-1/6 hidden md:block" : "w-1/4 md:w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
-                    {type}
-                </div>
-            </Tooltip>
-        </> : <>
-            <div className={`${showModifiedOnSmallScreen ? "w-1/6 hidden md:block" : "w-1/4 md:w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
-                {type}
-            </div>
-        </>}
-        
-        <div className={`${showModifiedOnSmallScreen ? "w-1/4 md:w-1/6" : "hidden md:block w-1/6"} text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip`}>
-            {reactiveDate(new Date(updatedAt))}
-        </div>
-        
-        <div className="w-1/4 md:w-1/6 text-xs text-center text-neutral-400 whitespace-nowrap text-ellipsis overflow-clip">
-            {`${friendlyBytes.count} ${friendlyBytes.metric.toUpperCase()}`}
-        </div>
-    </button>
-}
-
-const ROOT_DIRECTORY_PATH = "#"
-
-const AddOns = () => {
+const AddOns = (): JSX.Element => {
     const app = useAppShellContext()
     const {downloadClient} = useAppShellContext()
     const [searchParams, setSearchParams] = useSearchParams()
-    const confirm = useGlobalConfirm()
     const navigate = useNavigate()
     
     const [loadingInitialData, setLoadingInitialData] = useState(true)
@@ -252,15 +91,10 @@ const AddOns = () => {
     const [filter, setFilter] = useState<typeof filterOptions[number]>("updatedAt")
     const [order, setOrder] = useState<FilterOrder>("descending")
     const [viewingCargo, setViewingCargo] = useState("none")
-    const [targetCargo, setTargetCargo] = useState(new Cargo<Permissions>())
     const [cargoFound, setCargoFound] = useState(false)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
-    
     const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
-
-    const [cargoOptionsElement, setCargoOptionsElement] = useState<null | HTMLButtonElement>(null)
-    const [allCargosOptionsElement, setAllCargosOptionsElement] = useState<null | HTMLButtonElement>(null)
     const [mobileMainMenuElement, setMobileMainMenuElement] = useState<null | HTMLButtonElement>(null)
     const [showCargoInfo, setShowCargoInfo] = useState(false)
     const [showInstaller, setShowInstaller] = useState(false)
@@ -269,16 +103,32 @@ const AddOns = () => {
     const [statusAlertType, setStatusAlertType] = useState<"info" | "error" | "success" | "warning">("info")
     const [showCargoUpdater, setShowCargoUpdater] = useState(false)
 
-    const cargoDirectoryRef = useRef<CargoDirectory>({
-        path: ROOT_DIRECTORY_PATH,
-        contentBytes: 0,
-        files: [],
-        directories: []
-    })
     const viewingCargoBytes = useRef(0)
-    
-    const cargoDirectory = cargoDirectoryRef.current
-    const isViewingCargo = viewingCargo !== "none"
+    const {current: onBackToCargos} = useRef(() => setViewingCargo("none"))
+    const {current: toggleFilter} = useRef((filterName: typeof filter) => {
+        if (filter !== filterName) {
+            setFilter(filterName)
+            setOrder("descending")
+        } else if (order === "descending") {
+            setOrder("ascending")
+        } else {
+            setOrder("descending")
+        }
+    })
+    const targetCargoRef = useRef(new Cargo<Permissions>())
+    const {current: cargoStateToNumber} = useRef((state: CargoState) => {
+        switch (state) {
+            case "update-aborted":
+            case "update-failed":
+                return 3
+            case "updating":
+                return 2
+            case "cached":
+                return 1
+            default:
+                return 0
+        }
+    })
 
     const totalStorageBytes = useMemo(() => {
         return cargoIndex.cargos.reduce(
@@ -286,6 +136,9 @@ const AddOns = () => {
             0
         )
     }, [cargoIndex])
+
+    const isViewingCargo = viewingCargo !== "none"
+    const {current: targetCargo} = targetCargoRef
 
     useEffectAsync(async () => {
         if (!isViewingCargo) {
@@ -308,32 +161,15 @@ const AddOns = () => {
             setCargoFound(false)
             return
         }
-        const cargoTarget = cargo.data.pkg
-        const rootDirectory: CargoDirectory = {
-            path: ROOT_DIRECTORY_PATH,
-            contentBytes: 0,
-            files: [],
-            directories: []
-        }
-        for (let i = 0; i < cargoTarget.files.length; i++) {
-            const {name, bytes} = cargoTarget.files[i]
-            addFileToDirectory(rootDirectory, {name, bytes})
-        }
-        rootDirectory.files.push({
-            name: cargo.data.name,
-            bytes: cargo.data.bytes
-        })
+
+        
         viewingCargoBytes.current = cargo.data.bytes
-        calculateDirectorySize(rootDirectory)
-        cargoDirectoryRef.current = rootDirectory
-        setDirectoryPath([rootDirectory])
-        setViewingCargoIndex(index)
-        setTargetCargo(
-            new Cargo(cargoTarget as Cargo<Permissions>)
-        )
+        
+        targetCargoRef.current = new Cargo(cargo.data.pkg as Cargo<Permissions>)
         setCargoFound(true)
         setFilter("name")
         setOrder("descending")
+        setViewingCargoIndex(index)
     }, [viewingCargo])
     
     useEffectAsync(async () => {
@@ -383,9 +219,7 @@ const AddOns = () => {
                 })
             case "addon-type":
                 return copy.sort((a, b) => {
-                    const order = isMod(a) && !isMod(b)
-                        ? 1
-                        : -1
+                    const order = isMod(a) && !isMod(b) ? 1 : -1
                     return order * orderFactor
                 })
             case "name":
@@ -396,59 +230,6 @@ const AddOns = () => {
                 return copy
         }
     }, [filter, order, cargoIndex, searchText, searchParams])
-
-    const filteredDirectory = useMemo(() => {
-        const viewingDirectory = directoryPath.length < 1 
-            ? cargoDirectory
-            : directoryPath[directoryPath.length - 1]
-        const directory = {
-            ...viewingDirectory
-        }
-        if (searchText.length > 0) {
-            directory.files = directory
-                .files
-                .filter((file) => file.name.includes(searchText))
-            directory.directories = directory
-                .directories
-                .filter((directory) => directory.path.includes(searchText))
-        }
-        const orderFactor = order === "ascending" ? 1 : -1
-        switch (filter) {
-            case "bytes":
-                directory.directories.sort((a, b) => {
-                    const order = a.contentBytes > b.contentBytes ? 1 : -1
-                    return order * orderFactor
-                })
-                directory.files.sort((a, b) => {
-                    const order = a.bytes > b.bytes ? 1 : -1
-                    return order * orderFactor
-                })
-                break 
-            case "name":
-                directory.directories.sort((a, b) => {
-                    const order = a.path.localeCompare(b.path)
-                    return order * orderFactor
-                })
-                directory.files.sort((a, b) => {
-                    const order = a.name.localeCompare(b.name)
-                    return order * orderFactor
-                })
-            default:
-                break
-        }
-        return directory
-    }, [filter, order, searchText, targetCargo, directoryPath])
-
-    const toggleFilter = (filterName: typeof filter) => {
-        if (filter !== filterName) {
-            setFilter(filterName)
-            setOrder("descending")
-        } else if (order === "descending") {
-            setOrder("ascending")
-        } else {
-            setOrder("descending")
-        }
-    }
 
     useEffect(() => {
         const handerId = app.addEventListener("downloadprogress", async (progress) => {
@@ -657,6 +438,7 @@ const AddOns = () => {
                                 </Menu>
                             </div>
                         </div>
+
                         <div className="w-full mb-2 sm:mb-0 sm:w-3/5 sm:ml-1.5">
                             <TextField
                                 fullWidth
@@ -843,195 +625,33 @@ const AddOns = () => {
                     
                     <div className="w-11/12 sm:w-4/5 h-full">
                         <Divider className="bg-neutral-200"/>
-
-                        <div className=" text-sm text-neutral-300 p-3 flex items-center flex-wrap">
-                            <div>
-                                {isViewingCargo ? <>
-                                    <Tooltip title="My Add-ons">
-                                        <button
-                                            className="hover:bg-gray-900 p-1 px-2 rounded text-neutral-400"
-                                            onClick={() => {
-                                                if (isViewingCargo) {
-                                                    return setViewingCargo("none")
-                                                }
-                                            }}
-                                        >
-                                            {"My Add-ons"}
-                                        </button>
-                                    </Tooltip>
-                                </> : <>
-                                    <button
-                                        className="hover:bg-gray-900 p-1 px-2 rounded"
-                                        onClick={(event) => {
-                                            setAllCargosOptionsElement(event.currentTarget)
-                                        }}
-                                    >
-                                        {"My Add-ons"}
-                                        <span className="ml-2">
-                                            <FontAwesomeIcon 
-                                                icon={faCaretDown}
-                                            />
-                                        </span>
-                                    </button>
-
-                                    <Menu
-                                        anchorEl={allCargosOptionsElement}
-                                        open={!!allCargosOptionsElement}
-                                        onClose={() => setAllCargosOptionsElement(null)}
-                                    >
-                                        <MenuItem
-                                            className="hover:text-red-500"
-                                            onClick={async () => {
-                                                if (!await confirm({title: "Are you sure you want to uninstall this app?"})) {
-                                                    return
-                                                }
-                                                await downloadClient.uninstallAllAssets()
-                                                location.replace("/")
-                                            }}
-                                        >
-                                            <span className="mr-3">
-                                                <FontAwesomeIcon icon={faTrash} />
-                                            </span>
-                                            Uninstall App
-                                        </MenuItem>
-                                    </Menu>
-                                </>}
-                            </div>
-                            
-                            {isViewingCargo && !cargoFound ? <div>
-                                <span className="mx-1">
-                                    <FontAwesomeIcon 
-                                        icon={faAngleRight}
-                                    />
-                                </span>
-                                <button
-                                    className="hover:bg-gray-900 p-1 px-2 rounded text-yellow-500"
-                                >
-                                    {"Not found"}
-                                </button>
-                            </div> : <>
-                            </>}
-
-                            {isViewingCargo && cargoFound ? <>
-                                {directoryPath.map((pathSection, index) => {
-                                    const {path} = pathSection
-                                    return <div
-                                        key={`path-section-${index}`}
-                                        className="flex items-center"
-                                    >
-                                        <div>
-                                            <span className="mx-1">
-                                                <FontAwesomeIcon 
-                                                    icon={faAngleRight}
-                                                />
-                                            </span>
-                                        </div>
-
-                                        <div>
-                                            <button
-                                                className="hover:bg-gray-900 py-1 px-2 rounded"
-                                                onClick={(event) => {
-                                                    if (index < directoryPath.length - 1) {
-                                                        setDirectoryPath(directoryPath.slice(0, index + 1))
-                                                        return
-                                                    } else {
-                                                        setCargoOptionsElement(event.currentTarget)
-                                                    }
-                                                }}
-                                            >
-                                                <div className="flex items-center">
-                                                    {path === ROOT_DIRECTORY_PATH && targetCargo.crateLogoUrl !== CARGO_NULL_FIELD ? <div
-                                                        className="mr-1"
-                                                    >
-                                                        <CargoIcon 
-                                                            importUrl={cargoIndex.cargos[viewingCargoIndex].resolvedUrl}
-                                                            crateLogoUrl={targetCargo.crateLogoUrl}
-                                                            pixels={17}
-                                                            className="animate-fade-in-left"
-                                                        />
-                                                    </div> : <></>}
-                                                    <div>
-                                                        {path === ROOT_DIRECTORY_PATH 
-                                                            ? targetCargo.name
-                                                            : path
-                                                        }
-                                                        {index === directoryPath.length - 1 ? <>
-                                                            <span className="ml-2">
-                                                                <FontAwesomeIcon 
-                                                                    icon={faCaretDown}
-                                                                />
-                                                            </span>
-                                                        </> : <></>}
-                                                    </div>
-                                                </div>
-                                                
-                                            </button>
-                                        </div>
-
-                                        <Menu
-                                            anchorEl={cargoOptionsElement}
-                                            open={!!cargoOptionsElement}
-                                            onClose={() => setCargoOptionsElement(null)}
-                                        >
-                                            <MenuItem
-                                                className="hover:text-green-500"
-                                                onClick={() => {
-                                                    setShowCargoInfo(true)
-                                                    setCargoOptionsElement(null)
-                                                }}
-                                            >
-                                                <span className="mr-3">
-                                                    <FontAwesomeIcon icon={faInfoCircle} />
-                                                </span>
-                                                Info
-                                            </MenuItem>
-
-                                            <MenuItem
-                                                className="hover:text-blue-500"
-                                                onClick={() => {
-                                                    setShowCargoUpdater(true)
-                                                    setCargoOptionsElement(null)
-                                                }}
-                                            >
-                                                <span className="mr-2.5">
-                                                    <FontAwesomeIcon icon={faRotate} />
-                                                </span>
-                                                Update
-                                            </MenuItem>
-
-                                            <MenuItem
-                                                disabled={isStandardCargo(cargoIndex.cargos[viewingCargoIndex])}
-                                                className={isStandardCargo(cargoIndex.cargos[viewingCargoIndex]) ? "" : "hover:text-red-500"}
-                                                onClick={async () => {
-                                                    const target = cargoIndex.cargos[viewingCargoIndex]
-                                                    if (!await confirm({title: `Are you sure you want to delete this package?`, confirmButtonColor: "error"})) {
-                                                        setCargoOptionsElement(null)
-                                                        return
-                                                    }
-                                                    setViewingCargo("none")
-                                                    const copy = [...cargoIndex.cargos]
-                                                    copy.splice(viewingCargoIndex, 1)
-                                                    setCargoIndex({
-                                                        ...cargoIndex,
-                                                        cargos: copy
-                                                    })
-                                                    await downloadClient.deleteCargo(target.canonicalUrl)
-                                                    setStatusAlertContent("Deleted Successfully")
-                                                    setStatusAlertType("success")
-                                                    setShowStatusAlert(true)
-                                                }}
-                                            >
-                                                <span className="mr-3">
-                                                    <FontAwesomeIcon icon={faTrash} />
-                                                </span>
-                                                Delete
-                                            </MenuItem>
-                                        </Menu>
-                                    </div>
-                                })}
-                            </> : <></>}
-
-                        </div>
+                        
+                        <FileSystemBreadcrumbs 
+                            isViewingCargo={isViewingCargo}
+                            cargoFound={cargoFound}
+                            directoryPath={directoryPath}
+                            targetCargo={cargoFound
+                                ? cargoIndex.cargos[viewingCargoIndex]
+                                : null
+                            }
+                            onBackToCargos={onBackToCargos}
+                            mutateDirectoryPath={setDirectoryPath}
+                            onShowCargoInfo={() => setShowCargoInfo(true)}
+                            onShowCargoUpdater={() => setShowCargoUpdater(true)}
+                            onDeleteCargo={async (canonicalUrl) => {
+                                setViewingCargo("none")
+                                const copy = [...cargoIndex.cargos]
+                                copy.splice(viewingCargoIndex, 1)
+                                setCargoIndex({
+                                    ...cargoIndex,
+                                    cargos: copy
+                                })
+                                await downloadClient.deleteCargo(canonicalUrl)
+                                setStatusAlertContent("Deleted Successfully")
+                                setStatusAlertType("success")
+                                setShowStatusAlert(true)
+                            }}
+                        />
                         
                         <Divider className="bg-neutral-200"/>
                         
@@ -1174,10 +794,7 @@ const AddOns = () => {
                                             {"Package not found"}
                                         </div>
                                         <div>
-                                            <Button 
-                                                onClick={() => setViewingCargo("none")}
-                                                size="large"
-                                            >
+                                            <Button onClick={onBackToCargos} size="large">
                                                 Back
                                             </Button>
                                         </div>
@@ -1191,79 +808,19 @@ const AddOns = () => {
                                             totalStorageBytes={totalStorageBytes}
                                             filter={filter}
                                             order={order}
+                                            directoryPath={directoryPath}
                                             onOpenFileModal={setFileDetails}
-                                            onBackToPackages={() => setViewingCargo("none")}
+                                            onBackToCargos={onBackToCargos}
+                                            mutateDirectoryPath={setDirectoryPath}
                                         /> 
                                     </>}
                                 </div>
                             </> : <>
-                                <div className="w-full h-5/6 overflow-y-scroll animate-fade-in-left">
-                                    {filteredCargos.map((cargo, index) => {
-                                        const isAMod = isMod(cargo)
-                                        return <AddonListItem
-                                            key={`cargo-index-${index}`}
-                                            onClick={() => setViewingCargo(cargo.canonicalUrl)}
-                                            icon={((addonState: CargoState, mod: boolean) => {
-                                                switch (addonState) {
-                                                    case "update-aborted":
-                                                    case "update-failed":
-                                                        return <>
-                                                        <span className={"mr-3"}>
-                                                            <FontAwesomeIcon 
-                                                                icon={faFolder}
-                                                            />
-                                                        </span>
-                                                        <div className="absolute z-10 bottom-0 left-0 text-red-500">
-                                                            <FailedAddonIcon
-                                                                style={{fontSize: "12px"}}
-                                                            />
-                                                        </div>
-                                                    </>
-                                                    case "updating":
-                                                        return <>
-                                                            <span className={"mr-3 text-blue-500"}>
-                                                                <FontAwesomeIcon icon={faFolder}/>
-                                                            </span>
-                                                            <div className="absolute z-10 bottom-0 left-0 animate-spin">
-                                                                <UpdatingAddonIcon
-                                                                    style={{fontSize: "12px"}}
-                                                                />
-                                                            </div>
-                                                        </>
-                                                    default:
-                                                        return <>
-                                                            <span className={"mr-3 " + (mod ? "text-indigo-500" : "text-green-500")}>
-                                                                <FontAwesomeIcon 
-                                                                    icon={faFolder}
-                                                                />
-                                                            </span>
-                                                        </>
-                                                }
-                                            })(cargo.state, isAMod)}
-                                            name={cargo.name}
-                                            status={((addonState: CargoState) => {
-                                                switch (addonState) {
-                                                    case "update-aborted":
-                                                    case "update-failed":
-                                                        return <span className="text-red-500">
-                                                            {"Failed"}
-                                                        </span>
-                                                    case "updating":
-                                                        return <span className="text-blue-500">
-                                                            {"Updating"}
-                                                        </span>
-                                                    default:
-                                                        return <span>{"Saved"}</span>
-                                                }
-                                            })(cargo.state)}
-                                            type={isAMod ? "mod" : "extension"}
-                                            updatedAt={cargo.updatedAt}
-                                            byteCount={cargo.bytes}
-                                            showModifiedOnSmallScreen
-                                        />
-                                    })}
-                                    <div className="sm:hidden h-8" />
-                                </div>
+                                <CargoList
+                                    cargosIndexes={filteredCargos}
+                                    hasMore={false}
+                                    onViewCargo={setViewingCargo}
+                                />
                             </>}
                         </div>
                     </div>

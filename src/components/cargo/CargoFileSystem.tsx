@@ -1,7 +1,7 @@
 import { Cargo } from "../../lib/cargo"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import { Permissions } from "../../lib/types/permissions"
-import {useMemo, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import { MANIFEST_NAME } from "../../lib/cargo"
 import {Tooltip, Button} from "@mui/material"
 import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
@@ -14,7 +14,7 @@ import {useAppShellContext} from "../../routes/store"
 import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
 
-type FileSystemItem = {
+type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
     icon: JSX.Element
     name: string
@@ -30,7 +30,7 @@ const FileSystemMember = ({
     type,
     updatedAt,
     byteCount,
-}: FileSystemItem) => {
+}: FileSystemMemberProps) => {
     const friendlyBytes = readableByteCount(byteCount)
 
     return <button
@@ -61,9 +61,9 @@ const FileSystemMember = ({
     </button>
 }
 
-type FileMetadata = {name: string, bytes: number}
+export type FileMetadata = {name: string, bytes: number}
 
-type CargoDirectory = {
+export type CargoDirectory = {
     path: string,
     contentBytes: number
     files: FileMetadata[]
@@ -136,6 +136,17 @@ export type FileDetails = {
 
 const ROOT_DIRECTORY_PATH = "#"
 
+export type RootDirectoryPath = typeof ROOT_DIRECTORY_PATH
+
+const cleanDirectory = (): CargoDirectory => {
+    return {
+        path: ROOT_DIRECTORY_PATH,
+        contentBytes: 0,
+        files: [],
+        directories: []
+    }
+}
+
 export type CargoFileSystemProps = {
     cargoIndex: CargoIndex
     cargo: Cargo<Permissions>
@@ -145,8 +156,10 @@ export type CargoFileSystemProps = {
     totalStorageBytes: number
     order: FilterOrder
     filter: string
+    directoryPath: CargoDirectory[]
     onOpenFileModal: (details: FileDetails) => void
-    onBackToPackages: () => void
+    onBackToCargos: () => void
+    mutateDirectoryPath: (newValue: CargoDirectory[]) => unknown
 }
 
 export const CargoFileSystem = ({
@@ -158,24 +171,21 @@ export const CargoFileSystem = ({
     totalStorageBytes,
     filter,
     order,
+    directoryPath,
     onOpenFileModal,
-    onBackToPackages
+    onBackToCargos,
+    mutateDirectoryPath
 }: CargoFileSystemProps): JSX.Element => {
     const confirm = useGlobalConfirm()
     const {downloadClient} = useAppShellContext()
 
-    const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
+    const rootDir = useRef(cleanDirectory())
+    const {current: fileSystemRoot} = rootDir
 
-    const fileSystemRoot = useMemo(() => {
-        const cargoTarget = cargo
-        const rootDirectory: CargoDirectory = {
-            path: ROOT_DIRECTORY_PATH,
-            contentBytes: 0,
-            files: [],
-            directories: []
-        }
-        for (let i = 0; i < cargoTarget.files.length; i++) {
-            const {name, bytes} = cargoTarget.files[i]
+    useEffect(() => {
+        const rootDirectory = cleanDirectory()
+        for (let i = 0; i < cargo.files.length; i++) {
+            const {name, bytes} = cargo.files[i]
             addFileToDirectory(rootDirectory, {name, bytes})
         }
         rootDirectory.files.push({
@@ -183,13 +193,15 @@ export const CargoFileSystem = ({
             bytes: cargoBytes
         })
         calculateDirectorySize(rootDirectory)
-        return rootDirectory
-    }, [])
+        mutateDirectoryPath([rootDirectory])
+        rootDir.current = rootDirectory
+    }, [cargoIndex])
 
     const filteredDirectory = useMemo(() => {
-        const viewingDirectory = directoryPath.length < 1 
-            ? fileSystemRoot
-            : directoryPath[directoryPath.length - 1]
+        if (directoryPath.length < 1) {
+            return fileSystemRoot
+        }
+        const viewingDirectory = directoryPath[directoryPath.length - 1]
         const directory = {...viewingDirectory}
         
         if (searchText.length > 0) {
@@ -226,7 +238,6 @@ export const CargoFileSystem = ({
             default:
                 break
         }
-
         return directory
     }, [filter, order, searchText, directoryPath])
 
@@ -250,7 +261,7 @@ export const CargoFileSystem = ({
                 {"No content found"}
             </div>
             <div>
-                <Button onClick={onBackToPackages} size="large">
+                <Button onClick={onBackToCargos} size="large">
                     Back
                 </Button>
             </div>
@@ -263,9 +274,9 @@ export const CargoFileSystem = ({
                     <FileSystemMember 
                         onClick={() => {
                             if (directoryPath.length < 2) {
-                                onBackToPackages()
+                                onBackToCargos()
                             } else {
-                                setDirectoryPath(directoryPath.slice(0, -1))
+                                mutateDirectoryPath(directoryPath.slice(0, -1))
                             }
                         }}
                         icon={<span className={"mr-3 text-amber-300"}>
@@ -282,7 +293,9 @@ export const CargoFileSystem = ({
             {filteredDirectory.directories.map((directory, index) => {
                 return <FileSystemMember
                     key={`cargo-directory-${index}`}
-                    onClick={() => setDirectoryPath([...directoryPath, directory])}
+                    onClick={() => {
+                        mutateDirectoryPath([...directoryPath, directory]) 
+                    }}
                     icon={<span className={"mr-3 text-amber-300"}>
                         <FontAwesomeIcon icon={faFolder}/>
                     </span>
@@ -300,9 +313,9 @@ export const CargoFileSystem = ({
                     key={`cargo-file-${index}`}
                     onClick={async () => {
                         const basePath = cargoIndex.resolvedUrl
-                        const path = directoryPath.reduce(
-                            (total, next) => `${total}${next.path}/`, 
-                            "/"
+                        const path = directoryPath.slice(1).reduce(
+                            (total, next) => `/${total}${next.path}`, 
+                            ""
                         )
                         const cleanedBase = basePath.endsWith("/") 
                             ? basePath.slice(0, -1) 
@@ -317,7 +330,7 @@ export const CargoFileSystem = ({
                         const fileResponse = await downloadClient.getCachedFile(fullPath)
                         if (!fileResponse) {
                             console.error(`file ${fullPath} was not found although it should be cached!`)
-                            await confirm({title: "An error occurred when fetching file!"})
+                            await confirm({title: "Could not find file!"})
                             return
                         }
                         onOpenFileModal({
