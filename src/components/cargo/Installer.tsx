@@ -18,7 +18,7 @@ import {
     generatePermissionsSummary,
     hasUnsafePermissions
 } from "../../lib/utils/security/permissionsSummary"
-import { CargoSummary } from "./CargoInfo"
+import { CargoSummary } from "./CargoSummary"
 import type {Cargo} from "../../lib/cargo"
 import type {Permissions} from "../../lib/types/permissions"
 import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
@@ -125,7 +125,7 @@ export const Installer = ({
             return
         }
         if (updateResponse.status === Shabah.STATUS.preflightVerificationFailed) {
-            setInvalidation("package-has-invalid-resource")
+            setInvalidation("invalid-resource-detected")
             return
         }
         if (
@@ -155,7 +155,7 @@ export const Installer = ({
             && url !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
-            console.warn(`prevented unsafe package from being added. Url=${url}`)
+            console.warn(`prevented unsafe add-on from being added. Url=${url}`)
             setInvalidation("catch-all-error")
             return
         }
@@ -180,7 +180,7 @@ export const Installer = ({
             return
         }
         const {isUnsafe} = installResponse.permissions
-        if (!await confirm({title: `Are you sure you want to install this ${isUnsafe ? "unsafe ": ""} package?`, confirmButtonColor: isUnsafe ? "error" : "warning"})) {
+        if (!await confirm({title: `Are you sure you want to install this ${isUnsafe ? "unsafe ": ""} add-on?`, confirmButtonColor: isUnsafe ? "error" : "warning"})) {
             return
         }
         setIoOperation(true)
@@ -258,13 +258,13 @@ export const Installer = ({
                 </div> : <>
                     <div className="mb-1 pt-2 px-3">
                         <div className="text-xs ml-1 mb-1 text-neutral-300">
-                            {"Add a Package"}
+                            {"New Add-on"}
                         </div>
                         <TextField
                             id="cargo-url"
                             fullWidth
                             name="cargo-url"
-                            placeholder="Enter a url..."
+                            placeholder="Add-on url..."
                             value={url}
                             disabled={ioOperation}
                             error={

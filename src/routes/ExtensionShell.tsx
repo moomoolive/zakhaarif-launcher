@@ -150,19 +150,19 @@ const ExtensionShellPage = () => {
             console.warn("Sandbox refused to load because another extension sandbox already exists")
             return
         }
-        const unsafePackagesDisallowed = !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
+        const unsafeCargosDisallowed = !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         const permissionsSummary = generatePermissionsSummary(
             extensionCargo.current.permissions
         )
         const isUnsafe = (
-            unsafePackagesDisallowed
+            unsafeCargosDisallowed
             && hasUnsafePermissions(permissionsSummary)
             && extensionCargoIndex.current.canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
         )
         if (isUnsafe) {
             setError(true)
             setErrorMessage("Fatal Error Occurred")
-            console.error("[UNSAFE]: Blocked unsafe package from starting")
+            console.error("[UNSAFE]: Blocked unsafe cargo from starting")
             return
         }
 

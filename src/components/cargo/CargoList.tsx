@@ -19,7 +19,7 @@ type CargoSummaryProps = {
     status: JSX.Element
 }
 
-const CargoSummary = ({
+const CargoIndexSummary = ({
     onClick, 
     icon, 
     name,
@@ -133,7 +133,7 @@ export const CargoList = ({
     >
         {cargosIndexes.map((cargo, index) => {
             const isAMod = isMod(cargo)
-            return <CargoSummary
+            return <CargoIndexSummary
                 key={`cargo-summary-${index}`}
                 onClick={() => onViewCargo(cargo.canonicalUrl)}
                 icon={<CargoSummaryIcon 

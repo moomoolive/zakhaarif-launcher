@@ -119,7 +119,7 @@ const fetchCargo = async (
             : STATUS_CODES.badHttpCode
         return new CargoFetchResponse({
             code,
-            error: `error http code when requesting new package for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
+            error: `error http code when requesting new cargo for segment "${name}": status=${newCargoRes.status}, status_text=${newCargoRes.statusText}."`,
         })
     }
     const newCargoResponseCopy = newCargoRes.clone()

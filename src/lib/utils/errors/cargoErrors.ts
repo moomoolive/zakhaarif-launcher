@@ -1,7 +1,7 @@
 export type CargoRequestError = (
     | "insufficent-storage"
     | "invalid-encoding"
-    | "package-has-invalid-resource"
+    | "invalid-resource-detected"
     | "network-error"
     | "catch-all-error"
     | "not-found"
@@ -15,19 +15,19 @@ export const cargoErrorToText = (error: CargoRequestError) => {
         case "insufficent-storage":
             return "Insufficent disk space"
         case "invalid-encoding":
-            return "Package is encoded incorrectly"
-        case "package-has-invalid-resource":
-            return "Package has unreachable files"
+            return "Add-on is encoded incorrectly"
+        case "invalid-resource-detected":
+            return "Add-on has unreachable files"
         case "network-error":
-            return "Server could not provide package"
+            return "Server could not provide Add-on"
         case "not-found":
-            return "Package does not exist"
+            return "Add-on does not exist"
         case "malformed-url":
             return "Invalid url"
         case "analyzing":
             return "Loading..."
         case "catch-all-error":
-            return "Couldn't get package"
+            return "Couldn't get Add-on"
         default:
             return ""
     }

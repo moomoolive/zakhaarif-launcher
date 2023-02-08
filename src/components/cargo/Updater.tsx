@@ -22,7 +22,7 @@ import { isExtension } from "../../lib/utils/cargos"
 import { Cargo } from "../../lib/cargo"
 import { Permissions } from "../../lib/types/permissions"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
-import { PermissionsDisplay } from "./CargoInfo"
+import { PermissionsDisplay } from "./PermissionsDisplay"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 
 type UpdateState = (
@@ -117,7 +117,7 @@ export const CargoUpdater = ({
             && canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
-            console.warn(`prevented unsafe package from being updated. Url=${canonicalUrl}`)
+            console.warn(`prevented unsafe cargo from being updated. Url=${canonicalUrl}`)
             return endWithError(cargoErrorToText("catch-all-error"))
         }
         setCargoUpdateResponse({
@@ -147,7 +147,7 @@ export const CargoUpdater = ({
             return
         }
         const {isUnsafe} = updateCheck.permissions
-        if (!await confirm({title: `Are you sure you want to update this ${isUnsafe ? "unsafe ": ""}package?`, confirmButtonColor: isUnsafe ? "error" : "warning"})) {
+        if (!await confirm({title: `Are you sure you want to update this ${isUnsafe ? "unsafe ": ""}Add-on?`, confirmButtonColor: isUnsafe ? "error" : "warning"})) {
             return
         }
         setUpdateError("")

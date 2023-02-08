@@ -204,25 +204,12 @@ export const FileSystemBreadcrumbs = ({
                             className={isStandardCargo(targetCargo) ? "" : "hover:text-red-500"}
                             onClick={async () => {
                                 const target = targetCargo
-                                if (!await confirm({title: `Are you sure you want to delete this package?`, confirmButtonColor: "error"})) {
+                                if (!await confirm({title: `Are you sure you want to delete this add-on?`, confirmButtonColor: "error"})) {
                                     setCargoMenuElement(null)
                                     return
                                 }
                                 onDeleteCargo(target.canonicalUrl)
                                 setCargoMenuElement(null)
-                                /*
-                                setViewingCargo("none")
-                                const copy = [...cargoIndex.cargos]
-                                copy.splice(viewingCargoIndex, 1)
-                                setCargoIndex({
-                                    ...cargoIndex,
-                                    cargos: copy
-                                })
-                                await downloadClient.deleteCargo(target.canonicalUrl)
-                                setStatusAlertContent("Deleted Successfully")
-                                setStatusAlertType("success")
-                                setShowStatusAlert(true)
-                                */
                             }}
                         >
                             <span className="mr-3">
