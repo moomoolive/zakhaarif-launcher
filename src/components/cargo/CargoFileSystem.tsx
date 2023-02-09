@@ -13,6 +13,8 @@ import {urlToMime, Mime} from "../../lib/miniMime"
 import {useAppShellContext} from "../../routes/store"
 import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
+import { useDebounce } from "../../hooks/debounce"
+import LoadingIcon from "../LoadingIcon"
 
 type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
@@ -154,8 +156,7 @@ export type CargoFileSystemProps = {
     searchText: string
     lastPackageUpdate: number
     totalStorageBytes: number
-    order: FilterOrder
-    filter: string
+    filter: {type: string, order: FilterOrder}
     directoryPath: CargoDirectory[]
     onOpenFileModal: (details: FileDetails) => void
     onBackToCargos: () => void
@@ -170,7 +171,6 @@ export const CargoFileSystem = ({
     lastPackageUpdate,
     totalStorageBytes,
     filter,
-    order,
     directoryPath,
     onOpenFileModal,
     onBackToCargos,
@@ -178,11 +178,18 @@ export const CargoFileSystem = ({
 }: CargoFileSystemProps): JSX.Element => {
     const confirm = useGlobalConfirm()
     const {downloadClient} = useAppShellContext()
+    const createFileSystemDelay = useDebounce(700)
+
+    const [creatingFileSystem, setCreatingFileSystem] = useState(true)
 
     const rootDir = useRef(cleanDirectory())
     const {current: fileSystemRoot} = rootDir
 
     useEffect(() => {
+        createFileSystemDelay(() => setCreatingFileSystem(false))
+        if (cargo.files.length < 1) {
+            return
+        }
         const rootDirectory = cleanDirectory()
         for (let i = 0; i < cargo.files.length; i++) {
             const {name, bytes} = cargo.files[i]
@@ -213,8 +220,9 @@ export const CargoFileSystem = ({
             )
         }
 
+        const {type, order} = filter
         const orderFactor = order === "ascending" ? 1 : -1
-        switch (filter) {
+        switch (type) {
             case "bytes":
                 directory.directories.sort((a, b) => {
                     const order = a.contentBytes > b.contentBytes ? 1 : -1
@@ -228,18 +236,18 @@ export const CargoFileSystem = ({
             case "name":
                 directory.directories.sort((a, b) => {
                     const order = a.path.localeCompare(b.path)
-                    return order * orderFactor
+                    return order * -1 * orderFactor
                 })
                 directory.files.sort((a, b) => {
                     const order = a.name.localeCompare(b.name)
-                    return order * orderFactor
+                    return order * -1 * orderFactor
                 })
                 break
             default:
                 break
         }
         return directory
-    }, [filter, order, searchText, directoryPath])
+    }, [filter, searchText, directoryPath])
 
     const parentPathname = useMemo(() => {
         if (directoryPath.length < 2) {
@@ -253,101 +261,112 @@ export const CargoFileSystem = ({
     }, [directoryPath])
 
     return <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
-        {fileSystemRoot.files.length < 1 && fileSystemRoot.directories.length < 1 ? <>
-            <div className="text-yellow-500 mt-16 mb-3">
-                <span className="mr-2">
-                    <FontAwesomeIcon icon={faPuzzlePiece}/>
-                </span>
-                {"No content found"}
-            </div>
-            <div>
-                <Button onClick={onBackToCargos} size="large">
-                    Back
-                </Button>
+        {creatingFileSystem ? <>
+            <div className="mt-16 w-4/5 mx-auto">
+                <div className="animate-spin text-blue-500 text-3xl mb-3">
+                    <LoadingIcon/>
+                </div>
+                <div className="text-sm text-neutral-300">
+                    {"Looking up Files..."}
+                </div>
             </div>
         </> : <>
-            <Tooltip 
-                title="Back To Parent Folder" 
-                placement="top"
-            >
+            {fileSystemRoot.files.length < 1 && fileSystemRoot.directories.length < 1 ? <>
+                <div className="text-yellow-500 mt-16 mb-3">
+                    <span className="mr-2">
+                        <FontAwesomeIcon icon={faPuzzlePiece}/>
+                    </span>
+                    {"No content found"}
+                </div>
                 <div>
-                    <FileSystemMember 
+                    <Button onClick={onBackToCargos} size="large">
+                        Back
+                    </Button>
+                </div>
+            </> : <>
+                <Tooltip 
+                    title="Back To Parent Folder" 
+                    placement="top"
+                >
+                    <div>
+                        <FileSystemMember 
+                            onClick={() => {
+                                if (directoryPath.length < 2) {
+                                    onBackToCargos()
+                                } else {
+                                    mutateDirectoryPath(directoryPath.slice(0, -1))
+                                }
+                            }}
+                            icon={<span className={"mr-3 text-amber-300"}>
+                                <FontAwesomeIcon icon={faFolderTree} />
+                            </span>}
+                            name={parentPathname}
+                            type="parent folder"
+                            updatedAt={directoryPath.length < 2  ? lastPackageUpdate : cargoIndex.updatedAt}
+                            byteCount={directoryPath.length < 2 ? totalStorageBytes : directoryPath[directoryPath.length - 2].contentBytes}
+                        />
+                    </div>
+                </Tooltip>
+                
+                {filteredDirectory.directories.map((directory, index) => {
+                    return <FileSystemMember
+                        key={`cargo-directory-${index}`}
                         onClick={() => {
-                            if (directoryPath.length < 2) {
-                                onBackToCargos()
-                            } else {
-                                mutateDirectoryPath(directoryPath.slice(0, -1))
-                            }
+                            mutateDirectoryPath([...directoryPath, directory]) 
                         }}
                         icon={<span className={"mr-3 text-amber-300"}>
-                            <FontAwesomeIcon icon={faFolderTree} />
-                        </span>}
-                        name={parentPathname}
-                        type="parent folder"
-                        updatedAt={directoryPath.length < 2  ? lastPackageUpdate : cargoIndex.updatedAt}
-                        byteCount={directoryPath.length < 2 ? totalStorageBytes : directoryPath[directoryPath.length - 2].contentBytes}
-                    />
-                </div>
-            </Tooltip>
-            
-            {filteredDirectory.directories.map((directory, index) => {
-                return <FileSystemMember
-                    key={`cargo-directory-${index}`}
-                    onClick={() => {
-                        mutateDirectoryPath([...directoryPath, directory]) 
-                    }}
-                    icon={<span className={"mr-3 text-amber-300"}>
-                        <FontAwesomeIcon icon={faFolder}/>
-                    </span>
-                    }
-                    name={directory.path}
-                    type="folder"
-                    updatedAt={cargoIndex.updatedAt}
-                    byteCount={directory.contentBytes}
-                />
-            })}
-
-            {filteredDirectory.files.map((file, index) => {
-                const mime = urlToMime(file.name) || "text/plain"
-                return <FileSystemMember
-                    key={`cargo-file-${index}`}
-                    onClick={async () => {
-                        const basePath = cargoIndex.resolvedUrl
-                        const path = directoryPath.slice(1).reduce(
-                            (total, next) => `/${total}${next.path}`, 
-                            ""
-                        )
-                        const cleanedBase = basePath.endsWith("/") 
-                            ? basePath.slice(0, -1) 
-                            : basePath
-                        const cleanedPathEnd = path.endsWith("/")
-                            ? path.slice(0, -1) 
-                            : path
-                        const cleanedPath = cleanedPathEnd.startsWith("/")
-                            ? path.slice(1)
-                            : cleanedPathEnd
-                        const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                        const fileResponse = await downloadClient.getCachedFile(fullPath)
-                        if (!fileResponse) {
-                            console.error(`file ${fullPath} was not found although it should be cached!`)
-                            await confirm({title: "Could not find file!"})
-                            return
+                            <FontAwesomeIcon icon={faFolder}/>
+                        </span>
                         }
-                        onOpenFileModal({
-                            name: file.name,
-                            mime,
-                            url: fullPath,
-                            fileResponse,
-                            bytes: file.bytes,
-                        })
-                    }}
-                    icon={<MimeIcon mime={mime} className="mr-3"/>}
-                    name={file.name}
-                    type={mime}
-                    updatedAt={cargoIndex.updatedAt}
-                    byteCount={file.bytes}
-                />
-            })}
+                        name={directory.path}
+                        type="folder"
+                        updatedAt={cargoIndex.updatedAt}
+                        byteCount={directory.contentBytes}
+                    />
+                })}
+
+                {filteredDirectory.files.map((file, index) => {
+                    const mime = urlToMime(file.name) || "text/plain"
+                    return <FileSystemMember
+                        key={`cargo-file-${index}`}
+                        onClick={async () => {
+                            const basePath = cargoIndex.resolvedUrl
+                            const path = directoryPath.slice(1).reduce(
+                                (total, next) => `/${total}${next.path}`, 
+                                ""
+                            )
+                            const cleanedBase = basePath.endsWith("/") 
+                                ? basePath.slice(0, -1) 
+                                : basePath
+                            const cleanedPathEnd = path.endsWith("/")
+                                ? path.slice(0, -1) 
+                                : path
+                            const cleanedPath = cleanedPathEnd.startsWith("/")
+                                ? path.slice(1)
+                                : cleanedPathEnd
+                            const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
+                            const fileResponse = await downloadClient.getCachedFile(fullPath)
+                            if (!fileResponse) {
+                                console.error(`file ${fullPath} was not found although it should be cached!`)
+                                await confirm({title: "Could not find file!"})
+                                return
+                            }
+                            onOpenFileModal({
+                                name: file.name,
+                                mime,
+                                url: fullPath,
+                                fileResponse,
+                                bytes: file.bytes,
+                            })
+                        }}
+                        icon={<MimeIcon mime={mime} className="mr-3"/>}
+                        name={file.name}
+                        type={mime}
+                        updatedAt={cargoIndex.updatedAt}
+                        byteCount={file.bytes}
+                    />
+                })}
+            </>}
         </>}
     </div>
 }

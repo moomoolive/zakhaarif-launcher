@@ -44,6 +44,7 @@ export const SmallAddonsMenu = ({
             <Tooltip title="Menu" placement="left">
                 <button
                     onClick={(event) => setMenuElement(event.currentTarget)}
+                    className={`${!!menuElement ? "text-blue-500" : ""}`}
                 >
                     <FontAwesomeIcon icon={faBars}/>
                 </button>
@@ -56,6 +57,7 @@ export const SmallAddonsMenu = ({
             >
                 <MenuItem
                     onClick={onShowSettings}
+                    className="hover:text-green-500"
                 >
                     <span className="mr-4">
                         <FontAwesomeIcon icon={faGear}/>

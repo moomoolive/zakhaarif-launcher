@@ -1,4 +1,4 @@
-import {ReactNode, useEffect, useMemo, useState, useRef} from "react"
+import {ReactNode, useEffect, useState, useRef} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
 import {usePromise} from "../hooks/promise"
@@ -29,6 +29,8 @@ import { useEffectAsync } from "../hooks/effectAsync"
 import { io } from "../lib/monads/result"
 import { faNodeJs, faNpm } from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../lib/utils/consts/arabic"
+import { SETTINGS_TAB } from "../lib/utils/searchParameterKeys"
+import {useSearchParams} from "../hooks/searchParams"
 
 type SettingRouteProps = {
     children: ReactNode
@@ -348,7 +350,7 @@ const SubPageList = {
     }
 }
 
-const CoolEscapeButton = ({className = ""}= {}) => {
+const CoolEscapeButton = ({className = ""}= {}): JSX.Element => {
     return <div className={"text-right " + className}>
         <Link to="/start">
             <div className="w-full mb-1">
@@ -365,9 +367,32 @@ const CoolEscapeButton = ({className = ""}= {}) => {
     </div>
 }
 
-const SettingsPage = () => {
+type SettingsTab = keyof typeof SubPageList | "none"
+
+const getInitalTab = (searchParams: URLSearchParams): SettingsTab => {
+    if (!searchParams.has(SETTINGS_TAB)) {
+        return "none"
+    }
+    const targetTab = searchParams.get(SETTINGS_TAB) || ""
+    if (!(targetTab in SubPageList)) {
+        return "none"
+    }
+    return targetTab as SettingsTab
+}
+
+const SettingsPage = (): JSX.Element => {
     const navigate = useNavigate()
     const {downloadClient} = useAppShellContext()
+    const [searchParams, setSearchParams] = useSearchParams()
+
+    const {current: setSubpage} = useRef((key: SettingsTab) => {
+        if (key === "none") {
+            searchParams.delete(SETTINGS_TAB)
+        } else {
+            searchParams.set(SETTINGS_TAB, key)
+        }
+        setSearchParams(new URLSearchParams(searchParams))
+    })
 
     const appVersion = usePromise(
         downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl)
@@ -377,24 +402,14 @@ const SettingsPage = () => {
     )
 
     const [clipboardActionId, setClipboardActionId] = useState("none")
-    const [subpage, setSubpage] = useState<
-        keyof typeof SubPageList | "none"
-    >("none")
+    //const [subpage, setSubpage] = useState<SettingsTab>(getInitalTab(searchParams))
 
     const onClipboardAction = (actionId: string) => {
         setClipboardActionId(actionId)
         const milliseconds = 1_000
         window.setTimeout(() => setClipboardActionId("none"), milliseconds)
     }
-
-    const SubpageComponent = useMemo(() => {
-        if (subpage === "none") {
-            return () => <></>
-        }
-        const component = SubPageList[subpage]
-        return component
-    }, [subpage])
-
+    
     const versionText = appVersion.loading || !appVersion.data.ok
         ? "unknown"
         : appVersion.data.data?.version || "not installed"
@@ -428,10 +443,8 @@ const SettingsPage = () => {
                     </div>
                     <div className="w-1/2 pr-4 text-right">
                         <Tooltip title="Settings" placement="left">
-                            <span className="text-green-500 text-xl">
-                                <FontAwesomeIcon
-                                    icon={faGear}
-                                />
+                            <span className="text-blue-500 text-xl">
+                                <FontAwesomeIcon icon={faGear} />
                             </span>
                         </Tooltip>
                     </div>
@@ -586,7 +599,10 @@ const SettingsPage = () => {
                     </div>
                 </div>
             </div>}
-            displayLocation={subpage}
+            displayLocation={((searchParams.get(SETTINGS_TAB) || "") in SubPageList) 
+                ? searchParams.get(SETTINGS_TAB) as keyof typeof SubPageList 
+                : "none"
+            }
             routes={SubPageList}
             returnToHome={() => setSubpage("none")}
         />

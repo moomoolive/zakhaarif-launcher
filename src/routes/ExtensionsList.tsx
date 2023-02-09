@@ -15,10 +15,7 @@ import {
 } from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faMagnifyingGlass} from "@fortawesome/free-solid-svg-icons"
-import {
-    EXTENSION_CARGO_TAG,
-    EXTENSION_QUERY_PARAM,
-} from "../config"
+import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
@@ -199,9 +196,9 @@ const ExtensionsListPage = () => {
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
                                                 }
-                                                return `/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(entry)}&state=-1`
+                                                return `/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(entry)}&state=-1`
                                             default:
-                                                return `/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(entry)}`
+                                                return `/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(entry)}`
                                         }
                                     })(cargo)}
                                 >

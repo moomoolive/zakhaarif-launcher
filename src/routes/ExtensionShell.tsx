@@ -5,7 +5,7 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
-import {EXTENSION_QUERY_PARAM} from "../config"
+import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAppShellContext} from "./store"
 import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
@@ -85,7 +85,7 @@ const ExtensionShellPage = () => {
     }
 
     useEffectAsync(async () => {
-        const url = searchParams.get(EXTENSION_QUERY_PARAM) || NO_EXTENSION_URL
+        const url = searchParams.get(EXTENSION_SHELL_TARGET) || NO_EXTENSION_URL
         const canonicalUrl = decodeURIComponent(url)
 
         if (canonicalUrl.length < 1) {

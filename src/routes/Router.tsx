@@ -94,10 +94,10 @@ const PageDisplay = () => {
     }, [location])
 
     useEffect(() => {
-        if (location !== displayLocation) {
+        if (location.pathname !== displayLocation.pathname) {
             setTransitionStage(fadeOut)
         }
-      }, [location, displayLocation])
+    }, [location, displayLocation])
 
     return <div
         id="viewing-page"

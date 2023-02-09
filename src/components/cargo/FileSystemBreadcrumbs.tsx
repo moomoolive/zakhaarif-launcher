@@ -53,7 +53,7 @@ export const FileSystemBreadcrumbs = ({
             {isViewingCargo ? <>
                 <Tooltip title="My Add-ons">
                     <button
-                        className="hover:bg-gray-900 p-1 px-2 rounded text-neutral-400"
+                        className="hover:bg-gray-900 p-1 px-2 rounded text-neutral-400 animate-fade-in-left"
                         onClick={() => {
                             if (isViewingCargo) {
                                 onBackToCargos()
@@ -66,9 +66,7 @@ export const FileSystemBreadcrumbs = ({
             </> : <>
                 <button
                     className="hover:bg-gray-900 p-1 px-2 rounded"
-                    onClick={(event) => {
-                        setCargoMenuElement(event.currentTarget)
-                    }}
+                    onClick={(event) => setCargoMenuElement(event.currentTarget)}
                 >
                     {"My Add-ons"}
                     <span className="ml-2">
@@ -109,8 +107,7 @@ export const FileSystemBreadcrumbs = ({
             >
                 {"Not found"}
             </button>
-        </div> : <>
-        </>}
+        </div> : <></>}
 
         {isViewingCargo && cargoFound && targetCargo ? <>
             {directoryPath.map((pathSection, index) => {
@@ -188,6 +185,7 @@ export const FileSystemBreadcrumbs = ({
 
                         <MenuItem
                             className="hover:text-blue-500"
+                            disabled={targetCargo.state === "updating"}
                             onClick={() => {
                                 onShowCargoUpdater()
                                 setCargoMenuElement(null)

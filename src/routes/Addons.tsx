@@ -11,7 +11,7 @@ import {
     Divider,
     IconButton
 } from "@mui/material"
-import {Link, useSearchParams, useNavigate} from "react-router-dom"
+import {Link, useNavigate} from "react-router-dom"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faPuzzlePiece, 
@@ -23,7 +23,7 @@ import {
 import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
-import {emptyCargoIndices, CargoState, Shabah, CargoIndices} from "../lib/shabah/downloadClient"
+import {emptyCargoIndices, CargoState, Shabah, CargoIndices, CargoIndex} from "../lib/shabah/downloadClient"
 import {Cargo} from "../lib/cargo/index"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
@@ -37,6 +37,8 @@ import { FileSystemBreadcrumbs } from "../components/cargo/FileSystemBreadcrumbs
 import type {CargoDirectory} from "../components/cargo/CargoFileSystem"
 import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
+import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
+import {useSearchParams} from "../hooks/searchParams"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -65,77 +67,120 @@ const CargoList = lazyComponent(
     async () => (await import("../components/cargo/CargoList")).CargoList,
     {}
 )
-const LargeMenu = lazyComponent(async () => (await import("../components/add-ons/LargeAddonMenu")).LargeAddonMenu)
+const LargeMenu = lazyComponent(
+    async () => (await import("../components/add-ons/LargeAddonMenu")).LargeAddonMenu,
+    {}
+)
 const SmallMenu = lazyComponent(async () => (await import("../components/add-ons/SmallAddonsMenu")).SmallAddonsMenu)
 
-const filterOptions = ["updatedAt", "bytes", "state", "addon-type", "name"] as const
+const cargoStateToNumber = (state: CargoState) => {
+    switch (state) {
+        case "update-aborted":
+        case "update-failed":
+            return 3
+        case "updating":
+            return 2
+        case "cached":
+            return 1
+        default:
+            return 0
+    }
+}
+
+const SHOW_ALL_CARGOS = "none"
+
+type ShownModal = (
+    ""
+    | "FileOverlay"
+    | "Updater"
+    | "Installer"
+    | "CargoInfo"
+)
+
+type FilterType = "updatedAt" | "bytes" | "state" | "addon-type" | "name"
+
+type FilterConfig = {
+    type: FilterType
+    order: FilterOrder
+}
+
+type AlertConfig = {
+    type: "info" | "error" | "success" | "warning"
+    content: ReactNode
+}
 
 const AddOns = (): JSX.Element => {
     const app = useAppShellContext()
     const {downloadClient} = useAppShellContext()
-    const [_searchParams] = useSearchParams()
+    const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
     
     const [loadingInitialData, setLoadingInitialData] = useState(true)
     const [isInErrorState, setIsInErrorState] = useState(false)
     const [cargoIndex, setCargoIndex] = useState<DeepReadonly<CargoIndices>>(emptyCargoIndices())
     const [searchText, setSearchText] = useState("")
-    const [filter, setFilter] = useState<typeof filterOptions[number]>("updatedAt")
-    const [order, setOrder] = useState<FilterOrder>("descending")
-    const [viewingCargo, setViewingCargo] = useState("none")
-    const [cargoFound, setCargoFound] = useState(false)
+    const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updatedAt", order: "descending"})
+    //const [viewingCargo, setViewingCargo] = useState(
+    //    searchParams.has(ADDONS_VIEWING_CARGO)
+    //        ? decodeURIComponent(searchParams.get(ADDONS_VIEWING_CARGO) || SHOW_ALL_CARGOS)
+    //        : SHOW_ALL_CARGOS
+    //)
+    //const [targetCargo, setTargetCargo] = useState(new Cargo<Permissions>())
+    const [cargoFound, setCargoFound] = useState(true)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
     const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
-    const [showCargoInfo, setShowCargoInfo] = useState(false)
-    const [showInstaller, setShowInstaller] = useState(false)
-    const [showStatusAlert, setShowStatusAlert] = useState(false)
-    const [statusAlertContent, setStatusAlertContent] = useState<ReactNode>("hello world")
-    const [statusAlertType, setStatusAlertType] = useState<"info" | "error" | "success" | "warning">("info")
-    const [showCargoUpdater, setShowCargoUpdater] = useState(false)
+    const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null)
+    const [modalShown, setModalShown] = useState<ShownModal>("")
 
     const viewingCargoBytes = useRef(0)
-    const {current: onBackToCargos} = useRef(() => setViewingCargo("none"))
-    const {current: toggleFilter} = useRef((filterName: typeof filter, order: FilterOrder, currentFilter: typeof filter) => {
+    const {current: toggleFilter} = useRef((filterName: FilterType, order: FilterOrder, currentFilter: FilterType) => {
         if (currentFilter !== filterName) {
-            setFilter(filterName)
-            setOrder("descending")
+            setFilterConfig({type: filterName, order: "descending"})
         } else if (order === "descending") {
-            setOrder("ascending")
+            setFilterConfig((previous) => ({...previous, order: "ascending"}))
         } else {
-            setOrder("descending")
+            setFilterConfig((previous) => ({...previous, order: "descending"}))
         }
     })
     const targetCargoRef = useRef(new Cargo<Permissions>())
-    const {current: cargoStateToNumber} = useRef((state: CargoState) => {
-        switch (state) {
-            case "update-aborted":
-            case "update-failed":
-                return 3
-            case "updating":
-                return 2
-            case "cached":
-                return 1
-            default:
-                return 0
-        }
+    const storageUsageRef = useRef({used: 0, total: 0, left: 0})
+    const {current: setSearchKey} = useRef((key: string, value: string) => {
+        searchParams.set(key, value)
+        setSearchParams(new URLSearchParams(searchParams))
     })
-    const storageUsageRef = useRef({
-        used: 0, total: 0, left: 0
+    const {current: removeSearchKey} = useRef((key: string) => {
+        searchParams.delete(key)
+        setSearchParams(new URLSearchParams(searchParams))
     })
-    const {current: onShowInstaller} = useRef(
-        () => setShowInstaller(true)
-    )
-    const {current: onShowSettings} = useRef(
-        () => navigate("/settings")
-    )
+    const {current: onBackToCargos} = useRef(() => removeSearchKey(ADDONS_VIEWING_CARGO))
+    const {current: onShowInstaller} = useRef(() => setModalShown("Installer"))
+    const {current: onShowCargoInfo} = useRef(() => setSearchKey(ADDONS_MODAL, "info"))
+    const {current: onShowCargoUpdater} = useRef(() => setSearchKey(ADDONS_MODAL, "update"))
+    const {current: clearModal} = useRef(() => {
+        removeSearchKey(ADDONS_MODAL)
+        setModalShown("")
+    })
+    const {current: onShowSettings} = useRef(() => navigate("/settings"))
+    const {current: clearAlert} = useRef(() => setAlertConfig(null))
+    const {current: setViewingCargo} = useRef((canonicalUrl: string) => setSearchKey(ADDONS_VIEWING_CARGO, encodeURIComponent(canonicalUrl)))
+    const targetIndexRef = useRef<CargoIndex>({
+        name: "",
+        tag: "",
+        logoUrl: "",
+        resolvedUrl: "",
+        canonicalUrl: "",
+        bytes: 0,
+        entry: "",
+        version: "",
+        permissions: [],
+        state: "cached",
+        storageBytes: 0,
+        downloadQueueId: "",
+        createdAt: 0,
+        updatedAt: 0,
+    })
 
-    const totalStorageBytes = useMemo(() => {
-        return cargoIndex.cargos.reduce(
-            (total, next) => total + next.bytes, 
-            0
-        )
-    }, [cargoIndex])
     const {current: cargoFilters} = useRef([
         {targetFilter: "name", name: "Name", className: "w-1/2 lg:w-1/3"},
         {targetFilter: "state", name: "Status", className: "hidden lg:block w-1/6 text-center"},
@@ -150,27 +195,57 @@ const AddOns = (): JSX.Element => {
         {targetFilter: "bytes", name: "Size", className: "w-1/4 md:w-1/6 text-center"},
     ] as const)
 
-    const isViewingCargo = viewingCargo !== "none"
-    const {current: targetCargo} = targetCargoRef
+    const totalStorageBytes = useMemo(() => {
+        return cargoIndex.cargos.reduce(
+            (total, next) => total + next.bytes, 
+            0
+        )
+    }, [cargoIndex])
+
+    const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
     const {current: storageUsage} = storageUsageRef
+    const {current: targetCargo} = targetCargoRef
+
+    useEffect(() => {
+        if (!searchParams.has(ADDONS_MODAL)) {
+            return
+        } 
+        const value = searchParams.get(ADDONS_MODAL) || ""
+        if (value === "update") {
+            setModalShown("Updater")
+        } else if (value === "info") {
+            setModalShown("CargoInfo")
+        }
+    }, [searchParams])
 
     useEffectAsync(async () => {
-        if (!isViewingCargo) {
-            setFilter("updatedAt")
-            setOrder("descending")
+        if (cargoIndex.cargos.length < 1) {
+            return 
+        }
+        if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
+            setFilterConfig({type: "updatedAt", order: "descending"})
+            return
+        }
+        const canonicalUrl = decodeURIComponent(searchParams.get(ADDONS_VIEWING_CARGO) || "")
+        if (
+            canonicalUrl.length < 1
+            || targetIndexRef.current.canonicalUrl === canonicalUrl
+        ) {
             return
         }
         const index = cargoIndex.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === viewingCargo
+            (cargo) => cargo.canonicalUrl === canonicalUrl
         )
         if (index < 0) {
             setCargoFound(false)
             return
         }
         const targetCargoIndex = cargoIndex.cargos[index]
+        targetIndexRef.current = targetCargoIndex
         const cargo = await downloadClient.getCargoAtUrl(
             targetCargoIndex.resolvedUrl
         )
+        console.log("cargo res", cargo, "index", targetCargoIndex)
         if (!cargo.ok) {
             setCargoFound(false)
             return
@@ -178,10 +253,9 @@ const AddOns = (): JSX.Element => {
         viewingCargoBytes.current = cargo.data.bytes
         targetCargoRef.current = new Cargo(cargo.data.pkg as Cargo<Permissions>)
         setCargoFound(true)
-        setFilter("name")
-        setOrder("descending")
+        setFilterConfig({type: "name", order: "descending"})
         setViewingCargoIndex(index)
-    }, [viewingCargo])
+    }, [searchParams])
     
     useEffectAsync(async () => {
         const [cargoIndexRes, clientStorageRes] = await Promise.all([
@@ -201,6 +275,7 @@ const AddOns = (): JSX.Element => {
         if (isViewingCargo) {
             return cargoIndex.cargos
         }
+        const {order, type: filter} = filterConfig
         const orderFactor = order === "ascending" ? 1 : -1
         const copy = []
         for (let i = 0; i < cargoIndex.cargos.length; i++) {
@@ -242,7 +317,7 @@ const AddOns = (): JSX.Element => {
             default:
                 return copy
         }
-    }, [filter, order, cargoIndex, searchText])
+    }, [filterConfig, cargoIndex, searchText])
 
     useEffect(() => {
         const handerId = app.addEventListener("downloadprogress", async (progress) => {
@@ -289,24 +364,24 @@ const AddOns = (): JSX.Element => {
             </Link>
         </ErrorOverlay> : <>
             <div className="fixed z-0 w-screen h-screen overflow-clip">
-                {fileDetails ? <>
+                {modalShown === "FileOverlay" && fileDetails ? <>
                     <FileOverlay 
                         onClose={() => setFileDetails(null)}
                         {...fileDetails}
                     />
                 </> : <></>}
 
-                {showCargoInfo ? <>
+                {isViewingCargo && cargoFound && modalShown === "CargoInfo" ? <>
                     <CargoInfo
-                        onClose={() => setShowCargoInfo(false)}
+                        onClose={clearModal}
                         cargo={targetCargo}
                         cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
                     />
                 </> : <></>}
 
-                {showInstaller ? <>
+                {modalShown === "Installer" ? <>
                     <Installer
-                        onClose={() => setShowInstaller(false)}
+                        onClose={clearModal}
                         onInstallCargo={async (update, title) => {
                             const status = await downloadClient.executeUpdates(
                                 [update],
@@ -318,31 +393,25 @@ const AddOns = (): JSX.Element => {
                             const ok = !(status.data >= Shabah.ERROR_CODES_START)
                             return ok 
                         }}
-                        createAlert={(message) => {
-                            setStatusAlertContent(message)
-                            setStatusAlertType("success")
-                            setShowStatusAlert(true)
-                        }}
+                        createAlert={(content) => setAlertConfig({type: "success", content})}
                     />
                 </> : <></>}
 
-                {showStatusAlert ? <StatusAlert
-                    onClose={() => setShowStatusAlert(false)}
+                {!!alertConfig ? <StatusAlert
+                    onClose={clearAlert}
                     autoClose={4_000}
-                    color={statusAlertType}
-                    content={statusAlertContent}
+                    color={alertConfig.type}
+                    content={alertConfig.content}
                     className="fixed left-2 z-20 w-52"
                     style={{top: "91vh"}}
                 /> : <></>}
 
-                {isViewingCargo && showCargoUpdater ? <CargoUpdater
-                    onClose={() => setShowCargoUpdater(false)}
+                {isViewingCargo && cargoFound && modalShown === "Updater" ? <CargoUpdater
+                    onClose={clearModal}
                     cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
                     cargo={targetCargo}
-                    createAlert={(message) => {
-                        setStatusAlertContent(message)
-                        setStatusAlertType("success")
-                        setShowStatusAlert(true)
+                    createAlert={(content) => {
+                        setAlertConfig({type: "success", content})
                     }}
                     onUpdateCargo={async (update, title) => {
                         const status = await downloadClient.executeUpdates(
@@ -424,9 +493,7 @@ const AddOns = (): JSX.Element => {
                 <div className="sm:hidden w-11/12 mx-auto">
                     <div className="pb-2 text-xs text-neutral-300">
                         <span className="ml-1 mr-2 text-blue-500">
-                            <FontAwesomeIcon 
-                                icon={faHardDrive}
-                            />
+                            <FontAwesomeIcon icon={faHardDrive}/>
                         </span>
 
                         {loadingInitialData ? <span 
@@ -436,8 +503,11 @@ const AddOns = (): JSX.Element => {
                         </span> : <>
                             {isInErrorState
                                 ? "unknown"
-                                : `${toGigabytesString(storageUsage.used, 1)} of ${toGigabytesString(storageUsage.total, 1)} used` 
+                                : `${toGigabytesString(storageUsage.used, 1)} / ${toGigabytesString(storageUsage.total, 1)} used` 
                             }
+                            <span className="text-neutral-400 ml-1.5">
+                                {`(${cargoIndex.cargos.length} Add-ons)`}
+                            </span>
                         </>}
                     
                     </div>
@@ -449,7 +519,7 @@ const AddOns = (): JSX.Element => {
                     <div className="sm:hidden absolute z-20 bottom-2 right-4">
                         <Tooltip title="New Add-on" placement="left">
                             <Fab 
-                                onClick={() => setShowInstaller(true)}
+                                onClick={onShowInstaller}
                                 color="primary"
                             >
                                 <FontAwesomeIcon 
@@ -485,20 +555,15 @@ const AddOns = (): JSX.Element => {
                             }
                             onBackToCargos={onBackToCargos}
                             mutateDirectoryPath={setDirectoryPath}
-                            onShowCargoInfo={() => setShowCargoInfo(true)}
-                            onShowCargoUpdater={() => setShowCargoUpdater(true)}
+                            onShowCargoInfo={onShowCargoInfo}
+                            onShowCargoUpdater={onShowCargoUpdater}
                             onDeleteCargo={async (canonicalUrl) => {
-                                setViewingCargo("none")
                                 const copy = [...cargoIndex.cargos]
                                 copy.splice(viewingCargoIndex, 1)
-                                setCargoIndex({
-                                    ...cargoIndex,
-                                    cargos: copy
-                                })
+                                setCargoIndex({...cargoIndex, cargos: copy})
+                                onBackToCargos()
                                 await downloadClient.deleteCargo(canonicalUrl)
-                                setStatusAlertContent("Deleted Successfully")
-                                setStatusAlertType("success")
-                                setShowStatusAlert(true)
+                                setAlertConfig({type: "success", content: "Deleted Successfully"})
                             }}
                         />
                         
@@ -518,15 +583,15 @@ const AddOns = (): JSX.Element => {
                                                 className={`${targetFilter === "" ? "" : "hover:bg-gray-900"} rounded px-2 py-1`}
                                                 {...(targetFilter === "" 
                                                     ? {disabled: true}
-                                                    : {onClick: () => toggleFilter(targetFilter, order, filter)}
+                                                    : {onClick: () => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
                                                 )}
                                             >
                                                 {name}
                                                 {targetFilter === "" ? <></> : <>
                                                     <FilterChevron 
-                                                        currentFilter={filter}
+                                                        currentFilter={filterConfig.type}
                                                         targetFilter={targetFilter}
-                                                        order={order}
+                                                        order={filterConfig.order}
                                                         className="ml-1 lg:ml-2 text-blue-500"
                                                     />
                                                 </>}
@@ -542,13 +607,13 @@ const AddOns = (): JSX.Element => {
                                         >
                                             <button
                                                 className="hover:bg-gray-900 rounded px-2 py-1"
-                                                onClick={() => toggleFilter(targetFilter, order, filter)}
+                                                onClick={() => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
                                             >
                                                 {name}
                                                 <FilterChevron 
-                                                    currentFilter={filter}
+                                                    currentFilter={filterConfig.type}
                                                     targetFilter={targetFilter}
-                                                    order={order}
+                                                    order={filterConfig.order}
                                                     className="ml-1 lg:ml-2 text-blue-500"
                                                 />
                                             </button>
@@ -585,10 +650,12 @@ const AddOns = (): JSX.Element => {
                                             cargoBytes={viewingCargoBytes.current}
                                             lastPackageUpdate={cargoIndex.updatedAt}
                                             totalStorageBytes={totalStorageBytes}
-                                            filter={filter}
-                                            order={order}
+                                            filter={filterConfig}
                                             directoryPath={directoryPath}
-                                            onOpenFileModal={setFileDetails}
+                                            onOpenFileModal={(details) => {
+                                                setFileDetails(details)
+                                                setModalShown("FileOverlay")
+                                            }}
                                             onBackToCargos={onBackToCargos}
                                             mutateDirectoryPath={setDirectoryPath}
                                         /> 

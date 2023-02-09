@@ -6,10 +6,10 @@ import {
     faReact,
     faOsi,
 } from "@fortawesome/free-brands-svg-icons"
-import {faAngleRight} from "@fortawesome/free-solid-svg-icons"
 import {useEffect} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import { Tooltip } from "@mui/material"
+import { SETTINGS_TAB } from "../lib/utils/searchParameterKeys"
 
 const AppLaunchPage = () => {
     const navigate = useNavigate()
@@ -71,7 +71,7 @@ const AppLaunchPage = () => {
                     </div>
                 
                     <div className={`text-green-500 text-6xl mb-4 mr-8`}>
-                        <Link to="/settings?tab=acknowledgments">
+                        <Link to={`/settings?${SETTINGS_TAB}=acknowledgments`}>
                             <Tooltip title="Many other open-source projects">
                                 <FontAwesomeIcon icon={faOsi}/>
                             </Tooltip>

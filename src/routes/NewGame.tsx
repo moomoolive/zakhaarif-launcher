@@ -15,7 +15,7 @@ import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppShellContext} from "./store"
 import {emptyCargoIndices} from "../lib/shabah/downloadClient"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {EXTENSION_QUERY_PARAM, MOD_CARGO_TAG} from "../config"
+import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
 import {AppDatabase} from "../lib/database/AppDatabase"
@@ -80,7 +80,7 @@ const NewGamePage = () => {
                     if (!await confirm({title: "Are you sure you want to create a new game?"})) {
                         return
                     }
-                    navigate(`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`)
+                    navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`)
                 }}
             >
                 <div className="mb-1">
@@ -130,7 +130,7 @@ const NewGamePage = () => {
                             })
                             setLoading(false)
                             window.localStorage.setItem(SAVE_EXISTS, "1")
-                            navigate(`/extension?${EXTENSION_QUERY_PARAM}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
+                            navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
                         }}
                         disabled={loading}
                     >
