@@ -59,19 +59,23 @@ const CargoUpdater = lazyComponent(
     async () => (await import("../components/cargo/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
+const mainContentLoader = <div className="w-full h-5/6 animate-pulse text-neutral-500 pt-10">{"Loading..."}</div>
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
-    {}
+    {loadingElement: mainContentLoader}
 )
 const CargoList = lazyComponent(
     async () => (await import("../components/cargo/CargoList")).CargoList,
-    {}
+    {loadingElement: mainContentLoader}
 )
 const LargeMenu = lazyComponent(
     async () => (await import("../components/add-ons/LargeAddonMenu")).LargeAddonMenu,
-    {}
+    {loadingElement: <div className="w-60 h-full"/>}
 )
-const SmallMenu = lazyComponent(async () => (await import("../components/add-ons/SmallAddonsMenu")).SmallAddonsMenu)
+const SmallMenu = lazyComponent(
+    async () => (await import("../components/add-ons/SmallAddonsMenu")).SmallAddonsMenu,
+    {loadingElement: <div style={{height: "50px"}}/>}
+)
 
 const cargoStateToNumber = (state: CargoState) => {
     switch (state) {
@@ -86,8 +90,6 @@ const cargoStateToNumber = (state: CargoState) => {
             return 0
     }
 }
-
-const SHOW_ALL_CARGOS = "none"
 
 type ShownModal = (
     ""

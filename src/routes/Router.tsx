@@ -11,7 +11,6 @@ import {AppShellContext, useAppShellContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
 import MadeWith from "./MadeWith"
-import NotFound from "./NotFound"
 
 type LazyRouteLoader<T> = () => Promise<{ default: LazyComponent<T> }>
 
@@ -32,6 +31,7 @@ const Settings = lazyRoute(() => import("./Settings"))
 const ExtensionList = lazyRoute(() => import("./ExtensionsList"))
 const NewGame = lazyRoute(() => import("./NewGame"))
 const LoadGame = lazyRoute(() => import("./LoadGame"))
+const NotFound = lazyRoute(() => import("./NotFound"))
 
 const fadeOut = 2
 const fadeIn = 1
@@ -111,7 +111,6 @@ const PageDisplay = () => {
         }}
     >
         <Routes location={displayLocation}>
-            <Route path="*" element={<NotFound/>}/>
             <Route path="/" element={<Launcher/>}/>
             <Route path="/launch" element={<AppLaunch/>}/>
             <Route path="/made-with" element={<MadeWith/>}/>
@@ -119,6 +118,7 @@ const PageDisplay = () => {
             {
             // lazy loaded routes
             }
+            <Route path="*" element={<NotFound/>}/>
             <Route path="/start" element={<StartMenu/>}/>
             <Route path="/extension" element={<ExtensionShell/>}/>
             <Route path="/extensions-list" element={<ExtensionList/>}/>

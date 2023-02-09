@@ -18,7 +18,8 @@ import {
     faUser,
     faHandshakeAngle,
     IconDefinition,
-    faHeartBroken
+    faHeartBroken,
+    faGamepad
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
 import {PROFILE_NAME, ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
@@ -369,17 +370,6 @@ const CoolEscapeButton = ({className = ""}= {}): JSX.Element => {
 
 type SettingsTab = keyof typeof SubPageList | "none"
 
-const getInitalTab = (searchParams: URLSearchParams): SettingsTab => {
-    if (!searchParams.has(SETTINGS_TAB)) {
-        return "none"
-    }
-    const targetTab = searchParams.get(SETTINGS_TAB) || ""
-    if (!(targetTab in SubPageList)) {
-        return "none"
-    }
-    return targetTab as SettingsTab
-}
-
 const SettingsPage = (): JSX.Element => {
     const navigate = useNavigate()
     const {downloadClient} = useAppShellContext()
@@ -394,15 +384,9 @@ const SettingsPage = (): JSX.Element => {
         setSearchParams(new URLSearchParams(searchParams))
     })
 
-    const appVersion = usePromise(
-        downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl)
-    )
-    const gameVersion = usePromise(
-        downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl)
-    )
-
+    const launcherMetadata = usePromise(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl))
+    const gameMetadata = usePromise(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
     const [clipboardActionId, setClipboardActionId] = useState("none")
-    //const [subpage, setSubpage] = useState<SettingsTab>(getInitalTab(searchParams))
 
     const onClipboardAction = (actionId: string) => {
         setClipboardActionId(actionId)
@@ -410,9 +394,12 @@ const SettingsPage = (): JSX.Element => {
         window.setTimeout(() => setClipboardActionId("none"), milliseconds)
     }
     
-    const versionText = appVersion.loading || !appVersion.data.ok
-        ? "unknown"
-        : appVersion.data.data?.version || "not installed"
+    const versionText = launcherMetadata.loading
+        ? "loading..."
+        : launcherMetadata.data?.version || "not installed"
+    const gameVersionText = gameMetadata.loading
+        ? "loading..."
+        :  gameMetadata.data?.version || "not installed"
     
     useEffect(() => {
         const handler = (event: KeyboardEvent) => {
@@ -506,7 +493,7 @@ const SettingsPage = (): JSX.Element => {
                                 {
                                     id: "version",
                                     icon: faCodeBranch, 
-                                    name: "Version", 
+                                    name: "Launcher Version", 
                                     contents: <>{
                                         clipboardActionId === "version" 
                                             ? "Copied!" 
@@ -515,6 +502,20 @@ const SettingsPage = (): JSX.Element => {
                                     onClick: () => {
                                         navigator.clipboard.writeText(versionText)
                                         onClipboardAction("version")
+                                    }
+                                },
+                                {
+                                    id: "game-version",
+                                    icon: faGamepad, 
+                                    name: "Game Version", 
+                                    contents: <>{
+                                        clipboardActionId === "game-version" 
+                                            ? "Copied!" 
+                                            : gameVersionText
+                                    }</>,
+                                    onClick: () => {
+                                        navigator.clipboard.writeText(gameVersionText)
+                                        onClipboardAction("game-version")
                                     }
                                 },
                                 {
@@ -551,27 +552,31 @@ const SettingsPage = (): JSX.Element => {
                                     contentStyles = {},
                                     nameStyles = {}
                                 } = subsection as SettingSubsection
-                                return <button
+                                return <Tooltip
                                     key={`section-${index}-sub-${subIndex}`}
-                                    className="w-full px-4 py-3 flex hover:bg-neutral-700"
-                                    onClick={onClick}
+                                    title={name}
                                 >
-                                    <div 
-                                        className="w-1/2 text-left overflow-clip text-ellipsis whitespace-nowrap"
-                                        style={nameStyles}
+                                    <button
+                                        className="w-full px-4 py-3 flex hover:bg-neutral-700"
+                                        onClick={onClick}
                                     >
-                                        <span className="mr-3 text-neutral-400">
-                                            <FontAwesomeIcon icon={icon}/>
-                                        </span>
-                                        {name}
-                                    </div>
-                                    <div 
-                                        className="w-1/2 text-right text-neutral-400 overflow-x-clip text-ellipsis whitespace-nowrap"
-                                        style={contentStyles}
-                                    >
-                                        {contents}
-                                    </div>
-                                </button>
+                                        <div 
+                                            className="w-1/2 text-left overflow-clip text-ellipsis whitespace-nowrap"
+                                            style={nameStyles}
+                                        >
+                                            <span className="mr-3 text-neutral-400">
+                                                <FontAwesomeIcon icon={icon}/>
+                                            </span>
+                                            {name}
+                                        </div>
+                                        <div 
+                                            className="w-1/2 text-right text-neutral-400 overflow-x-clip text-ellipsis whitespace-nowrap"
+                                            style={contentStyles}
+                                        >
+                                            {contents}
+                                        </div>
+                                    </button>
+                                </Tooltip>
                             })}
                         </div>
                     })}

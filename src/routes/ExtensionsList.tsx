@@ -19,7 +19,7 @@ import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {CargoIcon} from "../components/cargo/Icon"
 import {FilterOrder, FilterChevron} from "../components/FilterChevron"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
-import { isExtension } from "../lib/utils/cargos"
+import {isExtension} from "../lib/utils/cargos"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
 

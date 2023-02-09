@@ -13,7 +13,7 @@ import {
   faLink, faTerminal, faFolderMinus
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import {Shabah} from "../lib/shabah/downloadClient"
+import {CargoState, Shabah} from "../lib/shabah/downloadClient"
 import {featureCheck} from "../lib/utils/appFeatureCheck"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {STANDARD_CARGOS} from "../standardCargos"
@@ -293,13 +293,14 @@ const LauncherRoot = (): JSX.Element => {
   }
 
   useEffect(() => {
-    updateListener.current = app.addEventListener("downloadprogress", (progress) => {
+    updateListener.current = app.addEventListener("downloadprogress", async (progress) => {
       console.log("got progress", progress)
       const {type, canonicalUrls} = progress
       const packages = updatingCorePackages.current
       const relatedToCorePackages = canonicalUrls.some(
         (url) => packages.includes(url)
       )
+      
       if (!relatedToCorePackages) {
         return
       }
@@ -308,16 +309,22 @@ const LauncherRoot = (): JSX.Element => {
         document.title = "Installing..."
         setProgressMsg("Installing...")
       }
-  
+
+      const cargoIndexes = await downloadClient.getCargoIndices()
+      const targetIndexes = progress.canonicalUrls
+        .map((url) => cargoIndexes.cargos.findIndex((cargo) => cargo.canonicalUrl === url))
+        .filter((index) => index > -1)
+      const {cargos} = cargoIndexes
       if (type === "success") {
+        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: "cached"}))
         window.setTimeout(launchApp, 3_000)
       }
   
       if (type === "abort" || type === "fail") {
+        const nextState: CargoState = type === "abort" ? "update-aborted" : "update-failed" 
+        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: nextState}))
         setLauncherState("error")
       }
-
-      downloadClient.refreshCargoIndices()
     })
 
     return () => {

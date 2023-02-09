@@ -6,7 +6,9 @@ export const main = async (args) => {
     console.info("[GAME LOADED] 😭 game loaded... with args =", args)
     const {messageAppShell, initialState} = args
     const {queryState, authToken, recommendedStyleSheetUrl} = initialState
-    const gameId = parseInt(queryState, 10)
+    const gameId = parseInt(
+        queryState.length < 1 ? "-1" : queryState, 10
+    )
     if (isNaN(gameId)) {
         console.error("inputted game id is not a number. game_id =", queryState)
         messageAppShell("signalFatalError", authToken)

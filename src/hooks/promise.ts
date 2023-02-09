@@ -1,23 +1,22 @@
-import {useState, useRef} from "react"
+import {useState} from "react"
 import {useEffectAsync} from "./effectAsync"
-import {io, ResultType} from "../lib/monads/result"
 
-export const usePromise = <T>(promise: Promise<T>) => {
-    const [promiseState, setPromiseState] = useState<
-        ResultType<T>
-    >(io.err("pending..."))
-    const pending = useRef(true)
+type PromiseReturn<T> = {
+    loading: boolean
+    data: T | null
+}
+
+export const usePromise = <T>(promise: Promise<T>): PromiseReturn<T> => {
+    const [promiseState, setPromiseState] = useState<T | null>(null)
+    const [loading, setLoading] = useState(true)
 
     useEffectAsync(async () => {
-        if (!pending.current || promiseState.ok) {
+        if (!loading) {
             return
         }
-        setPromiseState(await io.wrap(promise))
-        pending.current = false
+        setPromiseState(await promise)
+        setLoading(false)
     }, [])
 
-    return {
-        loading: pending.current,
-        data: promiseState
-    }
+    return {loading, data: promiseState}
 }

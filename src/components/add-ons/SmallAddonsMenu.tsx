@@ -32,6 +32,7 @@ export const SmallAddonsMenu = ({
                 </Link>
             </Tooltip>
         </div>
+        
         <div className="w-1/3 text-center">    
             <span className="text-green-500 mr-2">
                 <FontAwesomeIcon icon={faPuzzlePiece} />
@@ -40,6 +41,7 @@ export const SmallAddonsMenu = ({
                 {"Add-ons"}
             </span>
         </div>
+
         <div className="w-1/3 text-right">
             <Tooltip title="Menu" placement="left">
                 <button

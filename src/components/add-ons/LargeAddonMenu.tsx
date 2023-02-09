@@ -149,6 +149,5 @@ export const LargeAddonMenu = ({
                 {`${cargoCount} Add-ons`}
             </div>
         </div>
-
     </div>
 }

@@ -2,7 +2,6 @@
     "crateVersion": "0.1.0",
     "name": "Launcher",
     "version": "0.1.0-prealpha.0",
-    "entry": "bg-fetch-test/entry.js",
     "files": [
         "bg-fetch-test/entry.js",
         "bg-fetch-test/asset.svg",
@@ -12,7 +11,6 @@
         "bg-fetch-test/bird-svgrepo.svg",
         "bg-fetch-test/random.jpg"
     ],
-    "invalidation": "url-diff",
     "authors": [
         {"name": "Mostafa Elbannan"}
     ],

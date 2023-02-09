@@ -512,7 +512,7 @@ export class Shabah {
         return indices.cargos[index]
     }
 
-    async refreshCargoIndices() {
+    private async refreshCargoIndices() {
         const {origin, fileCache} = this
         const cargos = await getCargoIndices(origin, fileCache)
         this.cargoIndicesCache = cargos
