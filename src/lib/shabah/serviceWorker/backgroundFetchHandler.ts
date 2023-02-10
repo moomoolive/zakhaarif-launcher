@@ -78,7 +78,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         )
         
         const associatedCargos = cargoIndices.cargos.filter(
-            (cargo) => cargo.downloadQueueId === downloadQueueId
+            (cargo) => cargo.downloadId === downloadQueueId
         )
         log(
             eventName, 
@@ -226,10 +226,10 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             let state: CargoState = "cached"
             const resourcesFailed = processingStats.failedResources > 0
             if (eventType === "abort" && resourcesFailed) {
-                state = "update-aborted"
+                state = "aborted"
             }
             if (eventType === "fail" && resourcesFailed) {
-                state = "update-failed"
+                state = "failed"
             }
             log(
                 eventName, 
@@ -238,7 +238,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             updateCargoIndex(cargoIndices, {
                 ...cargoIndex,
                 state,
-                downloadQueueId: NO_UPDATE_QUEUED
+                downloadId: NO_UPDATE_QUEUED
             })
             
             const isErrorEvent = (

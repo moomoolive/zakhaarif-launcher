@@ -124,7 +124,7 @@ const main = async () => {
         keywords.push(...pKeywords, ...cKeywords)
         return {
             uuid: config.uuid || NULL_FIELD,
-            crateVersion: CRATE_VERSION,
+            schema: CRATE_VERSION,
             name: config.name || pJson?.name || "default-pkg-name",
             version: config.version || pJson?.version || "0.1.0-alpha.0",
             entry: config.entry || "index.html",

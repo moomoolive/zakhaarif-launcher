@@ -141,12 +141,12 @@ export const FileSystemBreadcrumbs = ({
                             }}
                         >
                             <div className="flex items-center">
-                                {path === ROOT_DIRECTORY_PATH && targetCargo.logoUrl !== CARGO_NULL_FIELD ? <div
+                                {path === ROOT_DIRECTORY_PATH && targetCargo.logo !== CARGO_NULL_FIELD ? <div
                                     className="mr-1"
                                 >
                                     <CargoIcon 
                                         importUrl={targetCargo.resolvedUrl}
-                                        crateLogoUrl={targetCargo.logoUrl}
+                                        crateLogoUrl={targetCargo.logo}
                                         pixels={17}
                                         className="animate-fade-in-left"
                                     />

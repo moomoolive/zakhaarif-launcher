@@ -652,52 +652,49 @@ describe("unsafe permissions detector", () => {
 
 const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
     {
-        tag: "random1",
+        tag: 0,
         name: "cool1",
-        logoUrl: NULL_FIELD,
+        logo: NULL_FIELD,
         resolvedUrl: `https://my-mamas-house.com/pkg/`,
         canonicalUrl: `https://my-mamas-house.com/pkg/`,
         bytes: 100,
         entry: `index.js`,
         version: "2.1.0",
         permissions: [],
-        storageBytes: 0,
         state: "cached",
-        createdAt: 0,
-        updatedAt: 0,
-        downloadQueueId: ""
+        created: 0,
+        updated: 0,
+        downloadId: ""
     },
     {
-        tag: "random4",
+        tag: 1,
         name: "cool2",
-        logoUrl: NULL_FIELD,
+        logo: NULL_FIELD,
         resolvedUrl: `https://my-dadas-house.com/pkg/`,
         canonicalUrl: `https://my-dadas-house.com/pkg/`,
         bytes: 100,
         entry: `index.js`,
         version: "32.3.0",
         permissions: [],
-        storageBytes: 0,
         state: "cached",
-        createdAt: 0,
-        updatedAt: 0,
-        downloadQueueId: ""
+        created: 0,
+        updated: 0,
+        downloadId: ""
     },
     {
-        tag: "random3",
+        tag: 2,
         name: "cool12",
-        logoUrl: NULL_FIELD,
+        logo: NULL_FIELD,
         resolvedUrl: `https://my-aunties-house.com/pkg/`,
         canonicalUrl: `https://my-aunties-house.com/pkg/`,
         bytes: 100,
         entry: `index.js`,
         version: "0.2.3",
         permissions: [],
-        storageBytes: 0,
         state: "cached",
-        createdAt: 0,
-        updatedAt: 0,
-        downloadQueueId: ""
+        created: 0,
+        updated: 0,
+        downloadId: ""
     },
 ]
 

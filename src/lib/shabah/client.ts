@@ -1,12 +1,6 @@
-import {ResultType, io} from "../../lib/monads/result"
-import {MANIFEST_NAME, MANIFEST_MINI_NAME} from "../../lib/cargo/index"
-import {
-    validateManifest, 
-    validateMiniCargo, 
-    ValidatedMiniCargo,
-    diffManifestFiles,
-    Cargo
-} from "../../lib/cargo/index"
+import {io} from "../../lib/monads/result"
+import {MANIFEST_FILE_SUFFIX} from "../../lib/cargo/index"
+import {validateManifest, diffManifestFiles, Cargo} from "../../lib/cargo/index"
 import {SemVer} from "../../lib/smallSemver/index"
 import {urlToMime} from "../../lib/miniMime/index"
 import {
@@ -19,7 +13,7 @@ import {
 import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
-import { isUrl } from "../utils/urls/isUrl"
+import {isUrl} from "../utils/urls/isUrl"
 
 export type RequestableResource = {
     requestUrl: string
@@ -34,31 +28,29 @@ export const STATUS_CODES = {
     updateQueued: 1,
     updateRetryQueued: 2,
     noDownloadbleResources: 3,
-    cargoNotFound: 6,
-    cargoNotInErrorState: 7,
-    errorIndexNotFound: 8,
-    cacheIsFresh: 9,
-    cached: 10,
-    updateError: 13,
-    cargoIsUpToDate: 14,
+    cached: 4,
+    manifestIsUpToDate: 5,
 
     networkError: ERROR_CODES_START,
     badHttpCode: 101,
     encodingNotAcceptable: 102,
-    invalidCargo: 103,
+    invalidManifestEncoding: 103,
     invalidRedirect: 104,
     preflightVerificationFailed: 105,
     updateImpossible: 106,
-    newCargoMissing: 107,
+    updateNotAvailable: 107,
     insufficentDiskSpace: 108,
     updateAlreadyQueued: 109,
     downloadManagerUnsyncedState: 110,
-    notFound: 111,
+    remoteResourceNotFound: 111,
     foundButContentIsEmpty: 112,
     noSegmentsFound: 113,
     invalidErrorDownloadIndex: 114,
     updateRetryImpossible: 115,
-    zeroUpdatesProvided: 116
+    zeroUpdatesProvided: 116,
+    invalidManifestUrl: 117,
+    malformedUrl: 118,
+    errorIndexNotFound: 119,
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
@@ -115,7 +107,7 @@ const fetchCargo = async (
     const newCargoRes = newCargoFetch.data
     if (!newCargoRes.ok) {
         const code = newCargoRes.status === 404
-            ? STATUS_CODES.notFound
+            ? STATUS_CODES.remoteResourceNotFound
             : STATUS_CODES.badHttpCode
         return new CargoFetchResponse({
             code,
@@ -140,11 +132,13 @@ const fetchCargo = async (
     const newCargoPkg = validateManifest(newCargoJson.data)
     if (newCargoPkg.errors.length > 0) {
         return new CargoFetchResponse({
-            code: STATUS_CODES.invalidCargo,
-            error: `new cargo for "${name}" is not a valid ${MANIFEST_NAME}. Errors: ${newCargoPkg.errors.join(",")}`,
+            code: STATUS_CODES.invalidManifestEncoding,
+            error: `new cargo for "${name}" is not a valid manifest. Errors: ${newCargoPkg.errors.join(",")}`,
         })
     }
-    const [baseUrl] = newCargoRes.url.split(MANIFEST_NAME)
+    const baseUrl = addSlashToEnd(
+        newCargoRes.url.split("/").slice(0, -1).join("/")
+    )
     if (baseUrl.length < 1) {
         return new CargoFetchResponse({
             code: STATUS_CODES.invalidRedirect,
@@ -223,7 +217,7 @@ const downloadError = (
 const versionUpToDate = ({
     previousCargo = null as null | Cargo
 } = {}) => downloadResponse({
-    code: STATUS_CODES.cargoIsUpToDate,
+    code: STATUS_CODES.manifestIsUpToDate,
     previousCargo
 })
 
@@ -294,12 +288,45 @@ export const checkForUpdates = async (
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
+    if (
+        (!canonicalUrl.startsWith("https://") && !canonicalUrl.startsWith("http://"))
+        || !isUrl(canonicalUrl)
+    ) {
+        return downloadError(
+            `"${canonicalUrl}" is not a valid url`,
+            STATUS_CODES.malformedUrl,
+            false,
+        )
+    }
+    if (!canonicalUrl.endsWith(MANIFEST_FILE_SUFFIX)) {
+        return downloadError(
+            `canonical url "${canonicalUrl}" is invalid because it does not have the required suffix "${MANIFEST_FILE_SUFFIX}"`, 
+            STATUS_CODES.invalidManifestUrl, 
+            false
+        )
+    }
+    const urlSegments = canonicalUrl.split("/")
+    if (urlSegments.length < 2) {
+        return downloadError(
+            `"${canonicalUrl}" is not a full url`,
+            STATUS_CODES.malformedUrl,
+            false,
+        )
+    }
+    const manifestName = urlSegments[urlSegments.length - 1]
+    if (manifestName === MANIFEST_FILE_SUFFIX) {
+        return downloadError(
+            `manifest cannot be called "${MANIFEST_FILE_SUFFIX}", a prefix must be provided (i.e. "file${MANIFEST_FILE_SUFFIX}")`,
+            STATUS_CODES.invalidManifestUrl, 
+            false
+        )
+    }
+
     const oldResolvedRootUrl = addSlashToEnd(oldResolvedUrl)
-    const requestRootUrl = addSlashToEnd(canonicalUrl)
-    const cargoUrl = oldResolvedRootUrl + MANIFEST_NAME
+    const cargoUrl = oldResolvedRootUrl + manifestName
 
     const storedCargoRes = await fileCache.getFile(cargoUrl)
-    const newCargoUrl = requestRootUrl + MANIFEST_NAME
+    const newCargoUrl = canonicalUrl
     if (
         oldResolvedUrl.length < 1
         || !storedCargoRes 
@@ -386,26 +413,6 @@ export const checkForUpdates = async (
     const oldCargo = {
         pkg: oldCargoPkg,
         semanticVersion: oldCargoSemanticVersion
-    }
-
-    const newMiniCargoUrl = requestRootUrl + MANIFEST_MINI_NAME
-    const newMiniCargoRes = await io.retry(
-        () => fetchFn(newMiniCargoUrl, {
-            method: "GET",
-            headers: cargoHeaders
-        }),
-        3
-    )
-    let newMiniCargoJson: ResultType<any>
-    let newMiniCargoPkg: ValidatedMiniCargo
-    if (
-        newMiniCargoRes.ok
-        && newMiniCargoRes.data.ok
-        && (newMiniCargoJson = await io.wrap(newMiniCargoRes.data.json())).ok
-        && (newMiniCargoPkg = validateMiniCargo(newMiniCargoJson.data)).errors.length < 1
-        && !newMiniCargoPkg.semanticVersion.isGreater(oldCargo.semanticVersion)
-    ) {
-        return versionUpToDate({previousCargo: oldCargoPkg})
     }
 
     const {

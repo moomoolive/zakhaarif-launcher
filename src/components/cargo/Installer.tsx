@@ -40,7 +40,7 @@ const toCargoIndex = (
     return {
         tag: isExtension ? EXTENSION_CARGO_TAG : MOD_CARGO_TAG,
         name: cargo.name,
-        logoUrl: cargo.crateLogoUrl,
+        logo: cargo.crateLogoUrl,
         resolvedUrl,
         canonicalUrl,
         bytes,
@@ -48,10 +48,9 @@ const toCargoIndex = (
         version: cargo.version,
         permissions: cargo.permissions,
         state: "cached",
-        storageBytes: 0,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        downloadQueueId: ""
+        created: Date.now(),
+        updated: Date.now(),
+        downloadId: ""
     }
 }
 
@@ -112,11 +111,12 @@ export const Installer = ({
 
     const onDownload = async () => {
         const updateResponse = await downloadClient.checkForUpdates({
-            tag: "",
+            // a random tag
+            tag: -1,
             canonicalUrl: url
         })
         console.log("response", updateResponse)
-        if (updateResponse.status === Shabah.STATUS.notFound) {
+        if (updateResponse.status === Shabah.STATUS.remoteResourceNotFound) {
             setInvalidation("not-found")
             return
         }
@@ -129,7 +129,7 @@ export const Installer = ({
             return
         }
         if (
-            updateResponse.status === Shabah.STATUS.invalidCargo
+            updateResponse.status === Shabah.STATUS.invalidManifestEncoding
             || updateResponse.status === Shabah.STATUS.encodingNotAcceptable
             || updateResponse.status === Shabah.STATUS.invalidRedirect
         ) {

@@ -44,7 +44,7 @@ const LinkableMod = ({mod, actionIcon}: LinkableModProps) => {
             return
         }
         const cargoResponse = await downloadClient.getCargoAtUrl(
-            mod.resolvedUrl
+            mod.canonicalUrl
         )
         if (!cargoResponse.ok) {
             setCargoError(true)
@@ -108,7 +108,7 @@ const LinkableMod = ({mod, actionIcon}: LinkableModProps) => {
                     </div>
 
                     <div className="text-xs text-neutral-400">
-                        {`Updated @ ${new Date(mod.updatedAt).toLocaleString("en-us", {
+                        {`Updated @ ${new Date(mod.updated).toLocaleString("en-us", {
                             day: "numeric",
                             year: "numeric",
                             month: "short"

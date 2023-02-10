@@ -224,15 +224,15 @@ export const saveDownloadIndices = async (
 }
 
 export type CargoState = (
-    "updating" | "cached" | "update-failed" | "update-aborted"
+    "updating" | "cached" | "failed" | "aborted"
 )
 
 export type Permissions = {key: string, value: string[]}[]
 
 export type CargoIndex = {
     name: string
-    tag: string
-    logoUrl: string
+    tag: number
+    logo: string
     resolvedUrl: string
     canonicalUrl: string
     bytes: number
@@ -240,13 +240,12 @@ export type CargoIndex = {
     version: string
     permissions: Permissions
     state: CargoState
-    storageBytes: number
-    downloadQueueId: string
-    createdAt: number
-    updatedAt: number
+    downloadId: string
+    created: number
+    updated: number
 }
 
-export type CargoIndexWithoutMeta = Omit<CargoIndex, "updatedAt" | "createdAt">
+export type CargoIndexWithoutMeta = Omit<CargoIndex, "updated" | "created">
 
 export const emptyCargoIndices = () => ({
     cargos: [] as Array<CargoIndex>,
@@ -284,18 +283,18 @@ export const updateCargoIndex = (
     indices: CargoIndices,
     target: CargoIndexWithoutMeta,
 ) => {
-    const updatedAt = Date.now()
-    indices.updatedAt = updatedAt
+    const updated = Date.now()
+    indices.updatedAt = updated
     const existingIndex = indices.cargos.findIndex(
         (cargo) => cargo.canonicalUrl === target.canonicalUrl
     )
     if (existingIndex < 0) {
-        indices.cargos.push({...target, updatedAt, createdAt: updatedAt})
+        indices.cargos.push({...target, updated, created: updated})
         return operationCodes.createdNew
     }
     const previousIndex = indices.cargos[existingIndex]
     const updatedIndex = {
-        ...previousIndex, ...target, updatedAt
+        ...previousIndex, ...target, updated
     }
     indices.cargos[existingIndex] = updatedIndex
     return operationCodes.updatedExisting

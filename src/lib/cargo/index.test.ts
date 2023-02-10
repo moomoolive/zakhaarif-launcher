@@ -11,7 +11,7 @@ import {SemVer} from "../smallSemver/index"
 
 const entry = "index.js"
 const manifest = new Cargo({
-    crateVersion: LATEST_CRATE_VERSION,
+    schema: LATEST_CRATE_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 
     entry, 
@@ -229,15 +229,15 @@ describe("manifest validation function", () => {
             delete v[k]
             return validateManifest(v)
         }
-        expect(del("crateVersion").errors.length).toBeGreaterThan(0)
+        expect(del("schema").errors.length).toBeGreaterThan(0)
         expect(del("name").errors.length).toBeGreaterThan(0)
         expect(del("version").errors.length).toBeGreaterThan(0)
         expect(del("files").errors.length).toBeGreaterThan(0)
     })
 
-    it("should return error if cargo.crateVersion is not a valid version", () => {
+    it("should return error if cargo.schema is not a valid version", () => {
         const m = structuredClone(manifest)
-        m.crateVersion = "random_version" as any
+        m.schema = "random_version" as any
         expect(validateManifest(m).errors.length).toBeGreaterThan(0)
     })
 
@@ -334,7 +334,7 @@ describe("manifest validation function", () => {
     it("should return no errors when missing all optional fields", () => {
         expect((() => {
             const value = validateManifest({
-                crateVersion: LATEST_CRATE_VERSION,
+                schema: LATEST_CRATE_VERSION,
                 version: "0.1.0", 
                 name: "test-pkg",
                 files: [{name: entry, bytes: 1_000}]
@@ -551,33 +551,5 @@ describe("manifest validation function", () => {
             const {pkg} = validated
             expect(pkg.metadata).toStrictEqual(metadata)
         }
-    })
-})
-
-import {validateMiniCargo} from "./index"
-
-describe("mini-cargo validation function", () => {
-    it("should return errors if non-object is provided", () => {
-        const v = <T>(val: T) => validateMiniCargo(val)
-        expect(v(null).errors.length).toBeGreaterThan(0)
-        expect(v(undefined).errors.length).toBeGreaterThan(0)
-        expect(v([]).errors.length).toBeGreaterThan(0)
-        expect(v(Symbol()).errors.length).toBeGreaterThan(0)
-        expect(v(1).errors.length).toBeGreaterThan(0)
-        expect(v(true).errors.length).toBeGreaterThan(0)
-        expect(v("str").errors.length).toBeGreaterThan(0)
-    })
-
-    it("should return errors if version is missing or not a valid semver", () => {
-        const v = <T>(val: T) => validateMiniCargo(val)
-        expect(v({}).errors.length).toBeGreaterThan(0)
-        expect(v({version: "not a semver"}).errors.length).toBeGreaterThan(0)
-    })
-
-    it("should return no errors if mini cargo is valid", () => {
-        const v = <T>(val: T) => validateMiniCargo(val)
-        expect(v({version: "0.1.0"}).errors.length).toBe(0) 
-        expect(v({version: "2.0.0"}).errors.length).toBe(0) 
-        expect(v({version: "3.0.2"}).errors.length).toBe(0) 
     })
 })

@@ -2,13 +2,12 @@ import {SemVer} from "../smallSemver/index"
 import {type} from "../utils/betterTypeof"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 
-export const MANIFEST_NAME = "cargo.json"
-export const MANIFEST_MINI_NAME = "cargo.mini.json"
-export const NULL_FIELD = "none"
-export const ALL_CRATE_VERSIONS = {"0.1.0": 1} as const
+export const MANIFEST_FILE_SUFFIX = ".huzma.json"
+export const NULL_FIELD = ""
+export const ALL_SCHEMA_VERSIONS = {"0.1.0": 1} as const
 export const LATEST_CRATE_VERSION = "0.1.0"
 
-export type CrateVersion = keyof typeof ALL_CRATE_VERSIONS
+export type SchemaVersion = keyof typeof ALL_SCHEMA_VERSIONS
 export type NullField = typeof NULL_FIELD
 export type RepoType = "git" | "other" | NullField
 export type ValidDefaultStrategies = ("url-diff" | "purge")
@@ -83,7 +82,7 @@ export class Cargo<
     Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
 > {
     // required fields
-    crateVersion: CrateVersion
+    schema: SchemaVersion
     name: string
     version: string
     files: Array<{
@@ -106,7 +105,7 @@ export class Cargo<
     metadata: Record<string, string>
 
     constructor({
-        crateVersion = "0.1.0",
+        schema = "0.1.0",
         name = "unspecified-name",
         version = NULL_MANIFEST_VERSION,
         files = [],
@@ -156,7 +155,7 @@ export class Cargo<
         this.entry = stripRelativePath(entry)
         this.version = version
         this.name = name
-        this.crateVersion = crateVersion
+        this.schema = schema
         const permissionsExpanded = permissions.map((permission) => {
             if (typeof permission === "string") {
                 return {key: permission, value: []}
@@ -176,12 +175,6 @@ export class Cargo<
         this.metadata = metadata
     }
 }
-
-export const toMiniCargo = <
-    Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
->({version}: Cargo<Permissions>): MiniCodeManifest => ({
-    version
-}) 
 
 const orNull = <T extends string>(str?: T) => typeof str === "string" ? str || NULL_FIELD : NULL_FIELD
 
@@ -217,35 +210,6 @@ const toInvalidation = (invalidation: string) => {
     }
 }
 
-export const validateMiniCargo = <T>(miniCargo: T) => {
-    const out = {
-        miniPkg: {version: "0.1.0-prealpha.1"},
-        errors: [] as string[],
-        semanticVersion: SemVer.null()
-    }
-    const miniC = miniCargo as MiniCodeManifest
-    const baseType = type(miniC)
-    if (baseType !== "object") {
-        out.errors.push(`expected mini cargo to be type "object" got "${baseType}"`)
-        return out
-    }
-    
-    if (!typevalid(miniC, "version", "string", out.errors)) {
-        return out
-    }
-    out.miniPkg.version = miniC.version
-
-    const semver = SemVer.fromString(miniC.version)
-    if (!semver) {
-        out.errors.push(`${miniC.version} is not a vaild semantic version`)
-        return out
-    }
-    out.semanticVersion = semver
-    return out
-}
-
-export type ValidatedMiniCargo = ReturnType<typeof validateMiniCargo>
-
 export const validateManifest = <T>(cargo: T) => {
     const out = dummyManifest()
     const {pkg, errors} = out
@@ -255,10 +219,10 @@ export const validateManifest = <T>(cargo: T) => {
         errors.push(`expected cargo to be type "object" got "${baseType}"`)
         return out
     }
-    if (!ALL_CRATE_VERSIONS[c.crateVersion || "" as CrateVersion]) {
-        errors.push(`crate version is invalid, got "${c.crateVersion}", valid=${Object.keys(ALL_CRATE_VERSIONS).join()}`)
+    if (!ALL_SCHEMA_VERSIONS[c.schema || "" as SchemaVersion]) {
+        errors.push(`crate version is invalid, got "${c.schema}", valid=${Object.keys(ALL_SCHEMA_VERSIONS).join()}`)
     }
-    pkg.crateVersion = c.crateVersion || LATEST_CRATE_VERSION
+    pkg.schema = c.schema || LATEST_CRATE_VERSION
 
     if (!typevalid(c, "name", "string", errors)) {}
     pkg.name = orNull(c.name)

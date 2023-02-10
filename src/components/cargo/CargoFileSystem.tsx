@@ -2,7 +2,6 @@ import { Cargo } from "../../lib/cargo"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import { Permissions } from "../../lib/types/permissions"
 import {useEffect, useMemo, useRef, useState} from "react"
-import { MANIFEST_NAME } from "../../lib/cargo"
 import {Tooltip, Button} from "@mui/material"
 import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "../../lib/utils/dates"
@@ -15,6 +14,7 @@ import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
 import LoadingIcon from "../LoadingIcon"
+import { getFileNameFromUrl } from "../../lib/utils/urls/getFilenameFromUrl"
 
 type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
@@ -195,8 +195,9 @@ export const CargoFileSystem = ({
             const {name, bytes} = cargo.files[i]
             addFileToDirectory(rootDirectory, {name, bytes})
         }
+
         rootDirectory.files.push({
-            name: MANIFEST_NAME,
+            name: getFileNameFromUrl(cargoIndex.canonicalUrl),
             bytes: cargoBytes
         })
         calculateDirectorySize(rootDirectory)
@@ -302,7 +303,7 @@ export const CargoFileSystem = ({
                             </span>}
                             name={parentPathname}
                             type="parent folder"
-                            updatedAt={directoryPath.length < 2  ? lastPackageUpdate : cargoIndex.updatedAt}
+                            updatedAt={directoryPath.length < 2  ? lastPackageUpdate : cargoIndex.updated}
                             byteCount={directoryPath.length < 2 ? totalStorageBytes : directoryPath[directoryPath.length - 2].contentBytes}
                         />
                     </div>
@@ -320,7 +321,7 @@ export const CargoFileSystem = ({
                         }
                         name={directory.path}
                         type="folder"
-                        updatedAt={cargoIndex.updatedAt}
+                        updatedAt={cargoIndex.updated}
                         byteCount={directory.contentBytes}
                     />
                 })}
@@ -362,7 +363,7 @@ export const CargoFileSystem = ({
                         icon={<MimeIcon mime={mime} className="mr-3"/>}
                         name={file.name}
                         type={mime}
-                        updatedAt={cargoIndex.updatedAt}
+                        updatedAt={cargoIndex.updated}
                         byteCount={file.bytes}
                     />
                 })}

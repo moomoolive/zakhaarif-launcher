@@ -41,10 +41,10 @@ const ExtensionShellPage = () => {
     
     const extensionCargo = useRef(new Cargo<Permissions>())
     const extensionCargoIndex = useRef<CargoIndex>({
-        tag: "tmp",
+        tag: -1,
         name: "tmp",
-        downloadQueueId: "",
-        logoUrl: NULL_FIELD,
+        downloadId: "",
+        logo: NULL_FIELD,
         resolvedUrl: "",
         canonicalUrl: "",
         bytes: 0,
@@ -52,9 +52,8 @@ const ExtensionShellPage = () => {
         version: "0.1.0",
         permissions: [],
         state: "cached",
-        storageBytes: 0,
-        createdAt: 0,
-        updatedAt: 0
+        created: 0,
+        updated: 0
     })
     const sandbox = useRef<JsSandbox | null>(null)
     const cleanupExtension = useRef(() => {
@@ -115,7 +114,9 @@ const ExtensionShellPage = () => {
             return
         }
 
-        const cargoResponse = await downloadClient.getCargoAtUrl(meta.resolvedUrl)
+        const cargoResponse = await downloadClient.getCargoAtUrl(
+            meta.canonicalUrl
+        )
         if (cargoResponse.ok) {
             await sandboxInitializePromise.promise
             extensionCargo.current = cargoResponse.data.pkg as Cargo<Permissions>

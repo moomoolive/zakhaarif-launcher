@@ -156,8 +156,8 @@ const LauncherRoot = (): JSX.Element => {
       (cargo) => downloadClient.getCargoIndexByCanonicalUrl(cargo.canonicalUrl)
     ))
     const errorPackages = standardCargos.filter((cargo) => (
-      cargo?.state === "update-aborted" 
-      || cargo?.state === "update-failed"
+      cargo?.state === "aborted" 
+      || cargo?.state === "failed"
     ))
     const urls = errorPackages
       .map((cargo) => cargo?.canonicalUrl || "")
@@ -321,8 +321,12 @@ const LauncherRoot = (): JSX.Element => {
       }
   
       if (type === "abort" || type === "fail") {
-        const nextState: CargoState = type === "abort" ? "update-aborted" : "update-failed" 
-        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: nextState}))
+        const nextState: CargoState = type === "abort" ? "aborted" : "failed" 
+        targetIndexes.forEach((index) => cargos.splice(index, 1, {
+          ...cargos[index],
+          state: nextState,
+          downloadId: "",
+        }))
         setLauncherState("error")
       }
     })
@@ -346,7 +350,7 @@ const LauncherRoot = (): JSX.Element => {
     const notInstalled = statuses.some((cargo) => !cargo)
     const isUpdating = statuses.some((cargo) => cargo?.state === "updating")
     const errorOccurred = statuses.some(
-      (cargo) => cargo?.state === "update-aborted" || cargo?.state === "update-failed"
+      (cargo) => cargo?.state === "aborted" || cargo?.state === "failed"
     )
 
     console.log(

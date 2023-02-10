@@ -65,8 +65,8 @@ type CargoSummaryIconProps = {
 
 const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Element => {
     switch (cargoState) {
-        case "update-aborted":
-        case "update-failed":
+        case "aborted":
+        case "failed":
             return <>
             <span className={"mr-3"}>
                 <FontAwesomeIcon 
@@ -114,8 +114,8 @@ export const CargoList = ({
 
     const {current: cargoStatus} = useRef((cargoState: CargoState) => {
         switch (cargoState) {
-            case "update-aborted":
-            case "update-failed":
+            case "aborted":
+            case "failed":
                 return <span className="text-red-500">
                     {"Failed"}
                 </span>
@@ -143,7 +143,7 @@ export const CargoList = ({
                 name={cargo.name}
                 status={cargoStatus(cargo.state)}
                 type={isAMod ? "mod" : "extension"}
-                updatedAt={cargo.updatedAt}
+                updatedAt={cargo.updated}
                 byteCount={cargo.bytes}
             />
         })}

@@ -37,7 +37,7 @@ export const CargoSummary = ({
     showModificationMetadata = false,
     showImportLinkCopy = false
 }: CargoSummaryProps): JSX.Element => {
-    const {resolvedUrl, updatedAt, bytes} = cargoIndex 
+    const {resolvedUrl, updated, bytes} = cargoIndex 
     const {
         name, 
         keywords, 
@@ -45,7 +45,7 @@ export const CargoSummary = ({
         license, 
         description,
         files,
-        crateVersion,
+        schema,
         homepageUrl,
         repo,
         authors,
@@ -74,10 +74,10 @@ export const CargoSummary = ({
         if (isStandardCargo(cargoIndex)) {
             keywords.push({text: "core", type: "std"})
         }
-        if (tag.startsWith(MOD_CARGO_TAG)) {
+        if (tag === MOD_CARGO_TAG) {
             keywords.push({text: "mod", type: "mod"})
         }
-        if (tag.startsWith(EXTENSION_CARGO_TAG)) {
+        if (tag === EXTENSION_CARGO_TAG) {
             keywords.push({text: "extension", type: "ext"})
         }
         return keywords
@@ -177,7 +177,7 @@ export const CargoSummary = ({
 
                 {showModificationMetadata ? <>
                     <div className="text-xs text-neutral-400">
-                        {"Updated: " + reactiveDate(new Date(updatedAt))}
+                        {"Updated: " + reactiveDate(new Date(updated))}
                     </div>
                 </> : <></>}
                 
@@ -279,7 +279,7 @@ export const CargoSummary = ({
                             </div>
 
                             <div>
-                                {`schema v${crateVersion}`}
+                                {`schema v${schema}`}
                             </div>
                         </div>
                     </div>

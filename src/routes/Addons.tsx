@@ -79,8 +79,8 @@ const SmallMenu = lazyComponent(
 
 const cargoStateToNumber = (state: CargoState) => {
     switch (state) {
-        case "update-aborted":
-        case "update-failed":
+        case "aborted":
+        case "failed":
             return 3
         case "updating":
             return 2
@@ -168,8 +168,8 @@ const AddOns = (): JSX.Element => {
     const {current: setViewingCargo} = useRef((canonicalUrl: string) => setSearchKey(ADDONS_VIEWING_CARGO, encodeURIComponent(canonicalUrl)))
     const targetIndexRef = useRef<CargoIndex>({
         name: "",
-        tag: "",
-        logoUrl: "",
+        tag: -1,
+        logo: "",
         resolvedUrl: "",
         canonicalUrl: "",
         bytes: 0,
@@ -177,10 +177,9 @@ const AddOns = (): JSX.Element => {
         version: "",
         permissions: [],
         state: "cached",
-        storageBytes: 0,
-        downloadQueueId: "",
-        createdAt: 0,
-        updatedAt: 0,
+        downloadId: "",
+        created: 0,
+        updated: 0,
     })
 
     const {current: cargoFilters} = useRef([
@@ -245,7 +244,7 @@ const AddOns = (): JSX.Element => {
         const targetCargoIndex = cargoIndex.cargos[index]
         targetIndexRef.current = targetCargoIndex
         const cargo = await downloadClient.getCargoAtUrl(
-            targetCargoIndex.resolvedUrl
+            targetCargoIndex.canonicalUrl
         )
         console.log("cargo res", cargo, "index", targetCargoIndex)
         if (!cargo.ok) {
@@ -290,7 +289,7 @@ const AddOns = (): JSX.Element => {
         switch (filter) {
             case "updatedAt":
                 return copy.sort((a, b) => {
-                    const order = a.updatedAt > b.updatedAt ? 1 : -1
+                    const order = a.updated > b.updated ? 1 : -1
                     return order * orderFactor
                 })
             case "bytes":
@@ -330,10 +329,10 @@ const AddOns = (): JSX.Element => {
             console.log("got progress", progress)
             let nextState: CargoState = "cached"
             if (type === "abort") {
-                nextState = "update-aborted"
+                nextState = "aborted"
             }
             if (type === "fail") {
-                nextState = "update-failed"
+                nextState = "failed"
             }
             const copy = {...cargoIndex}
             const targetIndexes = progress.canonicalUrls
@@ -343,7 +342,8 @@ const AddOns = (): JSX.Element => {
             for (const index of targetIndexes) {
                 cargos.splice(index, 1, {
                     ...cargos[index], 
-                    state: nextState
+                    state: nextState,
+                    downloadId: ""
                 })
             }
             await sleep(5_000)

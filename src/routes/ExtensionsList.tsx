@@ -72,7 +72,7 @@ const ExtensionsListPage = () => {
                 })
             case "modified":
                 return results.sort((a, b) => {
-                    return (a.updatedAt > b.updatedAt ? 1 : -1) * orderFactor
+                    return (a.updated > b.updated ? 1 : -1) * orderFactor
                 })
             default:
                 return results
@@ -181,7 +181,7 @@ const ExtensionsListPage = () => {
                         style={{maxHeight: "80%"}}
                     >
                         {filteredCargos.map((cargo, index) => {
-                            const {logoUrl, resolvedUrl, name} = cargo
+                            const {logo, resolvedUrl, name} = cargo
                             return <div
                                 key={`extension-${index}`}
                                 className="mr-5 sm:mr-8 mb-1"
@@ -207,7 +207,7 @@ const ExtensionsListPage = () => {
                                             <CargoIcon 
                                                 pixels={80}
                                                 importUrl={resolvedUrl}
-                                                crateLogoUrl={logoUrl}
+                                                crateLogoUrl={logo}
                                                 className="hover:shadow-2xl"
                                             />
                                         </div>

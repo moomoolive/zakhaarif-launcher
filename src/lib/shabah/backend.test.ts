@@ -246,9 +246,8 @@ describe("reading and writing to cargo indices", () => {
         const res = updateCargoIndex(
             index,
             {
-                tag: "pkg",
-                logoUrl: "",
-                storageBytes: 0,
+                tag: 0,
+                logo: "",
                 permissions: [] as Permissions,
                 name: "pkg",
                 state: "updating",
@@ -257,7 +256,7 @@ describe("reading and writing to cargo indices", () => {
                 entry: "store/index.js",
                 resolvedUrl: "store/",
                 canonicalUrl: "store/",
-                downloadQueueId: "",
+                downloadId: "",
             }
         )
         expect(index.cargos.length).toBe(1)
@@ -267,9 +266,9 @@ describe("reading and writing to cargo indices", () => {
     it("if cargo index is not in index collection new index should be created", () => {
         const index = emptyCargoIndices()
         const first = {
-            tag: "pkg",
+            tag: 0,
             name: "pkg",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
             state: "updating",
@@ -278,14 +277,14 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store/",
             canonicalUrl: "store/",
-            downloadQueueId: "",
+            downloadId: "",
         } as const
         updateCargoIndex(index, first)
         expect(index.cargos.length).toBe(1)
         const second = {
-            tag: "pkg",
+            tag: 0,
             name: "pkg",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
             state: "cached",
@@ -294,7 +293,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store/",
             canonicalUrl: "store/",
-            downloadQueueId: "",
+            downloadId: "",
         } as const
         const res = updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(1)
@@ -307,9 +306,9 @@ describe("reading and writing to cargo indices", () => {
         const origin = "https://myhouse.com"
         const index = await getCargoIndices(origin, fileCache)
         const first = {
-            tag: "pkg",
+            tag: 0,
             name: "pkg",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
             state: "updating",
@@ -318,14 +317,14 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-yeah/",
             canonicalUrl: "store1/",
-            downloadQueueId: ""
+            downloadId: ""
         } as const
         updateCargoIndex(index, first)
         const second = {
-            tag: "pkg-2",
+            tag: 1,
             name: "pkg",
             state: "cached",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
             version: "0.2.0",
@@ -333,7 +332,7 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-cool/",
             canonicalUrl: "store2/",
-            downloadQueueId: ""
+            downloadId: ""
         } as const
         updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(2)
@@ -350,10 +349,10 @@ describe("reading and writing to cargo indices", () => {
         const origin = "https://myhouse.com/"
         const index = await getCargoIndices(origin, fileCache)
         const first = {
-            tag: "pkg",
+            tag: 0,
             name: "pkg",
             state: "updating",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
             version: "0.1.0",
@@ -361,22 +360,22 @@ describe("reading and writing to cargo indices", () => {
             entry: "store/index.js",
             resolvedUrl: "store-1/",
             canonicalUrl: "store1/",
-            downloadQueueId: ""
+            downloadId: ""
         } as const
         updateCargoIndex(index, first)
         const second = {
-            tag: "pkg-2",
+            tag: 1,
             name: "pkg",
             state: "cached",
             permissions: [] as Permissions,
             version: "0.2.0",
-            logoUrl: "",
+            logo: "",
             storageBytes: 0,
             bytes: 0,
             entry: "store/index.js",
             resolvedUrl: "store-2/",
             canonicalUrl: "store2/",
-            downloadQueueId: ""
+            downloadId: ""
         } as const
         updateCargoIndex(index, second)
         expect(index.cargos.length).toBe(2)

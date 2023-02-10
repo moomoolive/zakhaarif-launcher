@@ -80,19 +80,19 @@ export const CargoUpdater = ({
             sleep(1_000)
         ] as const)
         console.log(updateResponse)
-        if (updateResponse.status === Shabah.STATUS.cargoIsUpToDate) {
+        if (updateResponse.status === Shabah.STATUS.manifestIsUpToDate) {
             setFetchingUpdate(false)
             setUpdaterState("up-to-date")
             return
         }
-        if (updateResponse.status === Shabah.STATUS.notFound) {
+        if (updateResponse.status === Shabah.STATUS.remoteResourceNotFound) {
             return endWithError(cargoErrorToText("not-found"))
         }
         if (updateResponse.status === Shabah.STATUS.badHttpCode) {
             return endWithError(cargoErrorToText("network-error"))
         }
         if (
-            updateResponse.status === Shabah.STATUS.invalidCargo
+            updateResponse.status === Shabah.STATUS.invalidManifestEncoding
             || updateResponse.status === Shabah.STATUS.encodingNotAcceptable
             || updateResponse.status === Shabah.STATUS.invalidRedirect
         ) {

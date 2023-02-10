@@ -12,8 +12,8 @@ export const isStandardCargo = (cargo: CargoIndex): boolean => {
     }
 }
 
-export const isMod = (cargo: CargoIndex): boolean => cargo.tag.startsWith(MOD_CARGO_TAG)
+export const isMod = (cargo: CargoIndex): boolean => cargo.tag === MOD_CARGO_TAG
 
-export const isExtension = (cargo: CargoIndex): boolean => cargo.tag.startsWith(EXTENSION_CARGO_TAG)
+export const isExtension = (cargo: CargoIndex): boolean => cargo.tag === EXTENSION_CARGO_TAG
 
 export const EXTENSION_METADATA_KEY = "is-extension"

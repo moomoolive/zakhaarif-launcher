@@ -11,7 +11,7 @@ type RawDiskMetadata = Readonly<{
 }>
 
 export type UpdateCheckConfig = {
-    tag: string
+    tag: number
     originalResolvedUrl: string
     resolvedUrl: string
     canonicalUrl: string
@@ -21,7 +21,6 @@ export type UpdateCheckConfig = {
     previousCargo: DeepReadonly<Cargo> | null
     downloadableResources: ReadonlyArray<RequestableResource>
     resourcesToDelete: ReadonlyArray<RequestableResource>
-    cargoStorageBytes: number
     diskInfo: RawDiskMetadata
     status?: StatusCode
 }
@@ -47,7 +46,7 @@ export class UpdateCheckResponse {
         return normalized <= diskInfo.total
     }
 
-    tag: string
+    tag: number
     readonly originalResolvedUrl: string
     readonly resolvedUrl: string
     readonly canonicalUrl: string
@@ -58,7 +57,6 @@ export class UpdateCheckResponse {
     readonly status: StatusCode
     readonly downloadableResources: ReadonlyArray<RequestableResource>
     readonly resourcesToDelete: ReadonlyArray<RequestableResource>
-    readonly cargoStorageBytes: number
     
     private readonly diskInfo: RawDiskMetadata
 
@@ -73,7 +71,6 @@ export class UpdateCheckResponse {
         this.previousCargo = config.previousCargo
         this.downloadableResources = config.downloadableResources
         this.resourcesToDelete = config.resourcesToDelete
-        this.cargoStorageBytes = config.cargoStorageBytes
         this.diskInfo = config.diskInfo
         this.status = config.status || STATUS_CODES.ok
     }
