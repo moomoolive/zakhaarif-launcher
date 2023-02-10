@@ -26,7 +26,7 @@ export const FadeIn = ({children, show}: FadeInProps) => {
     }
 
     return <span 
-        className={`${animation === FADE_IN ? "animate-fade-in-left" : "animate-fade-out-left"}`}
+        className={`${animation === FADE_IN ? "animate-fade-in-left" : "animate-fade-out-left animate-shrink-height"}`}
         onAnimationEnd={() => {
             if (animation === FADE_OUT) {
                 setInnerShow(false)

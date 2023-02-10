@@ -611,7 +611,7 @@ describe("executing updates", () => {
             )
             expect(!!cargoIndex).toBe(true)
             expect(cargoIndex?.state).toBe("updating")
-            expect(cargoIndex?.entry).toBe(updateResponse.resolvedUrl + ENTRY_NAME)
+            expect(cargoIndex?.entry).toBe(ENTRY_NAME)
             expect(!!(innerFileCache.getFile(
                 updateResponse.resolvedUrl + MANIFEST_NAME
             ))).toBe(true)

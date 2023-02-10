@@ -30,9 +30,14 @@ module.exports = {
         wiggle: 'wiggle 1s ease-in-out infinite',
         swing: "swing 1s ease infinite",
         "fade-in-left": "fade-in-left 0.5s forwards",
-        "fade-out-left": "fade-out-left 0.5s forwards"
+        "fade-out-left": "fade-out-left 0.5s forwards",
+        "shrink-height": "shrink-height 0.13s ease-out"
       },
       keyframes: {
+        "shrink-height": {
+          "0%": {transform: "scaleY(1.0)"},
+          "100%": {transform: "scaleY(0.0)"}
+        },
         wiggle: {
           '0%, 100%': {transform: 'rotate(-3deg)'},
           '50%': {transform: 'rotate(3deg)'},

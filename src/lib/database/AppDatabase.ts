@@ -14,6 +14,7 @@ type GameSaveV1 = {
     type: GameSaveType
     mods: {
         canonicalUrls: string[]
+        resolvedUrls: string[]
         entryUrls: string[]
     }
     content: {}

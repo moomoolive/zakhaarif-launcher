@@ -254,6 +254,7 @@ export const Installer = ({
                             installResponse.isExtension,
                             installResponse.checkResponse.bytesToDownload()
                         )}
+                        safeExternalNavigation
                     />
                 </div> : <>
                     <div className="mb-1 pt-2 px-3">

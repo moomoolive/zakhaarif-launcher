@@ -3,7 +3,7 @@ import {
     cargoIsUpdatable, 
     Cargo, 
     NULL_MANIFEST_VERSION,
-    LATEST_CRATE_VERSION, NULL_FIELD,
+    LATEST_SCHEMA_VERSION, NULL_FIELD,
     InvalidationStrategy
 } from "./index"
 import {diffManifestFiles, validateManifest} from "./index"
@@ -11,7 +11,7 @@ import {SemVer} from "../smallSemver/index"
 
 const entry = "index.js"
 const manifest = new Cargo({
-    schema: LATEST_CRATE_VERSION,
+    schema: LATEST_SCHEMA_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 
     entry, 
@@ -334,7 +334,7 @@ describe("manifest validation function", () => {
     it("should return no errors when missing all optional fields", () => {
         expect((() => {
             const value = validateManifest({
-                schema: LATEST_CRATE_VERSION,
+                schema: LATEST_SCHEMA_VERSION,
                 version: "0.1.0", 
                 name: "test-pkg",
                 files: [{name: entry, bytes: 1_000}]

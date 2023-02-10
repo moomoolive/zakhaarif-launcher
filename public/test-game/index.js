@@ -38,9 +38,15 @@ export const main = async (args) => {
     cssSheet.id = "main-style-sheet"
     document.head.appendChild(cssSheet)
     console.log("attempting to import mods")
-    await Promise.all(gameSave.mods.entryUrls.map(
-        async (url) => await import(url)  
-    ))
+    /** @type {string[]} */
+    const importUrls = []
+    console.log(gameSave.mods)
+    for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
+        const resolved = gameSave.mods.resolvedUrls[i]
+        const entry = gameSave.mods.entryUrls[i]
+        importUrls.push(resolved + entry)
+    }
+    await Promise.all(importUrls.map((url) => import(url)))
     const res = await messageAppShell("readyForDisplay")
     console.info("controller res", res)
 }

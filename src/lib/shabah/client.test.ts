@@ -3,7 +3,7 @@ import {checkForUpdates, STATUS_CODES} from "./client"
 import {FetchFunction, FileCache} from "./backend"
 import {ResultType, io} from "../monads/result"
 import {Cargo} from "../cargo/index"
-import {LATEST_CRATE_VERSION} from "../cargo/index"
+import {LATEST_SCHEMA_VERSION} from "../cargo/index"
 import { MANIFEST_FILE_SUFFIX } from "../cargo/index"
 
 type FileRecord = Record<string, () => ResultType<Response>>
@@ -84,7 +84,7 @@ const fetchFnAndFileCache = (
 }
 
 const cargoPkg = new Cargo({
-    schema: LATEST_CRATE_VERSION,
+    schema: LATEST_SCHEMA_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 
     entry: "index.js", 

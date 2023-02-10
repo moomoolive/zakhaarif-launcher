@@ -246,7 +246,7 @@ export class Shabah {
                 version: update.versions().new,
                 entry: update.newCargo?.entry === NULL_FIELD
                     ? NULL_FIELD
-                    : update.resolvedUrl + (update.newCargo?.entry || ""),
+                    : update.newCargo?.entry || NULL_FIELD,
                 bytes: update.downloadMetadata().cargoTotalBytes,
                 resolvedUrl: update.resolvedUrl,
                 canonicalUrl: update.canonicalUrl,

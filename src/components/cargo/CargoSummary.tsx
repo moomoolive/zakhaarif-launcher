@@ -1,4 +1,4 @@
-import {useState, useMemo} from "react"
+import {useState, useMemo, useRef} from "react"
 import {Collapse, Tooltip} from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -21,12 +21,18 @@ import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/typ
 import { cleanPermissions } from "../../lib/utils/security/permissionsSummary"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import {PermissionsDisplay} from "./PermissionsDisplay"
+import { useGlobalConfirm } from "../../hooks/globalConfirm"
+
+type PreventableEvent = {
+    preventDefault: () => unknown
+}
 
 export type CargoSummaryProps = {
     cargo: Cargo<Permissions>
     cargoIndex: CargoIndex
     showModificationMetadata?: boolean
     showImportLinkCopy?: boolean
+    safeExternalNavigation?: boolean
 }
 
 const SHRUNK_DESCRIPTION_CHARACTER_COUNT = 150
@@ -35,8 +41,11 @@ export const CargoSummary = ({
     cargo,
     cargoIndex,
     showModificationMetadata = false,
-    showImportLinkCopy = false
+    showImportLinkCopy = false,
+    safeExternalNavigation = false
 }: CargoSummaryProps): JSX.Element => {
+    const confirm = useGlobalConfirm()
+
     const {resolvedUrl, updated, bytes} = cargoIndex 
     const {
         name, 
@@ -59,6 +68,20 @@ export const CargoSummary = ({
 
     const [copiedId, setCopiedId] = useState("none")
     const [expandText, setExpandText] = useState(false)
+
+    const {current: safeNavigate} = useRef(async (
+        event: PreventableEvent, 
+        url: string
+    ) => {
+        if (!safeExternalNavigation) {
+            return
+        }
+        event.preventDefault()
+        if (!await confirm({title: `Are you sure you want to navigate to an external website?`, confirmButtonColor: "warning"})) {
+            return
+        }
+        window.open(url, "_blank", "noopener")
+    })
 
     const textToClipboard = (text: string, sectionId: string) => {
         navigator.clipboard.writeText(text)
@@ -185,7 +208,7 @@ export const CargoSummary = ({
                 <div className="text-sm text-neutral-400 my-3">
                     <div>
                         {showImportLinkCopy ? <>
-                            <a 
+                            <button 
                                 className="hover:text-green-500 mr-4 cursor-pointer"
                                 onClick={() => textToClipboard(resolvedUrl, "import-url")}
                             >
@@ -200,7 +223,7 @@ export const CargoSummary = ({
                                     </span>
                                     {"Copy Import Url"}
                                 </>}
-                            </a>
+                            </button>
                         </> : <></>}
                     </div>
                 </div>
@@ -221,14 +244,13 @@ export const CargoSummary = ({
                                         href={`mailto:${email}`}
                                         className="hover:text-green-500 text-neutral-400 cursor-pointer"
                                     >
-                                        <span
-                                            className="mr-2"
-                                        >
+                                        <span className="mr-2">
                                             <FontAwesomeIcon icon={faEnvelope} />
                                         </span>
                                     </a> : <></>}
                                     {url !== CARGO_NULL_FIELD ? <a
                                         href={url}
+                                        onClick={(event) => safeNavigate(event, url)}
                                         target="_blank"
                                         rel="noopener"
                                         className="hover:text-green-500 cursor-pointer text-neutral-400"
@@ -318,7 +340,8 @@ export const CargoSummary = ({
                 <div className="text-sm py-1 px-3">
                     {homepageUrl !== CARGO_NULL_FIELD ? <>
                         <a 
-                            href={homepageUrl} 
+                            href={homepageUrl}
+                            onClick={(event) => safeNavigate(event, homepageUrl)}
                             target="_blank" 
                             rel="noopener"
                             className="hover:text-green-500 mr-4"
@@ -332,8 +355,9 @@ export const CargoSummary = ({
 
                     {repo.url !== CARGO_NULL_FIELD ? <>
                         <a 
-                            href={homepageUrl} 
-                            target="_blank" 
+                            href={repo.url}
+                            onClick={(event) => safeNavigate(event, repo.url)}
+                            target="_blank"
                             rel="noopener"
                             className=" hover:text-green-500 mr-4"
                         >

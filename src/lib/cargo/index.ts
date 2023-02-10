@@ -5,7 +5,7 @@ import {stripRelativePath} from "../utils/urls/stripRelativePath"
 export const MANIFEST_FILE_SUFFIX = ".huzma.json"
 export const NULL_FIELD = ""
 export const ALL_SCHEMA_VERSIONS = {"0.1.0": 1} as const
-export const LATEST_CRATE_VERSION = "0.1.0"
+export const LATEST_SCHEMA_VERSION = "0.1.0"
 
 export type SchemaVersion = keyof typeof ALL_SCHEMA_VERSIONS
 export type NullField = typeof NULL_FIELD
@@ -222,7 +222,7 @@ export const validateManifest = <T>(cargo: T) => {
     if (!ALL_SCHEMA_VERSIONS[c.schema || "" as SchemaVersion]) {
         errors.push(`crate version is invalid, got "${c.schema}", valid=${Object.keys(ALL_SCHEMA_VERSIONS).join()}`)
     }
-    pkg.schema = c.schema || LATEST_CRATE_VERSION
+    pkg.schema = c.schema || LATEST_SCHEMA_VERSION
 
     if (!typevalid(c, "name", "string", errors)) {}
     pkg.name = orNull(c.name)

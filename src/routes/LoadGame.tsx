@@ -155,10 +155,16 @@ const LoadGamePage = () => {
                         const copy = [...saves]
                         const newSave = {
                             ...saves[saveIndex],
-                            mods: {
-                                canonicalUrls: linked.map((cargo) => cargo.canonicalUrl),
-                                entryUrls: linked.map((cargo) => cargo.entry)
-                            }
+                            mods: linked.reduce((total, next) => {
+                                total.canonicalUrls.push(next.canonicalUrl)
+                                total.resolvedUrls.push(next.resolvedUrl)
+                                total.entryUrls.push(next.entry)
+                                return total
+                            }, {
+                                canonicalUrls: [] as string[],
+                                resolvedUrls: [] as string[],
+                                entryUrls: [] as string[],
+                            }),
                         } as const
                         appDatabase.gameSaves.updateOne(
                             saves[saveIndex].id, newSave

@@ -39,6 +39,7 @@ import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
 import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
+import LoadingIcon from "../components/LoadingIcon"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -59,7 +60,14 @@ const CargoUpdater = lazyComponent(
     async () => (await import("../components/cargo/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
-const mainContentLoader = <div className="w-full h-5/6 animate-pulse text-neutral-500 pt-10">{"Loading..."}</div>
+const mainContentLoader = <div className="mt-16 w-4/5 mx-auto">
+    <div className="animate-spin text-blue-500 text-3xl mb-3">
+        <LoadingIcon/>
+    </div>
+    <div className="text-sm text-neutral-300">
+        {"Looking up Files..."}
+    </div>
+</div>
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
     {loadingElement: mainContentLoader}
@@ -122,12 +130,6 @@ const AddOns = (): JSX.Element => {
     const [cargoIndex, setCargoIndex] = useState<DeepReadonly<CargoIndices>>(emptyCargoIndices())
     const [searchText, setSearchText] = useState("")
     const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updatedAt", order: "descending"})
-    //const [viewingCargo, setViewingCargo] = useState(
-    //    searchParams.has(ADDONS_VIEWING_CARGO)
-    //        ? decodeURIComponent(searchParams.get(ADDONS_VIEWING_CARGO) || SHOW_ALL_CARGOS)
-    //        : SHOW_ALL_CARGOS
-    //)
-    //const [targetCargo, setTargetCargo] = useState(new Cargo<Permissions>())
     const [cargoFound, setCargoFound] = useState(true)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
@@ -256,7 +258,7 @@ const AddOns = (): JSX.Element => {
         setCargoFound(true)
         setFilterConfig({type: "name", order: "descending"})
         setViewingCargoIndex(index)
-    }, [searchParams])
+    }, [searchParams, cargoIndex])
     
     useEffectAsync(async () => {
         const [cargoIndexRes, clientStorageRes] = await Promise.all([

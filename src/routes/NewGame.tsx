@@ -122,10 +122,16 @@ const NewGamePage = () => {
                             const {id: gameId} = await appDatabase.gameSaves.create({
                                 name: gameName,
                                 type: "manual",
-                                mods: {
-                                    canonicalUrls: linkedMods.map((cargo) => cargo.canonicalUrl),
-                                    entryUrls: linkedMods.map((cargo) => cargo.entry),
-                                },
+                                mods: linkedMods.reduce((total, next) => {
+                                    total.canonicalUrls.push(next.canonicalUrl)
+                                    total.resolvedUrls.push(next.resolvedUrl)
+                                    total.entryUrls.push(next.entry)
+                                    return total
+                                }, {
+                                    canonicalUrls: [] as string[],
+                                    resolvedUrls: [] as string[],
+                                    entryUrls: [] as string[],
+                                }),
                                 content: {}
                             })
                             setLoading(false)

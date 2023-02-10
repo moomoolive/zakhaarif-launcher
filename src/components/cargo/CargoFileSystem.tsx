@@ -360,7 +360,11 @@ export const CargoFileSystem = ({
                                 bytes: file.bytes,
                             })
                         }}
-                        icon={<MimeIcon mime={mime} className="mr-3"/>}
+                        icon={<MimeIcon
+                            filename={file.name} 
+                            mime={mime} 
+                            className="mr-3"
+                        />}
                         name={file.name}
                         type={mime}
                         updatedAt={cargoIndex.updated}

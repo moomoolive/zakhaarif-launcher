@@ -77,7 +77,11 @@ export const FileOverlay = ({
 
                 <Tooltip title={name}>
                     <span className="ml-3">
-                        <MimeIcon mime={mime} className="mr-3"/>
+                        <MimeIcon
+                            filename={name}
+                            mime={mime} 
+                            className="mr-3"
+                        />
                         {name}
                     </span>
                 </Tooltip>

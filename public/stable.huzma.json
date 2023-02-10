@@ -9,7 +9,8 @@
         "bg-fetch-test/random-style.css",
         "bg-fetch-test/cool.png",
         "bg-fetch-test/bird-svgrepo.svg",
-        "bg-fetch-test/random.jpg"
+        "bg-fetch-test/random.jpg",
+        "bg-fetch-test/cool.json"
     ],
     "authors": [
         {"name": "Mostafa Elbannan"}

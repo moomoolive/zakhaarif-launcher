@@ -121,7 +121,8 @@ const ExtensionShellPage = () => {
             await sandboxInitializePromise.promise
             extensionCargo.current = cargoResponse.data.pkg as Cargo<Permissions>
             extensionCargoIndex.current = meta
-            setExtensionEntry({url: meta.entry, retry: 0})
+            const url = meta.resolvedUrl + meta.entry
+            setExtensionEntry({url, retry: 0})
             return
         }
 

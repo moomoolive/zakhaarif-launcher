@@ -8,13 +8,13 @@ const EXTENSION_LOADING_MESSAGES = [
         icon: <div className="text-green-500">
             <FontAwesomeIcon icon={faHandPointDown}/>
         </div>,
-        text: "Click the bottom right corner of screen to close extension at any time"
+        text: "Click the bottom right corner of screen to close at any time"
     },
     {
         icon: <div className="text-yellow-500">
             <FontAwesomeIcon icon={faCreditCard}/>
         </div>,
-        text: "Never enter sensitive information into extensions (credit cards, passwords, etc.)"
+        text: "Never enter sensitive information into game or other extensions (credit cards, passwords, etc.)"
     },
 ] as const
 
@@ -53,7 +53,7 @@ export const ExtensionLoadingScreen = ({onClose, isRetry}: ExtensionLoadingScree
         <div className="w-full h-1/2 flex items-start justify-center">
             <div>
                 <div className="mb-2 text-center">
-                    {`${isRetry ? "Restarting" : "Starting"} extension...`}
+                    {`${isRetry ? "Restarting" : "Starting"}...`}
                 </div>
                 <div className="w-3/5 max-w-xs mx-auto flex justify-center">
                     <div className="mr-4 mt-1">

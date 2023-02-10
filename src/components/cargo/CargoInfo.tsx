@@ -1,7 +1,7 @@
 import {Tooltip} from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft,} from "@fortawesome/free-solid-svg-icons"
-import {ClickAwayListener, IconButton} from "@mui/material"
+import {IconButton} from "@mui/material"
 import {Cargo} from "../../lib/cargo/index"
 import {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Permissions,} from "../../lib/types/permissions"
@@ -26,22 +26,22 @@ export const CargoInfo = ({
         <div className="absolute top-0 left-0">
             <div className="ml-2 mt-2">
                 <Tooltip title="Close">
-                    <IconButton>
+                    <IconButton onClick={onClose}>
                         <FontAwesomeIcon icon={faArrowLeft}/>
                     </IconButton>
                 </Tooltip>
             </div>
         </div>
         
-        <ClickAwayListener onClickAway={onClose}>
-            <div className="w-5/6 max-w-md py-3 rounded bg-neutral-800 animate-fade-in-left">
-                <CargoSummary
-                    cargo={cargo}
-                    cargoIndex={cargoIndex}
-                    showModificationMetadata
-                    showImportLinkCopy
-                />
-            </div>
-        </ClickAwayListener>
+        
+        <div className="w-5/6 max-w-md py-3 rounded bg-neutral-800 animate-fade-in-left">
+            <CargoSummary
+                cargo={cargo}
+                cargoIndex={cargoIndex}
+                showModificationMetadata
+                showImportLinkCopy
+            />
+        </div>
+        
     </div>
 }

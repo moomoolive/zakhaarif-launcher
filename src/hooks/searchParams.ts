@@ -6,7 +6,7 @@ type SearchParams = [
 ]
 
 export const useSearchParams = (): SearchParams => {
-    const [searchParams, setSearch] = useState(new URLSearchParams())
+    const [searchParams, setSearch] = useState(new URLSearchParams(location.search))
     
     const searchRef = useRef(location.search)
     const {current: setSearchParams} = useRef((newSearchParams: URLSearchParams) => {
