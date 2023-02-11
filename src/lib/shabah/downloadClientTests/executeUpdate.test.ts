@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "../downloadClient"
-import {CargoIndex, CargoState, FileCache, NO_UPDATE_QUEUED} from "../backend"
+import {CACHED, CargoIndex, CargoState, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
 import {DownloadManager} from "../backend"
 import { Cargo, MANIFEST_FILE_SUFFIX, NULL_FIELD } from "../../cargo"
 import { Permissions } from "../../types/permissions"
@@ -189,7 +189,7 @@ const cargoToCargoIndex = (
         tag = 0,
         resolvedUrl,
         bytes = 0,
-        state = "cached" as CargoState,
+        state = CACHED,
         downloadId = NO_UPDATE_QUEUED
     }: Partial<{
         tag: number
@@ -610,7 +610,7 @@ describe("executing updates", () => {
                 updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
-            expect(cargoIndex?.state).toBe("updating")
+            expect(cargoIndex?.state).toBe(UPDATING)
             expect(cargoIndex?.entry).toBe(ENTRY_NAME)
             expect(!!(innerFileCache.getFile(
                 updateResponse.resolvedUrl + MANIFEST_NAME
@@ -681,7 +681,7 @@ describe("executing updates", () => {
                 updateResponse.canonicalUrl
             )
             expect(!!cargoIndex).toBe(true)
-            expect(cargoIndex?.state).toBe("updating")
+            expect(cargoIndex?.state).toBe(UPDATING)
             expect(cargoIndex?.entry).toBe(NULL_FIELD)
             expect(queueResponse.ok).toBe(true)
             expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
@@ -840,7 +840,7 @@ describe("executing updates", () => {
                     canonicalUrl 
                 )
                 expect(!!foundCargo).toBe(true)
-                expect(foundCargo?.state).toBe("updating")
+                expect(foundCargo?.state).toBe(UPDATING)
                 const downloadId = downloadState.queuedDownloads[0].id
                 expect(foundCargo?.downloadId).toBe(downloadId)
 
@@ -942,7 +942,7 @@ describe("executing updates", () => {
                     canonicalUrl
                 )
                 expect(cargoIndex).not.toBe(null)
-                expect(cargoIndex?.state).toBe("cached")
+                expect(cargoIndex?.state).toBe(CACHED)
                 expect(cargoIndex?.downloadId).toBe(NO_UPDATE_QUEUED)
                 
                 for (const {storageUrl} of resourcesToDelete) {

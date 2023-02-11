@@ -223,8 +223,16 @@ export const saveDownloadIndices = async (
     return operationCodes.saved 
 }
 
+export const CACHED = 1
+export const UPDATING = 2
+export const FAILED = 3
+export const ABORTED = 4
+
 export type CargoState = (
-    "updating" | "cached" | "failed" | "aborted"
+    typeof CACHED 
+    | typeof UPDATING
+    | typeof FAILED 
+    | typeof ABORTED
 )
 
 export type Permissions = {key: string, value: string[]}[]

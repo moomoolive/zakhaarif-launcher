@@ -18,9 +18,11 @@ import {useEffectAsync} from "../hooks/effectAsync"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
-import {AppDatabase} from "../lib/database/AppDatabase"
+import {AppDatabase, MANUAL_SAVE} from "../lib/database/AppDatabase"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { isMod } from "../lib/utils/cargos"
+import { sleep } from "../lib/utils/sleep"
+import LoadingIcon from "../components/LoadingIcon"
 
 const NewGamePage = () => {
     const navigate = useNavigate()
@@ -119,9 +121,9 @@ const NewGamePage = () => {
                         type="submit"
                         onClick={async () => {
                             setLoading(true)
-                            const {id: gameId} = await appDatabase.gameSaves.create({
+                            const commitSavePromise = appDatabase.gameSaves.create({
                                 name: gameName,
-                                type: "manual",
+                                type: MANUAL_SAVE,
                                 mods: linkedMods.reduce((total, next) => {
                                     total.canonicalUrls.push(next.canonicalUrl)
                                     total.resolvedUrls.push(next.resolvedUrl)
@@ -134,13 +136,19 @@ const NewGamePage = () => {
                                 }),
                                 content: {}
                             })
+                            const [{id: gameId}] = await Promise.all([
+                                commitSavePromise,
+                                sleep(2_000)
+                            ] as const) 
                             setLoading(false)
                             window.localStorage.setItem(SAVE_EXISTS, "1")
                             navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
                         }}
                         disabled={loading}
                     >
-                        {loading? <span className="animate-pulse">{"Loading..."}</span> : "Start"}
+                        {loading? <span className="animate-spin text-blue-500">
+                            <LoadingIcon/>
+                        </span> : "Start"}
                     </Button>
                 </div>
             </form>

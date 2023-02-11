@@ -1,8 +1,8 @@
 import {createContext, useContext} from "react"
-import {TopLevelAppProps} from "../lib/types/globalState"
+import type {AppStore} from "../lib/utils/initAppStore"
 
-export const AppShellContext = createContext<TopLevelAppProps>(
-    null as unknown as TopLevelAppProps
+export const AppShellContext = createContext<AppStore>(
+    null as unknown as AppStore
 )
 
 export const useAppShellContext = () => useContext(AppShellContext)

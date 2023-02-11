@@ -1,5 +1,5 @@
 import { Tooltip, Menu, MenuItem } from "@mui/material"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faCaretDown, 
@@ -8,6 +8,8 @@ import {
     faInfoCircle,
     faRotate,
     faPlay,
+    faHelmetSafety,
+    faShieldDog,
 } from "@fortawesome/free-solid-svg-icons"
 import { useAppShellContext } from "../../routes/store"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
@@ -18,6 +20,7 @@ import {CargoIcon} from "./Icon"
 import { NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD } from "../../lib/cargo"
 import { useNavigate } from "react-router-dom"
 import { EXTENSION_SHELL_TARGET } from "../../lib/utils/searchParameterKeys"
+import { UPDATING } from "../../lib/shabah/backend"
 
 const ROOT_DIRECTORY_PATH: RootDirectoryPath = "#"
 
@@ -31,6 +34,7 @@ type FileSystemBreadcrumbsProps = {
     onShowCargoInfo: () => unknown
     onShowCargoUpdater: () => unknown
     onDeleteCargo: (canonicalUrl: string) => unknown
+    onRecoverCargo: (canonicalUrl: string) => unknown
 }
 
 export const FileSystemBreadcrumbs = ({
@@ -42,7 +46,8 @@ export const FileSystemBreadcrumbs = ({
     onBackToCargos,
     onShowCargoInfo,
     onShowCargoUpdater,
-    onDeleteCargo
+    onDeleteCargo,
+    onRecoverCargo
 }: FileSystemBreadcrumbsProps): JSX.Element => {
     const {downloadClient} = useAppShellContext()
     const confirm = useGlobalConfirm()
@@ -189,7 +194,7 @@ export const FileSystemBreadcrumbs = ({
 
                         <MenuItem
                             className="hover:text-blue-500"
-                            disabled={targetCargo.state === "updating"}
+                            disabled={targetCargo.state === UPDATING}
                             onClick={() => {
                                 onShowCargoUpdater()
                                 setCargoMenuElement(null)
@@ -202,22 +207,39 @@ export const FileSystemBreadcrumbs = ({
                         </MenuItem>
 
                         <MenuItem
-                            className="hover:text-yellow-500"
-                            disabled={targetCargo.entry === NULL_FIELD}
-                            onClick={async () => {
-                                const confirmed = await confirm({title: "Are you sure you want to run this add-on?", confirmButtonColor: "warning"})
+                            className="hover:text-indigo-500"
+                            //disabled={targetCargo.state === "updating"}
+                            onClick={() => {
+                                onRecoverCargo(targetCargo.canonicalUrl)
                                 setCargoMenuElement(null)
-                                if (!confirmed) {
-                                    return
-                                }
-                                navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(targetCargo.canonicalUrl)}`)
                             }}
                         >
-                            <span className="ml-0.5 mr-3">
-                                <FontAwesomeIcon icon={faPlay}/>
+                            <span className="mr-2.5">
+                                <FontAwesomeIcon icon={faShieldDog} />
                             </span>
-                            Run
+                            Recover
                         </MenuItem>
+                        
+                        {isExtension(targetCargo)
+                            ? <MenuItem
+                                className="hover:text-yellow-500"
+                                disabled={targetCargo.entry === NULL_FIELD}
+                                onClick={async () => {
+                                    const confirmed = await confirm({title: "Are you sure you want to run this add-on?", confirmButtonColor: "warning"})
+                                    setCargoMenuElement(null)
+                                    if (!confirmed) {
+                                        return
+                                    }
+                                    navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(targetCargo.canonicalUrl)}`)
+                                }}
+                            >
+                                <span className="ml-0.5 mr-3">
+                                    <FontAwesomeIcon icon={faPlay}/>
+                                </span>
+                                Run
+                            </MenuItem>
+                            : null
+                        }
 
                         <MenuItem
                             disabled={isStandardCargo(targetCargo)}

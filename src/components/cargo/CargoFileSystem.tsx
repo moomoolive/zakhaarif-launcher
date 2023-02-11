@@ -222,7 +222,7 @@ export const CargoFileSystem = ({
         }
 
         const {type, order} = filter
-        const orderFactor = order === "ascending" ? 1 : -1
+        const orderFactor = order
         switch (type) {
             case "bytes":
                 directory.directories.sort((a, b) => {
@@ -261,7 +261,7 @@ export const CargoFileSystem = ({
         return lastPath.path
     }, [directoryPath])
 
-    return <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
+    return <div className="w-full h-5/6 overflow-y-scroll text-center">
         {creatingFileSystem ? <>
             <div className="mt-16 w-4/5 mx-auto">
                 <div className="animate-spin text-blue-500 text-3xl mb-3">

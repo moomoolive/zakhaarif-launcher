@@ -5,7 +5,9 @@ import {
     CargoState, 
     FileCache, 
     NO_UPDATE_QUEUED,
-    DownloadManager
+    DownloadManager,
+    CACHED,
+    UPDATING
 } from "../backend"
 import {Cargo, MANIFEST_FILE_SUFFIX} from "../../cargo/index"
 import { Permissions } from "../../types/permissions"
@@ -194,7 +196,7 @@ const cargoToCargoIndex = (
         tag = 0,
         resolvedUrl,
         bytes = 0,
-        state = "cached" as CargoState,
+        state = CACHED,
         downloadId = NO_UPDATE_QUEUED
     }: Partial<{
         tag: number
@@ -357,7 +359,7 @@ describe("reading and updating cargo indexes", () => {
         )
         expect(!!foundInitial).toBe(true)
         expect(foundInitial?.downloadId).not.toBe(NO_UPDATE_QUEUED)
-        expect(foundInitial?.state).toBe("updating")
+        expect(foundInitial?.state).toBe(UPDATING)
         
         const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl
@@ -427,14 +429,14 @@ describe("reading and updating cargo indexes", () => {
         )
         expect(!!foundInitial).toBe(true)
         expect(foundInitial?.downloadId).not.toBe(NO_UPDATE_QUEUED)
-        expect(foundInitial?.state).toBe("updating")
+        expect(foundInitial?.state).toBe(UPDATING)
 
         const foundInitialSecond = await client.getCargoIndexByCanonicalUrl(
             secondCanonicalUrl
         )
         expect(!!foundInitialSecond).toBe(true)
         expect(foundInitialSecond?.downloadId || "none2").toBe(foundInitial?.downloadId || "none1")
-        expect(foundInitialSecond?.state).toBe("updating")
+        expect(foundInitialSecond?.state).toBe(UPDATING)
 
         const foundInitialDownload = await client.getDownloadIndexByCanonicalUrl(
             canonicalUrl

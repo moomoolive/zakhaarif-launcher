@@ -1,25 +1,23 @@
-import {Button, Tooltip} from "@mui/material"
+import {Button, Collapse, Tooltip} from "@mui/material"
 import {Link} from "react-router-dom"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { useRef, useState } from "react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faAngleDown, faAngleUp } from "@fortawesome/free-solid-svg-icons"
-import { FadeIn } from "../components/FadeIn"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {usePromise} from "../hooks/promise"
 import {STANDARD_CARGOS} from "../standardCargos"
 import { useAppShellContext } from "./store"
+import { CACHED } from "../lib/shabah/backend"
 
 const StartMenuPage = () => {
     const {downloadClient} = useAppShellContext()
-    
     const gameMetadata = usePromise(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
 
     const [expandSettings, setExpandSettings] = useState(false)
-
     const gameSaveExists = useRef(!!window.localStorage.getItem(SAVE_EXISTS))
 
-    const gameIsCached = gameMetadata.data?.state === "cached"
+    const gameIsCached = gameMetadata.data?.state === CACHED
 
     return <div 
         className="fixed z-0 w-screen h-screen flex overflow-clip"
@@ -38,56 +36,58 @@ const StartMenuPage = () => {
                 </>}
                 
                 <div className="w-full">
-                    {gameSaveExists.current ? <>
+                    <Collapse in={!expandSettings}>
+                        {gameSaveExists.current ? <>
+                            <div>
+                                <Link 
+                                    to={`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`}
+                                    style={gameIsCached && gameSaveExists.current 
+                                        ? {}
+                                        : {pointerEvents: "none"}
+                                    }
+                                >
+                                    <Button 
+                                        color="success"
+                                        fullWidth 
+                                        size="large"
+                                    >
+                                        {"Continue"}
+                                    </Button>
+                                </Link>
+                            </div>
+                        </> : <></>}
+
                         <div>
-                            <Link 
-                                to={`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`}
-                                style={gameIsCached && gameSaveExists.current 
-                                    ? {}
-                                    : {pointerEvents: "none"}
-                                }
-                            >
+                            <Link to="/new-game">
                                 <Button 
                                     color="success"
                                     fullWidth 
                                     size="large"
+                                    disabled={!gameIsCached}
                                 >
-                                    {"Continue"}
+                                    {"New Game"}
                                 </Button>
                             </Link>
                         </div>
-                    </> : <></>}
 
-                    <div>
-                        <Link to="/new-game">
-                            <Button 
-                                color="success"
-                                fullWidth 
-                                size="large"
-                                disabled={!gameIsCached}
-                            >
-                                {"New Game"}
-                            </Button>
-                        </Link>
-                    </div>
-
-                    {gameSaveExists.current ? <>
-                        <div>
-                            <Link to="/load-game">
-                                <Button 
-                                    color="success"
-                                    fullWidth 
-                                    size="large"
-                                >
-                                    {"Load Game"}
-                                </Button>
-                            </Link>
-                        </div>
-                    </> : <></>}
+                        {gameSaveExists.current ? <>
+                            <div>
+                                <Link to="/load-game">
+                                    <Button 
+                                        color="success"
+                                        fullWidth 
+                                        size="large"
+                                    >
+                                        {"Load Game"}
+                                    </Button>
+                                </Link>
+                            </div>
+                        </> : <></>}
+                    </Collapse>
 
                     <div>
                         <Button 
-                            color={expandSettings ? "warning" : "info"}
+                            color={expandSettings ? "success" : "info"}
                             fullWidth 
                             size="large"
                             onClick={() => setExpandSettings(!expandSettings)}
@@ -103,7 +103,7 @@ const StartMenuPage = () => {
                         </Button>
                     </div>
 
-                    <FadeIn show={expandSettings}>
+                    <Collapse in={expandSettings}>
                         <div>
                             <Link to="/settings">
                                 <Button 
@@ -139,19 +139,32 @@ const StartMenuPage = () => {
                                 </Button>
                             </Link>
                         </div>
-                    </FadeIn>
 
-                    <div>
-                        <Link to="/">
+                        <div>
                             <Button 
                                 color="warning"
                                 fullWidth 
                                 size="large"
+                                onClick={() => setExpandSettings(false)}
                             >
-                                {"Launcher"}
+                                {"Back"}
                             </Button>
-                        </Link>
-                    </div>
+                        </div>
+                    </Collapse>
+
+                    <Collapse in={!expandSettings}>
+                        <div>
+                            <Link to="/">
+                                <Button 
+                                    color="warning"
+                                    fullWidth 
+                                    size="large"
+                                >
+                                    {"Launcher"}
+                                </Button>
+                            </Link>
+                        </div>
+                    </Collapse>
                 </div>
             </div>
         </div>

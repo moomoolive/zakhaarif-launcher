@@ -111,12 +111,11 @@ describe("diff cargos function", () => {
         }
     })
 
-    it(`if inputted canonical url's file name does not end with manifest prefix ("${MANIFEST_FILE_SUFFIX}") or is named "${MANIFEST_FILE_SUFFIX}", an error should be returned`, async () => {
+    it(`if inputted canonical url's file name does not end with manifest prefix ("${MANIFEST_FILE_SUFFIX}"), an error should be returned`, async () => {
         const tests = [
             "https://website.com/manifest.json",
             "https://website2.com/index.js",
             "https://papas-pizza.com/yes.hello.js",
-            `https://papas-pizza.com/${MANIFEST_FILE_SUFFIX}`,
         ] as const
         const adaptors = fetchFnAndFileCache({}, {})
         for (const canonicalUrl of tests) {

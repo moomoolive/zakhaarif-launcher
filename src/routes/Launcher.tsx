@@ -24,6 +24,7 @@ import { useEffectAsync } from '../hooks/effectAsync'
 import LoadingIcon from '../components/LoadingIcon'
 import { UpdateCheckResponse } from '../lib/shabah/updateCheckStatus'
 import { sleep } from '../lib/utils/sleep'
+import { ABORTED, CACHED, FAILED, UPDATING } from '../lib/shabah/backend'
 
 const UnsupportedFeatures = (): JSX.Element => {
   const {current: features} = useRef(featureCheck() as ReadonlyArray<{name: string, supported: boolean, hardwareRelated?: boolean}>)
@@ -156,8 +157,8 @@ const LauncherRoot = (): JSX.Element => {
       (cargo) => downloadClient.getCargoIndexByCanonicalUrl(cargo.canonicalUrl)
     ))
     const errorPackages = standardCargos.filter((cargo) => (
-      cargo?.state === "aborted" 
-      || cargo?.state === "failed"
+      cargo?.state === ABORTED
+      || cargo?.state === FAILED
     ))
     const urls = errorPackages
       .map((cargo) => cargo?.canonicalUrl || "")
@@ -316,12 +317,12 @@ const LauncherRoot = (): JSX.Element => {
         .filter((index) => index > -1)
       const {cargos} = cargoIndexes
       if (type === "success") {
-        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: "cached"}))
+        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: CACHED}))
         window.setTimeout(launchApp, 3_000)
       }
   
       if (type === "abort" || type === "fail") {
-        const nextState: CargoState = type === "abort" ? "aborted" : "failed" 
+        const nextState: CargoState = type === "abort" ? ABORTED : FAILED 
         targetIndexes.forEach((index) => cargos.splice(index, 1, {
           ...cargos[index],
           state: nextState,
@@ -348,9 +349,9 @@ const LauncherRoot = (): JSX.Element => {
     console.log("statuses", statuses)
     
     const notInstalled = statuses.some((cargo) => !cargo)
-    const isUpdating = statuses.some((cargo) => cargo?.state === "updating")
+    const isUpdating = statuses.some((cargo) => cargo?.state === UPDATING)
     const errorOccurred = statuses.some(
-      (cargo) => cargo?.state === "aborted" || cargo?.state === "failed"
+      (cargo) => cargo?.state === ABORTED || cargo?.state === FAILED
     )
 
     console.log(

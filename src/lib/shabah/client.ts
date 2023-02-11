@@ -313,14 +313,8 @@ export const checkForUpdates = async (
             false,
         )
     }
+    
     const manifestName = urlSegments[urlSegments.length - 1]
-    if (manifestName === MANIFEST_FILE_SUFFIX) {
-        return downloadError(
-            `manifest cannot be called "${MANIFEST_FILE_SUFFIX}", a prefix must be provided (i.e. "file${MANIFEST_FILE_SUFFIX}")`,
-            STATUS_CODES.invalidManifestUrl, 
-            false
-        )
-    }
 
     const oldResolvedRootUrl = addSlashToEnd(oldResolvedUrl)
     const cargoUrl = oldResolvedRootUrl + manifestName

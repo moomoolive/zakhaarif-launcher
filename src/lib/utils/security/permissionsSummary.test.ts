@@ -24,6 +24,7 @@ import {
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
 import {CargoIndex, emptyCargoIndices} from "../../shabah/downloadClient"
 import { NULL_FIELD } from "../../cargo/index"
+import { CACHED } from "../../shabah/backend"
 
 describe("filtering malicous csp values", () => {
     it("values that don't start with https or http should be rejected", () => {
@@ -661,7 +662,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "2.1.0",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         created: 0,
         updated: 0,
         downloadId: ""
@@ -676,7 +677,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "32.3.0",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         created: 0,
         updated: 0,
         downloadId: ""
@@ -691,7 +692,7 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         entry: `index.js`,
         version: "0.2.3",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         created: 0,
         updated: 0,
         downloadId: ""

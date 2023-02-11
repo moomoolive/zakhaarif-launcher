@@ -1,4 +1,3 @@
-import {TopLevelAppProps, EventName} from "../types/globalState"
 import {Shabah} from "../shabah/downloadClient"
 import { webAdaptors } from "../shabah/adaptors/web-preset"
 import { APP_CACHE } from "../../config"
@@ -8,48 +7,72 @@ import {wRpc} from "../wRpc/simple"
 import {createAppRpcs, DownloadProgressListener} from "./appRpc"
 import {EventListenerRecord} from "./eventListener"
 
+export type EventMap = {
+    downloadprogress: DownloadProgressListener
+}
+
+export type EventName = keyof EventMap
+
+type EventListenerMap = {
+    [key in keyof EventMap]: EventListenerRecord<EventMap[key]>
+}
+
 export type AppStoreConfig = {
     setTerminalVisibility: (value: boolean) => void
 }
 
-let cached: null | TopLevelAppProps = null
-
-export const initAppStore = (config: AppStoreConfig): TopLevelAppProps => {
-    if (cached) {
-        return cached
+export class AppStore {
+    setTerminalVisibility: (visible: boolean) => void
+    readonly downloadClient: Shabah
+    sandboxInitializePromise: {
+        resolve: (value: boolean) => void
+        reject: (reason?: unknown) => void
+        promise: Promise<boolean>
     }
+    serviceWorkerTerminal: wRpc<ServiceWorkerRpcs>
 
-    const {setTerminalVisibility} = config
-    
-    const listeners = {
-        downloadprogress:  new EventListenerRecord<DownloadProgressListener>()
-    } as const satisfies Record<EventName, EventListenerRecord<Function>>
+    private eventListenerMap: EventListenerMap
+    private globalListeners: Array<{
+        event: "service-worker-message",
+        handler: Function
+    }>
 
-    const values: TopLevelAppProps = {
-        setTerminalVisibility,
-        downloadClient: new Shabah({
+    constructor(config: AppStoreConfig) {
+        this.setTerminalVisibility  = config.setTerminalVisibility
+        
+        this.downloadClient = new Shabah({
             origin: location.origin,
             adaptors: webAdaptors(APP_CACHE),
             permissionsCleaner: cleanPermissions
-        }),
-        sandboxInitializePromise: {
+        })
+        
+        this.sandboxInitializePromise = {
             resolve: () => {},
             reject: () => {},
             promise: Promise.resolve(true)
-        },
-        serviceWorkerTerminal: new wRpc<ServiceWorkerRpcs>({
+        }
+
+        this.eventListenerMap = {
+            downloadprogress: new EventListenerRecord()
+        }
+        this.globalListeners = []
+
+        const self = this
+        this.serviceWorkerTerminal = new wRpc<ServiceWorkerRpcs>({
             responses: createAppRpcs({
                 getProgressListeners: () => {
-                    return listeners.downloadprogress.getAll()
+                    return self.eventListenerMap.downloadprogress.getAll()
                 }
             }),
-            messageInterceptor: {
-                addEventListener: async (_, handler) => {
-                    const sw = navigator.serviceWorker
-                    sw.addEventListener("message", handler)
-                }
-            },
-            messageTarget: {
+            messageInterceptor: {addEventListener: () => {}},
+            messageTarget: {postMessage: () => {}}
+        })
+    }
+
+    initialize(): boolean {
+        const self = this
+        this.serviceWorkerTerminal.replaceSources(
+            {
                 postMessage: (data, transferables) => {
                     const target = navigator.serviceWorker.controller
                     if (!target) {
@@ -57,15 +80,43 @@ export const initAppStore = (config: AppStoreConfig): TopLevelAppProps => {
                     }
                     target.postMessage(data, transferables)
                 }
+            },
+            {
+                addEventListener: async (_, handler) => {
+                    const event = "service-worker-message"
+                    self.globalListeners.push({event, handler})
+                    const sw = navigator.serviceWorker
+                    sw.addEventListener("message", handler)
+                }
             }
-        }),
-        addEventListener: (name, handler) => {
-            return listeners[name].addEventListener(handler)
-        },
-        removeEventListener: (name, handlerId) => {
-            return listeners[name].removeEventListener(handlerId)
-        }
+        )
+        return true
     }
-    cached = values
-    return values
+
+    destroy(): boolean {
+        for (const {event, handler} of this.globalListeners) {
+            switch (event) {
+                case "service-worker-message":
+                    navigator.serviceWorker.removeEventListener(
+                        "message", 
+                        handler as (_: MessageEvent) => unknown
+                    )
+                    break
+                default:
+                    break
+            }
+        }
+        return true
+    }
+
+    addEventListener<Name extends EventName>(
+        name: Name, handler: EventMap[Name]
+    ): number {
+        return this.eventListenerMap[name].addEventListener(handler)
+    }
+
+    removeEventListener(name: EventName, handlerId: number): boolean {
+        return this.eventListenerMap[name].removeEventListener(handlerId)
+    }
+
 }

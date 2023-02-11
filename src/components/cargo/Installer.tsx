@@ -19,7 +19,7 @@ import {
     hasUnsafePermissions
 } from "../../lib/utils/security/permissionsSummary"
 import { CargoSummary } from "./CargoSummary"
-import type {Cargo} from "../../lib/cargo"
+import {Cargo, MANIFEST_FILE_SUFFIX} from "../../lib/cargo"
 import type {Permissions} from "../../lib/types/permissions"
 import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
 import { MOD_CARGO_TAG, EXTENSION_CARGO_TAG } from "../../config"
@@ -29,6 +29,7 @@ import { EXTENSION_METADATA_KEY } from "../../lib/utils/cargos"
 import { ALLOW_UNSAFE_PACKAGES } from "../../lib/utils/localStorageKeys"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 import {CargoRequestError, cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
+import { CACHED } from "../../lib/shabah/backend"
 
 const toCargoIndex = (
     canonicalUrl: string,
@@ -47,7 +48,7 @@ const toCargoIndex = (
         entry: cargo.entry,
         version: cargo.version,
         permissions: cargo.permissions,
-        state: "cached",
+        state: CACHED,
         created: Date.now(),
         updated: Date.now(),
         downloadId: ""
@@ -90,11 +91,14 @@ export const Installer = ({
         setUrl(nextUrl)
         setInvalidation("analyzing")
         urlCheck(() => {
-            const correctUrl = isUrl(nextUrl)
-            if (correctUrl) {
-                setInvalidation("none")
-            } else {
+            if (!nextUrl.startsWith("https://") && !nextUrl.startsWith("http://")) {
                 setInvalidation("malformed-url")
+            } else if (!isUrl(nextUrl)) {
+                setInvalidation("malformed-url")
+            } else if (!nextUrl.endsWith(MANIFEST_FILE_SUFFIX)) {
+                setInvalidation("invalid-manifest-url")
+            } else {
+                setInvalidation("none")
             }
         })
     })

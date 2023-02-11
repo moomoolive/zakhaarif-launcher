@@ -6,7 +6,7 @@ import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
-import { initAppStore } from "./lib/utils/initAppStore"
+import { AppStore } from "./lib/utils/initAppStore"
 
 const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
@@ -29,7 +29,7 @@ const  App = () => {
   const [showTerminal, setShowTerminal] = useState(false)
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
   const terminalReady = useRef(false)
-  const {current: globalState} = useRef(initAppStore({
+  const {current: globalState} = useRef(new AppStore({
     setTerminalVisibility: setShowTerminal
   }))
 
@@ -86,6 +86,11 @@ const  App = () => {
     const swUrl = import.meta.env.DEV ? "dev-sw.compiled.js" : "sw.compiled.js"
     navigator.serviceWorker.register(swUrl)
     serviceWorkerInitialized.current = true
+  }, [])
+
+  useEffect(() => {
+    globalState.initialize()
+    return () => { globalState.destroy() }
   }, [])
 
   return (

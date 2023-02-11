@@ -6,7 +6,7 @@ import {
 } from "react-router-dom"
 import {useState, useEffect, useRef} from "react"
 import {lazyComponent, LazyComponentOptions, LazyComponent} from "../components/Lazy"
-import type {TopLevelAppProps} from "../lib/types/globalState"
+import type {AppStore} from "../lib/utils/initAppStore"
 import {AppShellContext, useAppShellContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
@@ -131,7 +131,7 @@ const PageDisplay = () => {
 }
 
 type AppShellProps = {
-    globalState: TopLevelAppProps
+    globalState: AppStore
 }
 
 export const AppRouter = ({globalState}: AppShellProps) => {

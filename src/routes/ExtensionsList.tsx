@@ -17,7 +17,7 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faMagnifyingGlass} from "@fortawesome/free-solid-svg-icons"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {CargoIcon} from "../components/cargo/Icon"
-import {FilterOrder, FilterChevron} from "../components/FilterChevron"
+import {FilterOrder, FilterChevron, DESCENDING_ORDER, ASCENDING_ORDER} from "../components/FilterChevron"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import {isExtension} from "../lib/utils/cargos"
 
@@ -34,7 +34,7 @@ const ExtensionsListPage = () => {
     const [searchText, setSearchText] = useState("")
     type FilterTypes = typeof FILTERS[number]
     const [filter, setFilter] = useState<FilterTypes>("modified")
-    const [order, setOrder] = useState<FilterOrder>("descending")
+    const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
 
     const gameSaveExists = useRef(Boolean(window.localStorage.getItem(SAVE_EXISTS)))
 
@@ -64,7 +64,7 @@ const ExtensionsListPage = () => {
                 results.push({...cargo})
             }
         }
-        const orderFactor = order === "ascending" ? 1 : -1
+        const orderFactor = order
         switch (filter) {
             case "name":
                 return results.sort((a, b) => {
@@ -92,11 +92,11 @@ const ExtensionsListPage = () => {
     const toggleFilter = (filterName: typeof filter) => {
         if (filter !== filterName) {
             setFilter(filterName)
-            setOrder("descending")
-        } else if (order === "descending") {
-            setOrder("ascending")
+            setOrder(DESCENDING_ORDER)
+        } else if (order === DESCENDING_ORDER) {
+            setOrder(ASCENDING_ORDER)
         } else {
-            setOrder("descending")
+            setOrder(DESCENDING_ORDER)
         }
     }
     

@@ -6,12 +6,15 @@ export type CargoRequestError = (
     | "catch-all-error"
     | "not-found"
     | "malformed-url"
+    | "invalid-manifest-url"
     | "analyzing"
     | "none"
 )
 
 export const cargoErrorToText = (error: CargoRequestError) => {
     switch (error) {
+        case "invalid-manifest-url":
+            return "Invalid Add-on url"
         case "insufficent-storage":
             return "Insufficent disk space"
         case "invalid-encoding":
@@ -31,4 +34,4 @@ export const cargoErrorToText = (error: CargoRequestError) => {
         default:
             return ""
     }
-} 
+}

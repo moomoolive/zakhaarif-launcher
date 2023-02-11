@@ -1,40 +1,7 @@
-import Dexie from "dexie"
+import {Timestamps, GameSaveV1, GameSave} from "./definitions"
+import {Database} from "./innerDatabase"
 
-type Timestamps = {
-    createdAt: number
-    updatedAt: number
-}
-
-type DatabaseEntry<Schema> = { id: number } & Timestamps & Schema
-
-type GameSaveType = "manual" | "auto" | "quick"
-
-type GameSaveV1 = {
-    name: string
-    type: GameSaveType
-    mods: {
-        canonicalUrls: string[]
-        resolvedUrls: string[]
-        entryUrls: string[]
-    }
-    content: {}
-}
-
-export type GameSave = DatabaseEntry<GameSaveV1>
-
-const DATABASE_NAME = "app-database"
-const CURRENT_VERSION = 1
-
-class InnerDatabase extends Dexie {
-    gameSaves!: Dexie.Table<Omit<GameSave, "id">, number>
-
-    constructor() {
-        super(DATABASE_NAME)
-        this.version(CURRENT_VERSION).stores({
-            gameSaves: "++id, name, updatedAt"
-        })
-    }
-}
+export {MANUAL_SAVE, QUICK_SAVE, AUTO_SAVE} from "./definitions"
 
 const addTimestamps = <O extends Object>(object: O) => {
     const now = Date.now()
@@ -47,9 +14,9 @@ const updateTimestamps = <O extends Timestamps>(object: O) => {
 }
 
 class GameSaveInterface {
-    private db: InnerDatabase
+    private db: Database
 
-    constructor(db: InnerDatabase) {
+    constructor(db: Database) {
         this.db = db
     }
 
@@ -85,16 +52,15 @@ class GameSaveInterface {
 }
 
 export class AppDatabase {
-    private db: InnerDatabase
-
+    private db: Database
     gameSaves: GameSaveInterface
 
     constructor() {
-        this.db = new InnerDatabase()
+        this.db = new Database()
         this.gameSaves = new GameSaveInterface(this.db)
     }
 
-    clear() {
+    async clear() {
         return this.db.delete()
     }
 }

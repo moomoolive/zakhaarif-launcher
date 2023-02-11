@@ -11,7 +11,10 @@ import {
     saveErrorDownloadIndex,
     NO_UPDATE_QUEUED,
     DownloadSegment,
-    CargoState
+    CargoState,
+    CACHED,
+    ABORTED,
+    FAILED
 } from "../backend"
 import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
 
@@ -223,13 +226,13 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 start += maxFileProcessed
                 end = Math.min(len, end + maxFileProcessed)
             }
-            let state: CargoState = "cached"
+            let state: CargoState = CACHED
             const resourcesFailed = processingStats.failedResources > 0
             if (eventType === "abort" && resourcesFailed) {
-                state = "aborted"
+                state = ABORTED
             }
             if (eventType === "fail" && resourcesFailed) {
-                state = "failed"
+                state = FAILED
             }
             log(
                 eventName, 

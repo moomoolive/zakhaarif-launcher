@@ -11,6 +11,8 @@ import {
     emptyCargoIndices,
     updateCargoIndex,
     saveCargoIndices,
+    UPDATING,
+    CACHED,
 } from "./backend"
 
 const createFileCache = (initFiles: Record<string, Response>) => {
@@ -250,7 +252,7 @@ describe("reading and writing to cargo indices", () => {
                 logo: "",
                 permissions: [] as Permissions,
                 name: "pkg",
-                state: "updating",
+                state: UPDATING,
                 version: "0.1.0",
                 bytes: 0,
                 entry: "store/index.js",
@@ -271,7 +273,7 @@ describe("reading and writing to cargo indices", () => {
             logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
-            state: "updating",
+            state: UPDATING,
             version: "0.1.0",
             bytes: 0,
             entry: "store/index.js",
@@ -287,7 +289,7 @@ describe("reading and writing to cargo indices", () => {
             logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
-            state: "cached",
+            state: CACHED,
             version: "0.2.0",
             bytes: 0,
             entry: "store/index.js",
@@ -311,7 +313,7 @@ describe("reading and writing to cargo indices", () => {
             logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
-            state: "updating",
+            state: UPDATING,
             version: "0.1.0",
             bytes: 0,
             entry: "store/index.js",
@@ -323,7 +325,7 @@ describe("reading and writing to cargo indices", () => {
         const second = {
             tag: 1,
             name: "pkg",
-            state: "cached",
+            state: UPDATING,
             logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
@@ -351,7 +353,7 @@ describe("reading and writing to cargo indices", () => {
         const first = {
             tag: 0,
             name: "pkg",
-            state: "updating",
+            state: UPDATING,
             logo: "",
             storageBytes: 0,
             permissions: [] as Permissions,
@@ -366,7 +368,7 @@ describe("reading and writing to cargo indices", () => {
         const second = {
             tag: 1,
             name: "pkg",
-            state: "cached",
+            state: UPDATING,
             permissions: [] as Permissions,
             version: "0.2.0",
             logo: "",

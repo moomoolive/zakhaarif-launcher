@@ -1,7 +1,12 @@
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faChevronUp, faChevronDown} from "@fortawesome/free-solid-svg-icons"
 
-export type FilterOrder = "ascending" | "descending"
+export const ASCENDING_ORDER = 1
+export type AscendingOrder = typeof ASCENDING_ORDER
+export const DESCENDING_ORDER = -1
+export type DescendingOrder = typeof DESCENDING_ORDER
+
+export type FilterOrder = AscendingOrder | DescendingOrder
 
 export type FilterChevronProps = {
     currentFilter: string, 
@@ -18,7 +23,7 @@ export const FilterChevron = ({
 }: FilterChevronProps) => {
     if (currentFilter !== targetFilter) {
         return <></>
-    } else if (order === "descending") {
+    } else if (order === DESCENDING_ORDER) {
         return <span className={className}>
             <FontAwesomeIcon 
                 icon={faChevronUp}

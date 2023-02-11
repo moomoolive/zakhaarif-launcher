@@ -12,7 +12,11 @@ import {
     ResourceMap,
     getCargoIndices,
     NO_UPDATE_QUEUED,
-    DownloadSegment
+    DownloadSegment,
+    CACHED,
+    UPDATING,
+    ABORTED,
+    FAILED
 } from "../backend"
 import {urlToMime} from "../../miniMime/index"
 
@@ -141,7 +145,7 @@ describe("background fetch success handler", () => {
             bytes: 20,
             canonicalUrl: "https://remote-origin.site/pkg",
             version: "0.1.0",
-            state: "cached",
+            state: CACHED,
             downloadId,
         })
         const {fileCache, internalRecord} = createFileCache({})
@@ -190,7 +194,7 @@ describe("background fetch success handler", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -224,7 +228,7 @@ describe("background fetch success handler", () => {
             (await getCargoIndices(origin, fileCache))
                 .cargos
                 .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe("cached")
+        ).toBe(CACHED)
     })
 
     it("successful fetches should cache all assets found in download-index map into file cache", async () => {
@@ -280,7 +284,7 @@ describe("background fetch success handler", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -310,7 +314,7 @@ describe("background fetch success handler", () => {
             (await getCargoIndices(origin, fileCache)).cargos.find(
                 (cargo) => cargo.canonicalUrl === canonicalUrl
             )?.state
-        ).toBe("cached")
+        ).toBe(CACHED)
     })
 
     it(`successful fetches should set associated cargo indexes 'downloadId' to '${NO_UPDATE_QUEUED}' (no update queued)`, async () => {
@@ -367,7 +371,7 @@ describe("background fetch success handler", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -398,7 +402,7 @@ describe("background fetch success handler", () => {
             (cargo) => cargo.canonicalUrl === canonicalUrl
         )
         expect(!!targetCargo).toBe(true)
-        expect(targetCargo?.state).toBe("cached")
+        expect(targetCargo?.state).toBe(CACHED)
         expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
     })
 
@@ -508,7 +512,7 @@ describe("background fetch success handler", () => {
                     bytes: 20,
                     canonicalUrl,
                     version: "0.1.0",
-                    state: "updating",
+                    state: UPDATING,
                     downloadId
                 })
             }
@@ -561,7 +565,7 @@ describe("background fetch success handler", () => {
                     (cargo) => cargo.canonicalUrl === origin
                 )
                 expect(!!targetCargo).toBe(true)
-                expect(targetCargo?.state).toBe("cached")
+                expect(targetCargo?.state).toBe(CACHED)
                 expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
             }
         }
@@ -620,7 +624,7 @@ describe("background fetch success handler", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -653,7 +657,7 @@ describe("background fetch success handler", () => {
             (cargo) => cargo.canonicalUrl === canonicalUrl
         )
         expect(!!targetCargo).toBe(true)
-        expect(targetCargo?.state).toBe("cached")
+        expect(targetCargo?.state).toBe(CACHED)
         expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
         expect(progressEvents.length).toBe(2)
         expect(progressEvents[0]).toStrictEqual({
@@ -720,7 +724,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -753,7 +757,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             (await getCargoIndices(origin, fileCache))
                 .cargos
                 .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe("failed")
+        ).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -815,7 +819,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId: downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -851,7 +855,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             (await getCargoIndices(origin, fileCache))
                 .cargos
                 .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe("failed")
+        ).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -913,7 +917,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId: downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -951,7 +955,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         )
         expect(!!target).toBe(true)
         expect(target?.downloadId).toBe(NO_UPDATE_QUEUED)
-        expect(target?.state).toBe("failed")
+        expect(target?.state).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -1072,7 +1076,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                     bytes: 20,
                     canonicalUrl,
                     version: "0.1.0",
-                    state: "updating",
+                    state: UPDATING,
                     downloadId: downloadId
                 })
             }
@@ -1141,11 +1145,11 @@ describe("background fetch fail handler (abort/fail)", () => {
                 )
                 expect(!!cargoIndex).toBe(true)
                 if (shouldBeOk) {
-                    expect(cargoIndex?.state).toBe("cached")
+                    expect(cargoIndex?.state).toBe(CACHED)
                     expect(errorIndex).toBe(null)
                     continue
                 }
-                expect(cargoIndex?.state).toBe("failed")
+                expect(cargoIndex?.state).toBe(FAILED)
                 expect(errorIndex).not.toBe(null)
                 // should only have one segment
                 expect(errorIndex?.index.segments.length).toBe(1)
@@ -1212,7 +1216,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 20,
             canonicalUrl,
             version: "0.1.0",
-            state: "updating",
+            state: UPDATING,
             downloadId: downloadId
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
@@ -1246,7 +1250,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             (await getCargoIndices(origin, fileCache))
                 .cargos
                 .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe("aborted")
+        ).toBe(ABORTED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -1311,7 +1315,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                 bytes: 20,
                 canonicalUrl,
                 version: "0.1.0",
-                state: "updating",
+                state: UPDATING,
                 downloadId: downloadId
             })
             await saveCargoIndices(

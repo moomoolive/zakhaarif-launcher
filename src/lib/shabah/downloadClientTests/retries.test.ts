@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "../downloadClient"
-import {CargoIndex, CargoState, DownloadSegment, FileCache, getErrorDownloadIndex, NO_UPDATE_QUEUED, ResourceMap, saveErrorDownloadIndex} from "../backend"
+import {CACHED, CargoIndex, CargoState, DownloadSegment, FAILED, FileCache, getErrorDownloadIndex, NO_UPDATE_QUEUED, ResourceMap, saveErrorDownloadIndex, UPDATING} from "../backend"
 import {DownloadManager} from "../backend"
 import { Cargo} from "../../cargo"
 import { Permissions } from "../../types/permissions"
@@ -187,7 +187,7 @@ const cargoToCargoIndex = (
         tag = 0,
         resolvedUrl,
         bytes = 0,
-        state = "cached" as CargoState,
+        state = CACHED,
         downloadId = NO_UPDATE_QUEUED
     }: Partial<{
         tag: number
@@ -389,7 +389,7 @@ describe("download retries", () => {
                     canonicalUrl
                 )
                 expect(!!cargoIndexFound).toBe(true)
-                expect(cargoIndexFound?.state).toBe("cached")
+                expect(cargoIndexFound?.state).toBe(CACHED)
                 expect(downloadState.queuedDownloads.length).toBe(0)
                 const queueResponse = await client.retryFailedDownloads(
                     [canonicalUrl], "retry"
@@ -447,14 +447,14 @@ describe("download retries", () => {
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
                     cargo as Cargo<Permissions>,
-                    {state: "failed"}
+                    {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)
                 const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
                     canonicalUrl
                 )
                 expect(!!cargoIndexFound).toBe(true)
-                expect(cargoIndexFound?.state).toBe("failed")
+                expect(cargoIndexFound?.state).toBe(FAILED)
                 expect(downloadState.queuedDownloads.length).toBe(0)
                 const queueResponse = await client.retryFailedDownloads(
                     [canonicalUrl], "retry"
@@ -554,14 +554,14 @@ describe("download retries", () => {
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
                     cargo as Cargo<Permissions>,
-                    {state: "failed"}
+                    {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)
                 const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
                     canonicalUrl
                 )
                 expect(!!cargoIndexFound).toBe(true)
-                expect(cargoIndexFound?.state).toBe("failed")
+                expect(cargoIndexFound?.state).toBe(FAILED)
                 const queueResponse = await client.retryFailedDownloads(
                     [canonicalUrl], "retry"
                 )
@@ -577,7 +577,7 @@ describe("download retries", () => {
                     canonicalUrl
                 )
                 expect(!!cargoIndexFoundAfterMutation).toBe(true)
-                expect(cargoIndexFoundAfterMutation?.state).toBe("updating")
+                expect(cargoIndexFoundAfterMutation?.state).toBe(UPDATING)
                 expect(cargoIndexFoundAfterMutation?.downloadId).toBe(downloadState.queuedDownloads[0].id)
                 const errorIndexAfterMutation = await getErrorDownloadIndex(
                     resolvedUrl, adaptors.fileCache
@@ -661,14 +661,14 @@ describe("download retries", () => {
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
                     cargo as Cargo<Permissions>,
-                    {state: "failed"}
+                    {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)
                 const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
                     canonicalUrl
                 )
                 expect(!!cargoIndexFound).toBe(true)
-                expect(cargoIndexFound?.state).toBe("failed")
+                expect(cargoIndexFound?.state).toBe(FAILED)
             }
 
             const canonicalUrls = testCase.map((test) => test.origin + "/")
@@ -688,7 +688,7 @@ describe("download retries", () => {
                         canonicalUrl
                     )
                     expect(!!cargoIndexFoundAfterMutation).toBe(true)
-                    expect(cargoIndexFoundAfterMutation?.state).toBe("updating")
+                    expect(cargoIndexFoundAfterMutation?.state).toBe(UPDATING)
                     expect(cargoIndexFoundAfterMutation?.downloadId).toBe(downloadState.queuedDownloads[0].id)
                     const errorIndexAfterMutation = await getErrorDownloadIndex(
                         resolvedUrl, adaptors.fileCache

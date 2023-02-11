@@ -5,6 +5,7 @@ import {generatePermissionsSummary, cleanPermissions} from "../utils/security/pe
 import {PermissionsList} from "../cargo"
 import {Permissions, ALLOW_ALL_EMBEDS} from "../types/permissions"
 import {Mutable} from "../types/utility"
+import { CACHED } from "../shabah/backend"
 
 const mockSandboxDependencies: SandboxDependencies = {
     displayExtensionFrame: () => {},
@@ -22,7 +23,7 @@ const mockSandboxDependencies: SandboxDependencies = {
         entry: "",
         version: "0.1.0",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         created: 0,
         updated: 0,
         downloadId: "",

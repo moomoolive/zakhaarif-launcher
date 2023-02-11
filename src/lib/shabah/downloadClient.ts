@@ -30,6 +30,10 @@ import {
     NO_UPDATE_QUEUED,
     DownloadSegment,
     removeSlashAtEnd,
+    CACHED,
+    UPDATING,
+    ABORTED,
+    FAILED,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {NULL_FIELD} from "../cargo/index"
@@ -241,7 +245,7 @@ export class Shabah {
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
                 tag: update.tag,
-                state: !resourcesToRequest ? "cached" : "updating",
+                state: !resourcesToRequest ? CACHED : UPDATING,
                 permissions: update.newCargo?.permissions || [],
                 version: update.versions().new,
                 entry: update.newCargo?.entry === NULL_FIELD
@@ -310,7 +314,7 @@ export class Shabah {
                 return io.ok(STATUS_CODES.remoteResourceNotFound)
             }
             const {state} = cargoMeta
-            if (state !== "aborted" && state !== "failed") {
+            if (state !== ABORTED && state !== FAILED) {
                 return io.ok(STATUS_CODES.updateRetryImpossible)
             }
             const {resolvedUrl} = cargoMeta
@@ -359,7 +363,7 @@ export class Shabah {
             retryDownloadIndex.bytes += index.bytes
             this.putCargoIndex({
                 ...cargoMeta, 
-                state: "updating", 
+                state: UPDATING, 
                 downloadId: downloadQueueId
             })
         }
@@ -501,7 +505,7 @@ export class Shabah {
             )
         )
         if (
-            targetCargo.state === "updating" 
+            targetCargo.state === UPDATING
             && targetCargo.downloadId !== NO_UPDATE_QUEUED
         ) {
             promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))

@@ -1,6 +1,6 @@
 import {describe, it, expect} from "vitest"
 import {Shabah} from "../downloadClient"
-import {CargoIndex, CargoState, FileCache, NO_UPDATE_QUEUED} from "../backend"
+import {CACHED, CargoIndex, CargoState, FileCache, NO_UPDATE_QUEUED} from "../backend"
 import {DownloadManager} from "../backend"
 import {Cargo, MANIFEST_FILE_SUFFIX, } from "../../cargo"
 import {Permissions} from "../../types/permissions"
@@ -189,7 +189,7 @@ const cargoToCargoIndex = (
         tag = 0,
         resolvedUrl,
         bytes = 0,
-        state = "cached" as CargoState,
+        state = CACHED,
         downloadId = NO_UPDATE_QUEUED
     }: Partial<{
         tag: number
@@ -286,14 +286,13 @@ describe("checking for cargo updates", () => {
         }
     })
 
-    it(`should return error if file at canonicalUrl does not end with "${MANIFEST_FILE_SUFFIX}" or is named "${MANIFEST_FILE_SUFFIX}"`, async () => {
+    it(`should return error if file at canonicalUrl does not end with "${MANIFEST_FILE_SUFFIX}"`, async () => {
         const origin = "https://my-house.org"
         const {client} = createClient(origin, {})
         const cases = [
             {canonicalUrl: "https://yo-mama.com/package.json", tag: 0},
             {canonicalUrl: "https://yo-mama.com/index.js", tag: 0},
             {canonicalUrl: "https://papa.com/pkg.css", tag: 0},
-            {canonicalUrl: `https://yo-mama/${MANIFEST_FILE_SUFFIX}`, tag: 0},
         ] as const
         for (const c of cases) {
             const response = await client.checkForUpdates(c)

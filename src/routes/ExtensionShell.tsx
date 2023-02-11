@@ -18,7 +18,7 @@ import {
 } from "../lib/utils/security/permissionsSummary"
 import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
-import { CargoIndex } from "../lib/shabah/backend"
+import { CACHED, CargoIndex } from "../lib/shabah/backend"
 
 export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
@@ -51,7 +51,7 @@ const ExtensionShellPage = () => {
         entry: NULL_FIELD,
         version: "0.1.0",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         created: 0,
         updated: 0
     })
@@ -77,7 +77,7 @@ const ExtensionShellPage = () => {
     })
 
     const closeExtension = async () => {
-        if (!await confirm({title: "Are you sure you want to close this extension?", confirmButtonColor: "warning"})) {
+        if (!await confirm({title: "Are you sure you want to return to main menu?", confirmButtonColor: "warning"})) {
             return
         }
         navigate("/start")
@@ -91,7 +91,7 @@ const ExtensionShellPage = () => {
             console.warn(`a query parameter "entry" must be included in url to run an extension.`)
             setLoading(false)
             setError(true)
-            setErrorMessage("Extension Not Found")
+            setErrorMessage("Files Not Found")
             return
         }
 
@@ -102,14 +102,14 @@ const ExtensionShellPage = () => {
             console.warn(`extension "${canonicalUrl}" doesn't exist.`)
             setLoading(false)
             setError(true)
-            setErrorMessage("Extension Not Found")
+            setErrorMessage("Files Not Found")
             return
         }
 
-        if (meta.state !== "cached" || meta.entry === CARGO_NULL_FIELD) {
+        if (meta.state !== CACHED || meta.entry === CARGO_NULL_FIELD) {
             setLoading(false)
             setError(true)
-            setErrorMessage("Invalid Extension")
+            setErrorMessage("Invalid File")
             console.warn(`Prevented extension "${canonicalUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
             return
         }
@@ -127,7 +127,7 @@ const ExtensionShellPage = () => {
         }
 
         setError(true)
-        setErrorMessage("Extension Not Found")
+        setErrorMessage("Files Not Found")
         console.error("extension exists in index, but was not found")
         setLoading(false)
     }, [])
@@ -214,21 +214,19 @@ const ExtensionShellPage = () => {
                     
                     <div>
                         {showRestartExtension ? <>
-                            <Tooltip title="Restart Extension">
-                                <Button
-                                    onClick={() => {
-                                        cleanupExtension.current()
-                                        setError(false)
-                                        setLoading(true)
-                                        setExtensionEntry((old) => ({
-                                            ...old,
-                                            retry: old.retry + 1
-                                        }))
-                                    }}
-                                >
-                                    restart
-                                </Button>
-                            </Tooltip>
+                            <Button
+                                onClick={() => {
+                                    cleanupExtension.current()
+                                    setError(false)
+                                    setLoading(true)
+                                    setExtensionEntry((old) => ({
+                                        ...old,
+                                        retry: old.retry + 1
+                                    }))
+                                }}
+                            >
+                                Restart
+                            </Button>
                         </> : <></>}
 
                         <Tooltip title="Back To Start Menu">

@@ -1,7 +1,13 @@
 import { FullScreenLoadingOverlay } from "../components/LoadingOverlay"
 import { useEffectAsync } from "../hooks/effectAsync"
 import { useMemo, useRef, useState } from "react"
-import {AppDatabase, GameSave} from "../lib/database/AppDatabase"
+import {
+    AppDatabase,
+    MANUAL_SAVE,
+    QUICK_SAVE,
+    AUTO_SAVE
+} from "../lib/database/AppDatabase"
+import {GameSave} from "../lib/database/definitions"
 import { BackNavigationButton } from "../components/navigation/BackNavigationButton"
 import { faFloppyDisk, faRobot, faBolt, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
@@ -12,25 +18,13 @@ import { useAppShellContext } from "./store"
 import { emptyCargoIndices } from "../lib/shabah/downloadClient"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
-import { FilterChevron, FilterOrder } from "../components/FilterChevron"
+import { ASCENDING_ORDER, DESCENDING_ORDER, FilterChevron, FilterOrder } from "../components/FilterChevron"
 import { useNavigate } from "react-router-dom"
 import { isMod } from "../lib/utils/cargos"
 
 const DO_NOT_SHOW_LINKER = -1
 
 const SAVE_FILTERS = ["updatedAt", "name", "type"] as const
-
-const gameSaveTypeToNumber = (type: GameSave["type"]) => {
-    switch (type) {
-        case "quick":
-            return 2
-        case "auto":
-            return 1
-        case "manual":
-        default:
-            return 0
-    }
-}
 
 const LoadGamePage = () => {
     const {current: appDatabase} = useRef(new AppDatabase())
@@ -45,17 +39,15 @@ const LoadGamePage = () => {
         DO_NOT_SHOW_LINKER
     )
     const [currentFilter, setCurrentFilter] = useState<typeof SAVE_FILTERS[number]>("updatedAt")
-    const [order, setOrder] = useState<FilterOrder>("descending")
+    const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
 
     const filteredSaves = useMemo(() => {
         const savesList = [...saves]
-        const orderFactor = order === "ascending" ? 1 : -1
+        const orderFactor = order
         switch (currentFilter) {
             case "type":
                 return savesList.sort((a, b) => {
-                    const ratingA = gameSaveTypeToNumber(a.type)
-                    const ratingB = gameSaveTypeToNumber(b.type)
-                    const order = ratingA > ratingB ? 1 : -1
+                    const order = a.type > b.type ? 1 : -1
                     return order * orderFactor
                 })
             case "name":
@@ -103,7 +95,7 @@ const LoadGamePage = () => {
     }, [modLinkerSaveId, modMap, saves])
 
     const deleteSave = async (id: number) => {
-        if (!await confirm({title: "Are you sure you want to delete this save?"})) {
+        if (!await confirm({title: "Are you sure you want to delete this save?", confirmButtonColor: "warning"})) {
             return
         }
         const index = saves.findIndex((save) => save.id === id)
@@ -122,11 +114,11 @@ const LoadGamePage = () => {
     const toggleFilter = (filterName: typeof currentFilter) => {
         if (currentFilter !== filterName) {
             setCurrentFilter(filterName)
-            setOrder("descending")
-        } else if (order === "descending") {
-            setOrder("ascending")
+            setOrder(DESCENDING_ORDER)
+        } else if (order === DESCENDING_ORDER) {
+            setOrder(ASCENDING_ORDER)
         } else {
-            setOrder("descending")
+            setOrder(DESCENDING_ORDER)
         }
     }
 
@@ -230,11 +222,11 @@ const LoadGamePage = () => {
                                                 {type}
                                                 {((saveType: typeof type) => {
                                                     switch (saveType) {
-                                                        case "quick":
+                                                        case QUICK_SAVE://"quick":
                                                             return <span className="text-yellow-500 ml-1.5">
                                                                 <FontAwesomeIcon icon={faBolt}/>
                                                             </span>
-                                                        case "auto":
+                                                        case AUTO_SAVE:
                                                             return <span className="text-indigo-500 ml-1.5">
                                                                 <FontAwesomeIcon icon={faRobot}/>
                                                             </span>

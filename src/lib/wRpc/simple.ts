@@ -129,6 +129,22 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         }
     }
 
+    replaceSources(
+        messageTarget: MessagableEntity,
+        messageInterceptor: MessageInterceptor
+    ): boolean {
+        const self = this
+        this.messageInterceptor = messageInterceptor
+        this.messageTarget = messageTarget
+        this.messageInterceptor.addEventListener("message", (event) => {
+            self.consumeMessage(
+                event.data,
+                ("source" in event) ? event.source || null : null
+            )
+        })
+        return true
+    }
+
     async executeWithSource<T extends keyof RecipentActions>(
         name: T & string,
         source: MessagableEntity,

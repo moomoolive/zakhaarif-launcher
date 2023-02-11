@@ -25,7 +25,12 @@ import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
 import {emptyCargoIndices, CargoState, Shabah, CargoIndices, CargoIndex} from "../lib/shabah/downloadClient"
 import {Cargo} from "../lib/cargo/index"
-import {FilterOrder, FilterChevron} from "../components/FilterChevron"
+import {
+    ASCENDING_ORDER,
+    DESCENDING_ORDER,
+    FilterOrder, 
+    FilterChevron
+} from "../components/FilterChevron"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
 import {isMod} from "../lib/utils/cargos"
@@ -40,6 +45,8 @@ import {ScreenSize} from "../components/ScreenSize"
 import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
 import LoadingIcon from "../components/LoadingIcon"
+import { nanoid } from "nanoid"
+import { ABORTED, CACHED, FAILED, UPDATING } from "../lib/shabah/backend"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -60,21 +67,32 @@ const CargoUpdater = lazyComponent(
     async () => (await import("../components/cargo/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
-const mainContentLoader = <div className="mt-16 w-4/5 mx-auto">
-    <div className="animate-spin text-blue-500 text-3xl mb-3">
-        <LoadingIcon/>
-    </div>
-    <div className="text-sm text-neutral-300">
-        {"Looking up Files..."}
-    </div>
-</div>
+
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
-    {loadingElement: mainContentLoader}
+    {
+        loadingElement: <div className="mt-16 w-4/5 mx-auto">
+            <div className="animate-spin text-blue-500 text-3xl mb-3">
+                <LoadingIcon/>
+            </div>
+            <div className="text-sm text-neutral-400">
+                {"Looking up Files..."}
+            </div>
+        </div>
+    }
 )
 const CargoList = lazyComponent(
     async () => (await import("../components/cargo/CargoList")).CargoList,
-    {loadingElement: mainContentLoader}
+    {
+        loadingElement: <div className="mt-16 text-center">
+            <div className="animate-spin text-blue-500 text-3xl mb-3">
+                <LoadingIcon/>
+            </div>
+            <div className="text-sm text-neutral-400">
+                {"Looking up Add-ons..."}
+            </div>
+        </div>
+    }
 )
 const LargeMenu = lazyComponent(
     async () => (await import("../components/add-ons/LargeAddonMenu")).LargeAddonMenu,
@@ -84,20 +102,6 @@ const SmallMenu = lazyComponent(
     async () => (await import("../components/add-ons/SmallAddonsMenu")).SmallAddonsMenu,
     {loadingElement: <div style={{height: "50px"}}/>}
 )
-
-const cargoStateToNumber = (state: CargoState) => {
-    switch (state) {
-        case "aborted":
-        case "failed":
-            return 3
-        case "updating":
-            return 2
-        case "cached":
-            return 1
-        default:
-            return 0
-    }
-}
 
 type ShownModal = (
     ""
@@ -119,6 +123,8 @@ type AlertConfig = {
     content: ReactNode
 }
 
+const MINIMUM_VIEWING_ITEMS = 25
+
 const AddOns = (): JSX.Element => {
     const app = useAppShellContext()
     const {downloadClient} = useAppShellContext()
@@ -129,23 +135,25 @@ const AddOns = (): JSX.Element => {
     const [isInErrorState, setIsInErrorState] = useState(false)
     const [cargoIndex, setCargoIndex] = useState<DeepReadonly<CargoIndices>>(emptyCargoIndices())
     const [searchText, setSearchText] = useState("")
-    const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updatedAt", order: "descending"})
+    const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updatedAt", order: DESCENDING_ORDER})
     const [cargoFound, setCargoFound] = useState(true)
     const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
     const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
     const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null)
     const [modalShown, setModalShown] = useState<ShownModal>("")
+    const [viewingCount, setViewingCount] = useState(MINIMUM_VIEWING_ITEMS)
 
     const viewingCargoBytes = useRef(0)
     const {current: toggleFilter} = useRef((filterName: FilterType, order: FilterOrder, currentFilter: FilterType) => {
         if (currentFilter !== filterName) {
-            setFilterConfig({type: filterName, order: "descending"})
-        } else if (order === "descending") {
-            setFilterConfig((previous) => ({...previous, order: "ascending"}))
+            setFilterConfig({type: filterName, order: DESCENDING_ORDER})
+        } else if (order === DESCENDING_ORDER) {
+            setFilterConfig((previous) => ({...previous, order: ASCENDING_ORDER}))
         } else {
-            setFilterConfig((previous) => ({...previous, order: "descending"}))
+            setFilterConfig((previous) => ({...previous, order: DESCENDING_ORDER}))
         }
+        setViewingCount(MINIMUM_VIEWING_ITEMS)
     })
     const targetCargoRef = useRef(new Cargo<Permissions>())
     const storageUsageRef = useRef({used: 0, total: 0, left: 0})
@@ -178,10 +186,16 @@ const AddOns = (): JSX.Element => {
         entry: "",
         version: "",
         permissions: [],
-        state: "cached",
+        state: CACHED,
         downloadId: "",
         created: 0,
         updated: 0,
+    })
+    const filterElementsRef = useRef({
+        filter: "",
+        order: -1,
+        searchText: "",
+        elements: [] as CargoIndex[] 
     })
 
     const {current: cargoFilters} = useRef([
@@ -205,6 +219,7 @@ const AddOns = (): JSX.Element => {
         )
     }, [cargoIndex])
 
+    const cargoCount = cargoIndex.cargos.length
     const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
     const {current: storageUsage} = storageUsageRef
     const {current: targetCargo} = targetCargoRef
@@ -222,11 +237,15 @@ const AddOns = (): JSX.Element => {
     }, [searchParams])
 
     useEffectAsync(async () => {
-        if (cargoIndex.cargos.length < 1) {
+        if (cargoCount < 1) {
             return 
         }
         if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
-            setFilterConfig({type: "updatedAt", order: "descending"})
+            setViewingCount(MINIMUM_VIEWING_ITEMS)
+            setFilterConfig({
+                type: "updatedAt", 
+                order: DESCENDING_ORDER
+            })
             return
         }
         const canonicalUrl = decodeURIComponent(searchParams.get(ADDONS_VIEWING_CARGO) || "")
@@ -248,15 +267,14 @@ const AddOns = (): JSX.Element => {
         const cargo = await downloadClient.getCargoAtUrl(
             targetCargoIndex.canonicalUrl
         )
-        console.log("cargo res", cargo, "index", targetCargoIndex)
         if (!cargo.ok) {
             setCargoFound(false)
             return
         }
+        setFilterConfig({type: "name", order: DESCENDING_ORDER})
         viewingCargoBytes.current = cargo.data.bytes
         targetCargoRef.current = new Cargo(cargo.data.pkg as Cargo<Permissions>)
         setCargoFound(true)
-        setFilterConfig({type: "name", order: "descending"})
         setViewingCargoIndex(index)
     }, [searchParams, cargoIndex])
     
@@ -275,52 +293,72 @@ const AddOns = (): JSX.Element => {
     }, [])
 
     const filteredCargos = useMemo(() => {
-        if (isViewingCargo) {
+        if (isViewingCargo || cargoCount < 1) {
             return cargoIndex.cargos
         }
         const {order, type: filter} = filterConfig
-        const orderFactor = order === "ascending" ? 1 : -1
+        const orderFactor = order
+        const filterRef = filterElementsRef.current
+        const textIsSame = searchText === filterRef.searchText
+        const filterIsSame = filter === filterRef.filter
+        const orderIsSame = order === filterRef.order
+        const sameQuery = textIsSame && filterIsSame && orderIsSame
+        
+        if (sameQuery) {
+            return filterRef.elements.slice(0, viewingCount)
+        }
+
+        filterRef.filter = filter
+        filterRef.order = order
+        filterRef.searchText = searchText
         const copy = []
-        for (let i = 0; i < cargoIndex.cargos.length; i++) {
+        
+        for (let i = 0; i < cargoCount; i++) {
             const targetCargo = cargoIndex.cargos[i]
             if (!targetCargo.name.includes(searchText)) {
                 continue
             }
             copy.push({...targetCargo})
         }
+
         switch (filter) {
             case "updatedAt":
-                return copy.sort((a, b) => {
+                copy.sort((a, b) => {
                     const order = a.updated > b.updated ? 1 : -1
                     return order * orderFactor
                 })
+                break
             case "bytes":
-                return copy.sort((a, b) => {
+                copy.sort((a, b) => {
                     const order = a.bytes > b.bytes ? 1 : -1
                     return order * orderFactor
                 })
+                break
             case "state":
-                return copy.sort((a, b) => {
-                    const stateA = cargoStateToNumber(a.state)
-                    const stateB = cargoStateToNumber(b.state)
-                    const order = stateA > stateB ? 1 : -1
+                copy.sort((a, b) => {
+                    const order = a.state > b.state ? 1 : -1
                     return order * orderFactor
                 })
+                break
             case "addon-type":
-                return copy.sort((a, b) => {
+                copy.sort((a, b) => {
                     const order = isMod(a) && !isMod(b) ? 1 : -1
                     return order * orderFactor
                 })
+                break
             case "name":
-                return copy.sort((a, b) => {
+                copy.sort((a, b) => {
                     // the extra -1 here is to make descending order yield
                     // a result of names ordered from a to z, not z to a
                     return a.name.localeCompare(b.name) * -1 * orderFactor
                 })
+                break
             default:
-                return copy
+                break
         }
-    }, [filterConfig, cargoIndex, searchText])
+        filterRef.elements = copy
+        return copy.slice(0, viewingCount)
+    }, [filterConfig, cargoIndex, searchText, viewingCount])
 
     useEffect(() => {
         const handerId = app.addEventListener("downloadprogress", async (progress) => {
@@ -329,12 +367,12 @@ const AddOns = (): JSX.Element => {
                 return
             }
             console.log("got progress", progress)
-            let nextState: CargoState = "cached"
+            let nextState: CargoState = CACHED
             if (type === "abort") {
-                nextState = "aborted"
+                nextState = ABORTED
             }
             if (type === "fail") {
-                nextState = "failed"
+                nextState = FAILED
             }
             const copy = {...cargoIndex}
             const targetIndexes = progress.canonicalUrls
@@ -437,7 +475,7 @@ const AddOns = (): JSX.Element => {
                         }
                         indexes.cargos.splice(targetIndex, 1, {
                             ...copy.cargos[targetIndex],
-                            state: "updating"
+                            state: UPDATING
                         })
                         setCargoIndex(copy)
                         return true
@@ -510,7 +548,7 @@ const AddOns = (): JSX.Element => {
                                 : `${toGigabytesString(storageUsage.used, 1)} / ${toGigabytesString(storageUsage.total, 1)} used` 
                             }
                             <span className="text-neutral-400 ml-1.5">
-                                {`(${cargoIndex.cargos.length} Add-ons)`}
+                                {`(${cargoCount} Add-ons)`}
                             </span>
                         </>}
                     
@@ -535,7 +573,7 @@ const AddOns = (): JSX.Element => {
 
                     <ScreenSize minWidth={SMALL_SCREEN_MINIMUM_WIDTH_PX}>
                         <LargeMenu
-                            cargoCount={cargoIndex.cargos.length}
+                            cargoCount={cargoCount}
                             storageUsage={storageUsage}
                             isError={isInErrorState}
                             loading={loadingInitialData}
@@ -561,6 +599,9 @@ const AddOns = (): JSX.Element => {
                             mutateDirectoryPath={setDirectoryPath}
                             onShowCargoInfo={onShowCargoInfo}
                             onShowCargoUpdater={onShowCargoUpdater}
+                            onRecoverCargo={() => {
+                                console.log("show recovery modal")
+                            }}
                             onDeleteCargo={async (canonicalUrl) => {
                                 const copy = [...cargoIndex.cargos]
                                 copy.splice(viewingCargoIndex, 1)
@@ -668,8 +709,11 @@ const AddOns = (): JSX.Element => {
                             </> : <>
                                 <CargoList
                                     cargosIndexes={filteredCargos}
-                                    hasMore={false}
+                                    hasMore={cargoCount > viewingCount}
                                     onViewCargo={setViewingCargo}
+                                    onPaginate={() => {
+                                        setViewingCount((previous) => previous + 25)
+                                    }}
                                 />
                             </>}
                         </div>

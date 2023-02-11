@@ -7,7 +7,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faFolder } from "@fortawesome/free-solid-svg-icons"
 import UpdatingAddonIcon from "@mui/icons-material/Sync"
 import FailedAddonIcon from "@mui/icons-material/ReportProblem"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
+import LoadingIcon from "../LoadingIcon"
+import { ABORTED, FAILED, UPDATING } from "../../lib/shabah/backend"
 
 type CargoSummaryProps = {
     onClick: () => void | Promise<void>
@@ -65,8 +67,8 @@ type CargoSummaryIconProps = {
 
 const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Element => {
     switch (cargoState) {
-        case "aborted":
-        case "failed":
+        case ABORTED:
+        case FAILED:
             return <>
             <span className={"mr-3"}>
                 <FontAwesomeIcon 
@@ -79,7 +81,7 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
                 />
             </div>
         </>
-        case "updating":
+        case UPDATING:
             return <>
                 <span className={"mr-3 text-blue-500"}>
                     <FontAwesomeIcon icon={faFolder}/>
@@ -104,22 +106,56 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
 export type CargoListProps = {
     onViewCargo: (url: string) => void
     cargosIndexes: CargoIndex[]
-    hasMore: boolean
+    hasMore: boolean,
+    onPaginate: () => void
 }
+
+const PAGINATOR_ID = "cargo-list-paginator"
 
 export const CargoList = ({
     onViewCargo,
-    cargosIndexes
+    cargosIndexes,
+    hasMore,
+    onPaginate
 }: CargoListProps): JSX.Element => {
+    const paginatorObserver = useRef<IntersectionObserver | null>(null)
+
+    useEffect(() => {
+        if (paginatorObserver.current) {
+            return
+        }
+        const root = document.getElementById(PAGINATOR_ID)
+        if (!root) {
+            console.warn("observer couldn't find root element")
+            return
+        }
+        const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) {
+                    return
+                }
+                onPaginate()
+            }
+        }, {threshold: 0.8})
+        observer.observe(root)
+        paginatorObserver.current = observer
+        return () => {
+            if (!paginatorObserver.current) {
+                return
+            }
+            paginatorObserver.current.disconnect()
+            paginatorObserver.current = null
+        }
+    }, [])
 
     const {current: cargoStatus} = useRef((cargoState: CargoState) => {
         switch (cargoState) {
-            case "aborted":
-            case "failed":
+            case ABORTED:
+            case FAILED:
                 return <span className="text-red-500">
                     {"Failed"}
                 </span>
-            case "updating":
+            case UPDATING:
                 return <span className="text-blue-500">
                     {"Updating"}
                 </span>
@@ -147,6 +183,15 @@ export const CargoList = ({
                 byteCount={cargo.bytes}
             />
         })}
-        <div className="sm:hidden h-8" />
+
+        <div className={`w-4/5 mx-auto my-3 ${hasMore ? "" : "hidden"}`}>
+            <div className="animate-pulse text-center text-neutral-400 text-sm">
+                <span id={PAGINATOR_ID}>
+                    {"Loading..."}
+                </span>
+            </div>
+        </div>
+
+        <div className={`sm:hidden h-8 ${hasMore ? "hidden" : ""}`}/>
     </div> 
 }
