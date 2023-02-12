@@ -6,7 +6,7 @@ import {
 } from "react-router-dom"
 import {useState, useEffect, useRef} from "react"
 import {lazyComponent, LazyComponentOptions, LazyComponent} from "../components/Lazy"
-import type {AppStore} from "../lib/utils/initAppStore"
+import {AppStore} from "../lib/utils/initAppStore"
 import {AppShellContext, useAppShellContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
@@ -131,10 +131,19 @@ const PageDisplay = () => {
 }
 
 type AppShellProps = {
-    globalState: AppStore
+    setTerminalVisibility: (value: boolean) => void
 }
 
-export const AppRouter = ({globalState}: AppShellProps) => {
+export const AppRouter = ({setTerminalVisibility}: AppShellProps) => {
+    const {current: globalState} = useRef(new AppStore({
+        setTerminalVisibility
+    }))
+
+    useEffect(() => {
+        globalState.initialize()
+        return () => { globalState.destroy() }
+      }, [])
+
     return <BrowserRouter>
         <AppShellContext.Provider value={globalState}>
             <PageDisplay/>

@@ -45,8 +45,8 @@ import {ScreenSize} from "../components/ScreenSize"
 import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
 import LoadingIcon from "../components/LoadingIcon"
-import { nanoid } from "nanoid"
 import { ABORTED, CACHED, FAILED, UPDATING } from "../lib/shabah/backend"
+import { ERROR_CODES_START } from "../lib/shabah/client"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -67,7 +67,6 @@ const CargoUpdater = lazyComponent(
     async () => (await import("../components/cargo/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
-
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
     {
@@ -102,6 +101,10 @@ const SmallMenu = lazyComponent(
     async () => (await import("../components/add-ons/SmallAddonsMenu")).SmallAddonsMenu,
     {loadingElement: <div style={{height: "50px"}}/>}
 )
+const RecoveryModal = lazyComponent(
+    async () => (await import("../components/cargo/RecoveryModal")).RecoveryModal,
+    {loadingElement: FullScreenOverlayLoading}
+)
 
 type ShownModal = (
     ""
@@ -109,6 +112,7 @@ type ShownModal = (
     | "Updater"
     | "Installer"
     | "CargoInfo"
+    | "Recovery"
 )
 
 type FilterType = "updatedAt" | "bytes" | "state" | "addon-type" | "name"
@@ -167,6 +171,7 @@ const AddOns = (): JSX.Element => {
     })
     const {current: onBackToCargos} = useRef(() => removeSearchKey(ADDONS_VIEWING_CARGO))
     const {current: onShowInstaller} = useRef(() => setModalShown("Installer"))
+    const {current: onShowRecovery} = useRef(() => setModalShown("Recovery"))
     const {current: onShowCargoInfo} = useRef(() => setSearchKey(ADDONS_MODAL, "info"))
     const {current: onShowCargoUpdater} = useRef(() => setSearchKey(ADDONS_MODAL, "update"))
     const {current: clearModal} = useRef(() => {
@@ -195,6 +200,7 @@ const AddOns = (): JSX.Element => {
         filter: "",
         order: -1,
         searchText: "",
+        cargoIndex: null as CargoIndices | null,
         elements: [] as CargoIndex[] 
     })
 
@@ -279,6 +285,7 @@ const AddOns = (): JSX.Element => {
     }, [searchParams, cargoIndex])
     
     useEffectAsync(async () => {
+        await downloadClient.consumeQueuedMessages()
         const [cargoIndexRes, clientStorageRes] = await Promise.all([
             io.wrap(downloadClient.getCargoIndices()),
             io.wrap(downloadClient.diskInfo()),
@@ -302,7 +309,8 @@ const AddOns = (): JSX.Element => {
         const textIsSame = searchText === filterRef.searchText
         const filterIsSame = filter === filterRef.filter
         const orderIsSame = order === filterRef.order
-        const sameQuery = textIsSame && filterIsSame && orderIsSame
+        const indexIsSame = cargoIndex === filterRef.cargoIndex
+        const sameQuery = textIsSame && filterIsSame && orderIsSame && indexIsSame
         
         if (sameQuery) {
             return filterRef.elements.slice(0, viewingCount)
@@ -311,6 +319,7 @@ const AddOns = (): JSX.Element => {
         filterRef.filter = filter
         filterRef.order = order
         filterRef.searchText = searchText
+        filterRef.cargoIndex = cargoIndex
         const copy = []
         
         for (let i = 0; i < cargoCount; i++) {
@@ -366,28 +375,10 @@ const AddOns = (): JSX.Element => {
             if (type === "install") {
                 return
             }
-            console.log("got progress", progress)
-            let nextState: CargoState = CACHED
-            if (type === "abort") {
-                nextState = ABORTED
-            }
-            if (type === "fail") {
-                nextState = FAILED
-            }
-            const copy = {...cargoIndex}
-            const targetIndexes = progress.canonicalUrls
-                .map((url) => copy.cargos.findIndex((cargo) => cargo.canonicalUrl === url))
-                .filter((index) => index > -1)
-            const {cargos} = copy
-            for (const index of targetIndexes) {
-                cargos.splice(index, 1, {
-                    ...cargos[index], 
-                    state: nextState,
-                    downloadId: ""
-                })
-            }
+            await downloadClient.consumeQueuedMessages()
             await sleep(5_000)
-            setCargoIndex(copy)
+            const updatedCargos = await downloadClient.getCargoIndices()
+            setCargoIndex({...updatedCargos})
         })
         return () => { app.removeEventListener("downloadprogress", handerId) }
     })
@@ -431,11 +422,23 @@ const AddOns = (): JSX.Element => {
                             )
                             console.log("dl status", status)
                             const indexes = await downloadClient.getCargoIndices()
+                            console.log("indexes after download", indexes)
                             setCargoIndex({...indexes})
                             const ok = !(status.data >= Shabah.ERROR_CODES_START)
                             return ok 
                         }}
                         createAlert={(content) => setAlertConfig({type: "success", content})}
+                        onCheckIfCanonicalCargoExists={async (canonicalUrl: string) => {
+                            const index = cargoIndex.cargos.findIndex(
+                                (cargo) => cargo.canonicalUrl === canonicalUrl
+                            )
+                            return index > -1
+                        }}
+                        onUpdateCargo={(canonicalUrl) => {
+                            clearModal()
+                            setViewingCargo(canonicalUrl)
+                            onShowCargoUpdater()
+                        }}
                     />
                 </> : <></>}
 
@@ -444,7 +447,7 @@ const AddOns = (): JSX.Element => {
                     autoClose={4_000}
                     color={alertConfig.type}
                     content={alertConfig.content}
-                    className="fixed left-2 z-20 w-52"
+                    className="fixed left-2 z-30 w-52"
                     style={{top: "91vh"}}
                 /> : <></>}
 
@@ -481,6 +484,29 @@ const AddOns = (): JSX.Element => {
                         return true
                     }}
                 /> : <></>}
+
+                {isViewingCargo && cargoFound && modalShown === "Recovery" ? <>
+                    <RecoveryModal
+                        cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
+                        onClose={clearModal}
+                        onCreateAlert={(type, content) => setAlertConfig({type, content})}
+                        onRetryDownload={async (canonicalUrl, title) => {
+                            const retryResponse = await downloadClient.retryFailedDownloads(
+                                [canonicalUrl],
+                                title,
+                            )
+                            return retryResponse.data === Shabah.STATUS.updateRetryQueued
+                        }}
+                        onDeleteCargo={async (canonicalUrl) => {
+                            const copy = [...cargoIndex.cargos]
+                            copy.splice(viewingCargoIndex, 1)
+                            setCargoIndex({...cargoIndex, cargos: copy})
+                            onBackToCargos()
+                            await downloadClient.deleteCargo(canonicalUrl)
+                            return true
+                        }}
+                    />
+                </> : <></>}
 
                 <div className="w-full relative z-0 sm:h-1/12 flex items-center justify-center">
 
@@ -599,9 +625,7 @@ const AddOns = (): JSX.Element => {
                             mutateDirectoryPath={setDirectoryPath}
                             onShowCargoInfo={onShowCargoInfo}
                             onShowCargoUpdater={onShowCargoUpdater}
-                            onRecoverCargo={() => {
-                                console.log("show recovery modal")
-                            }}
+                            onRecoverCargo={onShowRecovery}
                             onDeleteCargo={async (canonicalUrl) => {
                                 const copy = [...cargoIndex.cargos]
                                 copy.splice(viewingCargoIndex, 1)

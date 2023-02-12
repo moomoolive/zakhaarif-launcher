@@ -34,10 +34,13 @@ const createFileCache = (initFiles: Record<string, Response>) => {
 
 const createDownloadIndex = ({
     id = "pkg", 
-    title = "none", 
+    title = "none",
+    name = "",
     bytes = 0, 
     canonicalUrl = "", 
     map = {},
+    downloadedResources = [],
+    canRevertToPreviousVersion = false,
     resourcesToDelete = [],
     version = "0.1.0", 
     previousVersion = "none", 
@@ -50,8 +53,11 @@ const createDownloadIndex = ({
         title, 
         bytes,
         segments: [{
-            map, 
-            canonicalUrl, 
+            map,
+            name,
+            canonicalUrl,
+            canRevertToPreviousVersion,
+            downloadedResources, 
             version, 
             previousVersion, 
             resolvedUrl,
@@ -419,12 +425,15 @@ describe("reading and writing error download indices", () => {
             segments: [
                 {
                     version: "0.1.0",
+                    name: "",
                     previousVersion: "0.1.0-beta",
                     resolvedUrl: "",
                     canonicalUrl: "",
                     bytes: 0,
                     map: {},
                     resourcesToDelete: [],
+                    downloadedResources: [],
+                    canRevertToPreviousVersion: false
                 }
             ]
         }
@@ -451,10 +460,13 @@ describe("reading and writing error download indices", () => {
                     version: "0.1.0",
                     previousVersion: "0.1.0-beta",
                     resolvedUrl: "",
+                    name: "",
                     canonicalUrl: "",
                     map: {},
                     bytes: 0,
                     resourcesToDelete: [],
+                    downloadedResources: [],
+                    canRevertToPreviousVersion: false
                 }
             ]
         }
@@ -478,19 +490,25 @@ describe("reading and writing error download indices", () => {
                     version: "0.1.0",
                     previousVersion: "0.1.0-beta",
                     resolvedUrl: "",
+                    name: "",
                     canonicalUrl: "",
                     bytes: 0,
                     map: {},
                     resourcesToDelete: [],
+                    downloadedResources: [],
+                    canRevertToPreviousVersion: false
                 },
                 {
                     version: "0.1.0",
                     previousVersion: "0.1.0-beta",
                     resolvedUrl: "",
                     canonicalUrl: "",
+                    name: "",
                     bytes: 0,
                     map: {},
                     resourcesToDelete: [],
+                    downloadedResources: [],
+                    canRevertToPreviousVersion: false
                 }
             ]
         }

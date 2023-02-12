@@ -1,4 +1,4 @@
-import {APP_CACHE} from "../src/config"
+import {APP_CACHE, DOWNLOAD_CLIENT_QUEUE} from "../src/config"
 import type {
     BackgroundFetchEventHandlerSetters
 } from "../src/lib/types/serviceWorkers"
@@ -11,6 +11,7 @@ import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
 import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
 import {wRpc} from "../src/lib/wRpc/simple"
 import type {AppRpcs} from "../src/lib/utils/appRpc"
+import { DownloadClientMessage, downloadClientMessageUrl } from "../src/lib/shabah/backend"
 
 const sw = globalThis.self as unknown as (
     ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
@@ -96,12 +97,22 @@ const notifyDownloadProgress = async (update: ProgressUpdateRecord) => {
     rpc.execute("notifyDownloadProgress", update)
 }
 
+const messageDownloadClient = async (message: DownloadClientMessage) => {
+    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
+    await targetCache.put(
+        downloadClientMessageUrl(message),
+        new Response(JSON.stringify(message), {status: 200, statusText: "OK"})
+    )
+    return true
+}
+
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
     origin: sw.location.origin,
     fileCache,
     log: logger,
     type: "success",
-    onProgress: notifyDownloadProgress
+    onProgress: notifyDownloadProgress,
+    messageDownloadClient
 })
 
 sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
@@ -113,7 +124,8 @@ const bgFetchAbortHandle = makeBackgroundFetchHandler({
     fileCache,
     log: logger,
     type: "abort",
-    onProgress: notifyDownloadProgress
+    onProgress: notifyDownloadProgress,
+    messageDownloadClient
 })
 
 sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
@@ -123,42 +135,8 @@ const bgFetchFailHandle = makeBackgroundFetchHandler({
     fileCache,
     log: logger,
     type: "fail",
-    onProgress: notifyDownloadProgress
+    onProgress: notifyDownloadProgress,
+    messageDownloadClient
 })
 
 sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))
-
-/*
-const unreachable = (_: never): never => { throw new Error("code path should never branch to here") }
-
-sw.onmessage = (event) => event.waitUntil((async () => {
-    const data = event.data as InboundMessage
-    if (typeof data.action !== "string") {
-        return
-    }
-    const {action} = data
-    switch (action) {
-        case "config:verbose_logs":
-            config.log = true
-            break
-        case "config:silent_logs": {}
-            config.log = false
-            break
-        case "list:connected_clients":  {
-            const clients = await sw.clients.matchAll()
-            const info = clients.map((c) =>`(id=${c.id || "unknown"}, url=${c.url}, type=${c.type})\n`)
-            console.info(`connected clients: ${info.join(",")}`,)
-            break
-        }
-        case "list:config":
-            console.info("config:", config)
-            break
-        default:
-            return unreachable(action)
-    }
-    if (data.action.startsWith("config:")) {
-        persistConfig()
-        console.info(`config changed, new config:`, config)
-    }
-})())
-*/

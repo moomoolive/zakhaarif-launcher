@@ -2,7 +2,7 @@ import type {DeepReadonly} from "../types/utility"
 import {Cargo} from "../cargo/index"
 import {CargoIndex} from "../shabah/downloadClient"
 import {ALLOW_ALL_PERMISSIONS, Permissions} from "../types/permissions"
-import {AppDatabase} from "../database/AppDatabase"
+import type {AppDatabase} from "../database/AppDatabase"
 import {sleep} from "../utils/sleep"
 import { APP_CACHE } from "../../config"
 import {wRpc} from "../wRpc/simple"
@@ -19,6 +19,7 @@ export type SandboxDependencies = DeepReadonly<{
     cargoIndex: CargoIndex
     cargo: Cargo<Permissions>
     recommendedStyleSheetUrl: string
+    database: AppDatabase
 }>
 
 export type RpcPersistentState = {
@@ -43,7 +44,6 @@ export const createRpcState = (
         secureContextEstablished: false,
         minimumLoadTimePromise: sleep(minimumLoadTime),
         fatalErrorOccurred: false,
-        database: new AppDatabase(),
         permissionsSummary,
         authToken: nanoid(AUTH_TOKEN_LENGTH)
     }
@@ -184,7 +184,7 @@ export const essentialRpcs = (state: RpcState) => {
             }
             state.fatalErrorOccurred = true
             console.log("extension encountered fatal error")
-            state.createFatalErrorMessage("Extension encountered a fatal error")
+            state.createFatalErrorMessage("Encountered a fatal error")
             return true
         },
         readyForDisplay: () => {

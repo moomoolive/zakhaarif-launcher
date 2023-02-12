@@ -71,8 +71,11 @@ export type ResourceMap = Record<string, ResourceMeta>
 export type DownloadSegment = {
     map: ResourceMap
     bytes: number
+    name: string
     version: string
     previousVersion: string
+    downloadedResources: string[]
+    canRevertToPreviousVersion: boolean
     resourcesToDelete: string[]
     canonicalUrl: string
     resolvedUrl: string
@@ -234,6 +237,24 @@ export type CargoState = (
     | typeof FAILED 
     | typeof ABORTED
 )
+
+export type DownloadClientMessage = {
+    timestamp: number
+    downloadId: string
+    stateUpdates: Array<{
+        canonicalUrl: string
+        state: CargoState
+    }>
+}
+
+export type DownloadClientMessageConsumer = {
+    getAllMessages: () => Promise<ReadonlyArray<DownloadClientMessage>>,
+    deleteMessage: (message: DownloadClientMessage) => Promise<boolean> 
+}
+
+export const downloadClientMessageUrl = (message: DownloadClientMessage): string => {
+    return `https://sw.queue/${message.downloadId}`
+}
 
 export type Permissions = {key: string, value: string[]}[]
 

@@ -1,14 +1,10 @@
 import type {CargoIndex, CargoState} from "../../lib/shabah/downloadClient"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
-import { Tooltip } from "@mui/material"
 import { reactiveDate } from "../../lib/utils/dates"
 import { isMod } from "../../lib/utils/cargos"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faFolder } from "@fortawesome/free-solid-svg-icons"
-import UpdatingAddonIcon from "@mui/icons-material/Sync"
-import FailedAddonIcon from "@mui/icons-material/ReportProblem"
+import { faExclamationTriangle, faFolder, faRotate } from "@fortawesome/free-solid-svg-icons"
 import { useEffect, useRef } from "react"
-import LoadingIcon from "../LoadingIcon"
 import { ABORTED, FAILED, UPDATING } from "../../lib/shabah/backend"
 
 type CargoSummaryProps = {
@@ -76,9 +72,9 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
                 />
             </span>
             <div className="absolute z-10 bottom-0 left-0 text-red-500">
-                <FailedAddonIcon
-                    style={{fontSize: "12px"}}
-                />
+                <span style={{fontSize: "12px"}}>
+                    <FontAwesomeIcon icon={faExclamationTriangle}/>
+                </span>
             </div>
         </>
         case UPDATING:
@@ -87,9 +83,9 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
                     <FontAwesomeIcon icon={faFolder}/>
                 </span>
                 <div className="absolute z-10 bottom-0 left-0 animate-spin">
-                    <UpdatingAddonIcon
-                        style={{fontSize: "12px"}}
-                    />
+                    <span style={{fontSize: "12px"}}>
+                        <FontAwesomeIcon icon={faRotate}/>
+                    </span>
                 </div>
             </>
         default:

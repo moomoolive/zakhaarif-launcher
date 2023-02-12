@@ -1,14 +1,30 @@
 import {useState, useEffect, useRef} from 'react'
 import {createTheme, ThemeProvider} from "@mui/material"
 import type {CommandDefinition, TerminalEngine} from "./lib/terminalEngine/index"
-import {featureCheck} from "./lib/utils/appFeatureCheck"
 import {ConfirmProvider} from "material-ui-confirm"
 import {lazyComponent} from "./components/Lazy"
 import terminalLoadingElement from "./components/loadingElements/terminal"
 import {useEffectAsync} from "./hooks/effectAsync"
-import { AppStore } from "./lib/utils/initAppStore"
+import LoadingIcon from './components/LoadingIcon'
+import { FEATURE_CHECK } from './lib/utils/featureCheck'
 
-const AppRouter = lazyComponent(async () => (await import("./routes/Router")).AppRouter)
+const AppRouter = lazyComponent(
+  async () => (await import("./routes/Router")).AppRouter,
+  {
+    loadingElement: <div className="fixed top-0 left-0 h-screen w-screen flex items-center justify-center">
+      <div>
+        <div className="text-blue-500 animate-spin mb-4 text-center">
+          <span className="text-4xl">
+            <LoadingIcon/>
+          </span>
+        </div>
+        <div className="text-neutral-400 animate-pulse">
+          {"Starting app..."}
+        </div>
+      </div>
+    </div>
+  }
+)
 const Terminal = lazyComponent(async () => (await import("./components/Terminal")).Terminal, {
   loadingElement: terminalLoadingElement
 })
@@ -28,13 +44,10 @@ const  App = () => {
   
   const [showTerminal, setShowTerminal] = useState(false)
   const [terminalEngine, setTerminalEngine] = useState<null | TerminalEngine>(null)
+  
   const terminalReady = useRef(false)
-  const {current: globalState} = useRef(new AppStore({
-    setTerminalVisibility: setShowTerminal
-  }))
-
   const serviceWorkerInitialized = useRef(false)
-  const {current: ALL_APIS_SUPPORTED} = useRef(featureCheck().every((feature) => feature.supported))
+  const {current: ALL_APIS_SUPPORTED} = useRef(FEATURE_CHECK.every((feature) => feature.supported))
   const {current: terminalState} = useRef({
     onBackTick: () => {}
   })
@@ -88,11 +101,6 @@ const  App = () => {
     serviceWorkerInitialized.current = true
   }, [])
 
-  useEffect(() => {
-    globalState.initialize()
-    return () => { globalState.destroy() }
-  }, [])
-
   return (
     <main>
       <ThemeProvider theme={launcherTheme}>
@@ -104,7 +112,7 @@ const  App = () => {
             />
           </> : <></>}
 
-          <AppRouter globalState={globalState}/>
+          <AppRouter setTerminalVisibility={setShowTerminal}/>
 
         </ConfirmProvider>
       </ThemeProvider>

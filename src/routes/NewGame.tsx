@@ -18,7 +18,7 @@ import {useEffectAsync} from "../hooks/effectAsync"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
-import {AppDatabase, MANUAL_SAVE} from "../lib/database/AppDatabase"
+import {MANUAL_SAVE} from "../lib/database/AppDatabase"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { isMod } from "../lib/utils/cargos"
 import { sleep } from "../lib/utils/sleep"
@@ -27,15 +27,13 @@ import LoadingIcon from "../components/LoadingIcon"
 const NewGamePage = () => {
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, database} = useAppShellContext()
 
     const [gameName, setGameName] = useState(`unnamed-${(Math.trunc(Math.random() * 99_999)).toString()}`)
     const [cargoIndices, setCargoIndices] = useState(emptyCargoIndices())
     const [showModLinker, setShowModLinker] = useState(false)
     const [linkedMods, setLinkedMods] = useState([] as CargoIndex[])
     const [loading, setLoading] = useState(false)
-
-    const {current: appDatabase} = useRef(new AppDatabase())
 
     useEffectAsync(async () => {
         const clientResponse = await downloadClient.getCargoIndices()
@@ -121,19 +119,20 @@ const NewGamePage = () => {
                         type="submit"
                         onClick={async () => {
                             setLoading(true)
-                            const commitSavePromise = appDatabase.gameSaves.create({
+                            const mods = linkedMods.reduce((total, next) => {
+                                total.canonicalUrls.push(next.canonicalUrl)
+                                total.resolvedUrls.push(next.resolvedUrl)
+                                total.entryUrls.push(next.entry)
+                                return total
+                            }, {
+                                canonicalUrls: [] as string[],
+                                resolvedUrls: [] as string[],
+                                entryUrls: [] as string[],
+                            })
+                            const commitSavePromise = database.gameSaves.create({
                                 name: gameName,
                                 type: MANUAL_SAVE,
-                                mods: linkedMods.reduce((total, next) => {
-                                    total.canonicalUrls.push(next.canonicalUrl)
-                                    total.resolvedUrls.push(next.resolvedUrl)
-                                    total.entryUrls.push(next.entry)
-                                    return total
-                                }, {
-                                    canonicalUrls: [] as string[],
-                                    resolvedUrls: [] as string[],
-                                    entryUrls: [] as string[],
-                                }),
+                                mods,
                                 content: {}
                             })
                             const [{id: gameId}] = await Promise.all([

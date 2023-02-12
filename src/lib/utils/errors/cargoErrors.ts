@@ -8,11 +8,14 @@ export type CargoRequestError = (
     | "malformed-url"
     | "invalid-manifest-url"
     | "analyzing"
+    | "manifest-already-exists"
     | "none"
 )
 
 export const cargoErrorToText = (error: CargoRequestError) => {
     switch (error) {
+        case "manifest-already-exists":
+            return "Add-on already exists"
         case "invalid-manifest-url":
             return "Invalid Add-on url"
         case "insufficent-storage":

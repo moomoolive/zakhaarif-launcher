@@ -30,6 +30,8 @@ export const STATUS_CODES = {
     noDownloadbleResources: 3,
     cached: 4,
     manifestIsUpToDate: 5,
+    messagesConsumed: 6,
+    noMessagesFound: 7,
 
     networkError: ERROR_CODES_START,
     badHttpCode: 101,
@@ -51,6 +53,8 @@ export const STATUS_CODES = {
     invalidManifestUrl: 117,
     malformedUrl: 118,
     errorIndexNotFound: 119,
+    allMessagesAreOrphaned: 120,
+    someMessagesAreOrphaned: 121
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]

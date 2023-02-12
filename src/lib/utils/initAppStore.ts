@@ -1,11 +1,14 @@
 import {Shabah} from "../shabah/downloadClient"
 import { webAdaptors } from "../shabah/adaptors/web-preset"
-import { APP_CACHE } from "../../config"
+import { APP_CACHE, DOWNLOAD_CLIENT_QUEUE } from "../../config"
 import { cleanPermissions } from "./security/permissionsSummary"
 import type {ServiceWorkerRpcs} from "../../../serviceWorkers/rpcs"
 import {wRpc} from "../wRpc/simple"
 import {createAppRpcs, DownloadProgressListener} from "./appRpc"
 import {EventListenerRecord} from "./eventListener"
+import { AppDatabase } from "../database/AppDatabase"
+import { DownloadClientMessage, downloadClientMessageUrl } from "../shabah/backend"
+import {FEATURE_CHECK} from "./featureCheck"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener
@@ -30,6 +33,8 @@ export class AppStore {
         promise: Promise<boolean>
     }
     serviceWorkerTerminal: wRpc<ServiceWorkerRpcs>
+    database: AppDatabase
+    readonly browserFeatures: typeof FEATURE_CHECK
 
     private eventListenerMap: EventListenerMap
     private globalListeners: Array<{
@@ -38,12 +43,37 @@ export class AppStore {
     }>
 
     constructor(config: AppStoreConfig) {
+        this.browserFeatures = FEATURE_CHECK
         this.setTerminalVisibility  = config.setTerminalVisibility
-        
+        this.database = new AppDatabase()
         this.downloadClient = new Shabah({
             origin: location.origin,
             adaptors: webAdaptors(APP_CACHE),
-            permissionsCleaner: cleanPermissions
+            permissionsCleaner: cleanPermissions,
+            messageConsumer: {
+                getAllMessages: async () => {
+                    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
+                    const files = await targetCache.keys()
+                    const messageFiles = await Promise.all(
+                        files.map((request) => targetCache.match(request.url))
+                    )
+                    const filteredMessages: Response[] = []
+                    for (const file of messageFiles) {
+                        if (file) {
+                            filteredMessages.push(file)
+                        } 
+                    }
+                    const messages = await Promise.all(
+                        filteredMessages.map((message) => message.json() as Promise<DownloadClientMessage>)
+                    )
+                    return messages as ReadonlyArray<DownloadClientMessage>
+                },
+                deleteMessage: async (message) => {
+                    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
+                    targetCache.delete(downloadClientMessageUrl(message))
+                    return true
+                }
+            }
         })
         
         this.sandboxInitializePromise = {

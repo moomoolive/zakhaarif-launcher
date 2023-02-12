@@ -2,7 +2,6 @@ import { FullScreenLoadingOverlay } from "../components/LoadingOverlay"
 import { useEffectAsync } from "../hooks/effectAsync"
 import { useMemo, useRef, useState } from "react"
 import {
-    AppDatabase,
     MANUAL_SAVE,
     QUICK_SAVE,
     AUTO_SAVE
@@ -27,8 +26,7 @@ const DO_NOT_SHOW_LINKER = -1
 const SAVE_FILTERS = ["updatedAt", "name", "type"] as const
 
 const LoadGamePage = () => {
-    const {current: appDatabase} = useRef(new AppDatabase())
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, database} = useAppShellContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
 
@@ -102,7 +100,7 @@ const LoadGamePage = () => {
         if (index < 0) {
             return
         }
-        appDatabase.gameSaves.deleteById(id)
+        database.gameSaves.deleteById(id)
         const copy = [...saves]
         copy.splice(index, 1)
         if (copy.length < 1) {
@@ -124,7 +122,7 @@ const LoadGamePage = () => {
 
     useEffectAsync(async () => {
         const [saves, cargoIndexesResponse] = await Promise.all([
-            appDatabase.gameSaves.getAll(),
+            database.gameSaves.getAll(),
             downloadClient.getCargoIndices()
         ] as const)
         setSaves(saves)
@@ -158,7 +156,7 @@ const LoadGamePage = () => {
                                 entryUrls: [] as string[],
                             }),
                         } as const
-                        appDatabase.gameSaves.updateOne(
+                        database.gameSaves.updateOne(
                             saves[saveIndex].id, newSave
                         )
                         copy.splice(saveIndex, 1, newSave)

@@ -25,10 +25,7 @@ import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import { PermissionsDisplay } from "./PermissionsDisplay"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 
-type UpdateState = (
-    "error"
-    | "up-to-date"
-)
+type UpdateState = "error" | "up-to-date"
 
 type UpdateResponse = {
     checkResponse: UpdateCheckResponse

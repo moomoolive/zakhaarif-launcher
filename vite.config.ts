@@ -1,8 +1,8 @@
-import { defineConfig, PluginOption } from 'vite'
+import {defineConfig, PluginOption} from 'vite'
 import react from '@vitejs/plugin-react'
 
 // taken from https://github.com/chaosprint/vite-plugin-cross-origin-isolation
-const allowSharedArrayBuffer = () => ({
+const serverAllowSharedArrayBuffer = () => ({
   name: "allow-shared-array-buffers",
   configureServer: (server) => {
     server.middlewares.use((_, res, next) => {
@@ -38,12 +38,22 @@ const logServerRequests = ({silent = false, withHeaders = true} = {}) => ({
 export default defineConfig({
   plugins: [
     react(),
-    allowSharedArrayBuffer(),
+    serverAllowSharedArrayBuffer(),
     logServerRequests({silent: true, withHeaders: false})
   ],
   build: {
     manifest: "build-manifest.json",
     target: "es2020",
-    outDir: "dist/main"
+    outDir: "dist/main",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          dexie: ["dexie"],
+          "@mui/material": ["@mui/material"],
+          "@fortawesome/free-brands-svg-icons": ["@fortawesome/free-brands-svg-icons"],
+          "@fortawesome/free-solid-svg-icons": ["@fortawesome/free-solid-svg-icons"],
+        } 
+      }
+    }
   },
 })

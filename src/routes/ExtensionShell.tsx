@@ -28,7 +28,7 @@ const NO_EXTENSION_URL = ""
 const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
-    const {downloadClient, sandboxInitializePromise} = useAppShellContext()
+    const {downloadClient, sandboxInitializePromise, database} = useAppShellContext()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
@@ -177,6 +177,7 @@ const ExtensionShellPage = () => {
                 displayExtensionFrame: () => {
                     setLoading(false)
                 },
+                database,
                 minimumLoadTime: 10_000,
                 queryState: searchParams.get("state") || "",
                 createFatalErrorMessage: (msg) => {

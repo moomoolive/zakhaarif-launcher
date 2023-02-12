@@ -13,7 +13,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import { useAppShellContext } from "../../routes/store"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
-import {isExtension, isStandardCargo} from "../../lib/utils/cargos"
+import {isExtension, isInErrorState, isStandardCargo} from "../../lib/utils/cargos"
 import type {CargoDirectory, RootDirectoryPath} from "./CargoFileSystem"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {CargoIcon} from "./Icon"
@@ -206,9 +206,8 @@ export const FileSystemBreadcrumbs = ({
                             Update
                         </MenuItem>
 
-                        <MenuItem
+                        {isInErrorState(targetCargo) ? <MenuItem
                             className="hover:text-indigo-500"
-                            //disabled={targetCargo.state === "updating"}
                             onClick={() => {
                                 onRecoverCargo(targetCargo.canonicalUrl)
                                 setCargoMenuElement(null)
@@ -218,16 +217,19 @@ export const FileSystemBreadcrumbs = ({
                                 <FontAwesomeIcon icon={faShieldDog} />
                             </span>
                             Recover
-                        </MenuItem>
+                        </MenuItem> : null}
                         
                         {isExtension(targetCargo)
                             ? <MenuItem
                                 className="hover:text-yellow-500"
-                                disabled={targetCargo.entry === NULL_FIELD}
                                 onClick={async () => {
                                     const confirmed = await confirm({title: "Are you sure you want to run this add-on?", confirmButtonColor: "warning"})
                                     setCargoMenuElement(null)
                                     if (!confirmed) {
+                                        return
+                                    }
+                                    if (targetCargo.canonicalUrl === import.meta.env.VITE_APP_LAUNCHER_CARGO_URL) {
+                                        navigate("/")
                                         return
                                     }
                                     navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(targetCargo.canonicalUrl)}`)
@@ -242,11 +244,11 @@ export const FileSystemBreadcrumbs = ({
                         }
 
                         <MenuItem
-                            disabled={isStandardCargo(targetCargo)}
-                            className={isStandardCargo(targetCargo) ? "" : "hover:text-red-500"}
+                            className="hover:text-red-500"
                             onClick={async () => {
                                 const target = targetCargo
-                                if (!await confirm({title: `Are you sure you want to delete this add-on?`, confirmButtonColor: "error"})) {
+                                const isStandard = isStandardCargo(targetCargo)
+                                if (!await confirm({title: `Are you sure you want to delete this ${isStandard ? " core " : ""}add-on forever?`, confirmButtonColor: "error"})) {
                                     setCargoMenuElement(null)
                                     return
                                 }

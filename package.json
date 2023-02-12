@@ -31,7 +31,6 @@
     "@fortawesome/free-brands-svg-icons": "^6.2.1",
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
-    "@mui/icons-material": "^5.10.16",
     "@mui/material": "^5.10.16",
     "alea": "^1.0.1",
     "babylonjs": "^5.38.0",

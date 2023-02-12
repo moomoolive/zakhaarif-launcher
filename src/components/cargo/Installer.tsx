@@ -30,6 +30,8 @@ import { ALLOW_UNSAFE_PACKAGES } from "../../lib/utils/localStorageKeys"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 import {CargoRequestError, cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
 import { CACHED } from "../../lib/shabah/backend"
+import { useNavigate } from "react-router-dom"
+import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../../lib/utils/searchParameterKeys"
 
 const toCargoIndex = (
     canonicalUrl: string,
@@ -69,12 +71,16 @@ export type InstallerProps = {
     onClose: () => void
     onInstallCargo: (update: UpdateCheckResponse, title: string) => Promise<boolean>
     createAlert: (message: ReactNode) => void
+    onCheckIfCanonicalCargoExists: (canonicalUrl: string) => Promise<boolean>
+    onUpdateCargo: (canonicalUrl: string) => unknown
 }
 
 export const Installer = ({
     onClose,
     onInstallCargo,
-    createAlert
+    createAlert,
+    onCheckIfCanonicalCargoExists,
+    onUpdateCargo
 }: InstallerProps): JSX.Element => {
     const urlCheck = useDebounce(1_000)
     const {downloadClient} = useAppShellContext()
@@ -90,8 +96,11 @@ export const Installer = ({
     const {current: updateUrl} = useRef((nextUrl: string) => {
         setUrl(nextUrl)
         setInvalidation("analyzing")
-        urlCheck(() => {
-            if (!nextUrl.startsWith("https://") && !nextUrl.startsWith("http://")) {
+        urlCheck(async () => {
+            const alreadyExists = await onCheckIfCanonicalCargoExists(nextUrl)
+            if (alreadyExists) {
+                setInvalidation("manifest-already-exists")
+            } else if (!nextUrl.startsWith("https://") && !nextUrl.startsWith("http://")) {
                 setInvalidation("malformed-url")
             } else if (!isUrl(nextUrl)) {
                 setInvalidation("malformed-url")
@@ -288,23 +297,38 @@ export const Installer = ({
                 </>}
 
                 <div className="px-3">
-                    <Button
-                        type="submit"
-                        className="w-1/2"
-                        disabled={
-                            invalidation !== "none" 
-                            || url.length < 1
-                            || ioOperation
-                        }
-                        onClick={onSubmit}
-                    >
-                        {ioOperation 
-                            ? <span className="text-lg animate-spin">
-                                <LoadingIcon/>
-                            </span> 
-                            : submitText
-                        }
-                    </Button>
+                    {invalidation === "manifest-already-exists" ? <>
+                        <Button
+                            type="submit"
+                            className="w-1/2"
+                            onClick={async () => {
+                                if (!await confirm({title: "Are you sure you want to update inputted add-on?", confirmButtonColor: "warning"})) {
+                                    return
+                                }
+                                onUpdateCargo(url)
+                            }}
+                        >
+                            Update
+                        </Button>
+                    </> : <>
+                        <Button
+                            type="submit"
+                            className="w-1/2"
+                            disabled={
+                                invalidation !== "none" 
+                                || url.length < 1
+                                || ioOperation
+                            }
+                            onClick={onSubmit}
+                        >
+                            {ioOperation 
+                                ? <span className="text-lg animate-spin">
+                                    <LoadingIcon/>
+                                </span> 
+                                : submitText
+                            }
+                        </Button>
+                    </>}
 
                     <Button
                         className="w-1/2"

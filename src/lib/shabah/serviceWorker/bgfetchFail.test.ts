@@ -16,10 +16,10 @@ import {
     CACHED,
     UPDATING,
     ABORTED,
-    FAILED
+    FAILED,
+    DownloadClientMessage
 } from "../backend"
 import {urlToMime} from "../../miniMime/index"
-
 import {
     BackgroundFetchUIEventCore,
     BackgroundFetchResult,
@@ -83,11 +83,14 @@ const createBgFetchEvent = ({
 const createDownloadIndex = ({
     id = "pkg", 
     title = "none", 
+    name = "",
     bytes = 0, 
     canonicalUrl = "", 
     map = {}, 
     version = "0.1.0",
     resourcesToDelete = [],
+    downloadedResources = [],
+    canRevertToPreviousVersion = false,
     previousVersion = "none", 
     resolvedUrl = "",
     previousId = ""
@@ -98,19 +101,22 @@ const createDownloadIndex = ({
         title, 
         bytes,
         segments: [{
+            name,
             map, 
             canonicalUrl, 
             version, 
             previousVersion, 
             resolvedUrl,
             bytes,
-            resourcesToDelete
+            resourcesToDelete,
+            downloadedResources,
+            canRevertToPreviousVersion
         }]
     }
     return putIndex
 }
 
-const createFileCache = (initFiles: Record<string, Response>) => {
+const createBgFetchArgs = (initFiles: Record<string, Response>) => {
     const cache = {
         getFile: async (url: string) => initFiles[url],
         putFile: async (url: string, file: Response) => { 
@@ -124,554 +130,17 @@ const createFileCache = (initFiles: Record<string, Response>) => {
         isPersisted: async () => true,
         listFiles: async () => [],
     }
-    return {fileCache: cache, internalRecord: initFiles}
+    const clientMessages: DownloadClientMessage[] = []
+    return {
+        fileCache: cache, 
+        internalRecord: initFiles,
+        messageDownloadClient: async (message: DownloadClientMessage) => {
+            clientMessages.push(message)
+            return true
+        },
+        clientMessages
+    }
 }
-
-describe("background fetch success handler", () => {
-    const makeBgFetchHandle = makeBackgroundFetchHandler
-
-    it("cache should not be changed if download indices doesn't exist", async () => {
-        const origin = "https://cool-potatos.com"
-        const cargoId = 0
-        const cargoIndices = emptyCargoIndices()
-        const downloadId = nanoid(21)
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: origin + "/pkg-store",
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl: "https://remote-origin.site/pkg",
-            version: "0.1.0",
-            state: CACHED,
-            downloadId,
-        })
-        const {fileCache, internalRecord} = createFileCache({})
-        await saveCargoIndices(cargoIndices, origin, fileCache)
-        const prevFilecount = Object.keys(internalRecord).length
-        const handler = makeBgFetchHandle({
-            origin, 
-            fileCache, 
-            log: () => {},
-            type: "success"
-        })
-        const {event, output} = createBgFetchEvent({
-            id: downloadId
-        })
-        await handler(event)
-        expect(Object.keys(internalRecord).length - prevFilecount).toBe(0)
-        expect(output.ui.updateCalled).toBe(false)
-    })
-
-    it("successful fetches should not cache responses not found in download index map", async () => {
-        const origin = "https://cool-potatos.com"
-        const remoteOrigin = "https://remote-origin.site"
-        const {fileCache, internalRecord} = createFileCache({})
-        const downloadIndices = emptyDownloadIndex()
-        const canonicalUrl = remoteOrigin
-        const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
-            id: downloadId,
-            title: "unknown",
-            version: "0.1.0",
-            previousVersion: "none",
-            resolvedUrl: "",
-            canonicalUrl,
-            map: {},
-            bytes: 0
-        }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: 1,
-            resolvedUrl: origin + "/pkg-store",
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
-        const handler = makeBgFetchHandle({
-            origin, 
-            fileCache, 
-            log: () => {},
-            type: "success"
-        })
-        const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
-            id: downloadId, 
-            recordsAvailable: true,
-            result: "success",
-            fetchResult: {
-                [remoteOrigin + "/pkg/cargo.json"]: new Response("", {
-                    status: 200,
-                }),
-                [remoteOrigin + "/pkg/another.json"]: new Response("", {
-                    status: 200,
-                }),
-            }
-        })
-        await handler(event)
-        expect(
-            Object.keys(internalRecord).length - prevFilecount
-        ).toBe(0)
-        expect(output.ui.updateCalled).toBe(true)
-        expect(!!output.ui.state).toBe(true)
-        expect(
-            (await getCargoIndices(origin, fileCache))
-                .cargos
-                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe(CACHED)
-    })
-
-    it("successful fetches should cache all assets found in download-index map into file cache", async () => {
-        const origin = "https://cool-potatos.com"
-        const remoteOrigin = "https://remote-origin.site"
-        const resolvedUrl = origin + "/pkg-store/"
-        const remoteRootUrl = remoteOrigin + "/pkg/"
-        const cacheFiles = [
-            "cargo.json",
-            "index.js",
-            "perf.wasm",
-            "icon.png",
-        ]
-        const cacheFileMeta = cacheFiles.map((name) => ({
-            storageUrl: resolvedUrl + name,
-            bytes: 0,
-            requestUrl: remoteRootUrl + name,
-            mime: urlToMime(name) || "text/plain"
-        }) as const)
-        const canonicalUrl = remoteOrigin
-        const {fileCache, internalRecord} = createFileCache({})
-        const downloadIndices = emptyDownloadIndex()
-        const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
-            id: downloadId,
-            title: "unknown",
-            version: "0.1.0",
-            previousVersion: "none",
-            resolvedUrl: "",
-            canonicalUrl,
-            map: cacheFileMeta.reduce((total, item) => {
-                const {requestUrl} = item
-                total[requestUrl] = {
-                    bytes: 0,
-                    storageUrl: item.storageUrl,
-                    mime: item.mime,
-                    status: 200,
-                    statusText: ""
-                }
-                return total
-            }, {} as ResourceMap),
-            bytes: 0
-        }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: 1,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
-        const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
-            id: downloadId, 
-            recordsAvailable: true,
-            result: "success",
-            fetchResult: cacheFileMeta.reduce((total, item) => {
-                total[item.requestUrl] = new Response("", {status: 200})
-                return total
-            }, {} as Record<string, Response>)
-        })
-        const handler = makeBgFetchHandle({
-            origin, 
-            fileCache, 
-            log: () => {},
-            type: "success"
-        })
-        await handler(event)
-        expect(Object.keys(internalRecord).length).toBe(
-            prevFilecount + cacheFileMeta.length
-        )
-        expect(output.ui.updateCalled).toBe(true)
-        expect(!!output.ui.state).toBe(true)
-        expect(
-            (await getCargoIndices(origin, fileCache)).cargos.find(
-                (cargo) => cargo.canonicalUrl === canonicalUrl
-            )?.state
-        ).toBe(CACHED)
-    })
-
-    it(`successful fetches should set associated cargo indexes 'downloadId' to '${NO_UPDATE_QUEUED}' (no update queued)`, async () => {
-        const origin = "https://cool-potatos.com"
-        const remoteOrigin = "https://remote-origin.site"
-        const resolvedUrl = origin + "/pkg-store/"
-        const remoteRootUrl = remoteOrigin + "/pkg/"
-        const cacheFiles = [
-            "cargo.json",
-            "index.js",
-            "perf.wasm",
-            "icon.png",
-        ]
-        const cacheFileMeta = cacheFiles.map((name) => ({
-            storageUrl: resolvedUrl + name,
-            bytes: 0,
-            requestUrl: remoteRootUrl + name,
-            mime: urlToMime(name) || "text/plain"
-        }) as const)
-        const cargoId = 0
-        const canonicalUrl = remoteOrigin
-        const {fileCache, internalRecord} = createFileCache({})
-        const downloadIndices = emptyDownloadIndex()
-        const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
-            id: downloadId,
-            title: "unknown",
-            version: "0.1.0",
-            previousVersion: "none",
-            resolvedUrl: "",
-            canonicalUrl,
-            map: cacheFileMeta.reduce((total, item) => {
-                const {requestUrl} = item
-                total[requestUrl] = {
-                    bytes: 0,
-                    storageUrl: item.storageUrl,
-                    mime: item.mime,
-                    status: 200,
-                    statusText: ""
-                }
-                return total
-            }, {} as ResourceMap),
-            bytes: 0
-        }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
-        const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
-            id: downloadId, 
-            recordsAvailable: true,
-            result: "success",
-            fetchResult: cacheFileMeta.reduce((total, item) => {
-                total[item.requestUrl] = new Response("", {status: 200})
-                return total
-            }, {} as Record<string, Response>)
-        })
-        const handler = makeBgFetchHandle({
-            origin, 
-            fileCache, 
-            log: () => {},
-            type: "success"
-        })
-        await handler(event)
-        expect(Object.keys(internalRecord).length).toBe(
-            prevFilecount + cacheFileMeta.length
-        )
-        expect(output.ui.updateCalled).toBe(true)
-        expect(!!output.ui.state).toBe(true)
-        const indexes = await getCargoIndices(origin, fileCache)
-        const targetCargo = indexes.cargos.find(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        expect(!!targetCargo).toBe(true)
-        expect(targetCargo?.state).toBe(CACHED)
-        expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
-    })
-
-    it(`can update multiple cargos simeltaneously within same bg-fetch`, async () => {
-        const mainOrigin = "https://cool-vegtables.com"
-        const testCases = [
-            [
-                {
-                    origin: "https://cool-potatoes.com/",
-                    files: [
-                        "cargo.json",
-                        "index.js",
-                        "perf.wasm",
-                        "icon.png",
-                    ]
-                },
-                {
-                    origin: "https://cool-eggplants.com/",
-                    files: [
-                        "cargo.json",
-                        "entry.js",
-                        "cool.png",
-                        "hi.jpeg",
-                    ]
-                },
-                {
-                    origin: "https://cool-pumpkin.com/",
-                    files: [
-                        "cargo.json",
-                        "index.html",
-                        "cool.png",
-                        "config.json",
-                    ]
-                },
-            ],
-            [
-                {
-                    origin: "https://hi.org/",
-                    files: [
-                        "cargo.json",
-                        "index.js",
-                    ]
-                },
-                {
-                    origin: "https://cool-eggplants.com/",
-                    files: [
-                        "cargo.json",
-                        "coool-entry.mjs",
-                        "terrain.png",
-                        "my-house.jpeg",
-                    ]
-                },
-            ]
-        ]
-        for (const testCase of testCases) {
-            const {fileCache, internalRecord} = createFileCache({})
-            const downloadId = nanoid(21)
-            const queuedDownload = {
-                id: downloadId, 
-                previousId: "",
-                title: "random-update" + Math.random(), 
-                bytes: 0,
-                segments: [] as DownloadSegment[]
-            }
-            const downloadIndices = emptyDownloadIndex()
-            const cargoIndices = emptyCargoIndices()
-            const allFileCacheMeta = []
-            for (const {origin, files} of testCase) {
-                const canonicalUrl = origin
-                const resolvedUrl = canonicalUrl
-                const cacheFileMeta = files.map((name) => ({
-                    storageUrl: resolvedUrl + name,
-                    bytes: 0,
-                    requestUrl: resolvedUrl + name,
-                    mime: urlToMime(name) || "text/plain"
-                }) as const)
-                allFileCacheMeta.push(...cacheFileMeta)
-                const cargoId = Math.trunc(Math.random() * 1_000)
-                const resourceMap = cacheFileMeta.reduce((total, item) => {
-                    const {requestUrl} = item
-                    total[requestUrl] = {
-                        bytes: 0,
-                        storageUrl: item.storageUrl,
-                        mime: item.mime,
-                        status: 200,
-                        statusText: ""
-                    }
-                    return total
-                }, {} as ResourceMap)
-                queuedDownload.segments.push({
-                    version: "0.1.0",
-                    previousVersion: "none",
-                    resolvedUrl: "",
-                    canonicalUrl,
-                    map: resourceMap,
-                    bytes: 0,
-                    resourcesToDelete: []
-                })
-                updateCargoIndex(cargoIndices, {
-                    tag: cargoId,
-                    resolvedUrl: resolvedUrl,
-                    entry: "index.js",
-                    logo: "",
-                    permissions: [],
-    
-                    name: "pkg-name",
-                    bytes: 20,
-                    canonicalUrl,
-                    version: "0.1.0",
-                    state: UPDATING,
-                    downloadId
-                })
-            }
-            updateDownloadIndex(
-                downloadIndices, 
-                queuedDownload
-            )
-            await saveDownloadIndices(
-                downloadIndices, 
-                mainOrigin, 
-                fileCache
-            )
-            await saveCargoIndices(
-                cargoIndices, 
-                mainOrigin, 
-                fileCache
-            )
-
-            const prevFilecount = Object.keys(internalRecord).length
-            
-            const fetchResult = allFileCacheMeta.reduce((total, item) => {
-                total[item.requestUrl] = new Response(
-                    "", {status: 200}
-                )
-                return total
-            }, {} as Record<string, Response>)
-
-            const {event, output} = createBgFetchEvent({
-                id: downloadId, 
-                recordsAvailable: true,
-                result: "success",
-                fetchResult 
-            })
-            const handler = makeBgFetchHandle({
-                origin: mainOrigin, 
-                fileCache, 
-                log: () => {},
-                type: "success"
-            })
-            await handler(event)
-            expect(Object.keys(internalRecord).length).toBe(
-                prevFilecount + allFileCacheMeta.length
-            )
-            expect(output.ui.updateCalled).toBe(true)
-            expect(!!output.ui.state).toBe(true)
-            const indexesAfterUpdate = await getCargoIndices(mainOrigin, fileCache)
-            
-            for (const {origin} of testCase) {
-                const targetCargo = indexesAfterUpdate.cargos.find(
-                    (cargo) => cargo.canonicalUrl === origin
-                )
-                expect(!!targetCargo).toBe(true)
-                expect(targetCargo?.state).toBe(CACHED)
-                expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
-            }
-        }
-    })
-
-    it(`successful background fetches should call progress handler twice`, async () => {
-        const origin = "https://cool-potatos.com"
-        const canonicalUrl = origin + "/"
-        const resolvedUrl = canonicalUrl
-        const cacheFiles = [
-            "cargo.json",
-            "index.js",
-            "perf.wasm",
-            "icon.png",
-        ]
-        const cacheFileMeta = cacheFiles.map((name) => ({
-            storageUrl: resolvedUrl + name,
-            bytes: 0,
-            requestUrl: resolvedUrl + name,
-            mime: urlToMime(name) || "text/plain"
-        }) as const)
-
-        const {fileCache, internalRecord} = createFileCache({})
-        const downloadIndices = emptyDownloadIndex()
-        const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
-            id: downloadId,
-            title: "unknown",
-            version: "0.1.0",
-            previousVersion: "none",
-            resolvedUrl: "",
-            canonicalUrl,
-            map: cacheFileMeta.reduce((total, item) => {
-                const {requestUrl} = item
-                total[requestUrl] = {
-                    bytes: 0,
-                    storageUrl: item.storageUrl,
-                    mime: item.mime,
-                    status: 200,
-                    statusText: ""
-                }
-                return total
-            }, {} as ResourceMap),
-            bytes: 0
-        }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        const cargoId = 0
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
-        const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
-            id: downloadId, 
-            recordsAvailable: true,
-            result: "success",
-            fetchResult: cacheFileMeta.reduce((total, item) => {
-                total[item.requestUrl] = new Response("", {status: 200})
-                return total
-            }, {} as Record<string, Response>)
-        })
-        const progressEvents: ProgressUpdateRecord[] = []
-        const handler = makeBgFetchHandle({
-            origin, 
-            fileCache, 
-            log: () => {},
-            type: "success",
-            onProgress: (update) => progressEvents.push(update)
-        })
-        await handler(event)
-        expect(Object.keys(internalRecord).length).toBe(
-            prevFilecount + cacheFileMeta.length
-        )
-        expect(output.ui.updateCalled).toBe(true)
-        expect(!!output.ui.state).toBe(true)
-        const indexes = await getCargoIndices(origin, fileCache)
-        const targetCargo = indexes.cargos.find(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        expect(!!targetCargo).toBe(true)
-        expect(targetCargo?.state).toBe(CACHED)
-        expect(targetCargo?.downloadId).toBe(NO_UPDATE_QUEUED)
-        expect(progressEvents.length).toBe(2)
-        expect(progressEvents[0]).toStrictEqual({
-            type: "install",
-            downloadId: downloadId,
-            canonicalUrls: [canonicalUrl]
-        })
-        expect(progressEvents[1]).toStrictEqual({
-            type: "success",
-            downloadId: downloadId,
-            canonicalUrls: [canonicalUrl]
-        })
-    })
-})
 
 describe("background fetch fail handler (abort/fail)", () => {
     it("failed handler should save successfully fetches to cache, and create a record of failed fetches", async () => {
@@ -694,7 +163,12 @@ describe("background fetch fail handler (abort/fail)", () => {
             statusText
         }) as const)
         const cargoId = 0
-        const {fileCache, internalRecord} = createFileCache({})
+        const {
+            fileCache, 
+            internalRecord, 
+            messageDownloadClient,
+            clientMessages
+        } = createBgFetchArgs({})
         const canonicalUrl = remoteOrigin
         const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
@@ -729,7 +203,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         })
         await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
-        const {event, output} = createBgFetchEvent({
+        const {event} = createBgFetchEvent({
             id: downloadId, 
             recordsAvailable: true,
             result: "failure",
@@ -744,6 +218,7 @@ describe("background fetch fail handler (abort/fail)", () => {
         const handler = makeBackgroundFetchHandler({
             origin, 
             fileCache, 
+            messageDownloadClient,
             log: () => {},
             type: "fail"
         })
@@ -753,15 +228,17 @@ describe("background fetch fail handler (abort/fail)", () => {
         expect(Object.keys(internalRecord).length).toBe(
             prevFilecount + finishedRequests.length + errorLogFile
         )
-        expect(
-            (await getCargoIndices(origin, fileCache))
-                .cargos
-                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
         )
+        expect(clientMessages).length(1)
+        expect(clientMessages[0].downloadId).toBe(downloadId)
+        expect(clientMessages[0].stateUpdates).length(1)
+        expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
+            canonicalUrl,
+            state: FAILED
+        })
         expect(errorIndex).not.toBe(null)
         const failedRequests = cacheFiles.filter((f) => f.status !== 200)
         expect(Object.keys(errorIndex?.index.segments[0].map || {}).length).toBe(
@@ -790,7 +267,10 @@ describe("background fetch fail handler (abort/fail)", () => {
         }) as const)
         const canonicalUrl = remoteOrigin
         const cargoId = 0
-        const {fileCache, internalRecord} = createFileCache({})
+        const {
+            fileCache, internalRecord, messageDownloadClient,
+            clientMessages
+        } = createBgFetchArgs({})
         const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
         updateDownloadIndex(downloadIndices, createDownloadIndex({
@@ -839,23 +319,25 @@ describe("background fetch fail handler (abort/fail)", () => {
         const handler = makeBackgroundFetchHandler({
             origin, 
             fileCache, 
+            messageDownloadClient,
             log: () => {},
             type: "fail"
         })
         await handler(event)
         expect(output.ui.updateCalled).toBe(true)
         expect(!!output.ui.state).toBe(true)
-
+        expect(clientMessages).length(1)
+        expect(clientMessages[0].downloadId).toBe(downloadId)
+        expect(clientMessages[0].stateUpdates).length(1)
+        expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
+            canonicalUrl,
+            state: FAILED
+        })
         const finishedRequests = cacheFiles.filter((f) => f.status === 200)
         const errorLogFile = 1
         expect(Object.keys(internalRecord).length).toBe(
             prevFilecount + finishedRequests.length + errorLogFile
         )
-        expect(
-            (await getCargoIndices(origin, fileCache))
-                .cargos
-                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -888,7 +370,10 @@ describe("background fetch fail handler (abort/fail)", () => {
         }) as const)
         const canonicalUrl = remoteOrigin
         const cargoId = 0
-        const {fileCache, internalRecord} = createFileCache({})
+        const {
+            fileCache, internalRecord, messageDownloadClient,
+            clientMessages
+        } = createBgFetchArgs({})
         const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
         updateDownloadIndex(downloadIndices, createDownloadIndex({
@@ -936,26 +421,27 @@ describe("background fetch fail handler (abort/fail)", () => {
         })
         const handler = makeBackgroundFetchHandler({
             origin, 
-            fileCache, 
+            fileCache,
+            messageDownloadClient, 
             log: () => {},
             type: "fail"
         })
         await handler(event)
         expect(output.ui.updateCalled).toBe(true)
         expect(!!output.ui.state).toBe(true)
+        expect(clientMessages).length(1)
+        expect(clientMessages[0].downloadId).toBe(downloadId)
+        expect(clientMessages[0].stateUpdates).length(1)
+        expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
+            canonicalUrl,
+            state: FAILED
+        })
 
         const finishedRequests = cacheFiles.filter((f) => f.status === 200)
         const errorLogFile = 1
         expect(Object.keys(internalRecord).length).toBe(
             prevFilecount + finishedRequests.length + errorLogFile
         )
-        const indexesAfterUpdate = await getCargoIndices(origin, fileCache)
-        const target = indexesAfterUpdate.cargos.find(
-            (cargo) => cargo.canonicalUrl === canonicalUrl 
-        )
-        expect(!!target).toBe(true)
-        expect(target?.downloadId).toBe(NO_UPDATE_QUEUED)
-        expect(target?.state).toBe(FAILED)
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -1025,7 +511,10 @@ describe("background fetch fail handler (abort/fail)", () => {
             ]
         ]
         for (const testCase of testCases) {
-            const {fileCache, internalRecord} = createFileCache({})
+            const {
+                fileCache, internalRecord, 
+                messageDownloadClient, clientMessages
+            } = createBgFetchArgs({})
             const downloadIndices = emptyDownloadIndex()
             const cargoIndices = emptyCargoIndices()
             const downloadId = nanoid(21)
@@ -1057,13 +546,16 @@ describe("background fetch fail handler (abort/fail)", () => {
                     return total
                 }, {} as ResourceMap)
                 queuedDownload.segments.push({
+                    name: "",
                     version: "0.1.0",
                     previousVersion: "none",
                     resolvedUrl,
                     canonicalUrl,
                     map: resourceMap,
                     bytes: 0,
-                    resourcesToDelete: []
+                    resourcesToDelete: [],
+                    downloadedResources: [],
+                    canRevertToPreviousVersion: false
                 })
                 updateCargoIndex(cargoIndices, {
                     tag: id,
@@ -1104,13 +596,15 @@ describe("background fetch fail handler (abort/fail)", () => {
             })
             const handler = makeBackgroundFetchHandler({
                 origin: mainOrigin, 
-                fileCache, 
+                fileCache,
+                messageDownloadClient,
                 log: () => {},
                 type: "fail"
             })
             await handler(event)
             expect(output.ui.updateCalled).toBe(true)
             expect(!!output.ui.state).toBe(true)
+            expect(clientMessages).length(1)
 
             const finishedRequests = allFileCacheMeta.filter(
                 (file) => file.status === 200
@@ -1127,29 +621,33 @@ describe("background fetch fail handler (abort/fail)", () => {
             expect(Object.keys(internalRecord).length).toBe(
                 prevFilecount + finishedRequests.length + errorLogFiles
             )
-            const indexesAfterUpdate = await getCargoIndices(
-                mainOrigin, fileCache
-            )
-            for (const {origin, files} of testCase) {
+            
+            for (const [index, {origin, files}] of testCase.entries()) {
                 const shouldBeOk = files.every(
                     (file) => file.status === 200 
                 )
                 const resolvedUrl = origin + "/"
                 const canonicalUrl = resolvedUrl
-                const cargoIndex = indexesAfterUpdate.cargos.find(
-                    (cargo) => cargo.canonicalUrl === canonicalUrl
-                )
+                
                 const errorIndex = await getErrorDownloadIndex(
                     resolvedUrl,
                     fileCache
                 )
-                expect(!!cargoIndex).toBe(true)
+                expect(clientMessages[0].downloadId).toBe(downloadId)
+                expect(clientMessages[0].stateUpdates).length(testCase.length)
+                
                 if (shouldBeOk) {
-                    expect(cargoIndex?.state).toBe(CACHED)
                     expect(errorIndex).toBe(null)
+                    expect(clientMessages[0].stateUpdates[index]).toStrictEqual({
+                        canonicalUrl,
+                        state: CACHED
+                    })
                     continue
                 }
-                expect(cargoIndex?.state).toBe(FAILED)
+                expect(clientMessages[0].stateUpdates[index]).toStrictEqual({
+                    canonicalUrl,
+                    state: FAILED
+                })
                 expect(errorIndex).not.toBe(null)
                 // should only have one segment
                 expect(errorIndex?.index.segments.length).toBe(1)
@@ -1187,7 +685,10 @@ describe("background fetch fail handler (abort/fail)", () => {
         }) as const)
         const cargoId = 0
         const canonicalUrl = remoteOrigin
-        const {fileCache, internalRecord} = createFileCache({})
+        const {
+            fileCache, internalRecord, 
+            messageDownloadClient, clientMessages
+        } = createBgFetchArgs({})
         const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
         updateDownloadIndex(downloadIndices, createDownloadIndex({
@@ -1235,7 +736,8 @@ describe("background fetch fail handler (abort/fail)", () => {
         })
         const handler = makeBackgroundFetchHandler({
             origin, 
-            fileCache, 
+            fileCache,
+            messageDownloadClient,
             log: () => {},
             type: "abort"
         })
@@ -1246,11 +748,14 @@ describe("background fetch fail handler (abort/fail)", () => {
         expect(Object.keys(internalRecord).length).toBe(
             prevFilecount + finishedRequests.length + errorLogFile
         )
-        expect(
-            (await getCargoIndices(origin, fileCache))
-                .cargos
-                .find((cargo) => cargo.canonicalUrl === canonicalUrl)?.state
-        ).toBe(ABORTED)
+        expect(clientMessages).length(1)
+        expect(clientMessages[0].downloadId).toBe(downloadId)
+        expect(clientMessages[0].stateUpdates).length(1)
+        expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
+            canonicalUrl,
+            state: ABORTED
+        })
+
         const errorIndex = await getErrorDownloadIndex(
             resolvedUrl,
             fileCache
@@ -1285,7 +790,7 @@ describe("background fetch fail handler (abort/fail)", () => {
                 status,
                 statusText
             }) as const)
-            const {fileCache} = createFileCache({})
+            const {fileCache, messageDownloadClient} = createBgFetchArgs({})
             const downloadIndices = emptyDownloadIndex()
             const downloadId = nanoid(21)
             updateDownloadIndex(downloadIndices, createDownloadIndex({
@@ -1338,6 +843,7 @@ describe("background fetch fail handler (abort/fail)", () => {
             const handler = makeBackgroundFetchHandler({
                 origin, 
                 fileCache, 
+                messageDownloadClient,
                 log: () => {},
                 type: eventName,
                 onProgress: (progress) => progressEvents.push(progress)

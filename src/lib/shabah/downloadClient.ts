@@ -34,6 +34,7 @@ import {
     UPDATING,
     ABORTED,
     FAILED,
+    DownloadClientMessageConsumer,
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {NULL_FIELD} from "../cargo/index"
@@ -64,6 +65,7 @@ export type ShabahConfig = {
         networkRequest: FetchFunction
         downloadManager: DownloadManager
     },
+    messageConsumer: DownloadClientMessageConsumer
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
@@ -82,18 +84,26 @@ export class Shabah {
     private networkRequest: FetchFunction
     private fileCache: FileCache
     private downloadManager: DownloadManager
+    private messageConsumer: DownloadClientMessageConsumer
+
     private cargoIndicesCache: null | CargoIndices
     private downloadIndicesCache: null | DownloadIndexCollection
     private permissionsCleaner: null | (
         (permissions: GeneralPermissions) => GeneralPermissions
     )
 
-    constructor({adaptors, origin, permissionsCleaner}: ShabahConfig) {
+    constructor({
+        adaptors, 
+        origin, 
+        permissionsCleaner,
+        messageConsumer
+    }: ShabahConfig) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
         }
         const {networkRequest, fileCache, downloadManager} = adaptors
         this.permissionsCleaner = permissionsCleaner || null
+        this.messageConsumer = messageConsumer
         this.networkRequest = networkRequest
         this.fileCache = fileCache
         this.downloadManager = downloadManager
@@ -263,13 +273,16 @@ export class Shabah {
             }
 
             downloadIndex.segments.push({
+                name: update.newCargo?.name || "",
                 map: createResourceMap(update.downloadableResources),
                 version: update.versions().new,
                 previousVersion: update.versions().old,
                 resolvedUrl: update.resolvedUrl,
                 canonicalUrl: update.canonicalUrl,
                 bytes: update.downloadMetadata().bytesToDownload,
-                resourcesToDelete: filesToDelete
+                resourcesToDelete: filesToDelete,
+                downloadedResources: [],
+                canRevertToPreviousVersion: false,
             })
         }
 
@@ -649,5 +662,53 @@ export class Shabah {
         ) 
         const {previousVersion, version} = downloadIndex.segments[segmentIndex]
         return {...response, previousVersion, version}
+    }
+
+    async consumeQueuedMessages(): Promise<StatusCode> {
+        const {messageConsumer} = this
+        const messages = await messageConsumer.getAllMessages()
+        
+        if (messages.length < 1) {
+            return STATUS_CODES.noMessagesFound
+        }
+
+        const stateUpdateCount = messages.reduce(
+            (total, next) => total + next.stateUpdates.length,
+            0
+        )
+        let notFoundCount = 0
+
+        const cargoIndexes = await this.getCargoIndices()
+        for (const message of messages) {
+            for (const update of message.stateUpdates) {
+                const {canonicalUrl, state} = update
+                const targetIndex = cargoIndexes.cargos.findIndex(
+                    (cargo) => cargo.canonicalUrl === canonicalUrl
+                )
+                if (targetIndex < 0) {
+                    notFoundCount++
+                    continue
+                }
+                cargoIndexes.cargos.splice(targetIndex, 1, {
+                    ...cargoIndexes.cargos[targetIndex],
+                    state,
+                    downloadId: NO_UPDATE_QUEUED
+                })
+            }
+        }
+
+        await this.persistCargoIndices(cargoIndexes)
+        await Promise.all(
+            messages.map((message) => messageConsumer.deleteMessage(message))
+        )
+
+        if (notFoundCount === stateUpdateCount) {
+            return STATUS_CODES.allMessagesAreOrphaned
+        }
+
+        if (notFoundCount > 0) {
+            return STATUS_CODES.someMessagesAreOrphaned
+        }
+        return STATUS_CODES.messagesConsumed
     }
 }

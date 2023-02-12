@@ -14,7 +14,8 @@ import {
     CargoState,
     CACHED,
     ABORTED,
-    FAILED
+    FAILED,
+    DownloadClientMessage
 } from "../backend"
 import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
 
@@ -32,6 +33,7 @@ export type BackgroundFetchSuccessOptions = {
     log: (...msgs: any[]) => void
     type: BackgroundFetchEventName
     onProgress?: (progressUpdate: ProgressUpdateRecord) => unknown
+    messageDownloadClient: (message: DownloadClientMessage) => Promise<boolean>
 }
 
 export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
@@ -44,7 +46,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         origin, 
         log, 
         type: eventType, 
-        onProgress = () => {}
+        onProgress = () => {},
+        messageDownloadClient
     } = options
     const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
     return async (
@@ -121,8 +124,24 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         let resourcesProcessed = 0
         let failCount = 0
         const orphanedResources = new Map<string, boolean>()
-        for (const cargoIndex of associatedCargos) {
-            const {canonicalUrl} = cargoIndex
+        
+        const downloadClientMessage: DownloadClientMessage = {
+            timestamp: Date.now(),
+            downloadId: downloadQueueId,
+            stateUpdates: []
+        }
+
+        for (const downloadSegement of targetDownloadIndex.segments) {
+            const {canonicalUrl} = downloadSegement
+            
+            const cargoIndex = cargoIndices.cargos.find(
+                (cargo) => cargo.canonicalUrl === canonicalUrl
+            )
+
+            if (!cargoIndex) {
+                continue
+            }
+
             const targetSegmentIndex = targetDownloadIndex.segments.findIndex(
                 (segment) => segment.canonicalUrl === canonicalUrl
             )
@@ -150,12 +169,15 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
 
             const errorDownloadSegment: DownloadSegment = {
                 map: {},
+                name: targetSegment.name,
                 bytes: 0,
                 version: targetSegment.version,
                 previousVersion: targetSegment.previousVersion,
                 canonicalUrl: targetSegment.canonicalUrl,
                 resolvedUrl: targetSegment.resolvedUrl,
-                resourcesToDelete: targetSegment.resourcesToDelete
+                resourcesToDelete: targetSegment.resourcesToDelete,
+                downloadedResources: [],
+                canRevertToPreviousVersion: targetSegment.canRevertToPreviousVersion
             }
             const errorDownloadIndex: DownloadIndex = {
                 // once download client attempts to
@@ -164,7 +186,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 id: "err",
                 previousId: targetDownloadIndex.id,
                 segments: [errorDownloadSegment],
-                title: `Failed ${updateTitle} (${cargoIndex.name})`,
+                title: `Failed ${canonicalUrl}`,
                 bytes: 0,
                 startedAt: Date.now()
             }
@@ -198,6 +220,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                         }
 
                         orphanedResources.set(targetUrl, false)
+                        errorDownloadSegment.downloadedResources.push(targetUrl)
                         processingStats.resourcesProcessed++
                         const {bytes} = targetResource
                         if (response.ok) {
@@ -236,12 +259,12 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             }
             log(
                 eventName, 
-                `saving cargo ${cargoIndex.name} with state "${state}"`
+                `saving cargo "${canonicalUrl}" with state "${state}"`
             )
-            updateCargoIndex(cargoIndices, {
-                ...cargoIndex,
-                state,
-                downloadId: NO_UPDATE_QUEUED
+
+            downloadClientMessage.stateUpdates.push({
+                canonicalUrl,
+                state
             })
             
             const isErrorEvent = (
@@ -253,7 +276,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 continue
             }
 
-            const originalUrl = cargoIndex.resolvedUrl
+            const originalUrl = downloadSegement.resolvedUrl
             let targetUrl = originalUrl
             if (
                 !targetUrl.startsWith("https://") 
@@ -283,6 +306,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             log(eventName, "successfully saved error log")
         }
 
+        await messageDownloadClient(downloadClientMessage)
+
         orphanedResources.forEach((value, key) => {
             if (!value) {
                 return
@@ -300,7 +325,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${orphanCount}, fail_count=${failCount}.${orphanCount > 0 ? " Releasing orphans!" : ""}`
         )
         
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         removeDownloadIndex(downloadIndices, downloadQueueId)
         await saveDownloadIndices(downloadIndices, origin, fileCache)
         log(eventName, "successfully persisted changes")
@@ -310,14 +334,14 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             eventType === "fail" 
             || eventType === "success"
         )
-
+        
         if (eventHasUiUpdate && event.updateUI) {
             const suffix = eventType === "fail"
                 ? "failed"
                 : "finished"
             await event.updateUI({title: `${updateTitle} ${suffix}!`})
         }
-
+        
         onProgress({...progressUpdater, type: eventType})
     }
 }

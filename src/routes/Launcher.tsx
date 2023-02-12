@@ -6,15 +6,18 @@ import {
   Tooltip,
   Collapse,
 } from "@mui/material"
-import SettingsIcon from "@mui/icons-material/Settings"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
-  faTimes, faCheck, faCodeBranch,
-  faLink, faTerminal, faFolderMinus
+  faTimes, 
+  faCheck, 
+  faCodeBranch,
+  faLink, 
+  faTerminal, 
+  faFolderMinus,
+  faGear,
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
-import {CargoState, Shabah} from "../lib/shabah/downloadClient"
-import {featureCheck} from "../lib/utils/appFeatureCheck"
+import {Shabah} from "../lib/shabah/downloadClient"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {STANDARD_CARGOS} from "../standardCargos"
 import {useAppShellContext} from "./store"
@@ -27,31 +30,34 @@ import { sleep } from '../lib/utils/sleep'
 import { ABORTED, CACHED, FAILED, UPDATING } from '../lib/shabah/backend'
 
 const UnsupportedFeatures = (): JSX.Element => {
-  const {current: features} = useRef(featureCheck() as ReadonlyArray<{name: string, supported: boolean, hardwareRelated?: boolean}>)
+  const {browserFeatures} = useAppShellContext()
+
   const [showFeatureDetails, setShowFeatureDetails] = useState(false)
 
-  const hardwareRequirementNotMet = features.some((feature) => {
-    return feature.hardwareRelated && !feature.supported
-  })
+  const {current: insufficentHardware} = useRef(browserFeatures.some(
+    (feature) => feature.hardwareRelated && !feature.supported)
+  )
+  const {current: insufficentSoftware} = useRef(browserFeatures.some(
+    (feature) => !feature.hardwareRelated && !feature.supported)
+  )
+  const {current: requirementText} = useRef((() => {
+    if (insufficentHardware && insufficentSoftware) {
+      return "device & browser"
+    } else if (insufficentHardware) {
+      return "device"
+    } else if (insufficentSoftware) {
+      return "browser"
+    } else {
+      return ""
+    }
+  })())
 
-  const softwareRequirementsNotMet = features.some((feature) => {
-    return !feature.hardwareRelated && !feature.supported
-  })
-
-  let requirementText = ""
-
-  if (hardwareRequirementNotMet && softwareRequirementsNotMet) {
-    requirementText = "device & browser"
-  } else if (hardwareRequirementNotMet) {
-    requirementText = "device"
-  } else if (softwareRequirementsNotMet) {
-    requirementText = "browser"
-  }
+  
 
   return <>
     <div className="text-sm text-yellow-500 mb-3 mt-6">
-      {`Your ${requirementText} ${softwareRequirementsNotMet && hardwareRequirementNotMet ? "don't" : "doesn't"} support all required features.`}<br/>
-      {softwareRequirementsNotMet ? <>
+      {`Your ${requirementText} ${insufficentSoftware && insufficentHardware ? "don't" : "doesn't"} support all required features.`}<br/>
+      {insufficentSoftware ? <>
         {"Try using the latest version of Chrome"}
         <span className="ml-2">
           <FontAwesomeIcon icon={faChrome}/>
@@ -71,7 +77,7 @@ const UnsupportedFeatures = (): JSX.Element => {
 
     <Collapse in={showFeatureDetails}>
       <div className="max-w-sm mx-auto text-left">
-          {features.filter(({supported}) => !supported).map((feature, i) => {
+          {browserFeatures.filter(({supported}) => !supported).map((feature, i) => {
             const hardwareRelated = feature.hardwareRelated || false
             return <div
               key={`feature-check-${i}`}
@@ -145,9 +151,8 @@ const LauncherRoot = (): JSX.Element => {
     sessionStorage.setItem(APP_LAUNCHED, "1")
     navigate("/launch")
   })
-  const updateListener = useRef(NO_LISTENER)
   const {current: allFeaturesSupported} = useRef(
-    featureCheck().every((feature) => feature.supported)
+    app.browserFeatures.every((feature) => feature.supported)
   )
 
   const closeSettings = () => setSettingsMenuElement(null)
@@ -294,8 +299,7 @@ const LauncherRoot = (): JSX.Element => {
   }
 
   useEffect(() => {
-    updateListener.current = app.addEventListener("downloadprogress", async (progress) => {
-      console.log("got progress", progress)
+    const handerId = app.addEventListener("downloadprogress", async (progress) => {
       const {type, canonicalUrls} = progress
       const packages = updatingCorePackages.current
       const relatedToCorePackages = canonicalUrls.some(
@@ -309,44 +313,35 @@ const LauncherRoot = (): JSX.Element => {
       if (type === "install") {
         document.title = "Installing..."
         setProgressMsg("Installing...")
+        return
       }
 
-      const cargoIndexes = await downloadClient.getCargoIndices()
-      const targetIndexes = progress.canonicalUrls
-        .map((url) => cargoIndexes.cargos.findIndex((cargo) => cargo.canonicalUrl === url))
-        .filter((index) => index > -1)
-      const {cargos} = cargoIndexes
-      if (type === "success") {
-        targetIndexes.forEach((index) => cargos.splice(index, 1, {...cargos[index], state: CACHED}))
-        window.setTimeout(launchApp, 3_000)
-      }
-  
+      await downloadClient.consumeQueuedMessages()
+      await sleep(3_000)
+      
       if (type === "abort" || type === "fail") {
-        const nextState: CargoState = type === "abort" ? ABORTED : FAILED 
-        targetIndexes.forEach((index) => cargos.splice(index, 1, {
-          ...cargos[index],
-          state: nextState,
-          downloadId: "",
-        }))
         setLauncherState("error")
+        return
       }
+
+      launchApp()     
     })
 
     return () => {
       document.title = APP_TITLE
-      app.removeEventListener("downloadprogress", updateListener.current)
+      app.removeEventListener("downloadprogress", handerId)
     }
   }, [])
 
   useEffectAsync(async () => {
+    await downloadClient.consumeQueuedMessages()
+
     const statuses = await Promise.all([
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl),
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl),
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[2].canonicalUrl),
     ] as const)
     const [launcherStatus] = statuses
-
-    console.log("statuses", statuses)
     
     const notInstalled = statuses.some((cargo) => !cargo)
     const isUpdating = statuses.some((cargo) => cargo?.state === UPDATING)
@@ -412,7 +407,9 @@ const LauncherRoot = (): JSX.Element => {
                       }
                   }}
                   >
-                  <SettingsIcon/>
+                    <span className="text-lg">
+                      <FontAwesomeIcon icon={faGear}/>
+                    </span>
                   </Button>
               </Tooltip>
 
@@ -469,7 +466,7 @@ const LauncherRoot = (): JSX.Element => {
                         localStorage.clear()
                         sessionStorage.clear()
                         await Promise.all([
-                          import("../lib/database/AppDatabase").then((mod) => new mod.AppDatabase().clear()),
+                          app.database.clear(),
                           downloadClient.uninstallAllAssets(),
                           sleep(3_000)
                         ])

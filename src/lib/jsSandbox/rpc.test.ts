@@ -6,6 +6,7 @@ import {PermissionsList} from "../cargo"
 import {Permissions, ALLOW_ALL_EMBEDS} from "../types/permissions"
 import {Mutable} from "../types/utility"
 import { CACHED } from "../shabah/backend"
+import type {AppDatabase} from "../database/AppDatabase"
 
 const mockSandboxDependencies: SandboxDependencies = {
     displayExtensionFrame: () => {},
@@ -29,6 +30,8 @@ const mockSandboxDependencies: SandboxDependencies = {
         downloadId: "",
     },
     cargo: new Cargo(),
+    // a quick hack for now
+    database: {} as unknown as AppDatabase,
     recommendedStyleSheetUrl: ""
 }
 
