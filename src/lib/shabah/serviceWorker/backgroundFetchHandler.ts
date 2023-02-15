@@ -2,14 +2,10 @@ import {
     getDownloadIndices,
     removeDownloadIndex,
     saveDownloadIndices,
-    getCargoIndices,
-    updateCargoIndex,
-    saveCargoIndices,
     FileCache,
     removeSlashAtEnd,
     DownloadIndex,
     saveErrorDownloadIndex,
-    NO_UPDATE_QUEUED,
     DownloadSegment,
     CargoState,
     CACHED,
@@ -56,57 +52,23 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
         const downloadQueueId = bgfetch.id
-        const [downloadIndices, cargoIndices] = await Promise.all([
-            getDownloadIndices(origin, fileCache),
-            getCargoIndices(origin, fileCache)
-        ] as const)
+        const downloadIndices = await getDownloadIndices(origin, fileCache)
         const downloadIndexPosition = downloadIndices.downloads.findIndex(
             (index) => index.id === downloadQueueId
         )
         log(eventName, `found download_index=${downloadIndexPosition > -1}`)
         if (downloadIndexPosition < 0) {
-            log(
-                eventName,
-                `Background fetch does not exist in records (id=${downloadQueueId}). Ignoring handler!`
-            )
+            log(eventName, `Background fetch does not exist in records (id=${downloadQueueId}). Ignoring handler!`)
             return
         }
         const targetDownloadIndex = downloadIndices.downloads[downloadIndexPosition]
-        const downloadSegmentsLength = targetDownloadIndex.segments.length
-        
+
         const fetchedResources = await bgfetch.matchAll()
         log(
             eventName,
             "resources downloaded",
-            fetchedResources.map(
-                (resource) => resource.request.url
-            )
+            fetchedResources.map((resource) => resource.request.url)
         )
-        
-        const associatedCargos = cargoIndices.cargos.filter(
-            (cargo) => cargo.downloadId === downloadQueueId
-        )
-        log(
-            eventName, 
-            `download_segments=${downloadSegmentsLength}, associated_cargos=${associatedCargos.length}`
-        )
-
-        const allAssociatedCargosAreInSegments = associatedCargos.every((cargo) => {
-            const {canonicalUrl} = cargo
-            const found = targetDownloadIndex.segments.find(
-                (segment) => segment.canonicalUrl === canonicalUrl
-            )
-            return !!found
-        })
-
-        if (!allAssociatedCargosAreInSegments) {
-            log(
-                eventName,
-                `Some of associated cargos were not found in download index segment!`,
-                associatedCargos,
-                targetDownloadIndex.segments,
-            )
-        }
 
         const progressUpdater: ProgressUpdateRecord = {
             type: "install",
@@ -134,14 +96,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         for (const downloadSegement of targetDownloadIndex.segments) {
             const {canonicalUrl} = downloadSegement
             
-            const cargoIndex = cargoIndices.cargos.find(
-                (cargo) => cargo.canonicalUrl === canonicalUrl
-            )
-
-            if (!cargoIndex) {
-                continue
-            }
-
             const targetSegmentIndex = targetDownloadIndex.segments.findIndex(
                 (segment) => segment.canonicalUrl === canonicalUrl
             )

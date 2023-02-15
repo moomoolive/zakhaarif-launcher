@@ -1,5 +1,5 @@
 import { Tooltip, Menu, MenuItem } from "@mui/material"
-import { useMemo, useState } from "react"
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faCaretDown, 
@@ -33,8 +33,9 @@ type FileSystemBreadcrumbsProps = {
     mutateDirectoryPath: (newValue: CargoDirectory[]) => unknown
     onShowCargoInfo: () => unknown
     onShowCargoUpdater: () => unknown
-    onDeleteCargo: (canonicalUrl: string) => unknown
+    onDeleteCargo: (canonicalUrl: string) => Promise<boolean>
     onRecoverCargo: (canonicalUrl: string) => unknown
+    onCreateAlert: (type: "success" | "error", content: ReactNode) => unknown
 }
 
 export const FileSystemBreadcrumbs = ({
@@ -47,13 +48,30 @@ export const FileSystemBreadcrumbs = ({
     onShowCargoInfo,
     onShowCargoUpdater,
     onDeleteCargo,
-    onRecoverCargo
+    onRecoverCargo,
+    onCreateAlert
 }: FileSystemBreadcrumbsProps): JSX.Element => {
     const {downloadClient} = useAppShellContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
 
     const [cargoMenuElement, setCargoMenuElement] = useState<HTMLElement | null>(null)
+    const [loadingCargo, setLoadingCargo] = useState(false)
+
+    const timerIdRef = useRef(-1)
+
+    useEffect(() => {
+        if (!isViewingCargo) {
+            setLoadingCargo(false)
+            return () => window.clearTimeout(timerIdRef.current)
+        }
+        setLoadingCargo(true)
+        timerIdRef.current = window.setTimeout(() => {
+            setLoadingCargo(false)
+        }, 600)
+        return () => window.clearTimeout(timerIdRef.current)
+    }, [isViewingCargo])
+
 
     return <div 
         className=" text-sm text-neutral-300 p-3 flex items-center flex-wrap"
@@ -106,19 +124,30 @@ export const FileSystemBreadcrumbs = ({
                 </Menu>
             </>}
         </div>
-        
-        {isViewingCargo && !cargoFound ? <div>
+
+        {isViewingCargo && loadingCargo ? <div>
             <span className="mx-1">
                 <FontAwesomeIcon icon={faAngleRight}/>
             </span>
             <button
-                className="hover:bg-gray-900 p-1 px-2 rounded text-yellow-500"
+                className="hover:bg-gray-900 p-1 px-2 rounded animate-pulse animate-fade-in-left"
+            >
+                {"Loading..."}
+            </button>
+        </div> : <></>}
+        
+        {isViewingCargo && !cargoFound && !loadingCargo ? <div>
+            <span className="mx-1">
+                <FontAwesomeIcon icon={faAngleRight}/>
+            </span>
+            <button
+                className="hover:bg-gray-900 p-1 px-2 rounded text-yellow-500 animate-fade-in-left"
             >
                 {"Not found"}
             </button>
         </div> : <></>}
 
-        {isViewingCargo && cargoFound && targetCargo ? <>
+        {isViewingCargo && cargoFound && targetCargo && !loadingCargo ? <>
             {directoryPath.map((pathSection, index) => {
                 const {path} = pathSection
                 return <div
@@ -252,8 +281,13 @@ export const FileSystemBreadcrumbs = ({
                                     setCargoMenuElement(null)
                                     return
                                 }
-                                onDeleteCargo(target.canonicalUrl)
                                 setCargoMenuElement(null)
+                                const response = await onDeleteCargo(target.canonicalUrl)
+                                if (response) {
+                                    onCreateAlert("success", "Deleted Successfully")
+                                    return
+                                }
+                                onCreateAlert("error", "Couldn't Delete")
                             }}
                         >
                             <span className="mr-3">

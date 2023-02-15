@@ -1,5 +1,5 @@
 import {Shabah} from "../downloadClient"
-import {CACHED, CargoIndex, CargoState, DownloadClientMessage, DownloadClientMessageConsumer, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
+import {CACHED, CargoIndex, CargoState, DownloadClientCargoIndexStorage, DownloadClientMessage, DownloadClientMessageConsumer, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
 import {DownloadManager} from "../backend"
 import { cleanPermissions } from "../../utils/security/permissionsSummary"
 import {UpdateCheckConfig, UpdateCheckResponse} from "../updateCheckStatus"
@@ -183,13 +183,34 @@ const dependencies = ({
         }
     }
 
+    const store: Record<string, CargoIndex> = {}
+
+    const indexStorage: DownloadClientCargoIndexStorage = {
+        getIndex: async (canonicalUrl) => {
+            if (!(canonicalUrl in store)) {
+                return null
+            }
+            return store[canonicalUrl]
+        },
+        putIndex: async (index) => {
+            store[index.canonicalUrl] = index
+            return true
+        },
+        deleteIndex: async (canonicalUrl) => {
+            delete store[canonicalUrl]
+            return true
+        }
+    }
+
     return {
         adaptors: {networkRequest, fileCache, downloadManager},
         caches: {networkCache, innerFileCache},
         downloadState,
+        internalCargoStore: store,
         canceledDownloads,
         messageConsumer,
-        clientMessages
+        clientMessages,
+        indexStorage
     }
 }
 
@@ -198,14 +219,15 @@ export const createClient = (
     config?: Parameters<typeof dependencies>[0]
 ) => {
     const deps = dependencies(config)
-    const {adaptors, messageConsumer} = deps
+    const {adaptors, messageConsumer, indexStorage} = deps
     return {
         ...deps, 
         client: new Shabah({
             origin,
             adaptors, 
             permissionsCleaner: cleanPermissions,
-            messageConsumer
+            messageConsumer,
+            indexStorage
         })
     }
 }

@@ -16,7 +16,7 @@ describe("consuming messages", () => {
         ] as const
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const cargo = new Cargo<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
@@ -28,10 +28,10 @@ describe("consuming messages", () => {
             expect(persistedCargoindex).not.toBe(null)
             expect(persistedCargoindex?.canonicalUrl).toBe(canonicalUrl)
             expect(await testClient.messageConsumer.getAllMessages()).length(0)
-            const cargosBefore = structuredClone((await client.getCargoIndices()).cargos)
+            const cargosBefore = structuredClone(Object.values(internalCargoStore))
             const consumeReponse = await client.consumeQueuedMessages()
             expect(consumeReponse).toBe(Shabah.STATUS.noMessagesFound)
-            const cargosAfter = structuredClone((await client.getCargoIndices()).cargos)
+            const cargosAfter = structuredClone(Object.values(internalCargoStore))
             expect(cargosBefore).toStrictEqual(cargosAfter)
         }
     })
@@ -45,7 +45,7 @@ describe("consuming messages", () => {
         ] as const
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const cargo = new Cargo<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
@@ -65,10 +65,10 @@ describe("consuming messages", () => {
                 ]
             })
             expect(await testClient.messageConsumer.getAllMessages()).length(1)
-            const cargosBefore = structuredClone((await client.getCargoIndices()).cargos)
+            const cargosBefore = structuredClone(Object.values(internalCargoStore))
             const consumeReponse = await client.consumeQueuedMessages()
             expect(consumeReponse).toBe(Shabah.STATUS.allMessagesAreOrphaned)
-            const cargosAfter = structuredClone((await client.getCargoIndices()).cargos)
+            const cargosAfter = structuredClone(Object.values(internalCargoStore))
             expect(cargosBefore).toStrictEqual(cargosAfter)
         }
     })
@@ -82,7 +82,7 @@ describe("consuming messages", () => {
         ] as const
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const cargo = new Cargo<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
@@ -106,10 +106,10 @@ describe("consuming messages", () => {
                 ]
             })
             expect(await testClient.messageConsumer.getAllMessages()).length(1)
-            const cargoLength = (await client.getCargoIndices()).cargos.length
+            const cargoLength = Object.values(internalCargoStore).length
             const consumeReponse = await client.consumeQueuedMessages()
             expect(consumeReponse).toBe(Shabah.STATUS.someMessagesAreOrphaned)
-            const currentLength = (await client.getCargoIndices()).cargos.length
+            const currentLength = Object.values(internalCargoStore).length
             expect(cargoLength).toBe(currentLength)
             const persistedCargoindexAfter = await client.getCargoIndexByCanonicalUrl(
                 canonicalUrl
@@ -129,7 +129,7 @@ describe("consuming messages", () => {
         ] as const
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const cargo = new Cargo<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
@@ -152,10 +152,10 @@ describe("consuming messages", () => {
                 stateUpdates: [{canonicalUrl, state: FAILED}]
             }
             expect(await testClient.messageConsumer.getAllMessages()).length(1)
-            const cargoLength = (await client.getCargoIndices()).cargos.length
+            const cargoLength = Object.values(internalCargoStore).length
             const consumeReponse = await client.consumeQueuedMessages()
             expect(consumeReponse).toBe(Shabah.STATUS.messagesConsumed)
-            const currentLength = (await client.getCargoIndices()).cargos.length
+            const currentLength = Object.values(internalCargoStore).length
             expect(cargoLength).toBe(currentLength)
             const persistedCargoindexAfter = await client.getCargoIndexByCanonicalUrl(
                 canonicalUrl
@@ -193,7 +193,7 @@ describe("consuming messages", () => {
         ] as const
         for (const {canonicalUrl, extraCargos} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const allUrls = [...extraCargos, canonicalUrl]
             for (const url of allUrls) {
                 const cargo = new Cargo<Permissions>({
@@ -220,10 +220,10 @@ describe("consuming messages", () => {
             }
             
             expect(await testClient.messageConsumer.getAllMessages()).length(allUrls.length)
-            const cargoLength = (await client.getCargoIndices()).cargos.length
+            const cargoLength = Object.values(internalCargoStore).length
             const consumeReponse = await client.consumeQueuedMessages()
             expect(consumeReponse).toBe(Shabah.STATUS.messagesConsumed)
-            const currentLength = (await client.getCargoIndices()).cargos.length
+            const currentLength = Object.values(internalCargoStore).length
             expect(cargoLength).toBe(currentLength)
             
             for (const url of allUrls) {
@@ -264,7 +264,7 @@ describe("consuming messages", () => {
         
         for (const {canonicalUrl, extraCargos} of tests) {
             const testClient = createClient(mainOrigin, {})
-            const {client} = testClient
+            const {client, internalCargoStore} = testClient
             const allUrls = [...extraCargos, canonicalUrl]
             for (const url of allUrls) {
                 const cargo = new Cargo<Permissions>({

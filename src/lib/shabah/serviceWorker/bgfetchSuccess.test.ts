@@ -6,11 +6,7 @@ import {
     emptyDownloadIndex,
     updateDownloadIndex,
     saveDownloadIndices,
-    emptyCargoIndices,
-    updateCargoIndex,
-    saveCargoIndices,
     ResourceMap,
-    getCargoIndices,
     NO_UPDATE_QUEUED,
     DownloadSegment,
     CACHED,
@@ -163,21 +159,6 @@ describe("background fetch success handler", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: 1,
-            resolvedUrl: origin + "/pkg-store",
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const handler = makeBackgroundFetchHandler({
             origin, 
             fileCache,
@@ -260,21 +241,6 @@ describe("background fetch success handler", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: 1,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -352,21 +318,6 @@ describe("background fetch success handler", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -465,7 +416,6 @@ describe("background fetch success handler", () => {
                 segments: [] as DownloadSegment[]
             }
             const downloadIndices = emptyDownloadIndex()
-            const cargoIndices = emptyCargoIndices()
             const allFileCacheMeta = []
             for (const {origin, files} of testCase) {
                 const canonicalUrl = origin
@@ -501,20 +451,6 @@ describe("background fetch success handler", () => {
                     downloadedResources: [],
                     canRevertToPreviousVersion: false
                 })
-                updateCargoIndex(cargoIndices, {
-                    tag: cargoId,
-                    resolvedUrl: resolvedUrl,
-                    entry: "index.js",
-                    logo: "",
-                    permissions: [],
-    
-                    name: "pkg-name",
-                    bytes: 20,
-                    canonicalUrl,
-                    version: "0.1.0",
-                    state: UPDATING,
-                    downloadId
-                })
             }
             updateDownloadIndex(
                 downloadIndices, 
@@ -522,11 +458,6 @@ describe("background fetch success handler", () => {
             )
             await saveDownloadIndices(
                 downloadIndices, 
-                mainOrigin, 
-                fileCache
-            )
-            await saveCargoIndices(
-                cargoIndices, 
                 mainOrigin, 
                 fileCache
             )
@@ -559,7 +490,6 @@ describe("background fetch success handler", () => {
             )
             expect(output.ui.updateCalled).toBe(true)
             expect(!!output.ui.state).toBe(true)
-            const indexesAfterUpdate = await getCargoIndices(mainOrigin, fileCache)
             expect(clientMessages.length).toBe(1)
             expect(clientMessages[0].stateUpdates.length).toBe(testCase.length)
 
@@ -620,22 +550,7 @@ describe("background fetch success handler", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
         const cargoId = 0
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            logo: "",
-            permissions: [],
-            name: "pkg-name",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 

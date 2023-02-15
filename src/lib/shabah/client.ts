@@ -32,6 +32,8 @@ export const STATUS_CODES = {
     manifestIsUpToDate: 5,
     messagesConsumed: 6,
     noMessagesFound: 7,
+    createNewIndex: 8,
+    updatedPreviousIndex: 9,
 
     networkError: ERROR_CODES_START,
     badHttpCode: 101,

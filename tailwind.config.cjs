@@ -29,8 +29,8 @@ module.exports = {
         'spin-slow': 'spin 3s linear infinite',
         wiggle: 'wiggle 1s ease-in-out infinite',
         swing: "swing 1s ease infinite",
-        "fade-in-left": "fade-in-left 0.5s forwards",
-        "fade-out-left": "fade-out-left 0.5s forwards",
+        "fade-in-left": "fade-in-left 0.4s forwards",
+        "fade-out-left": "fade-out-left 0.4s forwards",
         "shrink-height": "shrink-height 0.13s ease-out"
       },
       keyframes: {

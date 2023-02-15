@@ -256,6 +256,12 @@ export const downloadClientMessageUrl = (message: DownloadClientMessage): string
     return `https://sw.queue/${message.downloadId}`
 }
 
+export type DownloadClientCargoIndexStorage = {
+    getIndex: (canonicalUrl: string) => Promise<CargoIndex | null>
+    putIndex: (index: CargoIndex) => Promise<boolean>
+    deleteIndex: (canonicalUrl: string) => Promise<boolean>
+}
+
 export type Permissions = {key: string, value: string[]}[]
 
 export type CargoIndex = {
@@ -276,86 +282,6 @@ export type CargoIndex = {
 
 export type CargoIndexWithoutMeta = Omit<CargoIndex, "updated" | "created">
 
-export const emptyCargoIndices = () => ({
-    cargos: [] as Array<CargoIndex>,
-    updatedAt: Date.now(),
-    createdAt: Date.now(),
-    savedAt: Date.now(),
-    version: 1
-})
-
-export type CargoIndices = ReturnType<typeof emptyCargoIndices>
-
-export const getCargoIndices = async (
-    origin: string, 
-    fileCache: FileCache
-): Promise<CargoIndices> => {
-    return getCargoIndexesCore(fileCache, cargoIndicesUrl(origin))
-}
-
-export const getCargoIndexesCore = async (
-    fileCache: FileCache,
-    url: string
-): Promise<CargoIndices> => {
-    const cacheRes = await fileCache.getFile(url)
-    if (!cacheRes || !cacheRes.ok) {
-        return emptyCargoIndices()
-    }
-    try {
-        return await cacheRes.json() as CargoIndices
-    } catch {
-        return emptyCargoIndices()
-    }
-}
-
-export const updateCargoIndex = (
-    indices: CargoIndices,
-    target: CargoIndexWithoutMeta,
-) => {
-    const updated = Date.now()
-    indices.updatedAt = updated
-    const existingIndex = indices.cargos.findIndex(
-        (cargo) => cargo.canonicalUrl === target.canonicalUrl
-    )
-    if (existingIndex < 0) {
-        indices.cargos.push({...target, updated, created: updated})
-        return operationCodes.createdNew
-    }
-    const previousIndex = indices.cargos[existingIndex]
-    const updatedIndex = {
-        ...previousIndex, ...target, updated
-    }
-    indices.cargos[existingIndex] = updatedIndex
-    return operationCodes.updatedExisting
-}
-
 export const stringBytes = (str: string) => (new TextEncoder().encode(str)).length
-
-export const saveCargoIndices = async (
-    indexes: CargoIndices,
-    origin: string,
-    cache: FileCache
-): Promise<BackendOpertionCode> => {
-    return saveCargoIndexesCore(
-        indexes,
-        cargoIndicesUrl(origin),
-        cache
-    )
-}
-
-export const saveCargoIndexesCore = async (
-    indexes: CargoIndices,
-    url: string,
-    cache: FileCache
-): Promise<BackendOpertionCode> => {
-    indexes.savedAt = Date.now()
-    const text = JSON.stringify(indexes)
-    await cache.putFile(url, new Response(text, {
-        status: 200,
-        statusText: "OK",
-        headers: headers("application/json", stringBytes(text))
-    }))
-    return operationCodes.saved 
-}
 
 export const NO_UPDATE_QUEUED = ""

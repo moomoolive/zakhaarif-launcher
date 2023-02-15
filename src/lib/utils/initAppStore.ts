@@ -9,9 +9,44 @@ import {EventListenerRecord} from "./eventListener"
 import { AppDatabase } from "../database/AppDatabase"
 import { DownloadClientMessage, downloadClientMessageUrl } from "../shabah/backend"
 import {FEATURE_CHECK} from "./featureCheck"
+import {VERBOSE_LAUNCHER_LOGS} from "./localStorageKeys"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener
+}
+
+type AppLoggerConfig = {
+    silent: boolean
+    name: string
+}
+
+export class AppLogger {
+    silent: boolean
+    name: string
+
+    constructor(config: AppLoggerConfig) {
+        const {silent, name} = config
+        this.silent = silent
+        this.name = name
+    }
+
+    private prefix() {
+        return `[${this.name}]`
+    }
+
+    info(...messages: unknown[]): void {
+        if (!this.silent) {
+            console.info(this.prefix(), ...messages)
+        }
+    }
+
+    warn(...messages: unknown[]): void {
+        console.warn(this.prefix(), ...messages)
+    }
+
+    error(...messages: unknown[]): void {
+        console.error(this.prefix(), ...messages)
+    }
 }
 
 export type EventName = keyof EventMap
@@ -35,6 +70,7 @@ export class AppStore {
     serviceWorkerTerminal: wRpc<ServiceWorkerRpcs>
     database: AppDatabase
     readonly browserFeatures: typeof FEATURE_CHECK
+    logger: AppLogger
 
     private eventListenerMap: EventListenerMap
     private globalListeners: Array<{
@@ -43,13 +79,24 @@ export class AppStore {
     }>
 
     constructor(config: AppStoreConfig) {
+        const verboseLogs = localStorage.getItem(VERBOSE_LAUNCHER_LOGS)
+        this.logger = new AppLogger({
+            name: `🐢 App Shell`,
+            silent: verboseLogs === null
+                ? !import.meta.env.DEV
+                : verboseLogs !== "true"
+        })
         this.browserFeatures = FEATURE_CHECK
         this.setTerminalVisibility  = config.setTerminalVisibility
-        this.database = new AppDatabase()
+        
+        const database = new AppDatabase()
+        this.database = database
+        
         this.downloadClient = new Shabah({
             origin: location.origin,
             adaptors: webAdaptors(APP_CACHE),
             permissionsCleaner: cleanPermissions,
+            indexStorage: database.cargoIndexes,
             messageConsumer: {
                 getAllMessages: async () => {
                     const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)

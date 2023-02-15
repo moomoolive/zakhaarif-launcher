@@ -8,10 +8,6 @@ import {
 import {io, Ok} from "../monads/result"
 import {
     CargoIndexWithoutMeta,
-    CargoIndices,
-    saveCargoIndices,
-    getCargoIndices,
-    updateCargoIndex,
     DownloadIndexCollection,
     saveDownloadIndices,
     headers,
@@ -35,6 +31,8 @@ import {
     ABORTED,
     FAILED,
     DownloadClientMessageConsumer,
+    DownloadClientCargoIndexStorage,
+    CargoIndex
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {NULL_FIELD} from "../cargo/index"
@@ -45,11 +43,9 @@ import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import { NO_INSTALLATION } from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
 import { nanoid } from "nanoid"
-import { DeepReadonly } from "../types/utility"
 import { getFileNameFromUrl } from "../utils/urls/getFilenameFromUrl"
 
-export type {CargoIndex, CargoIndices, CargoState} from "./backend"
-export {emptyCargoIndices} from "./backend"
+export type {CargoIndex, CargoState} from "./backend"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
@@ -66,6 +62,7 @@ export type ShabahConfig = {
         downloadManager: DownloadManager
     },
     messageConsumer: DownloadClientMessageConsumer
+    indexStorage: DownloadClientCargoIndexStorage
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
@@ -85,8 +82,8 @@ export class Shabah {
     private fileCache: FileCache
     private downloadManager: DownloadManager
     private messageConsumer: DownloadClientMessageConsumer
+    private indexStorage: DownloadClientCargoIndexStorage
 
-    private cargoIndicesCache: null | CargoIndices
     private downloadIndicesCache: null | DownloadIndexCollection
     private permissionsCleaner: null | (
         (permissions: GeneralPermissions) => GeneralPermissions
@@ -96,7 +93,8 @@ export class Shabah {
         adaptors, 
         origin, 
         permissionsCleaner,
-        messageConsumer
+        messageConsumer,
+        indexStorage
     }: ShabahConfig) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
@@ -104,11 +102,11 @@ export class Shabah {
         const {networkRequest, fileCache, downloadManager} = adaptors
         this.permissionsCleaner = permissionsCleaner || null
         this.messageConsumer = messageConsumer
+        this.indexStorage = indexStorage
         this.networkRequest = networkRequest
         this.fileCache = fileCache
         this.downloadManager = downloadManager
         this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
-        this.cargoIndicesCache = null
         this.downloadIndicesCache = null
     }
 
@@ -502,45 +500,33 @@ export class Shabah {
     }
 
     async deleteCargo(canonicalUrl: string): Promise<Ok<StatusCode>> {
-        const cargoIndex = await this.getCargoIndices()
-        const index = cargoIndex.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        if (index < 0) {
+        const cargoIndex = await this.getCargoIndexByCanonicalUrl(canonicalUrl)
+        if (!cargoIndex) {
             return io.ok(STATUS_CODES.remoteResourceNotFound)
         }
-        const targetCargo = cargoIndex.cargos[index]
         const promises = []
         promises.push(
             this.deleteAllCargoFiles(
-                targetCargo.canonicalUrl,
-                targetCargo.resolvedUrl
+                cargoIndex.canonicalUrl,
+                cargoIndex.resolvedUrl
             )
         )
         if (
-            targetCargo.state === UPDATING
-            && targetCargo.downloadId !== NO_UPDATE_QUEUED
+            cargoIndex.state === UPDATING
+            && cargoIndex.downloadId !== NO_UPDATE_QUEUED
         ) {
             promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
         }
         await Promise.all(promises)
-        return io.ok(
-            await this.deleteCargoIndex(targetCargo.canonicalUrl)
-        )
+        return io.ok(await this.deleteCargoIndex(cargoIndex.canonicalUrl))
     }
 
     // cargo index interfaces
-    async getCargoIndexByCanonicalUrl(canonicalUrl: string) {
-        const indices = await this.getCargoIndices()
-        const index = indices.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        if (index < 0) {
-            return null
-        }
-        return indices.cargos[index]
+    async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<CargoIndex | null> {
+        return await this.indexStorage.getIndex(canonicalUrl)
     }
 
+    /*
     private async refreshCargoIndices() {
         const {origin, fileCache} = this
         const cargos = await getCargoIndices(origin, fileCache)
@@ -560,23 +546,32 @@ export class Shabah {
         return await saveCargoIndices(indices, origin, fileCache)
 
     }
+    */
 
-    async putCargoIndex(newIndex: CargoIndexWithoutMeta) {
-        const indices = await this.getCargoIndices()
-        updateCargoIndex(indices, newIndex)
-        return await this.persistCargoIndices(indices)
+    async putCargoIndex(newIndex: CargoIndexWithoutMeta): Promise<StatusCode> {
+        const previousIndex = await this.indexStorage.getIndex(newIndex.canonicalUrl)
+        if (!previousIndex) {
+            await this.indexStorage.putIndex({
+                ...newIndex,
+                created: Date.now(),
+                updated: Date.now()
+            })
+            return STATUS_CODES.createNewIndex
+        }
+        await this.indexStorage.putIndex({
+            ...previousIndex,
+            ...newIndex,
+            updated: Date.now()
+        })
+        return STATUS_CODES.updatedPreviousIndex
     }
 
-    async deleteCargoIndex(canonicalUrl: string) {
-        const indexes = await this.getCargoIndices()
-        const cargoIndex = indexes.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
-        )
-        if (cargoIndex < 0) {
+    async deleteCargoIndex(canonicalUrl: string): Promise<StatusCode> {
+        const targetIndex = await this.indexStorage.getIndex(canonicalUrl)
+        if (!targetIndex) {
             return STATUS_CODES.remoteResourceNotFound
         }
-        indexes.cargos.splice(cargoIndex, 1)
-        await this.persistCargoIndices(indexes)
+        await this.indexStorage.deleteIndex(canonicalUrl)
         return STATUS_CODES.ok
     }
 
@@ -678,29 +673,28 @@ export class Shabah {
         )
         let notFoundCount = 0
 
-        const cargoIndexes = await this.getCargoIndices()
         for (const message of messages) {
             for (const update of message.stateUpdates) {
                 const {canonicalUrl, state} = update
-                const targetIndex = cargoIndexes.cargos.findIndex(
-                    (cargo) => cargo.canonicalUrl === canonicalUrl
+                const targetIndex = await this.getCargoIndexByCanonicalUrl(
+                    canonicalUrl
                 )
-                if (targetIndex < 0) {
+                if (!targetIndex) {
                     notFoundCount++
                     continue
                 }
-                cargoIndexes.cargos.splice(targetIndex, 1, {
-                    ...cargoIndexes.cargos[targetIndex],
+                await this.putCargoIndex({
+                    ...targetIndex, 
                     state,
                     downloadId: NO_UPDATE_QUEUED
                 })
             }
         }
-
-        await this.persistCargoIndices(cargoIndexes)
-        await Promise.all(
-            messages.map((message) => messageConsumer.deleteMessage(message))
-        )
+        
+        await Promise.all([
+            ...messages.map((message) => messageConsumer.deleteMessage(message)),
+            this.refreshDownloadIndicies()
+        ])
 
         if (notFoundCount === stateUpdateCount) {
             return STATUS_CODES.allMessagesAreOrphaned

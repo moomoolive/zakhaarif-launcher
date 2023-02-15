@@ -9,7 +9,9 @@ import {
     TextField,
     InputAdornment,
     Divider,
-    IconButton
+    IconButton,
+    Collapse,
+    Skeleton
 } from "@mui/material"
 import {Link, useNavigate} from "react-router-dom"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
@@ -19,11 +21,13 @@ import {
     faArrowLeft,
     faPlus,
     faMagnifyingGlass,
+    faClock,
+    faFolder,
 } from "@fortawesome/free-solid-svg-icons"
 import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {useAppShellContext} from "./store"
 import {io} from "../lib/monads/result"
-import {emptyCargoIndices, CargoState, Shabah, CargoIndices, CargoIndex} from "../lib/shabah/downloadClient"
+import {Shabah, CargoIndex} from "../lib/shabah/downloadClient"
 import {Cargo} from "../lib/cargo/index"
 import {
     ASCENDING_ORDER,
@@ -47,6 +51,11 @@ import {useSearchParams} from "../hooks/searchParams"
 import LoadingIcon from "../components/LoadingIcon"
 import { ABORTED, CACHED, FAILED, UPDATING } from "../lib/shabah/backend"
 import { ERROR_CODES_START } from "../lib/shabah/client"
+import { useAsyncState } from "../hooks/promise"
+import { roundDecimal } from "../lib/math/rounding"
+import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
+import { useDebounce } from "../hooks/debounce"
+//import { makeTestCargoIndexes } from "../testScripts/dummyCargoIndexes"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -70,12 +79,14 @@ const CargoUpdater = lazyComponent(
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
     {
-        loadingElement: <div className="mt-16 w-4/5 mx-auto">
-            <div className="animate-spin text-blue-500 text-3xl mb-3">
-                <LoadingIcon/>
-            </div>
-            <div className="text-sm text-neutral-400">
-                {"Looking up Files..."}
+        loadingElement: <div className="w-full h-5/6 overflow-y-scroll text-center"> 
+            <div className="mt-16 w-4/5 mx-auto">
+                <div className="animate-spin text-blue-500 text-3xl mb-3">
+                    <LoadingIcon/>
+                </div>
+                <div className="text-sm text-neutral-400">
+                    {"Looking up Files..."}
+                </div>
             </div>
         </div>
     }
@@ -115,7 +126,7 @@ type ShownModal = (
     | "Recovery"
 )
 
-type FilterType = "updatedAt" | "bytes" | "state" | "addon-type" | "name"
+type FilterType = "updated" | "bytes" | "state" | "tag" | "name"
 
 type FilterConfig = {
     type: FilterType
@@ -127,26 +138,42 @@ type AlertConfig = {
     content: ReactNode
 }
 
-const MINIMUM_VIEWING_ITEMS = 25
+const PAGE_LIMIT = 25
+const FILE_SYSTEM_FILTERS = [
+    {targetFilter: "name", name: "Name", className: "w-1/2"},
+    {targetFilter: "", name: "Type", className: "w-1/4 md:w-1/6 text-center"},
+    {targetFilter: "", name: "Date", className: "hidden md:block w-1/6 text-center"},
+    {targetFilter: "bytes", name: "Size", className: "w-1/4 md:w-1/6 text-center"},
+] as const
+const CARGO_FILTERS = [
+    {targetFilter: "name", name: "Name", className: "w-1/2 lg:w-1/3"},
+    {targetFilter: "state", name: "Status", className: "hidden lg:block w-1/6 text-center"},
+    {targetFilter: "tag", name: "Type", className: "hidden md:block w-1/6 text-center"},
+    {targetFilter: "updated", name: "Date", className: "w-1/4 md:w-1/6 text-center"},
+    {targetFilter: "bytes", name: "Size", className: "w-1/4 md:w-1/6 text-center"},
+] as const
 
 const AddOns = (): JSX.Element => {
     const app = useAppShellContext()
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, database, logger} = useAppShellContext()
     const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
+    const testSearchDelay = useDebounce(300)
     
-    const [loadingInitialData, setLoadingInitialData] = useState(true)
+    const [queryLoading, setQueryLoading] = useState(true)
     const [isInErrorState, setIsInErrorState] = useState(false)
-    const [cargoIndex, setCargoIndex] = useState<DeepReadonly<CargoIndices>>(emptyCargoIndices())
     const [searchText, setSearchText] = useState("")
-    const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updatedAt", order: DESCENDING_ORDER})
-    const [cargoFound, setCargoFound] = useState(true)
-    const [viewingCargoIndex, setViewingCargoIndex] = useState(0)
+    const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updated", order: DESCENDING_ORDER})
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
     const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
     const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null)
     const [modalShown, setModalShown] = useState<ShownModal>("")
-    const [viewingCount, setViewingCount] = useState(MINIMUM_VIEWING_ITEMS)
+    const [offset, setOffset] = useState(0)
+    const [targetIndex, setTargetIndex] = useState<CargoIndex | null>(null)
+    const [cacheBusterId, setCacheBusterId] = useState(0)
+    const [storageUsage, setStorageUsage] = useState({used: 0, left: 0, total: 0})
+    const [cargoCount, setCargoCount] = useState(0)
+    const [latestUpdate, setLatestUpdate] = useState(Date.now())
 
     const viewingCargoBytes = useRef(0)
     const {current: toggleFilter} = useRef((filterName: FilterType, order: FilterOrder, currentFilter: FilterType) => {
@@ -157,10 +184,9 @@ const AddOns = (): JSX.Element => {
         } else {
             setFilterConfig((previous) => ({...previous, order: DESCENDING_ORDER}))
         }
-        setViewingCount(MINIMUM_VIEWING_ITEMS)
+        setOffset(0)
     })
     const targetCargoRef = useRef(new Cargo<Permissions>())
-    const storageUsageRef = useRef({used: 0, total: 0, left: 0})
     const {current: setSearchKey} = useRef((key: string, value: string) => {
         searchParams.set(key, value)
         setSearchParams(new URLSearchParams(searchParams))
@@ -181,54 +207,23 @@ const AddOns = (): JSX.Element => {
     const {current: onShowSettings} = useRef(() => navigate("/settings"))
     const {current: clearAlert} = useRef(() => setAlertConfig(null))
     const {current: setViewingCargo} = useRef((canonicalUrl: string) => setSearchKey(ADDONS_VIEWING_CARGO, encodeURIComponent(canonicalUrl)))
-    const targetIndexRef = useRef<CargoIndex>({
-        name: "",
-        tag: -1,
-        logo: "",
-        resolvedUrl: "",
-        canonicalUrl: "",
-        bytes: 0,
-        entry: "",
-        version: "",
-        permissions: [],
-        state: CACHED,
-        downloadId: "",
-        created: 0,
-        updated: 0,
-    })
-    const filterElementsRef = useRef({
-        filter: "",
-        order: -1,
-        searchText: "",
-        cargoIndex: null as CargoIndices | null,
-        elements: [] as CargoIndex[] 
-    })
+    const queryTimeRef = useRef(0)
 
-    const {current: cargoFilters} = useRef([
-        {targetFilter: "name", name: "Name", className: "w-1/2 lg:w-1/3"},
-        {targetFilter: "state", name: "Status", className: "hidden lg:block w-1/6 text-center"},
-        {targetFilter: "addon-type", name: "Type", className: "hidden md:block w-1/6 text-center"},
-        {targetFilter: "updatedAt", name: "Date", className: "w-1/4 md:w-1/6 text-center"},
-        {targetFilter: "bytes", name: "Size", className: "w-1/4 md:w-1/6 text-center"},
-    ] as const)
-    const {current: filesystemFilters} = useRef([
-        {targetFilter: "name", name: "Name", className: "w-1/2"},
-        {targetFilter: "", name: "Type", className: "w-1/4 md:w-1/6 text-center"},
-        {targetFilter: "", name: "Date", className: "hidden md:block w-1/6 text-center"},
-        {targetFilter: "bytes", name: "Size", className: "w-1/4 md:w-1/6 text-center"},
-    ] as const)
-
-    const totalStorageBytes = useMemo(() => {
-        return cargoIndex.cargos.reduce(
-            (total, next) => total + next.bytes, 
-            0
+    const onDeleteCargo = async (canonicalUrl: string) => {
+        onBackToCargos()
+        const deleteResponse = await downloadClient.deleteCargo(canonicalUrl)
+        logger.info("Delete operation returned with code", deleteResponse)
+        const targetIndex = cargoQuery.results.findIndex(
+            (cargo) => cargo.canonicalUrl === canonicalUrl
         )
-    }, [cargoIndex])
-
-    const cargoCount = cargoIndex.cargos.length
-    const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
-    const {current: storageUsage} = storageUsageRef
-    const {current: targetCargo} = targetCargoRef
+        if (targetIndex < 0) {
+            return true
+        }
+        cargoQuery.results.splice(targetIndex, 1)
+        setCargoQuery({...cargoQuery})
+        setCargoCount((previous) => previous - 1)
+        return true
+    }
 
     useEffect(() => {
         if (!searchParams.has(ADDONS_MODAL)) {
@@ -242,151 +237,167 @@ const AddOns = (): JSX.Element => {
         }
     }, [searchParams])
 
+    const [cargoQuery, setCargoQuery] = useState({
+        results: [] as CargoIndex[],
+        more: true,
+        order: -1 as FilterOrder,
+        filter: "",
+        offset: 0,
+        cacheBusterId: 0,
+        searchText: ""
+    })
+
     useEffectAsync(async () => {
-        if (cargoCount < 1) {
-            return 
+        const [count, storageUsage, timestamp] = await Promise.all([
+            database.cargoIndexes.cargoCount(),
+            downloadClient.diskInfo(),
+            database.cargoIndexes.latestUpdateTimestamp()
+        ] as const)
+        setStorageUsage(storageUsage)
+        setCargoCount(count)
+        setLatestUpdate(timestamp)
+    }, [])
+
+    useEffectAsync(async () => {
+        if (searchParams.has(ADDONS_VIEWING_CARGO)) {
+            return
         }
-        if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
-            setViewingCount(MINIMUM_VIEWING_ITEMS)
-            setFilterConfig({
-                type: "updatedAt", 
-                order: DESCENDING_ORDER
+        const sameQuery = (
+            cargoQuery.filter === filterConfig.type
+            && cargoQuery.order === filterConfig.order
+            && cargoQuery.offset === offset
+            && cargoQuery.cacheBusterId === cacheBusterId
+            && cargoQuery.searchText === searchText
+        )
+        if (sameQuery) {
+            return
+        }
+
+        if (searchText.length > 0) {
+            const {order, type} = filterConfig
+            setQueryLoading(true)
+            testSearchDelay(async () => {
+                const start = Date.now()
+                const query = await database.cargoIndexes.similaritySearch({
+                    text: searchText,
+                    sort: type,
+                    order,
+                    limit: 25
+                })
+                setCargoQuery({
+                    results: query,
+                    order,
+                    filter: type,
+                    offset: 0,
+                    more: false,
+                    cacheBusterId,
+                    searchText
+                })
+                queryTimeRef.current = Date.now() - start
+                setQueryLoading(false)
             })
+            return
+        }
+        setQueryLoading(offset === 0)
+        const queryMinimumTime = sleep(300)
+        const start = Date.now()
+        const query = await database.cargoIndexes.orderedQuery({
+            sort: filterConfig.type,
+            order: filterConfig.order,
+            offset,
+            limit: PAGE_LIMIT
+        })
+        queryTimeRef.current = Date.now() - start
+        const moreResults = query.length >= PAGE_LIMIT
+        await queryMinimumTime
+        setCargoQuery({
+            results: offset <= 0
+                ? query
+                : [...cargoQuery.results, ...query],
+            more: moreResults,
+            order: filterConfig.order,
+            filter: filterConfig.type,
+            offset,
+            cacheBusterId,
+            searchText: "",
+        })
+        setQueryLoading(false)
+    }, [searchParams, filterConfig, searchText, offset])
+
+    useEffectAsync(async () => {
+        if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
+            setOffset(0)
+            setFilterConfig({type: "updated", order: DESCENDING_ORDER})
             return
         }
         const canonicalUrl = decodeURIComponent(searchParams.get(ADDONS_VIEWING_CARGO) || "")
         if (
             canonicalUrl.length < 1
-            || targetIndexRef.current.canonicalUrl === canonicalUrl
+            || targetIndex?.canonicalUrl === canonicalUrl
         ) {
             return
         }
-        const index = cargoIndex.cargos.findIndex(
-            (cargo) => cargo.canonicalUrl === canonicalUrl
+        const index = await database.cargoIndexes.getIndex(
+            canonicalUrl
         )
-        if (index < 0) {
-            setCargoFound(false)
+        if (!index) {
             return
         }
-        const targetCargoIndex = cargoIndex.cargos[index]
-        targetIndexRef.current = targetCargoIndex
-        const cargo = await downloadClient.getCargoAtUrl(
-            targetCargoIndex.canonicalUrl
-        )
+        const cargo = await downloadClient.getCargoAtUrl(canonicalUrl)
         if (!cargo.ok) {
-            setCargoFound(false)
             return
         }
+        setTargetIndex(index)
         setFilterConfig({type: "name", order: DESCENDING_ORDER})
         viewingCargoBytes.current = cargo.data.bytes
         targetCargoRef.current = new Cargo(cargo.data.pkg as Cargo<Permissions>)
-        setCargoFound(true)
-        setViewingCargoIndex(index)
-    }, [searchParams, cargoIndex])
-    
-    useEffectAsync(async () => {
-        await downloadClient.consumeQueuedMessages()
-        const [cargoIndexRes, clientStorageRes] = await Promise.all([
-            io.wrap(downloadClient.getCargoIndices()),
-            io.wrap(downloadClient.diskInfo()),
-        ] as const)
-        setLoadingInitialData(false)
-        if (!clientStorageRes.ok || !cargoIndexRes.ok) {
-            setIsInErrorState(true)
-            return
-        }
-        setCargoIndex({...cargoIndexRes.data})
-        storageUsageRef.current = clientStorageRes.data
-    }, [])
-
-    const filteredCargos = useMemo(() => {
-        if (isViewingCargo || cargoCount < 1) {
-            return cargoIndex.cargos
-        }
-        const {order, type: filter} = filterConfig
-        const orderFactor = order
-        const filterRef = filterElementsRef.current
-        const textIsSame = searchText === filterRef.searchText
-        const filterIsSame = filter === filterRef.filter
-        const orderIsSame = order === filterRef.order
-        const indexIsSame = cargoIndex === filterRef.cargoIndex
-        const sameQuery = textIsSame && filterIsSame && orderIsSame && indexIsSame
-        
-        if (sameQuery) {
-            return filterRef.elements.slice(0, viewingCount)
-        }
-
-        filterRef.filter = filter
-        filterRef.order = order
-        filterRef.searchText = searchText
-        filterRef.cargoIndex = cargoIndex
-        const copy = []
-        
-        for (let i = 0; i < cargoCount; i++) {
-            const targetCargo = cargoIndex.cargos[i]
-            if (!targetCargo.name.includes(searchText)) {
-                continue
-            }
-            copy.push({...targetCargo})
-        }
-
-        switch (filter) {
-            case "updatedAt":
-                copy.sort((a, b) => {
-                    const order = a.updated > b.updated ? 1 : -1
-                    return order * orderFactor
-                })
-                break
-            case "bytes":
-                copy.sort((a, b) => {
-                    const order = a.bytes > b.bytes ? 1 : -1
-                    return order * orderFactor
-                })
-                break
-            case "state":
-                copy.sort((a, b) => {
-                    const order = a.state > b.state ? 1 : -1
-                    return order * orderFactor
-                })
-                break
-            case "addon-type":
-                copy.sort((a, b) => {
-                    const order = isMod(a) && !isMod(b) ? 1 : -1
-                    return order * orderFactor
-                })
-                break
-            case "name":
-                copy.sort((a, b) => {
-                    // the extra -1 here is to make descending order yield
-                    // a result of names ordered from a to z, not z to a
-                    return a.name.localeCompare(b.name) * -1 * orderFactor
-                })
-                break
-            default:
-                break
-        }
-        filterRef.elements = copy
-        return copy.slice(0, viewingCount)
-    }, [filterConfig, cargoIndex, searchText, viewingCount])
+    }, [searchParams])
 
     useEffect(() => {
         const handerId = app.addEventListener("downloadprogress", async (progress) => {
-            const {type} = progress
+            logger.info("Notified of progress update. message =", progress)
+            const {type, canonicalUrls} = progress
             if (type === "install") {
                 return
             }
-            await downloadClient.consumeQueuedMessages()
             await sleep(5_000)
-            const updatedCargos = await downloadClient.getCargoIndices()
-            setCargoIndex({...updatedCargos})
+            const consumeResponse = await downloadClient.consumeQueuedMessages()
+            logger.info(
+                `consumed incoming messages. Consume operation returned with code`, 
+                consumeResponse
+            )
+
+            const urlMap = new Map(canonicalUrls.map((url) => [url, 1]))
+            const newResultsResponse = await Promise.all(
+                canonicalUrls.map((url) => database.cargoIndexes.getIndex(url))
+            )
+
+            setCargoQuery((previous) => {
+                for (let i = 0; i < previous.results.length; i++) {
+                    const previousCargo = previous.results[i]
+                    if (!urlMap.has(previousCargo.canonicalUrl)) {
+                        continue
+                    }
+                    const replacement = newResultsResponse.find(
+                        (cargo) => cargo?.canonicalUrl ===  previousCargo.canonicalUrl
+                    )
+                    if (!replacement) {
+                        continue
+                    }
+                    previous.results.splice(i, 1, replacement)
+                }
+                return {...previous}
+            })
         })
         return () => { app.removeEventListener("downloadprogress", handerId) }
     })
 
-    return <FullScreenLoadingOverlay 
-        loading={loadingInitialData}
-    >
-        {isInErrorState ? <ErrorOverlay>
+    const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
+    const cargoFound = isViewingCargo && !!targetIndex
+    const showingValidCargo = isViewingCargo && cargoFound
+
+    if (isInErrorState) {
+        return <ErrorOverlay>
             <div className="text-neutral-400 mb-1">
                 An error occurred when search for files
             </div>
@@ -395,358 +406,335 @@ const AddOns = (): JSX.Element => {
                     Back to Home
                 </Button>
             </Link>
-        </ErrorOverlay> : <>
-            <div className="fixed z-0 w-screen h-screen overflow-clip">
-                {modalShown === "FileOverlay" && fileDetails ? <>
-                    <FileOverlay 
-                        onClose={() => setFileDetails(null)}
-                        {...fileDetails}
-                    />
-                </> : <></>}
+        </ErrorOverlay>
+    }
 
-                {isViewingCargo && cargoFound && modalShown === "CargoInfo" ? <>
-                    <CargoInfo
-                        onClose={clearModal}
-                        cargo={targetCargo}
-                        cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
-                    />
-                </> : <></>}
+    return <div 
+        className="fixed z-0 w-screen h-screen overflow-clip"
+    >
+        {modalShown === "FileOverlay" && fileDetails ? <>
+            <FileOverlay 
+                onClose={() => setFileDetails(null)}
+                {...fileDetails}
+            />
+        </> : <></>}
 
-                {modalShown === "Installer" ? <>
-                    <Installer
-                        onClose={clearModal}
-                        onInstallCargo={async (update, title) => {
-                            const status = await downloadClient.executeUpdates(
-                                [update],
-                                title
-                            )
-                            console.log("dl status", status)
-                            const indexes = await downloadClient.getCargoIndices()
-                            console.log("indexes after download", indexes)
-                            setCargoIndex({...indexes})
-                            const ok = !(status.data >= Shabah.ERROR_CODES_START)
-                            return ok 
-                        }}
-                        createAlert={(content) => setAlertConfig({type: "success", content})}
-                        onCheckIfCanonicalCargoExists={async (canonicalUrl: string) => {
-                            const index = cargoIndex.cargos.findIndex(
-                                (cargo) => cargo.canonicalUrl === canonicalUrl
-                            )
-                            return index > -1
-                        }}
-                        onUpdateCargo={(canonicalUrl) => {
-                            clearModal()
-                            setViewingCargo(canonicalUrl)
-                            onShowCargoUpdater()
-                        }}
-                    />
-                </> : <></>}
+        {showingValidCargo && modalShown === "CargoInfo" ? <>
+            <CargoInfo
+                onClose={clearModal}
+                cargo={targetCargoRef.current}
+                cargoIndex={targetIndex}
+            />
+        </> : <></>}
 
-                {!!alertConfig ? <StatusAlert
-                    onClose={clearAlert}
-                    autoClose={4_000}
-                    color={alertConfig.type}
-                    content={alertConfig.content}
-                    className="fixed left-2 z-30 w-52"
-                    style={{top: "91vh"}}
-                /> : <></>}
+        {modalShown === "Installer" ? <>
+            <Installer
+                onClose={clearModal}
+                onInstallCargo={async (update, title) => {
+                    const status = await downloadClient.executeUpdates(
+                        [update],
+                        title
+                    )
+                    app.logger.info("new install status", status)                    
+                    setCargoCount((previous) => previous + 1)
+                    setOffset(0)
+                    setCacheBusterId((previous) => previous + 1)
+                    const ok = !(status.data >= Shabah.ERROR_CODES_START)
+                    return ok 
+                }}
+                createAlert={(content) => setAlertConfig({type: "success", content})}
+                onCheckIfCanonicalCargoExists={async (canonicalUrl: string) => {
+                    return !!await database.cargoIndexes.getIndex(canonicalUrl)
+                }}
+                onUpdateCargo={(canonicalUrl) => {
+                    clearModal()
+                    setViewingCargo(canonicalUrl)
+                    onShowCargoUpdater()
+                }}
+            />
+        </> : <></>}
 
-                {isViewingCargo && cargoFound && modalShown === "Updater" ? <CargoUpdater
-                    onClose={clearModal}
-                    cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
-                    cargo={targetCargo}
-                    createAlert={(content) => {
-                        setAlertConfig({type: "success", content})
-                    }}
-                    onUpdateCargo={async (update, title) => {
-                        const status = await downloadClient.executeUpdates(
-                            [update],
-                            title
-                        )
-                        console.log("update queue status", status)
-                        const ok = !(status.data >= Shabah.ERROR_CODES_START)
-                        if (!ok) {
-                            return false
-                        }
-                        const indexes = await downloadClient.getCargoIndices()
-                        const copy = {...indexes}
-                        const targetIndex = copy.cargos.findIndex(
-                            (cargo) => cargo.canonicalUrl === cargoIndex.cargos[viewingCargoIndex].canonicalUrl
-                        )
-                        if (targetIndex < 0) {
-                            return true
-                        }
-                        indexes.cargos.splice(targetIndex, 1, {
-                            ...copy.cargos[targetIndex],
-                            state: UPDATING
-                        })
-                        setCargoIndex(copy)
-                        return true
-                    }}
-                /> : <></>}
+        {!!alertConfig ? <StatusAlert
+            onClose={clearAlert}
+            autoClose={4_000}
+            color={alertConfig.type}
+            content={alertConfig.content}
+            className="fixed left-2 z-30 w-52"
+            style={{top: "91vh"}}
+        /> : <></>}
 
-                {isViewingCargo && cargoFound && modalShown === "Recovery" ? <>
-                    <RecoveryModal
-                        cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
-                        onClose={clearModal}
-                        onCreateAlert={(type, content) => setAlertConfig({type, content})}
-                        onRetryDownload={async (canonicalUrl, title) => {
-                            const retryResponse = await downloadClient.retryFailedDownloads(
-                                [canonicalUrl],
-                                title,
-                            )
-                            return retryResponse.data === Shabah.STATUS.updateRetryQueued
-                        }}
-                        onDeleteCargo={async (canonicalUrl) => {
-                            const copy = [...cargoIndex.cargos]
-                            copy.splice(viewingCargoIndex, 1)
-                            setCargoIndex({...cargoIndex, cargos: copy})
-                            onBackToCargos()
-                            await downloadClient.deleteCargo(canonicalUrl)
-                            return true
-                        }}
-                    />
-                </> : <></>}
+        {showingValidCargo && modalShown === "Updater" ? <CargoUpdater
+            onClose={clearModal}
+            cargoIndex={targetIndex}
+            cargo={targetCargoRef.current}
+            createAlert={(content) => {
+                setAlertConfig({type: "success", content})
+            }}
+            onUpdateCargo={async (update, title) => {
+                const status = await downloadClient.executeUpdates(
+                    [update],
+                    title
+                )
+                logger.info("update queue status", status)
+                const ok = !(status.data >= Shabah.ERROR_CODES_START)
+                if (!ok) {
+                    return false
+                }
+                setCacheBusterId((previous) => previous + 1)
+                setOffset(0)
+                return true
+            }}
+        /> : <></>}
 
-                <div className="w-full relative z-0 sm:h-1/12 flex items-center justify-center">
+        {showingValidCargo && modalShown === "Recovery" ? <>
+            <RecoveryModal
+                cargoIndex={targetIndex}
+                onClose={clearModal}
+                onCreateAlert={(type, content) => setAlertConfig({type, content})}
+                onRetryDownload={async (canonicalUrl, title) => {
+                    const retryResponse = await downloadClient.retryFailedDownloads(
+                        [canonicalUrl],
+                        title,
+                    )
+                    const ok = retryResponse.data === Shabah.STATUS.updateRetryQueued
+                    if (!ok) {
+                        return false
+                    }
+                    setCacheBusterId((previous) => previous + 1)
+                    setOffset(0)
+                    return true
+                }}
+                onDeleteCargo={onDeleteCargo}
+            />
+        </> : <></>}
 
-                    <div className="hidden sm:block w-60">
-                        <div className="ml-2">
-                            <Tooltip title="Back">
-                                <Link to="/start">
-                                    <IconButton size="large">
-                                        <span className="text-xl">
-                                            <FontAwesomeIcon 
-                                                icon={faArrowLeft}
-                                            />
-                                        </span>
-                                    </IconButton>
-                                </Link>
-                            </Tooltip>
-                        </div>
-                    </div>
+        <div className="w-full relative z-0 sm:h-1/12 flex items-center justify-center">
 
-                    <div className="w-11/12 sm:w-4/5">
-                        <ScreenSize maxWidth={SMALL_SCREEN_MINIMUM_WIDTH_PX}>
-                            <SmallMenu
-                                onShowSettings={onShowSettings}
-                            />
-                        </ScreenSize>
-
-                        <div className="w-full mb-2 sm:mb-0 sm:w-3/5 sm:ml-1.5">
-                            <TextField
-                                fullWidth
-                                size="small"
-                                id="add-ons-search-bar"
-                                name="search-bar"
-                                className="rounded"
-                                placeholder={`${isViewingCargo && cargoFound ? "File, folders" : "Add-on"}...`}
-                                value={searchText}
-                                onChange={(event) => setSearchText(event.target.value)}
-                                InputProps={{
-                                    startAdornment: <InputAdornment position="start">
-                                        <span className="text-neutral-300">
-                                            <FontAwesomeIcon
-                                                icon={faMagnifyingGlass}
-                                            />
-                                        </span>
-                                    </InputAdornment>
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                </div>
-
-                <div className="sm:hidden w-11/12 mx-auto">
-                    <div className="pb-2 text-xs text-neutral-300">
-                        <span className="ml-1 mr-2 text-blue-500">
-                            <FontAwesomeIcon icon={faHardDrive}/>
-                        </span>
-
-                        {loadingInitialData ? <span 
-                            className="animate-pulse"
-                        >
-                            {"calculating..."}
-                        </span> : <>
-                            {isInErrorState
-                                ? "unknown"
-                                : `${toGigabytesString(storageUsage.used, 1)} / ${toGigabytesString(storageUsage.total, 1)} used` 
-                            }
-                            <span className="text-neutral-400 ml-1.5">
-                                {`(${cargoCount} Add-ons)`}
-                            </span>
-                        </>}
-                    
-                    </div>
-                </div>
-                
-                <div className="w-full relative z-0 h-10/12 sm:h-11/12 flex items-center justify-center">
-                    <Divider className="bg-neutral-200"/>
-
-                    <div className="sm:hidden absolute z-20 bottom-2 right-4">
-                        <Tooltip title="New Add-on" placement="left">
-                            <Fab 
-                                onClick={onShowInstaller}
-                                color="primary"
-                            >
-                                <FontAwesomeIcon 
-                                    icon={faPlus}
-                                />
-                            </Fab>
-                        </Tooltip>
-                    </div>
-
-                    <ScreenSize minWidth={SMALL_SCREEN_MINIMUM_WIDTH_PX}>
-                        <LargeMenu
-                            cargoCount={cargoCount}
-                            storageUsage={storageUsage}
-                            isError={isInErrorState}
-                            loading={loadingInitialData}
-                            className="w-60 h-full text-sm"
-                            onShowInstaller={onShowInstaller}
-                            onShowStats={() => {}}
-                            onShowSettings={onShowSettings}
-                        />
-                    </ScreenSize>
-                    
-                    <div className="w-11/12 sm:w-4/5 h-full">
-                        <Divider className="bg-neutral-200"/>
-                        
-                        <FileSystemBreadcrumbs 
-                            isViewingCargo={isViewingCargo}
-                            cargoFound={cargoFound}
-                            directoryPath={directoryPath}
-                            targetCargo={cargoFound
-                                ? cargoIndex.cargos[viewingCargoIndex]
-                                : null
-                            }
-                            onBackToCargos={onBackToCargos}
-                            mutateDirectoryPath={setDirectoryPath}
-                            onShowCargoInfo={onShowCargoInfo}
-                            onShowCargoUpdater={onShowCargoUpdater}
-                            onRecoverCargo={onShowRecovery}
-                            onDeleteCargo={async (canonicalUrl) => {
-                                const copy = [...cargoIndex.cargos]
-                                copy.splice(viewingCargoIndex, 1)
-                                setCargoIndex({...cargoIndex, cargos: copy})
-                                onBackToCargos()
-                                await downloadClient.deleteCargo(canonicalUrl)
-                                setAlertConfig({type: "success", content: "Deleted Successfully"})
-                            }}
-                        />
-                        
-                        <Divider className="bg-neutral-200"/>
-                        
-                        <div className="w-full sm:w-11/12 h-full">
-
-                            <div className="px-4 py-2 flex justify-center items-center text-xs lg:text-base text-neutral-300 mr-3">
-                                {isViewingCargo && cargoFound ? <>
-                                    {filesystemFilters.map((filesystemFilter, index) => {
-                                        const {targetFilter, className, name} = filesystemFilter
-                                        return <div
-                                            key={`filesystem-filter-${index}`}
-                                            className={className}
-                                        >
-                                            <button
-                                                className={`${targetFilter === "" ? "" : "hover:bg-gray-900"} rounded px-2 py-1`}
-                                                {...(targetFilter === "" 
-                                                    ? {disabled: true}
-                                                    : {onClick: () => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
-                                                )}
-                                            >
-                                                {name}
-                                                {targetFilter === "" ? <></> : <>
-                                                    <FilterChevron 
-                                                        currentFilter={filterConfig.type}
-                                                        targetFilter={targetFilter}
-                                                        order={filterConfig.order}
-                                                        className="ml-1 lg:ml-2 text-blue-500"
-                                                    />
-                                                </>}
-                                            </button>
-                                        </div>
-                                    })}
-                                </> : <>
-                                    {cargoFilters.map((cargoFilter, index) => {
-                                        const {targetFilter, name, className} = cargoFilter
-                                        return <div
-                                            key={`cargo-filter-${index}`}
-                                            className={className}
-                                        >
-                                            <button
-                                                className="hover:bg-gray-900 rounded px-2 py-1"
-                                                onClick={() => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
-                                            >
-                                                {name}
-                                                <FilterChevron 
-                                                    currentFilter={filterConfig.type}
-                                                    targetFilter={targetFilter}
-                                                    order={filterConfig.order}
-                                                    className="ml-1 lg:ml-2 text-blue-500"
-                                                />
-                                            </button>
-                                        </div>
-                                    })}
-                                </>}
-                                
-                            </div>
-
-                            <Divider className="bg-neutral-200"/>
-
-
-                            {isViewingCargo ? <>
-                                <div className="w-full h-5/6 overflow-y-scroll text-center animate-fade-in-left">
-                                    {!cargoFound ? <>
-                                        <div className="text-yellow-500 mt-16 mb-3">
-                                            <span className="mr-2">
-                                                <FontAwesomeIcon
-                                                    icon={faPuzzlePiece}
-                                                />
-                                            </span>
-                                            {"Add-on not found"}
-                                        </div>
-                                        <div>
-                                            <Button onClick={onBackToCargos} size="large">
-                                                Back
-                                            </Button>
-                                        </div>
-                                    </> : <>
-                                        <CargoFileSystem 
-                                            cargoIndex={cargoIndex.cargos[viewingCargoIndex]}
-                                            cargo={targetCargo}
-                                            searchText={searchText}
-                                            cargoBytes={viewingCargoBytes.current}
-                                            lastPackageUpdate={cargoIndex.updatedAt}
-                                            totalStorageBytes={totalStorageBytes}
-                                            filter={filterConfig}
-                                            directoryPath={directoryPath}
-                                            onOpenFileModal={(details) => {
-                                                setFileDetails(details)
-                                                setModalShown("FileOverlay")
-                                            }}
-                                            onBackToCargos={onBackToCargos}
-                                            mutateDirectoryPath={setDirectoryPath}
-                                        /> 
-                                    </>}
-                                </div>
-                            </> : <>
-                                <CargoList
-                                    cargosIndexes={filteredCargos}
-                                    hasMore={cargoCount > viewingCount}
-                                    onViewCargo={setViewingCargo}
-                                    onPaginate={() => {
-                                        setViewingCount((previous) => previous + 25)
-                                    }}
-                                />
-                            </>}
-                        </div>
-                    </div>
-                    
+            <div className="hidden sm:block w-60">
+                <div className="ml-2">
+                    <Tooltip title="Back">
+                        <Link to="/start">
+                            <IconButton size="large">
+                                <span className="text-xl">
+                                    <FontAwesomeIcon 
+                                        icon={faArrowLeft}
+                                    />
+                                </span>
+                            </IconButton>
+                        </Link>
+                    </Tooltip>
                 </div>
             </div>
-        </>}
-    </FullScreenLoadingOverlay>
+
+            <div className="w-11/12 sm:w-4/5">
+                <ScreenSize maxWidth={SMALL_SCREEN_MINIMUM_WIDTH_PX}>
+                    <SmallMenu
+                        onShowSettings={onShowSettings}
+                    />
+                </ScreenSize>
+
+                <div className="w-full mb-2 sm:mb-0 sm:w-3/5 sm:ml-1.5">
+                    <TextField
+                        fullWidth
+                        size="small"
+                        id="add-ons-search-bar"
+                        name="search-bar"
+                        className="rounded"
+                        placeholder={`${isViewingCargo && cargoFound ? "File, folders" : "Add-on"}...`}
+                        value={searchText}
+                        onChange={(event) => setSearchText(event.target.value)}
+                        InputProps={{
+                            startAdornment: <InputAdornment position="start">
+                                <span className="text-neutral-300">
+                                    <FontAwesomeIcon
+                                        icon={faMagnifyingGlass}
+                                    />
+                                </span>
+                            </InputAdornment>
+                        }}
+                    />
+                </div>
+            </div>
+
+        </div>
+
+        <div className="sm:hidden w-11/12 mx-auto pb-1">
+            <div className="text-xs text-neutral-300">
+                <span className="ml-1 mr-2 text-blue-500">
+                    <FontAwesomeIcon icon={faHardDrive}/>
+                </span>
+
+                {`${toGigabytesString(storageUsage.used, 1)} / ${toGigabytesString(storageUsage.total, 1)} used`}
+                
+                <span className="text-neutral-400 ml-1.5">
+                    {`(${cargoCount.toLocaleString("en-us")} Add-ons)`}
+                </span>
+            </div>
+        </div>
+        
+        <div className="w-full relative z-0 h-10/12 sm:h-11/12 flex items-center justify-center">
+            <Divider className="bg-neutral-200"/>
+
+            <div className="sm:hidden absolute z-20 bottom-2 right-4">
+                <Tooltip title="New Add-on" placement="left">
+                    <Fab 
+                        onClick={onShowInstaller}
+                        color="primary"
+                    >
+                        <FontAwesomeIcon icon={faPlus} />
+                    </Fab>
+                </Tooltip>
+            </div>
+
+            <ScreenSize minWidth={SMALL_SCREEN_MINIMUM_WIDTH_PX}>
+                <LargeMenu
+                    cargoCount={cargoCount}
+                    storageUsage={storageUsage}
+                    isError={isInErrorState}
+                    loading={false}
+                    className="w-60 h-full text-sm"
+                    onShowInstaller={onShowInstaller}
+                    onShowStats={() => {}}
+                    onShowSettings={onShowSettings}
+                />
+            </ScreenSize>
+            
+            <div className="w-11/12 sm:w-4/5 h-full">
+                <Divider className="bg-neutral-200"/>
+                
+                <FileSystemBreadcrumbs 
+                    isViewingCargo={isViewingCargo}
+                    cargoFound={cargoFound}
+                    directoryPath={directoryPath}
+                    targetCargo={targetIndex}
+                    onBackToCargos={onBackToCargos}
+                    mutateDirectoryPath={setDirectoryPath}
+                    onShowCargoInfo={onShowCargoInfo}
+                    onShowCargoUpdater={onShowCargoUpdater}
+                    onRecoverCargo={onShowRecovery}
+                    onDeleteCargo={onDeleteCargo}
+                    onCreateAlert={(type, content) => setAlertConfig({type, content})}
+                />
+                
+                <Divider className="bg-neutral-200"/>
+                
+                <div className="w-full relative sm:w-11/12 h-full">
+
+                    <div className="px-4 py-2 flex justify-center items-center text-xs lg:text-sm text-neutral-300 mr-3">
+                        {isViewingCargo && cargoFound ? <>
+                            {FILE_SYSTEM_FILTERS.map((filesystemFilter, index) => {
+                                const {targetFilter, className, name} = filesystemFilter
+                                return <div
+                                    key={`filesystem-filter-${index}`}
+                                    className={className}
+                                >
+                                    <button
+                                        className={`${targetFilter === "" ? "" : "hover:bg-gray-900"} rounded px-2 py-1`}
+                                        {...(targetFilter === "" 
+                                            ? {disabled: true}
+                                            : {onClick: () => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
+                                        )}
+                                    >
+                                        {name}
+                                        {targetFilter === "" ? <></> : <>
+                                            <FilterChevron 
+                                                currentFilter={filterConfig.type}
+                                                targetFilter={targetFilter}
+                                                order={filterConfig.order}
+                                                className="ml-1 lg:ml-2 text-blue-500"
+                                            />
+                                        </>}
+                                    </button>
+                                </div>
+                            })}
+                        </> : <>
+                            {CARGO_FILTERS.map((cargoFilter, index) => {
+                                const {targetFilter, name, className} = cargoFilter
+                                return <div
+                                    key={`cargo-filter-${index}`}
+                                    className={className}
+                                >
+                                    <button
+                                        className="hover:bg-gray-900 rounded px-2 py-1"
+                                        onClick={() => toggleFilter(targetFilter, filterConfig.order, filterConfig.type)}
+                                    >
+                                        {name}
+                                        <FilterChevron 
+                                            currentFilter={filterConfig.type}
+                                            targetFilter={targetFilter}
+                                            order={filterConfig.order}
+                                            className="ml-1 lg:ml-2 text-blue-500"
+                                        />
+                                    </button>
+                                </div>
+                            })}
+                        </>}
+                        
+                    </div>
+
+                    
+
+                    <Divider className="bg-neutral-200"/>
+
+                    
+
+                    {isViewingCargo ? <>
+                        <CargoFileSystem
+                            cargoIndex={targetIndex}
+                            cargo={targetCargoRef.current}
+                            searchText={searchText}
+                            cargoBytes={viewingCargoBytes.current}
+                            lastPackageUpdate={latestUpdate}
+                            totalStorageBytes={storageUsage.total}
+                            filter={filterConfig}
+                            directoryPath={directoryPath}
+                            onOpenFileModal={(details) => {
+                                setFileDetails(details)
+                                setModalShown("FileOverlay")
+                            }}
+                            onBackToCargos={onBackToCargos}
+                            mutateDirectoryPath={setDirectoryPath}
+                        />
+                    </> : <>
+                        {queryLoading ? <>
+                            <div 
+                                className="w-full h-5/6 overflow-y-scroll animate-fade-in-left"
+                            >
+                                {new Array<number>(6).fill(0).map((_, index) => {
+                                    return <div
+                                        key={`cargo-index-skeleton-${index}`}
+                                        className="flex p-4 justify-center items-center"
+                                    >
+                                        <div className="w-1/3 animate-pulse">
+                                            <FontAwesomeIcon icon={faFolder}/>
+                                        </div>
+                                        
+                                        <div className="w-2/3 px-2">
+                                            <Skeleton/>
+                                        </div>
+                                    </div>
+                                })}
+                            </div>
+                        </> : <>
+                            <CargoList
+                                cargosIndexes={cargoQuery.results}
+                                hasMore={cargoQuery.more}
+                                onViewCargo={setViewingCargo}
+                                onPaginate={() => { setOffset((previous) => previous + PAGE_LIMIT) }}
+                            />
+
+                            <div className="text-neutral-500 text-xs ml-1 mb-1 animate-fade-in-left">
+                                <span>
+                                    {`${cargoQuery.results.length.toLocaleString("en-us")} results (${Math.max(roundDecimal(queryTimeRef.current / MILLISECONDS_PER_SECOND, 2), 0.01).toFixed(2)} seconds)`}
+                                </span>
+                            </div>
+                        </>}
+                    </>}
+                </div>
+            </div>
+            
+        </div>
+    </div>
 }
 
 export default AddOns

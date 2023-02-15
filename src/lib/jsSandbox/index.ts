@@ -211,14 +211,10 @@ export class JsSandbox {
         } as const
         this.reconfiguredPermissions = configuredPermissions
         const originalCargoIndexes = await downloadClient.getCargoIndices()
-        const cargos = originalCargoIndexes.cargos//addStandardCargosToCargoIndexes(originalCargoIndexes.cargos)
+        const cargos = originalCargoIndexes.cargos
         const merged = canonicalUrls.length < 1 
             ? configuredPermissions
-            : mergePermissionSummaries(
-                this.reconfiguredPermissions, 
-                {...originalCargoIndexes, cargos}
-            )
-        //console.log("permissions", merged)
+            : mergePermissionSummaries(this.reconfiguredPermissions, {cargos})
         this.persistentState.configuredPermissions = true
         const iframeArguments = this.iframeArguments(
             merged, location.origin,

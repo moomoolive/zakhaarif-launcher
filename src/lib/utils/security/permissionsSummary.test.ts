@@ -22,9 +22,13 @@ import {
     UNSAFE_INLINE_CSP
 } from "./permissionsSummary"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
-import {CargoIndex, emptyCargoIndices} from "../../shabah/downloadClient"
+import {CargoIndex} from "../../shabah/downloadClient"
 import { NULL_FIELD } from "../../cargo/index"
 import { CACHED } from "../../shabah/backend"
+
+const emptyCargoIndices = () => {
+    return {cargos: [] as CargoIndex[]}
+}
 
 describe("filtering malicous csp values", () => {
     it("values that don't start with https or http should be rejected", () => {

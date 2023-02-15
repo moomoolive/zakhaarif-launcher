@@ -16,7 +16,6 @@ import {
 import {useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {useAppShellContext} from "../../routes/store"
-import {CargoIndices} from "../../lib/shabah/downloadClient"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_CARGOS} from "../../standardCargos"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"

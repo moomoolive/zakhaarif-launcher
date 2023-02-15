@@ -123,8 +123,6 @@ type PwaInstallEvent = Event & PwaInstallPrompt
 const APP_TITLE = "Game Launcher"
 let pwaInstallPrompt = null as null | PwaInstallEvent
 
-const NO_LISTENER = -1
-
 type LauncherState = (
   "uninstalled"
   | "cached"

@@ -5,7 +5,7 @@ import {
     permissionsMeta
 } from "../../types/permissions"
 import {PermissionsList} from "../../cargo/index"
-import { CargoIndices } from "../../shabah/downloadClient"
+import { CargoIndex } from "../../shabah/downloadClient"
 import { isUrl } from "../urls/isUrl"
 
 const permissionsSummary = (allowAll: boolean) => {
@@ -316,9 +316,13 @@ export const iframeSandbox = (
     return base
 }
 
+type CargoIndexes = {
+    cargos: CargoIndex[]
+}
+
 export const mergePermissionSummaries = (
     originalPermissions: PermissionsSummary,
-    cargoIndexes: CargoIndices
+    cargoIndexes: CargoIndexes
 ): PermissionsSummary => {
     if (
         originalPermissions.embedExtensions.length < 1

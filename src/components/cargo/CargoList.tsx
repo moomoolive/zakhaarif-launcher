@@ -3,7 +3,7 @@ import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import { reactiveDate } from "../../lib/utils/dates"
 import { isMod } from "../../lib/utils/cargos"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faExclamationTriangle, faFolder, faRotate } from "@fortawesome/free-solid-svg-icons"
+import { faExclamationTriangle, faFolder, faMagnifyingGlass, faRotate } from "@fortawesome/free-solid-svg-icons"
 import { useEffect, useRef } from "react"
 import { ABORTED, FAILED, UPDATING } from "../../lib/shabah/backend"
 
@@ -91,9 +91,7 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
         default:
             return <>
                 <span className={"mr-3 " + (isAMod ? "text-indigo-500" : "text-green-500")}>
-                    <FontAwesomeIcon 
-                        icon={faFolder}
-                    />
+                    <FontAwesomeIcon icon={faFolder}/>
                 </span>
             </>
     }
@@ -163,22 +161,33 @@ export const CargoList = ({
     return <div 
         className="w-full h-5/6 overflow-y-scroll animate-fade-in-left"
     >
-        {cargosIndexes.map((cargo, index) => {
-            const isAMod = isMod(cargo)
-            return <CargoIndexSummary
-                key={`cargo-summary-${index}`}
-                onClick={() => onViewCargo(cargo.canonicalUrl)}
-                icon={<CargoSummaryIcon 
-                    cargoState={cargo.state}
-                    isAMod={isAMod} 
-                />}
-                name={cargo.name}
-                status={cargoStatus(cargo.state)}
-                type={isAMod ? "mod" : "extension"}
-                updatedAt={cargo.updated}
-                byteCount={cargo.bytes}
-            />
-        })}
+        {cargosIndexes.length < 1 ? <>
+            <div className="mt-16 w-full text-center">
+                <div className="text-yellow-500 text-4xl mb-4">
+                    <FontAwesomeIcon icon={faMagnifyingGlass}/>
+                </div>
+                <div className="text-neutral-400">
+                    {"No results found"}
+                </div>
+            </div>
+        </> : <>
+            {cargosIndexes.map((cargo, index) => {
+                const isAMod = isMod(cargo)
+                return <CargoIndexSummary
+                    key={`cargo-summary-${index}`}
+                    onClick={() => onViewCargo(cargo.canonicalUrl)}
+                    icon={<CargoSummaryIcon 
+                        cargoState={cargo.state}
+                        isAMod={isAMod} 
+                    />}
+                    name={cargo.name}
+                    status={cargoStatus(cargo.state)}
+                    type={isAMod ? "mod" : "extension"}
+                    updatedAt={cargo.updated}
+                    byteCount={cargo.bytes}
+                />
+            })}
+        </>}
 
         <div className={`w-4/5 mx-auto my-3 ${hasMore ? "" : "hidden"}`}>
             <div className="animate-pulse text-center text-neutral-400 text-sm">

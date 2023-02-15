@@ -71,11 +71,11 @@ export const RecoveryModal = ({
     })
 
     useEffectAsync(async () => {
-        //if (!isInErrorState(cargoIndex)) {
-        //    setNoErrorsFound(true)
-        //    setLoading(false)
-        //    return
-        //}
+        if (!isInErrorState(cargoIndex)) {
+            setNoErrorsFound(true)
+            setLoading(false)
+            return
+        }
         setLoading(false)
     }, [])
 

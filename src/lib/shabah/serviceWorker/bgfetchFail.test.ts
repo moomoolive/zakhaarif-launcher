@@ -6,11 +6,7 @@ import {
     emptyDownloadIndex,
     updateDownloadIndex,
     saveDownloadIndices,
-    emptyCargoIndices,
-    updateCargoIndex,
-    saveCargoIndices,
     ResourceMap,
-    getCargoIndices,
     NO_UPDATE_QUEUED,
     DownloadSegment,
     CACHED,
@@ -187,21 +183,6 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            name: "pkg-name",
-            permissions: [],
-            logo: "",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event} = createBgFetchEvent({
             id: downloadId, 
@@ -288,21 +269,6 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            name: "pkg-name",
-            permissions: [],
-            logo: "",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId: downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -391,21 +357,6 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            name: "pkg-name",
-            permissions: [],
-            logo: "",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId: downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -516,7 +467,6 @@ describe("background fetch fail handler (abort/fail)", () => {
                 messageDownloadClient, clientMessages
             } = createBgFetchArgs({})
             const downloadIndices = emptyDownloadIndex()
-            const cargoIndices = emptyCargoIndices()
             const downloadId = nanoid(21)
             const queuedDownload = {
                 id: downloadId, 
@@ -557,28 +507,11 @@ describe("background fetch fail handler (abort/fail)", () => {
                     downloadedResources: [],
                     canRevertToPreviousVersion: false
                 })
-                updateCargoIndex(cargoIndices, {
-                    tag: id,
-                    resolvedUrl: resolvedUrl,
-                    entry: "index.js",
-                    name: "pkg-name",
-                    permissions: [],
-    
-                    logo: "",
-                    bytes: 20,
-                    canonicalUrl,
-                    version: "0.1.0",
-                    state: UPDATING,
-                    downloadId: downloadId
-                })
             }
 
             updateDownloadIndex(downloadIndices, queuedDownload)
             await saveDownloadIndices(
                 downloadIndices, mainOrigin, fileCache
-            )
-            await saveCargoIndices(
-                cargoIndices, mainOrigin, fileCache
             )
             const prevFilecount = Object.keys(internalRecord).length
             const fetchResult = allFileCacheMeta.reduce((total, item) => {
@@ -706,21 +639,6 @@ describe("background fetch fail handler (abort/fail)", () => {
             bytes: 0
         }))
         await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoIndices = emptyCargoIndices()
-        updateCargoIndex(cargoIndices, {
-            tag: cargoId,
-            resolvedUrl: resolvedUrl,
-            entry: "index.js",
-            name: "pkg-name",
-            permissions: [],
-            logo: "",
-            bytes: 20,
-            canonicalUrl,
-            version: "0.1.0",
-            state: UPDATING,
-            downloadId: downloadId
-        })
-        await saveCargoIndices(cargoIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event} = createBgFetchEvent({
             id: downloadId, 
@@ -807,26 +725,9 @@ describe("background fetch fail handler (abort/fail)", () => {
                 }, {} as ResourceMap),
                 bytes: 0
             }))
+
             await saveDownloadIndices(downloadIndices, origin, fileCache)
-            const cargoIndices = emptyCargoIndices()
-            updateCargoIndex(cargoIndices, {
-                tag: Math.trunc(Math.random() * 5),
-                resolvedUrl: resolvedUrl,
-                entry: "index.js",
-                name: "pkg-name",
-                permissions: [],
-
-                logo: "",
-                bytes: 20,
-                canonicalUrl,
-                version: "0.1.0",
-                state: UPDATING,
-                downloadId: downloadId
-            })
-            await saveCargoIndices(
-                cargoIndices, origin, fileCache
-            )
-
+            
             const {event, output} = createBgFetchEvent({
                 id: downloadId, 
                 recordsAvailable: true,

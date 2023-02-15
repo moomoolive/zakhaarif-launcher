@@ -83,7 +83,7 @@ export const Installer = ({
     onUpdateCargo
 }: InstallerProps): JSX.Element => {
     const urlCheck = useDebounce(1_000)
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, logger} = useAppShellContext()
     const confirm = useGlobalConfirm()
     useCloseOnEscape(onClose)
 
@@ -119,16 +119,15 @@ export const Installer = ({
     const showCargo = !!installResponse?.checkResponse.newCargo
     const installText = cacheError.length > 0
         ? "Retry"
-        : "Install"
-    const submitText = showCargo ? installText : "Fetch"
+        : "Confirm"
+    const submitText = showCargo ? installText : "Install"
 
     const onDownload = async () => {
         const updateResponse = await downloadClient.checkForUpdates({
-            // a random tag
             tag: -1,
             canonicalUrl: url
         })
-        console.log("response", updateResponse)
+        logger.info("Inital cargo check response", updateResponse)
         if (updateResponse.status === Shabah.STATUS.remoteResourceNotFound) {
             setInvalidation("not-found")
             return
@@ -168,7 +167,7 @@ export const Installer = ({
             && url !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
-            console.warn(`prevented unsafe add-on from being added. Url=${url}`)
+            logger.warn(`prevented unsafe add-on from being added. Url=${url}`)
             setInvalidation("catch-all-error")
             return
         }

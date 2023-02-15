@@ -1,63 +1,24 @@
-import {Timestamps, GameSaveV1, GameSave} from "./definitions"
-import {Database} from "./innerDatabase"
-
-export {MANUAL_SAVE, QUICK_SAVE, AUTO_SAVE} from "./definitions"
-
-const addTimestamps = <O extends Object>(object: O) => {
-    const now = Date.now()
-    return {...object, createdAt: now, updatedAt: now}
-}
-
-const updateTimestamps = <O extends Timestamps>(object: O) => {
-    object.updatedAt = Date.now()
-    return object
-}
-
-class GameSaveInterface {
-    private db: Database
-
-    constructor(db: Database) {
-        this.db = db
-    }
-
-    async create(data: GameSaveV1) {
-        const dataWithTimestamps = addTimestamps(data)
-        const id = await this.db.gameSaves.put(dataWithTimestamps)
-        return {id, ...dataWithTimestamps}
-    }
-
-    async getById(id: number) {
-        return await this.db.gameSaves.get(id) as GameSave | undefined
-    }
-
-    async latest() {
-        return await this.db.gameSaves
-            .orderBy("updatedAt")
-            .last() as GameSave | undefined
-    }
-
-    async getAll() {
-        return await this.db.gameSaves.toArray() as Array<GameSave>
-    }
-
-    async updateOne(id: number, changes: GameSave) {
-        const withTimestamps = updateTimestamps(changes)
-        await this.db.gameSaves.update(id, changes)
-        return withTimestamps
-    }
-
-    async deleteById(id: number) {
-        return await this.db.gameSaves.delete(id)
-    }
-}
+import {Database, DATABASE_NAME, CURRENT_VERSION} from "./innerDatabase"
+import {CargoIndexes} from "./CargoIndexes"
+import {GameSaves} from "./GameSaves"
 
 export class AppDatabase {
     private db: Database
-    gameSaves: GameSaveInterface
+    readonly gameSaves: GameSaves
+    readonly cargoIndexes: CargoIndexes
 
     constructor() {
         this.db = new Database()
-        this.gameSaves = new GameSaveInterface(this.db)
+        this.gameSaves = new GameSaves(this.db)
+        this.cargoIndexes = new CargoIndexes(this.db)
+    }
+
+    name(): string {
+        return DATABASE_NAME
+    }
+
+    version(): number {
+        return CURRENT_VERSION
     }
 
     async clear() {

@@ -146,7 +146,7 @@ export const LargeAddonMenu = ({
             </div>
 
             <div className="text-xs text-neutral-400">
-                {`${cargoCount} Add-ons`}
+                {`${cargoCount.toLocaleString("en-us")} Add-ons`}
             </div>
         </div>
     </div>

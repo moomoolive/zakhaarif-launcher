@@ -1,7 +1,7 @@
 import {ReactNode, useEffect, useState, useRef} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppShellContext} from "./store"
-import {usePromise} from "../hooks/promise"
+import {useAsyncState} from "../hooks/promise"
 import {STANDARD_CARGOS} from "../standardCargos"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -22,7 +22,7 @@ import {
     faGamepad
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
-import {PROFILE_NAME, ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
+import {PROFILE_NAME, ALLOW_UNSAFE_PACKAGES, VERBOSE_LAUNCHER_LOGS} from "../lib/utils/localStorageKeys"
 import { useDebounce } from "../hooks/debounce"
 import { useGlobalConfirm } from "../hooks/globalConfirm"
 import LoadingIcon from "../components/LoadingIcon"
@@ -317,12 +317,54 @@ const SubPageList = {
     },
     developerOptions: () => {
         const confirm = useGlobalConfirm()
+        const {logger} = useAppShellContext()
         
         const [unsafePermissions, setUnsafePermissions] = useState(
             !!localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         )
+        const [verboseLogs, setVerboseLogs] = useState(
+            localStorage.getItem(VERBOSE_LAUNCHER_LOGS) === "true"
+        )
 
         return <div>
+            <div className="mb-8">
+                <div>
+                    <Switch 
+                        id="unsafe-permissions-switch"
+                        name="unsafe-permissions"
+                        color="success"
+                        checked={verboseLogs}
+                        onChange={async (event) => {
+                            if (event.target.checked) {
+                                logger.silent = false
+                                console.info("[🐸 Frogger]: Logging has been turned on!")
+                                setVerboseLogs(true)
+                                localStorage.setItem(VERBOSE_LAUNCHER_LOGS, "true")
+                            } else {
+                                console.info("[🐸 Frogger]: Logging has been switched off. Goodbye!")
+                                logger.silent = true
+                                setVerboseLogs(false)
+                                localStorage.setItem(VERBOSE_LAUNCHER_LOGS, "false")
+                            } 
+                        }}
+                        inputProps={{'aria-label': 'controlled'}}
+                    />
+                    <span>
+                        {"Launcher Logs"}
+                    </span>
+                </div>
+            </div>
+            
+            <div className="mx-2">
+                <Divider/>
+            </div>
+            
+            <div className="mx-2.5 mt-2 mb-1">
+                <div className="text-sm text-red-500">
+                    {"Unsafe Options"}
+                </div>
+            </div>
+
             <div>
                 <Switch 
                     id="unsafe-permissions-switch"
@@ -384,8 +426,8 @@ const SettingsPage = (): JSX.Element => {
         setSearchParams(new URLSearchParams(searchParams))
     })
 
-    const launcherMetadata = usePromise(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl))
-    const gameMetadata = usePromise(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
+    const [launcherMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl))
+    const [gameMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
     const [clipboardActionId, setClipboardActionId] = useState("none")
 
     const onClipboardAction = (actionId: string) => {
