@@ -40,6 +40,14 @@ export class CargoIndexes {
         }
         return response.data
     }
+
+    async getManyIndexes(canonicalUrls: string[]): Promise<Array<CargoIndex | null>> {
+        if (canonicalUrls.length < 1) {
+            return []
+        }
+        const response = await this.db.appCargoIndexes.bulkGet(canonicalUrls)
+        return response.map((cargo) => cargo || null)
+    }
     
     async putIndex(index: CargoIndex): Promise<boolean> {
         const response = await io.wrap(this.db.appCargoIndexes.put(index))
@@ -60,24 +68,46 @@ export class CargoIndexes {
         return response.ok
     }
 
-    getExtensions(params: QueryParams<"updated" | "name">): Promise<AppCargoIndex[]> {
-        const {limit, offset, sort, order} = params
-        const initialQuery = this.db.appCargoIndexes
-            .where("tag")
-            .equals(EXTENSION_CARGO_TAG)
-            .offset(offset)
-            .limit(limit)
-        if (order === ASCENDING_ORDER) {
-            return initialQuery.sortBy(sort)
-        }
-        return initialQuery.reverse().sortBy(sort)
+    async getExtensions(params: QueryParams<"updated" | "name">): Promise<AppCargoIndex[]> {
+        const query = await this.orderedQuery(params)
+        return query.filter(
+            (cargo) => cargo.tag === EXTENSION_CARGO_TAG
+        )
     }
 
-    async extensionCount(): Promise<number> {
-        return await this.db.appCargoIndexes
-            .where("tag")
-            .equals(EXTENSION_CARGO_TAG)
-            .count()
+    async getMods(params: QueryParams<"updated" | "name">): Promise<AppCargoIndex[]> {
+        const query = await this.orderedQuery(params)
+        return query.filter(
+            (cargo) => cargo.tag === MOD_CARGO_TAG
+        )
+    }
+
+    similaritySearchWithTag(
+        tag: number,
+        params: SimilaritySearchParams
+    ): Promise<CargoIndex[]> {
+        const {text, order, sort, limit} = params
+        const baseQuery = this.db.appCargoIndexes.orderBy(sort)
+        const ordered = order === ASCENDING_ORDER
+            ? baseQuery
+            : baseQuery.reverse()
+        const normalizedQuery = text.toLowerCase()
+        return ordered
+            .filter((cargo) => cargo.tag === tag && cargo.name.toLowerCase().includes(normalizedQuery))
+            .limit(limit)
+            .toArray()
+    }
+
+    countByTag(tag: number): Promise<number> {
+        return this.db.appCargoIndexes.where("tag").equals(tag).count()
+    }
+
+    extensionCount(): Promise<number> {
+        return this.countByTag(EXTENSION_CARGO_TAG)
+    }
+
+    modCount(): Promise<number> {
+        return this.countByTag(MOD_CARGO_TAG)
     }
 
     cargoCount(): Promise<number> {
@@ -96,7 +126,10 @@ export class CargoIndexes {
     }
 
     async latestUpdateTimestamp(): Promise<number> {
-        const index = await this.db.appCargoIndexes.orderBy("updated").first()
+        const index = await this.db.appCargoIndexes
+            .orderBy("updated")
+            .reverse()
+            .first()
         if (!index) {
             return Date.now()
         }
@@ -105,12 +138,20 @@ export class CargoIndexes {
 
     similaritySearch(params: SimilaritySearchParams): Promise<CargoIndex[]> {
         const {text, order, sort, limit} = params
+        const normalizedQuery = text.toLowerCase()
         const baseQuery = this.db.appCargoIndexes
-            .filter((cargo) => cargo.name.includes(text))
+            .filter((cargo) => cargo.name.toLowerCase().includes(normalizedQuery))
             .limit(limit)
         const orderedQuery = order === ASCENDING_ORDER
             ? baseQuery
             : baseQuery.reverse()
         return orderedQuery.sortBy(sort)
+    }
+
+    async getAllCanonicalUrls(): Promise<string[]> {
+        const start = Date.now()
+        const result = await this.db.appCargoIndexes.toCollection().primaryKeys()
+        console.log("primary key operation took", Date.now() - start)
+        return result
     }
 }

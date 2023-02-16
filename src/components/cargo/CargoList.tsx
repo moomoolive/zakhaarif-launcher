@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faExclamationTriangle, faFolder, faMagnifyingGlass, faRotate } from "@fortawesome/free-solid-svg-icons"
 import { useEffect, useRef } from "react"
 import { ABORTED, FAILED, UPDATING } from "../../lib/shabah/backend"
+import { Paginator } from "../Paginator"
 
 type CargoSummaryProps = {
     onClick: () => void | Promise<void>
@@ -104,43 +105,12 @@ export type CargoListProps = {
     onPaginate: () => void
 }
 
-const PAGINATOR_ID = "cargo-list-paginator"
-
 export const CargoList = ({
     onViewCargo,
     cargosIndexes,
     hasMore,
     onPaginate
 }: CargoListProps): JSX.Element => {
-    const paginatorObserver = useRef<IntersectionObserver | null>(null)
-
-    useEffect(() => {
-        if (paginatorObserver.current) {
-            return
-        }
-        const root = document.getElementById(PAGINATOR_ID)
-        if (!root) {
-            console.warn("observer couldn't find root element")
-            return
-        }
-        const observer = new IntersectionObserver((entries) => {
-            for (const entry of entries) {
-                if (!entry.isIntersecting) {
-                    return
-                }
-                onPaginate()
-            }
-        }, {threshold: 0.8})
-        observer.observe(root)
-        paginatorObserver.current = observer
-        return () => {
-            if (!paginatorObserver.current) {
-                return
-            }
-            paginatorObserver.current.disconnect()
-            paginatorObserver.current = null
-        }
-    }, [])
 
     const {current: cargoStatus} = useRef((cargoState: CargoState) => {
         switch (cargoState) {
@@ -167,7 +137,7 @@ export const CargoList = ({
                     <FontAwesomeIcon icon={faMagnifyingGlass}/>
                 </div>
                 <div className="text-neutral-400">
-                    {"No results found"}
+                    {"No add-ons found"}
                 </div>
             </div>
         </> : <>
@@ -191,9 +161,14 @@ export const CargoList = ({
 
         <div className={`w-4/5 mx-auto my-3 ${hasMore ? "" : "hidden"}`}>
             <div className="animate-pulse text-center text-neutral-400 text-sm">
-                <span id={PAGINATOR_ID}>
-                    {"Loading..."}
-                </span>
+                <Paginator
+                    id="cargo-list-paginator"
+                    onPaginate={onPaginate}
+                >
+                    <span>
+                        {"Loading..."}
+                    </span>
+                </Paginator>
             </div>
         </div>
 

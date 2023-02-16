@@ -1,7 +1,7 @@
 export const ADDONS_VIEWING_CARGO = "canonical_url"
-export const ADDONS_SHOW_CARGO_INFO = "expand_info"
-export const ADDONS_OPEN_UPDATER = "update"
 export const ADDONS_MODAL = "modal"
+export const ADDONS_INFO_MODAL = "info"
+export const ADDONS_UPDATE_MODAL = "update"
 
 export const SETTINGS_TAB = "tab"
 

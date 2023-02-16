@@ -22,25 +22,28 @@ import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { isMod } from "../lib/utils/cargos"
 import { sleep } from "../lib/utils/sleep"
 import LoadingIcon from "../components/LoadingIcon"
+import { STANDARD_CARGOS } from "../standardCargos"
 
 const NewGamePage = () => {
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
-    const {downloadClient, database} = useAppShellContext()
+    const {database, logger} = useAppShellContext()
 
     const [gameName, setGameName] = useState(`unnamed-${(Math.trunc(Math.random() * 99_999)).toString()}`)
-    const [cargoIndices, setCargoIndices] = useState(emptyCargoIndices())
     const [showModLinker, setShowModLinker] = useState(false)
     const [linkedMods, setLinkedMods] = useState([] as CargoIndex[])
     const [loading, setLoading] = useState(false)
 
     useEffectAsync(async () => {
-        const clientResponse = await downloadClient.getCargoIndices()
-        const allCargos = clientResponse.cargos
-        const cargos = allCargos.filter((cargo) => isMod(cargo))
-        const standardMod = cargos[0]
+        const standardMod = await database.cargoIndexes.getIndex(
+            STANDARD_CARGOS[2].canonicalUrl
+        )
+        if (!standardMod) {
+            logger.warn("standard mods were not found")
+            setLinkedMods([])
+            return  
+        } 
         setLinkedMods([standardMod])
-        setCargoIndices({...clientResponse, cargos})
     }, [])
 
     return <div 
@@ -50,7 +53,6 @@ const NewGamePage = () => {
         {showModLinker ? <>
             <ModLinker
                 onClose={() => setShowModLinker(false)}
-                modIndexes={cargoIndices}
                 linkedMods={linkedMods}
                 setLinkedMods={setLinkedMods}
             />
@@ -134,6 +136,7 @@ const NewGamePage = () => {
                                 mods,
                                 content: {}
                             })
+                            console.log("database commit", commitSavePromise)
                             const [{id: gameId}] = await Promise.all([
                                 commitSavePromise,
                                 sleep(2_000)

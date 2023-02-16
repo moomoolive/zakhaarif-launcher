@@ -19,6 +19,7 @@ import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
 import { ASCENDING_ORDER, DESCENDING_ORDER, FilterChevron, FilterOrder } from "../components/FilterChevron"
 import { useNavigate } from "react-router-dom"
 import { isMod } from "../lib/utils/cargos"
+import {CargoIndex} from "../lib/shabah/downloadClient"
 
 const DO_NOT_SHOW_LINKER = -1
 
@@ -31,12 +32,12 @@ const LoadGamePage = () => {
 
     const [loading, setLoading] = useState(true)
     const [saves, setSaves] = useState([] as GameSave[])
-    const [modIndexes, setModIndexes] = useState(emptyCargoIndices())
     const [modLinkerSaveId, setModLinkerSaveId] = useState(
         DO_NOT_SHOW_LINKER
     )
     const [currentFilter, setCurrentFilter] = useState<typeof SAVE_FILTERS[number]>("updatedAt")
     const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
+    const [linkedMods, setLinkedMods] = useState<CargoIndex[]>([])
 
     const filteredSaves = useMemo(() => {
         const savesList = [...saves]
@@ -54,42 +55,35 @@ const LoadGamePage = () => {
             case "updatedAt":
             default:
                 return savesList.sort((a, b) => {
-                    const order = a.updatedAt > b.updatedAt ? 1 : -1
+                    const order = a.updated > b.updated ? 1 : -1
                     return order * orderFactor
                 })
         }
     }, [saves, currentFilter, order])
 
-    const modMap = useMemo(() => {
-        const map = new Map<string, number>()
-        for (let index = 0; index < modIndexes.cargos.length; index++) {
-            const element = modIndexes.cargos[index]
-            map.set(element.canonicalUrl, index)
-        }
-        return map
-    }, [modIndexes])
-
-    const linkedMods = useMemo(() => {
+    useEffectAsync(async () => {
         if (modLinkerSaveId === DO_NOT_SHOW_LINKER) {
-            return []
+            return
         }
-        const linked = []
+        
         const saveIndex = saves.findIndex((save) => save.id === modLinkerSaveId)
         if (saveIndex < 0) {
-            return []
+            return
         }
-        const targetMod = saves[saveIndex]
-        for (let index = 0; index < targetMod.mods.canonicalUrls.length; index++) {
-            const element = targetMod.mods.canonicalUrls[index]
-            if (!modMap.has(element)) {
+        const linked: CargoIndex[] = []
+        const targetSave = saves[saveIndex]
+        const modIndexes = await database.cargoIndexes.getManyIndexes(
+            targetSave.mods.canonicalUrls
+        )
+        for (let i = 0; i < modIndexes.length; i++) {
+            const index = modIndexes[i]
+            if (!index) {
                 continue
             }
-            const targetModIndex = modMap.get(element) || 0
-            const mod = modIndexes.cargos[targetModIndex]
-            linked.push({...mod})
+            linked.push(index)
         }
-        return linked
-    }, [modLinkerSaveId, modMap, saves])
+        setLinkedMods(linked)
+    }, [modLinkerSaveId, saves])
 
     const deleteSave = async (id: number) => {
         if (!await confirm({title: "Are you sure you want to delete this save?", confirmButtonColor: "warning"})) {
@@ -120,14 +114,10 @@ const LoadGamePage = () => {
     }
 
     useEffectAsync(async () => {
-        const [saves, cargoIndexesResponse] = await Promise.all([
-            database.gameSaves.getAll(),
-            downloadClient.getCargoIndices()
+        const [saves] = await Promise.all([
+            database.gameSaves.getAll()
         ] as const)
         setSaves(saves)
-        const allCargos = cargoIndexesResponse.cargos
-        const cargos = allCargos.filter((cargo) => isMod(cargo))
-        setModIndexes({...cargoIndexesResponse, cargos})
         setLoading(false)
     }, [])
 
@@ -136,8 +126,7 @@ const LoadGamePage = () => {
             <BackNavigationButton/>
 
             {modLinkerSaveId !== DO_NOT_SHOW_LINKER ? <>
-                <ModLinker 
-                    modIndexes={modIndexes}
+                <ModLinker
                     linkedMods={linkedMods}
                     setLinkedMods={async (linked) => {
                         const saveIndex = saves.findIndex((save) => save.id === modLinkerSaveId)
@@ -201,7 +190,7 @@ const LoadGamePage = () => {
 
                         <div className="w-full h-5/6 overflow-y-scroll overflow-x-clip px-2">
                             {filteredSaves.map((save, index) => {
-                                const {name, type, updatedAt, id} = save
+                                const {name, type, updated, id} = save
                                 const openGame = () => navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${id.toString()}`)
                                 return <div
                                     key={`save-${index}`}
@@ -216,21 +205,31 @@ const LoadGamePage = () => {
                                         </div>
                                         <div className="w-1/4 text-right">
                                             <div className="text-xs text-neutral-400">
-                                                {type}
                                                 {((saveType: typeof type) => {
                                                     switch (saveType) {
-                                                        case QUICK_SAVE://"quick":
-                                                            return <span className="text-yellow-500 ml-1.5">
-                                                                <FontAwesomeIcon icon={faBolt}/>
+                                                        case QUICK_SAVE:
+                                                            return <span>
+                                                                {"quick"}
+                                                                <span className="text-yellow-500 ml-1.5">
+                                                                    <FontAwesomeIcon icon={faBolt}/>
+                                                                </span>
                                                             </span>
                                                         case AUTO_SAVE:
-                                                            return <span className="text-indigo-500 ml-1.5">
-                                                                <FontAwesomeIcon icon={faRobot}/>
+                                                            return <span>
+                                                                {"auto"}
+                                                                <span className="text-indigo-500 ml-1.5">
+                                                                    <FontAwesomeIcon icon={faRobot}/>
+                                                                </span>
+                                                            </span>
+                                                        case MANUAL_SAVE:
+                                                            return <span>
+                                                                {"manual"}
+                                                                <span className="text-blue-500 ml-2">
+                                                                    <FontAwesomeIcon icon={faFloppyDisk}/>
+                                                                </span>
                                                             </span>
                                                         default:
-                                                            return <span className="text-blue-500 ml-2">
-                                                                <FontAwesomeIcon icon={faFloppyDisk}/>
-                                                            </span>
+                                                            return <></>
                                                             
                                                     }
                                                 })(type)}
@@ -240,7 +239,7 @@ const LoadGamePage = () => {
 
                                     <div className="w-full py-2 px-2 text-xs text-neutral-500 flex items-center">
                                         <div className="w-1/2" onClick={openGame}>
-                                            {new Date(updatedAt).toLocaleString("en-us", {
+                                            {new Date(updated).toLocaleString("en-us", {
                                                 month: "short",
                                                 day: "numeric",
                                                 year: "numeric",

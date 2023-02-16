@@ -3,25 +3,34 @@ import {
     Tooltip, 
     Button,
     Divider,
+    Skeleton,
+    TextField,
+    InputAdornment,
 } from "@mui/material"
-import { ReactNode, useEffect, useMemo, useState } from "react"
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
     faArrowLeft, 
     faPlus, 
     faXmark, 
     faInfo,
-    faFaceSadCry
+    faFaceSadCry,
+    faMagnifyingGlass
 } from "@fortawesome/free-solid-svg-icons"
-import {useNavigate} from "react-router-dom"
+import {Link, useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {useAppShellContext} from "../../routes/store"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_CARGOS} from "../../standardCargos"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
-import { MOD_CARGO_TAG } from "../../config"
+import { EXTENSION_CARGO_TAG, MOD_CARGO_TAG } from "../../config"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
+import { DESCENDING_ORDER, FilterOrder } from "../FilterChevron"
+import { sleep } from "../../lib/utils/sleep"
+import { ADDONS_INFO_MODAL, ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../../lib/utils/searchParameterKeys"
+import { Paginator } from "../Paginator"
+import { useDebounce } from "../../hooks/debounce"
 
 type LinkableModProps = {
     mod: CargoIndex
@@ -29,53 +38,24 @@ type LinkableModProps = {
 }
 
 const LinkableMod = ({mod, actionIcon}: LinkableModProps) => {
-    const {downloadClient} = useAppShellContext()
-    
-    const [showInfo, setShowInfo] = useState(false)
-    const [modCargo, setModCargo] = useState(new Cargo())
-    const [cargoError, setCargoError] = useState(false)
-
-    useEffectAsync(async () => {
-        if (!showInfo) {
-            return
-        }
-        if (modCargo.version !== NULL_MANIFEST_VERSION) {
-            return
-        }
-        const cargoResponse = await downloadClient.getCargoAtUrl(
-            mod.canonicalUrl
-        )
-        if (!cargoResponse.ok) {
-            setCargoError(true)
-            return
-        }
-        setCargoError(false)
-        setModCargo(cargoResponse.data.pkg)
-    }, [showInfo])
-
     return <div className="w-full">
-        <div className="px-2 py-1 w-full flex items-center text-sm rounded text-neutral-200 hover:bg-neutral-900/50">
-            <Tooltip title={mod.name}>
-                <div className="w-7/12 sm:w-8/12 whitespace-nowrap text-ellipsis overflow-clip">
-                    {mod.name}
-                </div>
-            </Tooltip>
+        <div className="px-1 py-2 w-full flex items-center text-sm rounded text-neutral-200 hover:bg-neutral-900/50">
+            <div className="w-9/12 sm:w-8/12 whitespace-nowrap text-ellipsis overflow-clip">
+                {mod.name}
+            </div>
 
-            <Tooltip title={`Version ${mod.version}`}>
-                <div className="text-neutral-400 w-2/12 sm:w-1/12 whitespace-nowrap text-ellipsis overflow-clip">
-                    {"v" + mod.version}
-                </div>
-            </Tooltip>
-            <div className="w-3/12 flex justify-end items-center">
+            <div className="w-3/12 text-left flex justify-end items-center">
                 <div>
-                    <Tooltip title="Info">
-                        <button
-                            className="text-blue-500 mr-6"
-                            onClick={() => setShowInfo(!showInfo)}
-                        >
-                            <FontAwesomeIcon icon={faInfo}/>
-                        </button>
-                    </Tooltip>
+                    <Link
+                        to={`/add-ons?${ADDONS_VIEWING_CARGO}=${encodeURIComponent(mod.canonicalUrl)}&${ADDONS_MODAL}=${ADDONS_INFO_MODAL}`}
+                        target="_blank"
+                    >
+                        <Tooltip title="Info">
+                            <button className="text-blue-500 mr-6">
+                                <FontAwesomeIcon icon={faInfo}/>
+                            </button>
+                        </Tooltip>
+                    </Link>
                 </div>
 
                 <div>
@@ -83,78 +63,153 @@ const LinkableMod = ({mod, actionIcon}: LinkableModProps) => {
                 </div>
             </div>
         </div>
-        {showInfo ?  <div 
-            className="w-full px-2 py-1 animate-fade-in-left"
-        >
-            {cargoError ? <>
-                <div className="text-red-500">
-                    Error Occurred
-                </div>
-            </> : <>
-                <button 
-                    className="mb-2 text-sm w-full py-2 text-red-400 bg-neutral-700 rounded hover:bg-neutral-900/50"
-                    onClick={() => setShowInfo(false)}
-                >
-                    Close
-                </button>
-                <div className="text-neutral-300 text-sm max-h-16 overflow-x-clip overflow-y-scroll text-ellipsis">
-                    <div className="mb-2">
-                        {modCargo.description}
-                    </div>
-
-                    <div className="text-xs text-blue-500">
-                        {"v" + mod.version}
-                    </div>
-
-                    <div className="text-xs text-neutral-400">
-                        {`Updated @ ${new Date(mod.updated).toLocaleString("en-us", {
-                            day: "numeric",
-                            year: "numeric",
-                            month: "short"
-                        })}`}
-                    </div>
-                </div>
-            </>}
-        </div> : <></>}
     </div>
-}
-
-export type ModLinkerProps = {
-    onClose: () => void
-    modIndexes: CargoIndices
-    linkedMods: CargoIndex[]
-    setLinkedMods: (newMods: CargoIndex[]) => void
 }
 
 const STANDARD_MOD_COUNT = STANDARD_CARGOS.filter((cargo) => cargo.tag === MOD_CARGO_TAG).length
 
+const PAGE_LIMIT = 25
+
+type SortType = (
+    "updated"
+)
+
+const unlinkedModsSkeleton = <div>
+    <div>
+        <Divider className="bg-neutral-600"/>
+    </div>
+    <div className="w-full flex flex-wrap">
+        {new Array<number>(10).fill(1).map((_, index) => {
+            return <div
+                key={`unlinked-skeleton-${index}`}
+                className="flex items-center justify-end w-full py-2"
+            >
+                <div className="w-3/4">
+                    <Skeleton 
+                        height={15}
+                        width={100}
+                        variant="rounded"  
+                        animation="wave"
+                    />
+                </div>
+
+                <div className="w-1/4 px-2">
+                    <Skeleton 
+                        height={15}
+                        width={40}
+                        variant="rounded"  
+                        animation="wave"
+                    />
+                </div>
+            </div>
+        })}
+    </div>
+</div>
+
+export type ModLinkerProps = {
+    onClose: () => void
+    linkedMods: CargoIndex[]
+    setLinkedMods: (newMods: CargoIndex[]) => void
+}
+
 export const ModLinker = ({
     onClose,
-    modIndexes,
     linkedMods,
     setLinkedMods
 }: ModLinkerProps) => {
+    const {database} = useAppShellContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
     useCloseOnEscape(onClose)
+    const textSearchDelay = useDebounce(300)
 
-    const unlinkedMods = useMemo(() => {
-        const linkMap = new Map<string, number>()
-        for (let index = 0; index < linkedMods.length; index++) {
-            const element = linkedMods[index]
-            linkMap.set(element.canonicalUrl, 1)
+    const [sort, setSort] = useState<SortType>("updated")
+    const [offset, setOffset] = useState(0)
+    const [queryTime, setQueryTime] = useState(0)
+    const [modCount, setModCount] = useState(0)
+    const [searchText, setSearchText] = useState("")
+    const [loading, setLoading] = useState(true)
+    const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
+    const [cacheBusterId, setCacheBusterId] = useState(0)
+    const [cargoQuery, setCargoQuery] = useState({
+        results: [] as CargoIndex[],
+        sort: "",
+        order: DESCENDING_ORDER as FilterOrder,
+        offset: 0,
+        searchText: "",
+        more: false
+    })
+
+    const {current: linkedMap} = useRef(new Map(
+        linkedMods.map((cargo) => [cargo.canonicalUrl, 1])
+    ))
+
+    useEffectAsync(async () => {
+        const [count] = await Promise.all([
+            database.cargoIndexes.modCount()
+        ] as const)
+        setModCount(count)
+    }, [])
+
+    useEffectAsync(async () => {
+        if (modCount < 1) {
+            return
         }
-        const allMods = modIndexes.cargos
-        const unlinked = []
-        for (let index = 0; index < allMods.length; index++) {
-            const element = allMods[index]
-            if (linkMap.has(element.canonicalUrl)) {
-                continue
-            }
-            unlinked.push({...element})
+
+        if (searchText.length > 0) {
+            setLoading(true)
+            textSearchDelay(async () => {
+                const start = Date.now()
+                const query = await database.cargoIndexes.similaritySearchWithTag(
+                    MOD_CARGO_TAG,
+                    {
+                        text: searchText,
+                        sort,
+                        order,
+                        limit: PAGE_LIMIT
+                    }
+                )
+                setQueryTime(Date.now() - start)
+                setCargoQuery({
+                    results: query,
+                    order,
+                    sort,
+                    offset: 0,
+                    more: false,
+                    searchText
+                })
+                setLoading(false)
+            })
+            return
         }
-        return unlinked
-    }, [linkedMods])
+
+        setLoading(offset === 0)
+        const minimumTime = sleep(400)
+        const start = Date.now()
+        const query = await database.cargoIndexes.getMods({
+            sort,
+            order,
+            offset,
+            limit: PAGE_LIMIT
+        })
+        setQueryTime(Date.now() - start)
+        await minimumTime
+        const filteredQuery = query.filter(
+            (cargo) => !linkedMap.has(cargo.canonicalUrl)
+        )
+        const results = offset === 0
+            ? filteredQuery
+            : [...cargoQuery.results, ...filteredQuery]
+        setCargoQuery({
+            results,
+            order,
+            sort,
+            offset,
+            searchText: "",
+            more: results.length < modCount
+        })
+        setLoading(false)
+    }, [searchText, sort, order, offset, modCount, cacheBusterId])
 
     return <div
         className="animate-fade-in-left w-screen h-screen z-10 fixed top-0 left-0 flex items-center justify-center bg-neutral-900/80"
@@ -171,10 +226,14 @@ export const ModLinker = ({
         
         <div className="w-5/6 max-w-xl bg-neutral-800 rounded p-3 overflow-clip">
             <div className="mb-4">
-                <div className="text-green-500 text-xs mb-1">
+                <div className="text-green-500 text-sm mb-1">
                     {"Linked"}
+                    
+                    <span className="text-neutral-500 ml-1 text-xs">
+                        {`(${(linkedMods.length).toLocaleString("en-us")} mods)`}
+                    </span>
                 </div>
-                <div className="max-h-40 overflow-y-scroll">
+                <div className="h-32 overflow-y-scroll">
                     {linkedMods.length < 1 ? <>
                         <div className="w-full py-2 text-center text-sm text-neutral-400">
                             <span className="mr-2 text-yellow-500">
@@ -199,13 +258,16 @@ export const ModLinker = ({
                                                 <button
                                                     className="text-red-500 pt-1 text-base"
                                                     onClick={() => {
-                                                        if (mod.canonicalUrl === import.meta.env.VITE_APP_STANDARD_MOD_CARGO_URL) {
-                                                            confirm({title: `Mod "${mod.name}" cannot be unlinked!`})
-                                                            return
-                                                        }
                                                         const copy = [...linkedMods]
                                                         copy.splice(index, 1)
                                                         setLinkedMods(copy)
+                                                        setCargoQuery((previous) => {
+                                                            return {
+                                                                ...previous,
+                                                                results: [mod, ...previous.results]
+                                                            }
+                                                        })
+                                                        linkedMap.delete(mod.canonicalUrl)
                                                     }}
                                                 >
                                                     <FontAwesomeIcon icon={faXmark}/>
@@ -224,62 +286,132 @@ export const ModLinker = ({
             </div>
 
             <div>
-                <div className="text-blue-500 text-xs mb-1">
+                <div className="text-blue-500 text-sm mb-1">
                     {"Unlinked"}
+                    <span className="text-neutral-500 ml-1 text-xs">
+                        {`(${(modCount - linkedMods.length).toLocaleString("en-us")} mods)`}
+                    </span>
                 </div>
-                <div className="max-h-40 overflow-y-scroll">
-                    {unlinkedMods.length < 1 ? <>
-                        <div className="w-full py-2 text-center text-sm text-neutral-400">
-                            <span className="mr-2 text-yellow-500">
-                                <FontAwesomeIcon icon={faFaceSadCry}/>
-                            </span>
-                            {"No Mods to Link"}
-                        </div>
-                        {linkedMods.length <= STANDARD_MOD_COUNT ? <>
-                            <div>
-                                <Button 
-                                    size="small"
-                                    fullWidth
-                                    onClick={async () => {
-                                        if (!await confirm({title: "Are you sure you want to leave this page?"})) {
-                                            return
-                                        }
-                                        navigate("/add-ons")
-                                    }}
-                                >
-                                    {"Add Some"}
-                                </Button>
+                
+                <div className="mb-2">
+                    <TextField 
+                        id="unlinked-mod-search"
+                        name="unlinked-mod-search"
+                        placeholder={"Mod name..."}
+                        value={searchText}
+                        fullWidth
+                        size="small"
+                        onChange={(event) => setSearchText(event.target.value)}
+                        InputProps={{
+                            startAdornment: <InputAdornment position="start">
+                                <span className="text-neutral-300">
+                                    <FontAwesomeIcon icon={faMagnifyingGlass}/>
+                                </span>
+                            </InputAdornment>
+                        }}
+                    />
+                </div>
+
+                <div className="h-32 overflow-y-scroll">
+                    {loading ? <>{unlinkedModsSkeleton}</> : <>
+                        {cargoQuery.results.length < 1 ? <>
+                            <div className="w-full py-2 text-center text-sm text-neutral-400">
+                                <span className="mr-2 text-yellow-500">
+                                    <FontAwesomeIcon icon={faMagnifyingGlass}/>
+                                </span>
+                                {"No mods found"}
                             </div>
-                        </> : <></>}
-                    </> : <>
-                        <div>
-                            <Divider className="bg-neutral-600"/>
-                        </div>
-                        <div className="w-full flex flex-wrap">
-                            {unlinkedMods.map((mod, index) => {
-                                return <div 
-                                    className="w-full"
-                                    key={`linked-mod-${index}`}
+
+                            {modCount < 1 ? <>
+                                <div>
+                                    <Button 
+                                        size="small"
+                                        fullWidth
+                                        onClick={async () => {
+                                            if (!await confirm({title: "Are you sure you want to leave this page?"})) {
+                                                return
+                                            }
+                                            navigate("/add-ons")
+                                        }}
+                                    >
+                                        {"Add Some"}
+                                    </Button>
+                                </div>
+                            </> : <></>}
+
+                        </> : <>
+                            <div>
+                                <Divider className="bg-neutral-600"/>
+                            </div>
+                            <div className="w-full flex flex-wrap">
+                                {cargoQuery.results.map((mod, index) => {
+                                    return <div 
+                                        className="w-full"
+                                        key={`linked-mod-${index}`}
+                                    >
+                                        <LinkableMod 
+                                            mod={mod}
+                                            actionIcon={
+                                                <Tooltip title="Link">
+                                                    <button
+                                                        className="text-green-500 pt-1 text-base"
+                                                        onClick={() => {
+                                                            linkedMap.set(mod.canonicalUrl, 1)
+                                                            setCargoQuery((previous) => {
+                                                                const {results} = previous
+                                                                const targetIndex = results.findIndex(
+                                                                    (cargo) => cargo.canonicalUrl === mod.canonicalUrl
+                                                                )
+                                                                const copy = {...previous}
+                                                                if (targetIndex < 0) {
+                                                                    return copy
+                                                                }
+                                                                results.splice(targetIndex, 1)
+                                                                return copy
+                                                            })
+                                                            setLinkedMods([...linkedMods, mod])
+                                                        }}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPlus}/>
+                                                    </button>
+                                                </Tooltip>
+                                            }
+                                        />
+                                        <div>
+                                            <Divider className="bg-neutral-600"/>
+                                        </div>
+                                    </div> 
+                                })}
+
+                                {cargoQuery.more ? <Paginator
+                                    id="unlinked-mod-paginator"
+                                    threshold={[0, 0.5, 1.0]}
+                                    onPaginate={() => {
+                                        setOffset((previous) => previous + PAGE_LIMIT)
+                                    }}
+                                    className="flex items-center justify-end w-full py-2"
                                 >
-                                    <LinkableMod 
-                                        mod={mod}
-                                        actionIcon={
-                                            <Tooltip title="Link">
-                                                <button
-                                                    className="text-green-500 pt-1 text-base"
-                                                    onClick={() => setLinkedMods([...linkedMods, mod])}
-                                                >
-                                                    <FontAwesomeIcon icon={faPlus}/>
-                                                </button>
-                                            </Tooltip>
-                                        }
-                                    />
-                                    <div>
-                                        <Divider className="bg-neutral-600"/>
+                                    <div className="w-3/4">
+                                        <Skeleton 
+                                            height={15}
+                                            width={100}
+                                            variant="rounded"  
+                                            animation="wave"
+                                        />
                                     </div>
-                                </div> 
-                            })}
-                        </div>
+
+                                    <div className="w-1/4 px-2">
+                                        <Skeleton 
+                                            height={15}
+                                            width={40}
+                                            variant="rounded"  
+                                            animation="wave"
+                                        />
+                                    </div>
+                                    
+                                </Paginator> : <></>}
+                            </div>
+                        </>}
                     </>}
                 </div>
             </div>

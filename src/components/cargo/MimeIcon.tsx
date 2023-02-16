@@ -64,9 +64,7 @@ export const MimeIcon = ({
             </span>
         default:
             return <span className={`${className}`}>
-                <FontAwesomeIcon 
-                    icon={faFile}
-                />
+                <FontAwesomeIcon icon={faFile}/>
             </span>
     }
 }

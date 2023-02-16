@@ -2,7 +2,6 @@ import {ALLOW_ALL_PERMISSIONS} from "../types/permissions"
 import {createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
 import {wRpc} from "../wRpc/simple"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
-//import {addStandardCargosToCargoIndexes} from "../../standardCargos"
 import {
     essentialRpcs, 
     embedAnyExtensionRpcs,
@@ -12,7 +11,7 @@ import {
     createRpcState,
     RpcPersistentState
 } from "./rpc"
-import type {Shabah} from "../shabah/downloadClient"
+import type {CargoIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
 
 const createRpcFunctions = (state: RpcState) => {
@@ -88,7 +87,7 @@ export class JsSandbox {
         this.rpc = this.createRpc(this.state)
     }
 
-    private createRpc(state: RpcState) {
+    private createRpc(state: RpcState): wRpc<{}> {
         const self = this
         return new wRpc({
             responses: createRpcFunctions(state),
@@ -111,8 +110,25 @@ export class JsSandbox {
         })
     }
 
-    private async createPermissions() {
-        const {downloadClient} = this
+    private async getCargoIndexesFromDb(
+        canonicalUrls: string[]
+    ): Promise<CargoIndex[]> {
+        const targetCargos = await this.dependencies
+            .database
+            .cargoIndexes
+            .getManyIndexes(canonicalUrls)
+        const cargos: CargoIndex[] = []
+        for (let i = 0; i < targetCargos.length; i++) {
+            const cargo = targetCargos[i]
+            if (!cargo) {
+                continue
+            }
+            cargos.push(cargo)
+        }
+        return cargos
+    }
+
+    private async createPermissions(): Promise<PermissionsSummary> {
         const {originalPermissions} = this
         if (originalPermissions.embedExtensions.length < 1) {
             return originalPermissions
@@ -120,14 +136,16 @@ export class JsSandbox {
         if (originalPermissions.embedExtensions[0] === ALLOW_ALL_PERMISSIONS) {
             return originalPermissions
         }
-        const cargoIndexes = await downloadClient.getCargoIndices()
-        return mergePermissionSummaries(originalPermissions, cargoIndexes)
+        const cargos = await this.getCargoIndexesFromDb(originalPermissions.embedExtensions)
+        return mergePermissionSummaries(
+            originalPermissions, {cargos}
+        )
     }
 
     private iframeArguments(
         permissionsSummary: PermissionsSummary,
         currentOrigin: string
-    ) {
+    ): IframeArguments {
         const iframeArgs = new IframeArguments()
         iframeArgs.attributes.push({
             key: "allow", 
@@ -153,7 +171,7 @@ export class JsSandbox {
         iframe: HTMLIFrameElement, 
         iframeArguments: IframeArguments,
         reconfigured: boolean
-    ) {
+    ): HTMLIFrameElement {
         const {contentSecurityPolicy, attributes} = iframeArguments
         iframe.id = this.id
         iframe.name = this.name
@@ -169,7 +187,7 @@ export class JsSandbox {
         return iframe
     }
 
-    async initialize() {
+    async initialize(): Promise<HTMLElement> {
         const permissionsSummary = await this.createPermissions()
         const iframeArguments = this.iframeArguments(
             permissionsSummary, location.origin
@@ -183,20 +201,20 @@ export class JsSandbox {
         return sandbox
     }
 
-    domElement() {
-        return this.iframeElement as HTMLElement
+    domElement(): HTMLElement {
+        return this.iframeElement
     }
 
-    destroy() {
+    destroy(): boolean {
         const callback = this.frameListener
         window.removeEventListener("message", callback)
         this.iframeElement.remove()
         console.log(`cleaned up all resources associated with sandbox "${this.id}"`)
+        return true
     }
 
-    private async mutatePermissions(canonicalUrls: string[]) {
+    private async mutatePermissions(canonicalUrls: string[]): Promise<boolean> {
         const {originalPermissions} = this
-        const {downloadClient} = this
         if (
             this.persistentState.configuredPermissions
             || !this.initialized
@@ -209,12 +227,12 @@ export class JsSandbox {
             ...this.originalPermissions,
             embedExtensions: canonicalUrls
         } as const
+        
         this.reconfiguredPermissions = configuredPermissions
-        const originalCargoIndexes = await downloadClient.getCargoIndices()
-        const cargos = originalCargoIndexes.cargos
-        const merged = canonicalUrls.length < 1 
-            ? configuredPermissions
-            : mergePermissionSummaries(this.reconfiguredPermissions, {cargos})
+        const cargos = await this.getCargoIndexesFromDb(canonicalUrls)
+        const merged =  mergePermissionSummaries(
+            this.reconfiguredPermissions, {cargos}
+        )
         this.persistentState.configuredPermissions = true
         const iframeArguments = this.iframeArguments(
             merged, location.origin,

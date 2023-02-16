@@ -46,7 +46,7 @@ import { FileSystemBreadcrumbs } from "../components/cargo/FileSystemBreadcrumbs
 import type {CargoDirectory} from "../components/cargo/CargoFileSystem"
 import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
-import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
+import { ADDONS_INFO_MODAL, ADDONS_MODAL, ADDONS_UPDATE_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
 import LoadingIcon from "../components/LoadingIcon"
 import { ABORTED, CACHED, FAILED, UPDATING } from "../lib/shabah/backend"
@@ -56,6 +56,7 @@ import { roundDecimal } from "../lib/math/rounding"
 import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
 import { useDebounce } from "../hooks/debounce"
 //import { makeTestCargoIndexes } from "../testScripts/dummyCargoIndexes"
+import {CargoFileSystemSkeleton} from "../components/cargo/CargoFileSystemSkeleton"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -78,31 +79,27 @@ const CargoUpdater = lazyComponent(
 )
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
-    {
-        loadingElement: <div className="w-full h-5/6 overflow-y-scroll text-center"> 
-            <div className="mt-16 w-4/5 mx-auto">
-                <div className="animate-spin text-blue-500 text-3xl mb-3">
-                    <LoadingIcon/>
-                </div>
-                <div className="text-sm text-neutral-400">
-                    {"Looking up Files..."}
-                </div>
+    {loadingElement: CargoFileSystemSkeleton}
+)
+const CargoListSkeleton = <div className="w-full h-5/6 overflow-y-scroll">
+    {new Array<number>(6).fill(0).map((_, index) => {
+        return <div
+            key={`cargo-index-skeleton-${index}`}
+            className="flex p-4 justify-center items-center animate-pulse"
+        >
+            <div className="w-1/3">
+                <FontAwesomeIcon icon={faFolder}/>
+            </div>
+            
+            <div className="w-2/3 px-2">
+                <Skeleton animation={false}/>
             </div>
         </div>
-    }
-)
+    })}
+</div>
 const CargoList = lazyComponent(
     async () => (await import("../components/cargo/CargoList")).CargoList,
-    {
-        loadingElement: <div className="mt-16 text-center">
-            <div className="animate-spin text-blue-500 text-3xl mb-3">
-                <LoadingIcon/>
-            </div>
-            <div className="text-sm text-neutral-400">
-                {"Looking up Add-ons..."}
-            </div>
-        </div>
-    }
+    {loadingElement: CargoListSkeleton}
 )
 const LargeMenu = lazyComponent(
     async () => (await import("../components/add-ons/LargeAddonMenu")).LargeAddonMenu,
@@ -158,10 +155,9 @@ const AddOns = (): JSX.Element => {
     const {downloadClient, database, logger} = useAppShellContext()
     const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
-    const testSearchDelay = useDebounce(300)
+    const textSearchDelay = useDebounce(300)
     
     const [queryLoading, setQueryLoading] = useState(true)
-    const [isInErrorState, setIsInErrorState] = useState(false)
     const [searchText, setSearchText] = useState("")
     const [filterConfig, setFilterConfig] = useState<FilterConfig>({type: "updated", order: DESCENDING_ORDER})
     const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
@@ -195,18 +191,25 @@ const AddOns = (): JSX.Element => {
         searchParams.delete(key)
         setSearchParams(new URLSearchParams(searchParams))
     })
-    const {current: onBackToCargos} = useRef(() => removeSearchKey(ADDONS_VIEWING_CARGO))
+    const {current: onBackToCargos} = useRef(() => {
+        removeSearchKey(ADDONS_VIEWING_CARGO)
+        setFilterConfig({type: "updated", order: DESCENDING_ORDER})
+    })
     const {current: onShowInstaller} = useRef(() => setModalShown("Installer"))
     const {current: onShowRecovery} = useRef(() => setModalShown("Recovery"))
-    const {current: onShowCargoInfo} = useRef(() => setSearchKey(ADDONS_MODAL, "info"))
-    const {current: onShowCargoUpdater} = useRef(() => setSearchKey(ADDONS_MODAL, "update"))
+    const {current: onShowCargoInfo} = useRef(() => setSearchKey(ADDONS_MODAL, ADDONS_INFO_MODAL))
+    const {current: onShowCargoUpdater} = useRef(() => setSearchKey(ADDONS_MODAL, ADDONS_UPDATE_MODAL))
     const {current: clearModal} = useRef(() => {
         removeSearchKey(ADDONS_MODAL)
         setModalShown("")
     })
     const {current: onShowSettings} = useRef(() => navigate("/settings"))
     const {current: clearAlert} = useRef(() => setAlertConfig(null))
-    const {current: setViewingCargo} = useRef((canonicalUrl: string) => setSearchKey(ADDONS_VIEWING_CARGO, encodeURIComponent(canonicalUrl)))
+    const {current: setViewingCargo} = useRef((canonicalUrl: string) => {
+        const url = encodeURIComponent(canonicalUrl)
+        setSearchKey(ADDONS_VIEWING_CARGO, url)
+        setFilterConfig({type: "name", order: DESCENDING_ORDER})
+    })
     const queryTimeRef = useRef(0)
 
     const onDeleteCargo = async (canonicalUrl: string) => {
@@ -230,9 +233,9 @@ const AddOns = (): JSX.Element => {
             return
         } 
         const value = searchParams.get(ADDONS_MODAL) || ""
-        if (value === "update") {
+        if (value === ADDONS_UPDATE_MODAL) {
             setModalShown("Updater")
-        } else if (value === "info") {
+        } else if (value === ADDONS_INFO_MODAL) {
             setModalShown("CargoInfo")
         }
     }, [searchParams])
@@ -276,7 +279,7 @@ const AddOns = (): JSX.Element => {
         if (searchText.length > 0) {
             const {order, type} = filterConfig
             setQueryLoading(true)
-            testSearchDelay(async () => {
+            textSearchDelay(async () => {
                 const start = Date.now()
                 const query = await database.cargoIndexes.similaritySearch({
                     text: searchText,
@@ -395,19 +398,6 @@ const AddOns = (): JSX.Element => {
     const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
     const cargoFound = isViewingCargo && !!targetIndex
     const showingValidCargo = isViewingCargo && cargoFound
-
-    if (isInErrorState) {
-        return <ErrorOverlay>
-            <div className="text-neutral-400 mb-1">
-                An error occurred when search for files
-            </div>
-            <Link to="/start">
-                <Button>
-                    Back to Home
-                </Button>
-            </Link>
-        </ErrorOverlay>
-    }
 
     return <div 
         className="fixed z-0 w-screen h-screen overflow-clip"
@@ -590,7 +580,7 @@ const AddOns = (): JSX.Element => {
                 <LargeMenu
                     cargoCount={cargoCount}
                     storageUsage={storageUsage}
-                    isError={isInErrorState}
+                    isError={false}
                     loading={false}
                     className="w-60 h-full text-sm"
                     onShowInstaller={onShowInstaller}
@@ -614,6 +604,7 @@ const AddOns = (): JSX.Element => {
                     onRecoverCargo={onShowRecovery}
                     onDeleteCargo={onDeleteCargo}
                     onCreateAlert={(type, content) => setAlertConfig({type, content})}
+                    onGetSearchResultUrls={() => cargoQuery.results.map((result) => result.canonicalUrl)}
                 />
                 
                 <Divider className="bg-neutral-200"/>
@@ -685,7 +676,7 @@ const AddOns = (): JSX.Element => {
                             searchText={searchText}
                             cargoBytes={viewingCargoBytes.current}
                             lastPackageUpdate={latestUpdate}
-                            totalStorageBytes={storageUsage.total}
+                            totalStorageBytes={storageUsage.used}
                             filter={filterConfig}
                             directoryPath={directoryPath}
                             onOpenFileModal={(details) => {
@@ -697,24 +688,7 @@ const AddOns = (): JSX.Element => {
                         />
                     </> : <>
                         {queryLoading ? <>
-                            <div 
-                                className="w-full h-5/6 overflow-y-scroll animate-fade-in-left"
-                            >
-                                {new Array<number>(6).fill(0).map((_, index) => {
-                                    return <div
-                                        key={`cargo-index-skeleton-${index}`}
-                                        className="flex p-4 justify-center items-center"
-                                    >
-                                        <div className="w-1/3 animate-pulse">
-                                            <FontAwesomeIcon icon={faFolder}/>
-                                        </div>
-                                        
-                                        <div className="w-2/3 px-2">
-                                            <Skeleton/>
-                                        </div>
-                                    </div>
-                                })}
-                            </div>
+                            {CargoListSkeleton}
                         </> : <>
                             <CargoList
                                 cargosIndexes={cargoQuery.results}

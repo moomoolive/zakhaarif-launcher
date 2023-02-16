@@ -2,11 +2,11 @@ import { Cargo } from "../../lib/cargo"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
 import { Permissions } from "../../lib/types/permissions"
 import {useEffect, useMemo, useRef, useState} from "react"
-import {Tooltip, Button} from "@mui/material"
+import {Tooltip, Button, Skeleton} from "@mui/material"
 import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "../../lib/utils/dates"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import {faFolder, faFolderTree, faPuzzlePiece} from "@fortawesome/free-solid-svg-icons"
+import {faFile, faFolder, faFolderTree, faPuzzlePiece} from "@fortawesome/free-solid-svg-icons"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import {urlToMime, Mime} from "../../lib/miniMime"
 import {useAppShellContext} from "../../routes/store"
@@ -15,6 +15,7 @@ import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
 import LoadingIcon from "../LoadingIcon"
 import { getFileNameFromUrl } from "../../lib/utils/urls/getFilenameFromUrl"
+import {CargoFileSystemSkeleton} from "./CargoFileSystemSkeleton"
 
 type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
@@ -262,16 +263,7 @@ export const CargoFileSystem = ({
     }, [directoryPath])
 
     if (creatingFileSystem) {
-        return <div className="w-full h-5/6 overflow-y-scroll text-center"> 
-            <div className="mt-16 w-4/5 mx-auto">
-                <div className="animate-spin text-blue-500 text-3xl mb-3">
-                    <LoadingIcon/>
-                </div>
-                <div className="text-sm text-neutral-300">
-                    {"Looking up Files..."}
-                </div>
-            </div>
-        </div>
+        return CargoFileSystemSkeleton
     }
 
     if (!cargoIndex) {

@@ -1,4 +1,4 @@
-import { Tooltip, Menu, MenuItem } from "@mui/material"
+import { Tooltip, Menu, MenuItem, Skeleton } from "@mui/material"
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {
@@ -10,6 +10,8 @@ import {
     faPlay,
     faHelmetSafety,
     faShieldDog,
+    faDownload,
+    faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons"
 import { useAppShellContext } from "../../routes/store"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
@@ -21,6 +23,7 @@ import { NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD } from "../../lib/cargo"
 import { useNavigate } from "react-router-dom"
 import { EXTENSION_SHELL_TARGET } from "../../lib/utils/searchParameterKeys"
 import { UPDATING } from "../../lib/shabah/backend"
+import { nanoid } from "nanoid"
 
 const ROOT_DIRECTORY_PATH: RootDirectoryPath = "#"
 
@@ -36,6 +39,7 @@ type FileSystemBreadcrumbsProps = {
     onDeleteCargo: (canonicalUrl: string) => Promise<boolean>
     onRecoverCargo: (canonicalUrl: string) => unknown
     onCreateAlert: (type: "success" | "error", content: ReactNode) => unknown
+    onGetSearchResultUrls: () => string[]
 }
 
 export const FileSystemBreadcrumbs = ({
@@ -49,16 +53,28 @@ export const FileSystemBreadcrumbs = ({
     onShowCargoUpdater,
     onDeleteCargo,
     onRecoverCargo,
-    onCreateAlert
+    onCreateAlert,
+    onGetSearchResultUrls
 }: FileSystemBreadcrumbsProps): JSX.Element => {
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient, logger, database} = useAppShellContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
 
     const [cargoMenuElement, setCargoMenuElement] = useState<HTMLElement | null>(null)
-    const [loadingCargo, setLoadingCargo] = useState(false)
+    const [loadingCargo, setLoadingCargo] = useState(true)
 
     const timerIdRef = useRef(-1)
+    const {current: downloadCanonicalUrls} = useRef((
+        filePrefix: string,
+        urls: string[]
+    ) => {
+        logger.info(`found ${urls.length} canonical urls. Creating data url...`)
+        const encodedJson = encodeURIComponent(JSON.stringify(urls))
+        const downloadLink = document.createElement("a")
+        downloadLink.download = `${filePrefix}.${nanoid(6)}.json`
+        downloadLink.href = "data:text/json;charset=utf-8," +  encodedJson
+        downloadLink.click()
+    })
 
     useEffect(() => {
         if (!isViewingCargo) {
@@ -107,6 +123,44 @@ export const FileSystemBreadcrumbs = ({
                     onClose={() => setCargoMenuElement(null)}
                 >
                     <MenuItem
+                        className="hover:text-green-500"
+                        onClick={async () => {
+                            if (!await confirm({title: "Are you sure you want to export all add-ons to JSON?", confirmButtonColor: "success"})) {
+                                return
+                            }
+                            const canonicalUrls = await database.cargoIndexes.getAllCanonicalUrls()
+                            setCargoMenuElement(null)
+                            downloadCanonicalUrls("add-ons", canonicalUrls)
+                            onCreateAlert("success", "Exported add-ons")
+                        }}
+                    >
+                        <span className="mr-3">
+                            <FontAwesomeIcon icon={faDownload}/>
+                        </span>
+
+                        {"Export add-ons to JSON"}
+                    </MenuItem>
+
+                    <MenuItem
+                        className="hover:text-green-500"
+                        onClick={async () => {
+                            if (!await confirm({title: "Are you sure you want to export search results to JSON?", confirmButtonColor: "success"})) {
+                                return
+                            }
+                            const canonicalUrls = onGetSearchResultUrls()
+                            setCargoMenuElement(null)
+                            downloadCanonicalUrls("add-ons", canonicalUrls)
+                            onCreateAlert("success", "Exported add-ons")
+                        }}
+                    >
+                        <span className="mr-3">
+                            <FontAwesomeIcon icon={faMagnifyingGlass}/>
+                        </span>
+
+                        {"Search results to JSON"}
+                    </MenuItem>
+
+                    <MenuItem
                         className="hover:text-red-500"
                         onClick={async () => {
                             if (!await confirm({title: "Are you sure you want to uninstall this app?", confirmButtonColor: "error"})) {
@@ -130,9 +184,9 @@ export const FileSystemBreadcrumbs = ({
                 <FontAwesomeIcon icon={faAngleRight}/>
             </span>
             <button
-                className="hover:bg-gray-900 p-1 px-2 rounded animate-pulse animate-fade-in-left"
+                className="hover:bg-gray-900 p-1 px-2 w-10 rounded animate-fade-in-left"
             >
-                {"Loading..."}
+                <Skeleton animation="wave"/>
             </button>
         </div> : <></>}
         
