@@ -10,7 +10,7 @@ import {faArrowLeft} from "@fortawesome/free-solid-svg-icons"
 import { ReactNode, useMemo, useRef, useState } from "react"
 import { useDebounce } from "../../hooks/debounce"
 import { isUrl } from "../../lib/utils/urls/isUrl"
-import {useAppShellContext} from "../../routes/store"
+import {useAppContext} from "../../routes/store"
 import LoadingIcon from "../LoadingIcon"
 import { UpdateCheckResponse } from "../../lib/shabah/updateCheckStatus"
 import {
@@ -83,7 +83,7 @@ export const Installer = ({
     onUpdateCargo
 }: InstallerProps): JSX.Element => {
     const urlCheck = useDebounce(1_000)
-    const {downloadClient, logger} = useAppShellContext()
+    const {downloadClient, logger} = useAppContext()
     const confirm = useGlobalConfirm()
     useCloseOnEscape(onClose)
 

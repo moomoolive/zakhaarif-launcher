@@ -13,7 +13,7 @@ import {
     faDownload,
     faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons"
-import { useAppShellContext } from "../../routes/store"
+import { useAppContext } from "../../routes/store"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import {isExtension, isInErrorState, isStandardCargo} from "../../lib/utils/cargos"
 import type {CargoDirectory, RootDirectoryPath} from "./CargoFileSystem"
@@ -56,7 +56,7 @@ export const FileSystemBreadcrumbs = ({
     onCreateAlert,
     onGetSearchResultUrls
 }: FileSystemBreadcrumbsProps): JSX.Element => {
-    const {downloadClient, logger, database} = useAppShellContext()
+    const {downloadClient, logger, database} = useAppContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
 

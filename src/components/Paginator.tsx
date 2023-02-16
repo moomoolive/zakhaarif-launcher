@@ -1,5 +1,5 @@
 import { ReactNode, useRef, useEffect } from "react"
-import { useAppShellContext } from "../routes/store"
+import { useAppContext } from "../routes/store"
 
 export type PaginatorProps = {
     id: string
@@ -16,7 +16,7 @@ export const Paginator = ({
     threshold = [0.8],
     className = ""
 }: PaginatorProps): JSX.Element => {
-    const {logger} = useAppShellContext()
+    const {logger} = useAppContext()
 
     const paginatorObserver = useRef<IntersectionObserver | null>(null)
 

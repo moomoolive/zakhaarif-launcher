@@ -25,7 +25,7 @@ import {
     faFolder,
 } from "@fortawesome/free-solid-svg-icons"
 import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {io} from "../lib/monads/result"
 import {Shabah, CargoIndex} from "../lib/shabah/downloadClient"
 import {Cargo} from "../lib/cargo/index"
@@ -151,8 +151,8 @@ const CARGO_FILTERS = [
 ] as const
 
 const AddOns = (): JSX.Element => {
-    const app = useAppShellContext()
-    const {downloadClient, database, logger} = useAppShellContext()
+    const app = useAppContext()
+    const {downloadClient, database, logger} = useAppContext()
     const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
     const textSearchDelay = useDebounce(300)

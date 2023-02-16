@@ -12,7 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {Link, useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import type {CargoIndex} from "../lib/shabah/downloadClient"
@@ -27,7 +27,7 @@ import { STANDARD_CARGOS } from "../standardCargos"
 const NewGamePage = () => {
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
-    const {database, logger} = useAppShellContext()
+    const {database, logger} = useAppContext()
 
     const [gameName, setGameName] = useState(`unnamed-${(Math.trunc(Math.random() * 99_999)).toString()}`)
     const [showModLinker, setShowModLinker] = useState(false)

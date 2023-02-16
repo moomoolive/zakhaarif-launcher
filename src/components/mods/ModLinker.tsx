@@ -19,7 +19,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {Link, useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
-import {useAppShellContext} from "../../routes/store"
+import {useAppContext} from "../../routes/store"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_CARGOS} from "../../standardCargos"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
@@ -117,7 +117,7 @@ export const ModLinker = ({
     linkedMods,
     setLinkedMods
 }: ModLinkerProps) => {
-    const {database} = useAppShellContext()
+    const {database} = useAppContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
     useCloseOnEscape(onClose)

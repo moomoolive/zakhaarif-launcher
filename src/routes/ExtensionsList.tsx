@@ -1,4 +1,4 @@
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {CargoIndex} from "../lib/shabah/downloadClient"
 import { useEffect, useMemo, useState, useRef } from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
@@ -68,7 +68,7 @@ const extensionTilesSkeleton = <div
 const PAGE_LIMIT = 32
 
 const ExtensionsListPage = (): JSX.Element => {
-    const {database} = useAppShellContext()
+    const {database} = useAppContext()
     const textSearchDelay = useDebounce(300)
 
     const [loading, setLoading] = useState(true)

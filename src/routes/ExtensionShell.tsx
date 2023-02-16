@@ -6,7 +6,7 @@ import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
@@ -28,7 +28,7 @@ const NO_EXTENSION_URL = ""
 const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
-    const {downloadClient, sandboxInitializePromise, database} = useAppShellContext()
+    const {downloadClient, sandboxInitializePromise, database} = useAppContext()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()

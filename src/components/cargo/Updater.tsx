@@ -6,7 +6,7 @@ import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
 import { useRef, useState, ReactNode } from "react"
 import { UpdateCheckResponse } from "../../lib/shabah/updateCheckStatus"
 import { useEffectAsync } from "../../hooks/effectAsync"
-import { useAppShellContext } from "../../routes/store"
+import { useAppContext } from "../../routes/store"
 import LoadingIcon from "../LoadingIcon"
 import {cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
 import { sleep } from "../../lib/utils/sleep"
@@ -52,7 +52,7 @@ export const CargoUpdater = ({
     createAlert,
     onUpdateCargo
 }: CargoUpdaterProps): JSX.Element => {
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient} = useAppContext()
     const confirm = useGlobalConfirm()
     useCloseOnEscape(onClose)
 

@@ -705,4 +705,11 @@ export class Shabah {
         }
         return STATUS_CODES.messagesConsumed
     }
+
+    async askToPersist(): Promise<boolean> {
+        if (await this.fileCache.isPersisted()) {
+            return false
+        }
+        return this.fileCache.requestPersistence()
+    }
 }

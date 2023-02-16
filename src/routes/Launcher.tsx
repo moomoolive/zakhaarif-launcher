@@ -20,17 +20,17 @@ import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import {Shabah} from "../lib/shabah/downloadClient"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {STANDARD_CARGOS} from "../standardCargos"
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {useNavigate} from "react-router-dom"
-import {APP_LAUNCHED} from "../lib/utils/localStorageKeys"
+import {APP_LAUNCHED, ASKED_TO_PERSIST} from "../lib/utils/localStorageKeys"
 import { useEffectAsync } from '../hooks/effectAsync'
 import LoadingIcon from '../components/LoadingIcon'
 import { UpdateCheckResponse } from '../lib/shabah/updateCheckStatus'
 import { sleep } from '../lib/utils/sleep'
-import { ABORTED, CACHED, FAILED, UPDATING } from '../lib/shabah/backend'
+import { ABORTED, FAILED, UPDATING } from '../lib/shabah/backend'
 
 const UnsupportedFeatures = (): JSX.Element => {
-  const {browserFeatures} = useAppShellContext()
+  const {browserFeatures} = useAppContext()
 
   const [showFeatureDetails, setShowFeatureDetails] = useState(false)
 
@@ -133,7 +133,7 @@ type LauncherState = (
 
 const LauncherRoot = (): JSX.Element => {
   const confirm = useGlobalConfirm()
-  const app = useAppShellContext()
+  const app = useAppContext()
   const {setTerminalVisibility, downloadClient} = app
   const navigate = useNavigate()
 
@@ -294,6 +294,15 @@ const LauncherRoot = (): JSX.Element => {
     setProgressMsg("Updating...")
     document.title = "Updating..."
     setCurrentAppVersion(launcher.versions().old)
+    
+    if (
+      import.meta.env.PROD
+      && !window.localStorage.getItem(ASKED_TO_PERSIST)
+    ) {
+      await downloadClient.askToPersist()
+      window.localStorage.setItem(ASKED_TO_PERSIST, "true")
+      return
+    }
   }
 
   useEffect(() => {

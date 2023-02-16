@@ -13,7 +13,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {Button, Tooltip} from "@mui/material"
 import { useGlobalConfirm } from "../hooks/globalConfirm"
 import { ModLinker } from "../components/mods/ModLinker"
-import { useAppShellContext } from "./store"
+import { useAppContext } from "./store"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
 import { ASCENDING_ORDER, DESCENDING_ORDER, FilterChevron, FilterOrder } from "../components/FilterChevron"
@@ -26,7 +26,7 @@ const DO_NOT_SHOW_LINKER = -1
 const SAVE_FILTERS = ["updatedAt", "name", "type"] as const
 
 const LoadGamePage = () => {
-    const {downloadClient, database} = useAppShellContext()
+    const {database} = useAppContext()
     const confirm = useGlobalConfirm()
     const navigate = useNavigate()
 

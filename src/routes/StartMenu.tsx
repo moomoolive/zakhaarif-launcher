@@ -7,11 +7,11 @@ import { faAngleDown, faAngleUp } from "@fortawesome/free-solid-svg-icons"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAsyncState} from "../hooks/promise"
 import {STANDARD_CARGOS} from "../standardCargos"
-import { useAppShellContext } from "./store"
+import { useAppContext } from "./store"
 import { CACHED } from "../lib/shabah/backend"
 
 const StartMenuPage = () => {
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient} = useAppContext()
     const [gameMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
 
     const [expandSettings, setExpandSettings] = useState(false)

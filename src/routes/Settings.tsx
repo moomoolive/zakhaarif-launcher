@@ -1,6 +1,6 @@
 import {ReactNode, useEffect, useState, useRef} from "react"
 import {useNavigate, Link} from "react-router-dom"
-import {useAppShellContext} from "./store"
+import {useAppContext} from "./store"
 import {useAsyncState} from "../hooks/promise"
 import {STANDARD_CARGOS} from "../standardCargos"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
@@ -317,7 +317,7 @@ const SubPageList = {
     },
     developerOptions: () => {
         const confirm = useGlobalConfirm()
-        const {logger} = useAppShellContext()
+        const {logger} = useAppContext()
         
         const [unsafePermissions, setUnsafePermissions] = useState(
             !!localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
@@ -414,7 +414,7 @@ type SettingsTab = keyof typeof SubPageList | "none"
 
 const SettingsPage = (): JSX.Element => {
     const navigate = useNavigate()
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient} = useAppContext()
     const [searchParams, setSearchParams] = useSearchParams()
 
     const {current: setSubpage} = useRef((key: SettingsTab) => {

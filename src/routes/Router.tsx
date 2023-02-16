@@ -7,7 +7,7 @@ import {
 import {useState, useEffect, useRef} from "react"
 import {lazyComponent, LazyComponentOptions, LazyComponent} from "../components/Lazy"
 import {AppStore} from "../lib/utils/initAppStore"
-import {AppShellContext, useAppShellContext} from "./store"
+import {AppShellContext, useAppContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
 import MadeWith from "./MadeWith"
@@ -38,7 +38,7 @@ const fadeIn = 1
 
 const PageDisplay = () => {
     const location = useLocation()
-    const appContext = useAppShellContext()
+    const appContext = useAppContext()
 
     const [displayLocation, setDisplayLocation] = useState(location)
     const [transitionStage, setTransitionStage] = useState(fadeIn)

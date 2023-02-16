@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {faFile, faFolder, faFolderTree, faPuzzlePiece} from "@fortawesome/free-solid-svg-icons"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import {urlToMime, Mime} from "../../lib/miniMime"
-import {useAppShellContext} from "../../routes/store"
+import {useAppContext} from "../../routes/store"
 import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
@@ -178,7 +178,7 @@ export const CargoFileSystem = ({
     mutateDirectoryPath
 }: CargoFileSystemProps): JSX.Element => {
     const confirm = useGlobalConfirm()
-    const {downloadClient} = useAppShellContext()
+    const {downloadClient} = useAppContext()
     const createFileSystemDelay = useDebounce(700)
 
     const [creatingFileSystem, setCreatingFileSystem] = useState(true)
