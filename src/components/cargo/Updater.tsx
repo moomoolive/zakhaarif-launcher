@@ -52,7 +52,7 @@ export const CargoUpdater = ({
     createAlert,
     onUpdateCargo
 }: CargoUpdaterProps): JSX.Element => {
-    const {downloadClient} = useAppContext()
+    const {downloadClient, logger} = useAppContext()
     const confirm = useGlobalConfirm()
     useCloseOnEscape(onClose)
 
@@ -76,7 +76,7 @@ export const CargoUpdater = ({
             downloadClient.checkForUpdates({tag, canonicalUrl}),
             sleep(1_000)
         ] as const)
-        console.log(updateResponse)
+        logger.info("raw update response", updateResponse)
         if (updateResponse.status === Shabah.STATUS.manifestIsUpToDate) {
             setFetchingUpdate(false)
             setUpdaterState("up-to-date")
@@ -114,7 +114,7 @@ export const CargoUpdater = ({
             && canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
-            console.warn(`prevented unsafe cargo from being updated. Url=${canonicalUrl}`)
+            logger.warn(`prevented unsafe cargo from being updated. Url=${canonicalUrl}`)
             return endWithError(cargoErrorToText("catch-all-error"))
         }
         setCargoUpdateResponse({

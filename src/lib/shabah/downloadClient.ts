@@ -63,6 +63,7 @@ export type ShabahConfig = {
     },
     messageConsumer: DownloadClientMessageConsumer
     indexStorage: DownloadClientCargoIndexStorage
+    virtualFileCache?: FileCache
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
@@ -83,6 +84,7 @@ export class Shabah {
     private downloadManager: DownloadManager
     private messageConsumer: DownloadClientMessageConsumer
     private indexStorage: DownloadClientCargoIndexStorage
+    private virtualFileCache: FileCache
 
     private downloadIndicesCache: null | DownloadIndexCollection
     private permissionsCleaner: null | (
@@ -94,7 +96,8 @@ export class Shabah {
         origin, 
         permissionsCleaner,
         messageConsumer,
-        indexStorage
+        indexStorage,
+        virtualFileCache
     }: ShabahConfig) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
@@ -105,6 +108,7 @@ export class Shabah {
         this.indexStorage = indexStorage
         this.networkRequest = networkRequest
         this.fileCache = fileCache
+        this.virtualFileCache = virtualFileCache || fileCache
         this.downloadManager = downloadManager
         this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
         this.downloadIndicesCache = null
@@ -311,7 +315,6 @@ export class Shabah {
         canonicalUrls: string[],
         title: string
     ): Promise<Ok<StatusCode>> {
-
         if (canonicalUrls.length < 1) {
             return io.ok(STATUS_CODES.zeroUpdatesProvided)
         }
@@ -330,7 +333,7 @@ export class Shabah {
             }
             const {resolvedUrl} = cargoMeta
             const errDownloadIndexRes = await getErrorDownloadIndex(
-                resolvedUrl, this.fileCache
+                resolvedUrl, this.virtualFileCache
             )
             if (!errDownloadIndexRes) {
                 return io.ok(STATUS_CODES.errorIndexNotFound)
@@ -382,7 +385,7 @@ export class Shabah {
         const self = this
         await Promise.all([
             this.persistDownloadIndices(downloadsIndex),
-            ...removeFileUrls.map((url) => self.fileCache.deleteFile(url))
+            ...removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url))
         ])
         await this.downloadManager.queueDownload(
             downloadQueueId,
@@ -416,8 +419,12 @@ export class Shabah {
         return io.ok(STATUS_CODES.cached)
     }
 
-    uninstallAllAssets() {
-        return this.fileCache.deleteAllFiles()
+    uninstallAllAssets(): Promise<unknown> {
+        return Promise.all([
+            this.fileCache.deleteAllFiles(),
+            this.virtualFileCache.deleteAllFiles(),
+            this.messageConsumer.deleteAllMessages()
+        ] as const)
     }
 
     async getCargoAtUrl(canonicalUrl: string) {
@@ -517,36 +524,21 @@ export class Shabah {
         ) {
             promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
         }
+
+        const errorDownloadIndex = await getErrorDownloadIndex(cargoIndex.resolvedUrl, this.virtualFileCache)
+        if (errorDownloadIndex) {
+            promises.push(
+                this.virtualFileCache.deleteFile(errorDownloadIndex.url)
+            )
+        }
         await Promise.all(promises)
+        
         return io.ok(await this.deleteCargoIndex(cargoIndex.canonicalUrl))
     }
 
-    // cargo index interfaces
     async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<CargoIndex | null> {
         return await this.indexStorage.getIndex(canonicalUrl)
     }
-
-    /*
-    private async refreshCargoIndices() {
-        const {origin, fileCache} = this
-        const cargos = await getCargoIndices(origin, fileCache)
-        this.cargoIndicesCache = cargos
-        return cargos
-    }
-
-    async getCargoIndices(): Promise<DeepReadonly<CargoIndices>> {
-        if (this.cargoIndicesCache) {
-            return this.cargoIndicesCache
-        }
-        return this.refreshCargoIndices()
-    }
-
-    private async persistCargoIndices(indices: CargoIndices) {
-        const {origin, fileCache} = this
-        return await saveCargoIndices(indices, origin, fileCache)
-
-    }
-    */
 
     async putCargoIndex(newIndex: CargoIndexWithoutMeta): Promise<StatusCode> {
         const previousIndex = await this.indexStorage.getIndex(newIndex.canonicalUrl)
@@ -622,13 +614,13 @@ export class Shabah {
     }
 
     private async persistDownloadIndices(indices: DownloadIndexCollection) {
-        const {origin, fileCache} = this
-        return await saveDownloadIndices(indices, origin, fileCache)
+        const {origin, virtualFileCache} = this
+        return await saveDownloadIndices(indices, origin, virtualFileCache)
     }
 
     private async refreshDownloadIndicies() {
-        const {origin, fileCache} = this
-        const indices = await getDownloadIndices(origin, fileCache)
+        const {origin, virtualFileCache} = this
+        const indices = await getDownloadIndices(origin, virtualFileCache)
         this.downloadIndicesCache = indices
         return indices
     }

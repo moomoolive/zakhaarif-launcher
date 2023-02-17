@@ -54,7 +54,7 @@ export type DownloadManager = {
 
 export const removeSlashAtEnd = (str: string) => str.endsWith("/") ? str.slice(0, -1) : str
 
-export const downloadIncidesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__download-indices__.json`
+export const downloadIndicesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__download-indices__.json`
 
 export const cargoIndicesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__cargo-indices__.json`
 
@@ -157,7 +157,7 @@ export const getDownloadIndices = async (
     origin: string, 
     fileCache: FileCache
 ) => {
-    const url = downloadIncidesUrl(origin)
+    const url = downloadIndicesUrl(origin)
     const cacheRes = await fileCache.getFile(url)
     if (!cacheRes || !cacheRes.ok) {
         return emptyDownloadIndex()
@@ -217,7 +217,7 @@ export const saveDownloadIndices = async (
 ) => {
     indices.savedAt = Date.now()
     const text = JSON.stringify(indices)
-    const url = downloadIncidesUrl(origin)
+    const url = downloadIndicesUrl(origin)
     await cache.putFile(url, new Response(text, {
         status: 200,
         statusText: "OK",
@@ -250,6 +250,7 @@ export type DownloadClientMessage = {
 export type DownloadClientMessageConsumer = {
     getAllMessages: () => Promise<ReadonlyArray<DownloadClientMessage>>,
     deleteMessage: (message: DownloadClientMessage) => Promise<boolean> 
+    deleteAllMessages: () => Promise<boolean>
 }
 
 export const downloadClientMessageUrl = (message: DownloadClientMessage): string => {

@@ -1,4 +1,5 @@
 //import {main as start} from "./index"
+/*
 import type {MainScriptArguments} from "../lib/types/extensions"
 
 export const main = async (args: MainScriptArguments) => {
@@ -31,3 +32,5 @@ export const main = async (args: MainScriptArguments) => {
     //    messageAppShell("signalFatalError", authToken)
     //}, 10_000)
 }
+*/
+export {}

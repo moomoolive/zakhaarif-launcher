@@ -178,7 +178,7 @@ export const CargoFileSystem = ({
     mutateDirectoryPath
 }: CargoFileSystemProps): JSX.Element => {
     const confirm = useGlobalConfirm()
-    const {downloadClient} = useAppContext()
+    const {downloadClient, logger} = useAppContext()
     const createFileSystemDelay = useDebounce(700)
 
     const [creatingFileSystem, setCreatingFileSystem] = useState(true)
@@ -364,7 +364,7 @@ export const CargoFileSystem = ({
                     const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
                     const fileResponse = await downloadClient.getCachedFile(fullPath)
                     if (!fileResponse) {
-                        console.error(`file ${fullPath} was not found although it should be cached!`)
+                        logger.warn(`file ${fullPath} was not found although it should be cached!`)
                         await confirm({title: "Could not find file!"})
                         return
                     }

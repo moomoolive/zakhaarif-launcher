@@ -55,10 +55,40 @@ class MockCache {
     }
 }
 
+const createCache = (
+    cacheFiles: FileHandlers,
+    cacheQuota: {usage: number, quota: number}
+) => {
+    const innerFileCache = new MockCache(cacheFiles)
+    const fileCache: FileCache = {
+        getFile: async (url) => {
+            return innerFileCache.getFile(url) || null
+        },
+        putFile: async (url, response) => {
+            innerFileCache.putFile(url, response)
+            return true
+        },
+        queryUsage: async () => cacheQuota,
+        deleteFile: async (url) => {
+            innerFileCache.deleteFile(url)
+            return true
+        },
+        deleteAllFiles: async () => {
+            innerFileCache.deleteAll()
+            return true
+        },
+        listFiles: async () => [],
+        isPersisted: async () => true,
+        requestPersistence: async () => true
+    }
+    return [innerFileCache, fileCache] as const
+}
+
 const dependencies = ({
     cacheFiles = {} as FileHandlers,
     cacheQuota = {usage: 0, quota: 0},
     networkFiles = {} as FileHandlers,
+    createVirtualCache = false
 } = {}) => {
     
     const networkCache = new MockCache(networkFiles)
@@ -94,6 +124,8 @@ const dependencies = ({
         return redirectResponse
     }
 
+    const [innerFileCache, fileCache] = createCache(cacheFiles, cacheQuota)
+    /*
     const innerFileCache = new MockCache(cacheFiles)
     const fileCache: FileCache = {
         getFile: async (url) => {
@@ -116,6 +148,7 @@ const dependencies = ({
         isPersisted: async () => true,
         requestPersistence: async () => true
     }
+    */
 
     const downloadState = {
         queuedDownloads: [] as Array<{
@@ -180,6 +213,10 @@ const dependencies = ({
             }
             delete clientMessages[targetMessage.downloadId]
             return true
+        },
+        deleteAllMessages: async () => {
+            clientMessages = {}
+            return true
         }
     }
 
@@ -202,15 +239,18 @@ const dependencies = ({
         }
     }
 
+    const [innerVirtualCache, virtualFileCache] = createCache({}, cacheQuota) 
+
     return {
         adaptors: {networkRequest, fileCache, downloadManager},
-        caches: {networkCache, innerFileCache},
+        caches: {networkCache, innerFileCache, innerVirtualCache},
         downloadState,
         internalCargoStore: store,
         canceledDownloads,
         messageConsumer,
         clientMessages,
-        indexStorage
+        indexStorage,
+        virtualFileCache
     }
 }
 
@@ -219,7 +259,12 @@ export const createClient = (
     config?: Parameters<typeof dependencies>[0]
 ) => {
     const deps = dependencies(config)
-    const {adaptors, messageConsumer, indexStorage} = deps
+    const {
+        adaptors, 
+        messageConsumer, 
+        indexStorage,
+        virtualFileCache
+    } = deps
     return {
         ...deps, 
         client: new Shabah({
@@ -227,7 +272,8 @@ export const createClient = (
             adaptors, 
             permissionsCleaner: cleanPermissions,
             messageConsumer,
-            indexStorage
+            indexStorage,
+            ...(config?.createVirtualCache ? {virtualFileCache} : {})
         })
     }
 }

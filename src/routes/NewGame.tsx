@@ -130,17 +130,21 @@ const NewGamePage = () => {
                                 resolvedUrls: [] as string[],
                                 entryUrls: [] as string[],
                             })
-                            const commitSavePromise = database.gameSaves.create({
+                            const saveParams = {
                                 name: gameName,
                                 type: MANUAL_SAVE,
                                 mods,
                                 content: {}
-                            })
-                            console.log("database commit", commitSavePromise)
+                            } as const
+                            logger.info(
+                                "creating new save file with params", 
+                                saveParams
+                            )
                             const [{id: gameId}] = await Promise.all([
-                                commitSavePromise,
+                                database.gameSaves.create(saveParams),
                                 sleep(2_000)
-                            ] as const) 
+                            ] as const)
+                            logger.info("successfully created save!")
                             setLoading(false)
                             window.localStorage.setItem(SAVE_EXISTS, "1")
                             navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)

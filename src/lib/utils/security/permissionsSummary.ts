@@ -225,7 +225,9 @@ export const CSP_CONSTANT_POLICY = "object-src 'none';manifest-src 'none';base-u
 
 export const UNSAFE_INLINE_CSP = "'unsafe-inline'"
 export const UNSAFE_EVAL_CSP = "'unsafe-eval'"
-export const UNSAFE_DATA_URLS_CSP = "data:"
+export const ALLOW_DATA_URLS_CSP = "data:"
+export const ALLOW_BLOB_URLS_CSP = "blob:"
+export const UNSAFE_DATA_URLS_CSP = ALLOW_DATA_URLS_CSP
 export const UNSAFE_BLOBS_CSP = "blob:"
 export const ALLOW_ALL_ORIGINS_CSP = "*"
 export const SAME_ORIGIN_CSP_KEYWORD = "'self'"

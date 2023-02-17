@@ -22,16 +22,24 @@ const isTransferable = (data: unknown) => (
     && data?.__x_tdata__ === TDATA
 )
 
-type RpcAction = (data?: any) => any
+type RpcResponse<State extends object> = (
+    (() => any)
+    | ((param: any) => any)
+    | ((param: any, state: State) => any)
+)
 
-export type TerminalActions = {
-    readonly [key: string]: RpcAction
+type RpcOutboundAction = (
+    (() => any)
+    | ((param: any) => any)
+    | ((param: any, state: any) => any)
+)
+
+type TerminalOutboundActions = {
+    readonly [key: string]: RpcOutboundAction
 }
 
-export type TActions<T extends TerminalActions> = {
-    [key in keyof T]: T[key] extends (arg: infer Arg) => infer Return
-        ? (arg: Arg) => Return
-        : never
+export type TerminalActions<State extends object> = {
+    readonly [key: string]: RpcResponse<State>
 }
 
 type TransferableFunctionReturn<T> = T extends TransferableReturn<infer ValueType>
@@ -49,18 +57,18 @@ export type MessageContainer = {
     data: unknown
 }
 
+type TerminalActionTuples<
+    T extends TerminalOutboundActions
+> = {
+    [key in keyof T]: Parameters<T[key]> extends ([param: any] | [param: any, state: any])
+        ? Parameters<T[key]>[0] extends (null | undefined)
+            ? [] : [param: Parameters<T[key]>[0]]
+        : []
+}
+
 export const OUTBOUND_MESSAGE = -1
 export const ERROR_RESPONSE_HANDLE = "__x_rpc_error__"
 export const RESPONSE_HANDLE = "__x_rpc_response__"
-
-type RecipentRpc<RecipentActions extends TerminalActions> = {
-    [key in keyof RecipentActions]: Parameters<RecipentActions[key]>[0] extends undefined 
-        ? () => RpcReturn<ReturnType<RecipentActions[key]>>
-        : (
-            data: Parameters<RecipentActions[key]>[0],
-            transferables?: Transferable[]
-        ) => RpcReturn<ReturnType<RecipentActions[key]>>
-}
 
 export type MessagableEntity = {
     postMessage: (data: any, transferables: Transferable[]) => any
@@ -76,15 +84,19 @@ type MessageInterceptor = {
     ) => any
 }
 
-type RpcArguments = {
+type RpcArguments<State extends object> = {
     messageTarget: MessagableEntity
-    responses: TerminalActions,
+    responses: TerminalActions<State>,
     messageInterceptor: MessageInterceptor
+    state?: State
 }
 
 const emptyTransferArray = [] as Transferable[]
 
-export class wRpc<RecipentActions extends TerminalActions = {}> {
+export class wRpc<
+    RecipentActions extends TerminalOutboundActions = {},
+    State extends object = {},
+> {
     static transfer = transferData
 
     private idCount: number
@@ -93,16 +105,19 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         resolve: (data: any) => void
         reject: (reason: any) => void
     }>
-    private actionsIndex: Map<string, RpcAction>
+    private actionsIndex: Map<string, RpcResponse<State>>
     private messageContainer: MessageContainer
     private messageTarget: MessagableEntity
     private messageInterceptor: MessageInterceptor
+    private state: State
 
     constructor({
         responses,
         messageTarget,
         messageInterceptor,
-    }: RpcArguments) {
+        state = {} as State
+    }: RpcArguments<State>) {
+        this.state = state
         this.messageInterceptor = messageInterceptor
         this.messageTarget = messageTarget
         this.messageInterceptor.addEventListener("message", (event) => {
@@ -156,15 +171,22 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         ) as RpcReturn<ReturnType<RecipentActions[T]>>
     }
 
-    async execute<T extends keyof RecipentActions>(name: T & string): Promise<RpcReturn<ReturnType<RecipentActions[T]>>>
-    async execute<T extends keyof RecipentActions>(name: T & string, data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0], transferables?: Transferable[]): Promise<RpcReturn<ReturnType<RecipentActions[T]>>>
+    execute<T extends keyof RecipentActions>(
+        name: T & string,
+        ...args: TerminalActionTuples<RecipentActions>[T] extends [params: any]
+            ? (
+                [param: TerminalActionTuples<RecipentActions>[T][0]]
+                | [param: TerminalActionTuples<RecipentActions>[T][0], transferables: Transferable[]]
+            )
+            : []
+    ): Promise<RpcReturn<ReturnType<RecipentActions[T]>>>
     async execute<T extends keyof RecipentActions>(
-        name: T & string, 
-        data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0] = null, 
-        transferables: Transferable[] = emptyTransferArray
-    ) {
+        name: T & string,
+        param: null = null ,
+        transferables: Transferable[] = []
+    ): Promise<RpcReturn<ReturnType<RecipentActions[T]>>> {
         return await this.outboundMessage(
-            this.messageTarget, name, data, transferables
+            this.messageTarget, name, param, transferables
         ) as RpcReturn<ReturnType<RecipentActions[T]>>
     }
 
@@ -279,7 +301,7 @@ export class wRpc<RecipentActions extends TerminalActions = {}> {
         if (message.respondingTo === OUTBOUND_MESSAGE) {
             const handler = this.actionsIndex.get(message.handle)!
             try {
-                const data = await handler(message.data) ?? null
+                const data = await handler(message.data, this.state) ?? null
                 this.responseMessage(source, message.id, data)
             } catch (err) {
                 this.errorResponseMessage(

@@ -3,6 +3,7 @@ import {Cargo} from "../cargo"
 import { NO_INSTALLATION } from "./utility"
 import { DeepReadonly } from "../types/utility"
 import {readableByteCount} from "../utils/storage/friendlyBytes"
+import {debugStatusCode, DebugStatusName} from "./debug"
 
 type RawDiskMetadata = Readonly<{
     used: number
@@ -55,6 +56,7 @@ export class UpdateCheckResponse {
     readonly errors: ReadonlyArray<string>
     readonly previousCargo: DeepReadonly<Cargo> | null
     readonly status: StatusCode
+    readonly statusText: DebugStatusName
     readonly downloadableResources: ReadonlyArray<RequestableResource>
     readonly resourcesToDelete: ReadonlyArray<RequestableResource>
     
@@ -73,6 +75,7 @@ export class UpdateCheckResponse {
         this.resourcesToDelete = config.resourcesToDelete
         this.diskInfo = config.diskInfo
         this.status = config.status || STATUS_CODES.ok
+        this.statusText = debugStatusCode(this.status)
     }
 
     errorOccurred() {

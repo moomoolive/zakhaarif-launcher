@@ -1,28 +1,13 @@
 import {ALLOW_ALL_PERMISSIONS} from "../types/permissions"
-import {createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
+import {ALLOW_BLOB_URLS_CSP, ALLOW_DATA_URLS_CSP, createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
 import {wRpc} from "../wRpc/simple"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
-import {
-    essentialRpcs, 
-    embedAnyExtensionRpcs,
-    gameSaveRpcs,
-    RpcState,
-    SandboxDependencies,
-    createRpcState,
-    RpcPersistentState
-} from "./rpc"
+import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
 import type {CargoIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
+import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
 
-const createRpcFunctions = (state: RpcState) => {
-    return {
-        ...essentialRpcs(state),
-        ...embedAnyExtensionRpcs(state),
-        ...gameSaveRpcs(state)
-    } as const
-}
-
-export type SandboxFunctions = ReturnType<typeof createRpcFunctions>
+export type SandboxFunctions = AllRpcs
 
 class IframeArguments {
     attributes: {key: ("allow" | "sandbox"), value: string}[] = []
@@ -46,7 +31,7 @@ export class JsSandbox {
     private readonly originalPermissions: PermissionsSummary
     private reconfiguredPermissions: PermissionsSummary | null
     private initialized: boolean
-    private rpc: wRpc<SandboxFunctions>
+    private rpc: wRpc<{}, RpcState>
     
     readonly id: string
     readonly name: string
@@ -87,9 +72,10 @@ export class JsSandbox {
         this.rpc = this.createRpc(this.state)
     }
 
-    private createRpc(state: RpcState): wRpc<{}> {
+    private createRpc(state: RpcState): wRpc<{}, RpcState> {
         const self = this
         return new wRpc({
+            state,
             responses: createRpcFunctions(state),
             messageTarget: {
                 postMessage: (data, transferables) => {
@@ -161,7 +147,11 @@ export class JsSandbox {
             allowRequestsToHostOrigin: true,
             hostOrigin: currentOrigin + "/",
             cargoOrigin: this.state.cargoIndex.resolvedUrl,
-            workerSource: ["self"],
+            workerSource: [
+                "self",
+                ALLOW_BLOB_URLS_CSP,
+                ALLOW_DATA_URLS_CSP
+            ],
             iframeSource: ["none"]
         })
         return iframeArgs
@@ -209,7 +199,7 @@ export class JsSandbox {
         const callback = this.frameListener
         window.removeEventListener("message", callback)
         this.iframeElement.remove()
-        console.log(`cleaned up all resources associated with sandbox "${this.id}"`)
+        this.dependencies.logger.info(`cleaned up all resources associated with sandbox "${this.id}"`)
         return true
     }
 

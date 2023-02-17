@@ -25,6 +25,7 @@ export type ProgressUpdateRecord = {
 
 export type BackgroundFetchSuccessOptions = {
     fileCache: FileCache
+    virtualFileCache?: FileCache
     origin: string,
     log: (...msgs: any[]) => void
     type: BackgroundFetchEventName
@@ -46,13 +47,16 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         messageDownloadClient
     } = options
     const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
+    const virtualFileCache = options.virtualFileCache || fileCache
     return async (
         event: BackgroundFetchHandlerEvent
     ) => {
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
         const downloadQueueId = bgfetch.id
-        const downloadIndices = await getDownloadIndices(origin, fileCache)
+        const downloadIndices = await getDownloadIndices(
+            origin, virtualFileCache
+        )
         const downloadIndexPosition = downloadIndices.downloads.findIndex(
             (index) => index.id === downloadQueueId
         )
@@ -255,7 +259,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             await saveErrorDownloadIndex(
                 targetUrl,
                 errorDownloadIndex,
-                fileCache
+                virtualFileCache
             )
             log(eventName, "successfully saved error log")
         }
@@ -280,7 +284,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         )
         
         removeDownloadIndex(downloadIndices, downloadQueueId)
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
+        await saveDownloadIndices(downloadIndices, origin, virtualFileCache)
         log(eventName, "successfully persisted changes")
         // "abort" does not have update-ui
         // https://developer.chrome.com/blog/background-fetch/#service-worker-events

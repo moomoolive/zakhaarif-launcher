@@ -148,10 +148,9 @@ export class CargoIndexes {
         return orderedQuery.sortBy(sort)
     }
 
-    async getAllCanonicalUrls(): Promise<string[]> {
-        const start = Date.now()
-        const result = await this.db.appCargoIndexes.toCollection().primaryKeys()
-        console.log("primary key operation took", Date.now() - start)
-        return result
+    getAllCanonicalUrls(): Promise<string[]> {
+        return this.db.appCargoIndexes
+            .toCollection()
+            .primaryKeys()
     }
 }

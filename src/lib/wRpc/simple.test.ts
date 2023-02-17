@@ -92,8 +92,8 @@ describe("terminal communication", () => {
 
     it("transferable objects should not be passed to executing function", async () => {
         const terminalOneActions = {
+            ping: () => true,
             doCoolStuff: (...args: [ArrayBuffer]) => {
-                expect(args.length).toBe(1)
                 const [data] = args
                 expect(data).toBeInstanceOf(ArrayBuffer)
                 return wRpc.transfer(data, [data])

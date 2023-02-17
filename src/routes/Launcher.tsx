@@ -134,7 +134,7 @@ type LauncherState = (
 const LauncherRoot = (): JSX.Element => {
   const confirm = useGlobalConfirm()
   const app = useAppContext()
-  const {setTerminalVisibility, downloadClient} = app
+  const {setTerminalVisibility, downloadClient, logger} = app
   const navigate = useNavigate()
 
   const [progressMsg, setProgressMsg] = useState("")
@@ -207,10 +207,11 @@ const LauncherRoot = (): JSX.Element => {
     // update ui should take a least a second
     const [updates] = await Promise.all([updateCheck, sleep(1_000)] as const)
     const [launcher, gameExtension, standardMod] = updates 
-    console.log(
-      "launcher", launcher,
-      "game-extension", gameExtension,
-      "std-mod", standardMod
+    
+    logger.info(
+      "launcher update response", launcher,
+      "game-extension update response", gameExtension,
+      "std-mod update response", standardMod
     )
 
     const updatesAvailable = updates.filter((update) => update.updateAvailable())
@@ -221,11 +222,11 @@ const LauncherRoot = (): JSX.Element => {
     const errorOccurred = errors.length > 0
     const updateAvailable = updatesAvailable.length > 0
 
-    console.log(
-      "updates available", updateAvailable,
-      "errors", errorOccurred,
-      "previous exists", previousVersionsExist,
-      "enough space", enoughStorage
+    logger.info(
+      "updates_available =", updateAvailable,
+      "error_occurred =", errorOccurred,
+      "installation_exists =", previousVersionsExist,
+      "enough_space =", enoughStorage
     )
 
     if (errorOccurred && previousVersionsExist) {
@@ -267,7 +268,7 @@ const LauncherRoot = (): JSX.Element => {
       "game core",
     )
 
-    console.log("queue response", queueResponse)
+    logger.info("queue response", queueResponse)
 
     if (queueResponse.data === Shabah.STATUS.noDownloadbleResources) {
       setProgressMsg("Installing...")
@@ -356,11 +357,11 @@ const LauncherRoot = (): JSX.Element => {
       (cargo) => cargo?.state === ABORTED || cargo?.state === FAILED
     )
 
-    console.log(
-      "from init",
-      "not installed", notInstalled,
-      "error", errorOccurred,
-      "updating", isUpdating
+    logger.info(
+      "standard cargo statuses:",
+      "not_installed =", notInstalled,
+      "error =", errorOccurred,
+      "updating =", isUpdating
     )
 
     if (!launcherStatus || notInstalled) {
@@ -442,10 +443,11 @@ const LauncherRoot = (): JSX.Element => {
                       Terminal
                     </div>
                   </MenuItem>
-
-                  <MenuItem 
+                  
+                  {/**
+                   * <MenuItem 
                     onClick={() => {
-                        console.log("bookmark", pwaInstallPrompt)
+                        
                     }}
                     className="hover:text-green-500"
                   >
@@ -458,6 +460,8 @@ const LauncherRoot = (): JSX.Element => {
                       Create Desktop Link
                     </div>
                   </MenuItem>
+                   */}
+                  
 
                   <MenuItem 
                     className="hover:text-yellow-500"

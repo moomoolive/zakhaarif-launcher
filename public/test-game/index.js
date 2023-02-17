@@ -6,9 +6,8 @@ export const main = async (args) => {
     console.info("[GAME LOADED] 😭 game loaded... with args =", args)
     const {messageAppShell, initialState} = args
     const {queryState, authToken, recommendedStyleSheetUrl} = initialState
-    const gameId = parseInt(
-        queryState.length < 1 ? "-1" : queryState, 10
-    )
+    const inputId = queryState.length < 1 ? "-1" : queryState
+    const gameId = parseInt(inputId, 10)
     if (isNaN(gameId)) {
         console.error("inputted game id is not a number. game_id =", queryState)
         messageAppShell("signalFatalError", authToken)
@@ -47,6 +46,15 @@ export const main = async (args) => {
         importUrls.push(resolved + entry)
     }
     await Promise.all(importUrls.map((url) => import(url)))
+    console.info("creating worker")
+    
+    const file = await fetch(new URL("./worker.js", import.meta.url))
+    const blobUrl = URL.createObjectURL(await file.blob())
+    const worker = new Worker(blobUrl, {
+        type: "module",
+        name: "test-worker"
+    })
+    worker.postMessage("hello there")
     const res = await messageAppShell("readyForDisplay")
     console.info("controller res", res)
 }

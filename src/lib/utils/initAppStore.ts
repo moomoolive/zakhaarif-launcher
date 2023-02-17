@@ -10,6 +10,7 @@ import { AppDatabase } from "../database/AppDatabase"
 import { DownloadClientMessage, downloadClientMessageUrl } from "../shabah/backend"
 import {FEATURE_CHECK} from "./featureCheck"
 import {VERBOSE_LAUNCHER_LOGS} from "./localStorageKeys"
+import { Logger } from "../types/app"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener
@@ -20,7 +21,7 @@ type AppLoggerConfig = {
     name: string
 }
 
-export class AppLogger {
+export class AppLogger implements Logger {
     silent: boolean
     name: string
 
@@ -32,6 +33,10 @@ export class AppLogger {
 
     private prefix() {
         return `[${this.name}]`
+    }
+
+    isSilent(): boolean {
+        return this.silent
     }
 
     info(...messages: unknown[]): void {
@@ -81,7 +86,7 @@ export class AppStore {
     constructor(config: AppStoreConfig) {
         const verboseLogs = localStorage.getItem(VERBOSE_LAUNCHER_LOGS)
         this.logger = new AppLogger({
-            name: `🐢 App Shell`,
+            name: `🐬 App Daemon`,
             silent: verboseLogs === null
                 ? !import.meta.env.DEV
                 : verboseLogs !== "true"
@@ -119,7 +124,8 @@ export class AppStore {
                     const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
                     targetCache.delete(downloadClientMessageUrl(message))
                     return true
-                }
+                },
+                deleteAllMessages: async () => caches.delete(DOWNLOAD_CLIENT_QUEUE)
             }
         })
         

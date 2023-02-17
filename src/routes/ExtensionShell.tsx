@@ -28,7 +28,12 @@ const NO_EXTENSION_URL = ""
 const IFRAME_CONTAINER_ID = "extension-iframe-container"
 
 const ExtensionShellPage = () => {
-    const {downloadClient, sandboxInitializePromise, database} = useAppContext()
+    const {
+        downloadClient, 
+        sandboxInitializePromise, 
+        database,
+        logger
+    } = useAppContext()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const confirm = useGlobalConfirm()
@@ -88,7 +93,7 @@ const ExtensionShellPage = () => {
         const canonicalUrl = decodeURIComponent(url)
 
         if (canonicalUrl.length < 1) {
-            console.warn(`a query parameter "entry" must be included in url to run an extension.`)
+            logger.warn(`a query parameter "entry" must be included in url to run an extension.`)
             setLoading(false)
             setError(true)
             setErrorMessage("Files Not Found")
@@ -99,7 +104,7 @@ const ExtensionShellPage = () => {
             canonicalUrl
         )
         if (!meta) {
-            console.warn(`extension "${canonicalUrl}" doesn't exist.`)
+            logger.warn(`extension "${canonicalUrl}" doesn't exist.`)
             setLoading(false)
             setError(true)
             setErrorMessage("Files Not Found")
@@ -110,7 +115,7 @@ const ExtensionShellPage = () => {
             setLoading(false)
             setError(true)
             setErrorMessage("Invalid File")
-            console.warn(`Prevented extension "${canonicalUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
+            logger.warn(`Prevented extension "${canonicalUrl}" from running because extension is not in cached on disk (current_state=${meta.state})`)
             return
         }
 
@@ -128,7 +133,7 @@ const ExtensionShellPage = () => {
 
         setError(true)
         setErrorMessage("Files Not Found")
-        console.error("extension exists in index, but was not found")
+        logger.error("extension exists in index, but was not found")
         setLoading(false)
     }, [])
 
@@ -140,7 +145,7 @@ const ExtensionShellPage = () => {
         if (!extensionFrameContainer) {
             setError(true)
             setErrorMessage("Fatal Error Occurred")
-            console.error("couldn't find extension container")
+            logger.error("couldn't find extension container")
             setLoading(false)
             return
         }
@@ -149,7 +154,7 @@ const ExtensionShellPage = () => {
             ? !!(document.getElementById(sandboxElement.domElement().id))
             : false
         if (sandboxAlreadyLoaded) {
-            console.warn("Sandbox refused to load because another extension sandbox already exists")
+            logger.warn("Sandbox refused to load because another extension sandbox already exists")
             return
         }
         const unsafeCargosDisallowed = !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
@@ -161,10 +166,11 @@ const ExtensionShellPage = () => {
             && hasUnsafePermissions(permissionsSummary)
             && extensionCargoIndex.current.canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
         )
+
         if (isUnsafe) {
             setError(true)
             setErrorMessage("Fatal Error Occurred")
-            console.error("[UNSAFE]: Blocked unsafe cargo from starting")
+            logger.error("Blocked UNSAFE cargo from starting")
             return
         }
 
@@ -174,6 +180,8 @@ const ExtensionShellPage = () => {
             name: `${extensionCargo.current.name}-sandbox`,
             downloadClient,
             dependencies: {
+                logger,
+                origin: window.location.origin,
                 displayExtensionFrame: () => {
                     setLoading(false)
                 },
