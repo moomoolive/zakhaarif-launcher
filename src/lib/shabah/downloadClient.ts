@@ -8,21 +8,15 @@ import {
 import {io, Ok} from "../monads/result"
 import {
     CargoIndexWithoutMeta,
-    DownloadIndexCollection,
-    saveDownloadIndices,
     headers,
     FetchFunction,
-    getDownloadIndices,
-    updateDownloadIndex,
     FileCache,
-    stringBytes,
     DownloadManager,
     serviceWorkerPolicies,
     DownloadState,
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
     DownloadIndex,
-    removeDownloadIndex,
     NO_UPDATE_QUEUED,
     DownloadSegment,
     removeSlashAtEnd,
@@ -30,9 +24,10 @@ import {
     UPDATING,
     ABORTED,
     FAILED,
-    DownloadClientMessageConsumer,
+    ClientMessageChannel,
     DownloadClientCargoIndexStorage,
-    CargoIndex
+    CargoIndex,
+    BackendMessageChannel
 } from "./backend"
 import {BYTES_PER_MB} from "../utils/consts/storage"
 import {NULL_FIELD} from "../cargo/index"
@@ -44,6 +39,7 @@ import { NO_INSTALLATION } from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
 import { nanoid } from "nanoid"
 import { getFileNameFromUrl } from "../utils/urls/getFilenameFromUrl"
+import {stringBytes} from "../utils/stringBytes"
 
 export type {CargoIndex, CargoState} from "./backend"
 
@@ -60,10 +56,11 @@ export type ShabahConfig = {
         fileCache: FileCache
         networkRequest: FetchFunction
         downloadManager: DownloadManager
+        virtualFileCache: FileCache
     },
-    messageConsumer: DownloadClientMessageConsumer
+    clientMessageChannel: ClientMessageChannel
+    backendMessageChannel: BackendMessageChannel
     indexStorage: DownloadClientCargoIndexStorage
-    virtualFileCache?: FileCache
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
@@ -81,12 +78,11 @@ export class Shabah {
 
     private networkRequest: FetchFunction
     private fileCache: FileCache
-    private downloadManager: DownloadManager
-    private messageConsumer: DownloadClientMessageConsumer
-    private indexStorage: DownloadClientCargoIndexStorage
     private virtualFileCache: FileCache
-
-    private downloadIndicesCache: null | DownloadIndexCollection
+    private downloadManager: DownloadManager
+    private clientMessageChannel: ClientMessageChannel
+    private backendMessageChannel: BackendMessageChannel
+    private indexStorage: DownloadClientCargoIndexStorage
     private permissionsCleaner: null | (
         (permissions: GeneralPermissions) => GeneralPermissions
     )
@@ -95,31 +91,38 @@ export class Shabah {
         adaptors, 
         origin, 
         permissionsCleaner,
-        messageConsumer,
+        clientMessageChannel,
         indexStorage,
-        virtualFileCache
+        backendMessageChannel
     }: ShabahConfig) {
         if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
             throw new Error("origin of download client must be full url, starting with https:// or http://")
         }
-        const {networkRequest, fileCache, downloadManager} = adaptors
+        const {
+            networkRequest, fileCache, 
+            downloadManager, virtualFileCache
+        } = adaptors
         this.permissionsCleaner = permissionsCleaner || null
-        this.messageConsumer = messageConsumer
+        this.clientMessageChannel = clientMessageChannel
         this.indexStorage = indexStorage
         this.networkRequest = networkRequest
         this.fileCache = fileCache
-        this.virtualFileCache = virtualFileCache || fileCache
+        this.virtualFileCache = virtualFileCache
         this.downloadManager = downloadManager
         this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
-        this.downloadIndicesCache = null
+        this.backendMessageChannel = backendMessageChannel
     }
 
     async diskInfo() {
         const [diskusage, downloadIndices] = await Promise.all([
             this.fileCache.queryUsage(),
-            this.getDownloadIndices()
+            this.backendMessageChannel.getAllMessages()
         ] as const)
-        const used = diskusage.usage + downloadIndices.totalBytes
+        const currentDownloadBytes = downloadIndices.reduce(
+            (total, next) => total + next.bytes,
+            0
+        )
+        const used = diskusage.usage + currentDownloadBytes
         const total = Math.max(
             diskusage.quota - SYSTEM_RESERVED_BYTES,
             0
@@ -135,9 +138,12 @@ export class Shabah {
         const cargoIndex = await this.getCargoIndexByCanonicalUrl(
             cargo.canonicalUrl
         )
+        const oldResolvedUrl = cargoIndex?.resolvedUrl || ""
+        const oldManifestName = cargoIndex?.manifestName || ""
         const response = await checkForUpdates({
             canonicalUrl: cargo.canonicalUrl,
-            oldResolvedUrl: cargoIndex?.resolvedUrl || "",
+            oldResolvedUrl,
+            oldManifestName
         }, this.networkRequest, this.fileCache)
         
         if (response.newCargo && this.permissionsCleaner) {
@@ -148,7 +154,7 @@ export class Shabah {
         return new UpdateCheckResponse({
             status: response.code,
             tag: cargo.tag,
-            originalResolvedUrl: cargoIndex?.resolvedUrl || "",
+            originalResolvedUrl: oldResolvedUrl,
             resolvedUrl: response.newCargo?.resolvedUrl || "",
             canonicalUrl: cargo.canonicalUrl,
             errors: response.errors,
@@ -158,6 +164,8 @@ export class Shabah {
             downloadableResources: response.downloadableResources,
             resourcesToDelete: response.resoucesToDelete,
             diskInfo: await this.diskInfo(),
+            manifestName: response.manifestName,
+            oldManifestName
         })
     }
 
@@ -212,8 +220,8 @@ export class Shabah {
         }        
         
         let byteCount = 0
-        const filesToRequest = []
-        const filesToDelete = []
+        const filesToRequest: string[] = []
+        const filesToDelete: string[] = []
         for (const update of updates) {
             byteCount += update.downloadMetadata().bytesToDownload
             
@@ -232,16 +240,17 @@ export class Shabah {
         const downloadQueueId = resourcesToRequest 
             ? provisionDownloadId() 
             : NO_UPDATE_QUEUED
-        const downloadIndex = {
+        const downloadIndex: DownloadIndex = {
             id: downloadQueueId,
             previousId: "",
             bytes: byteCount,
             segments: [] as DownloadSegment[],
-            title
+            title,
+            startedAt: Date.now()
         }
         const promises: Promise<unknown>[] = []
         for (const update of updates) {
-            const manifestName = update.resolvedUrl + getFileNameFromUrl(update.canonicalUrl)
+            const manifestName = update.resolvedUrl + update.manifestName
             promises.push(this.fileCache.putFile(
                 manifestName,
                 new Response(JSON.stringify(update.newCargo), {
@@ -253,6 +262,13 @@ export class Shabah {
                     )
                 })
             ))
+
+            if (
+                update.oldManifestName.length > 0 
+                && update.oldManifestName !== update.manifestName
+            ) {
+                filesToDelete.push(`${update.originalResolvedUrl}/${update.oldManifestName}`)
+            }
             
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
@@ -268,6 +284,7 @@ export class Shabah {
                 canonicalUrl: update.canonicalUrl,
                 logo: update.newCargo?.crateLogoUrl || "",
                 downloadId: downloadQueueId,
+                manifestName: update.manifestName
             }))
 
             if (downloadQueueId === NO_UPDATE_QUEUED) {
@@ -357,16 +374,17 @@ export class Shabah {
             errorReports.push({errorReport, cargoMeta})
         }
 
-        const downloadsIndex = await this.getDownloadIndices()
+        //const downloadsIndex = await this.getDownloadIndices()
         const removeFileUrls = []
         const requestFileUrls = []
         const downloadQueueId = provisionDownloadId()
-        const retryDownloadIndex = {
+        const retryDownloadIndex: DownloadIndex = {
             id: downloadQueueId,
             previousId: "",
             bytes: 0,
             segments: [] as DownloadSegment[],
-            title
+            title,
+            startedAt: Date.now()
         }
         for (const {errorReport, cargoMeta} of errorReports) {
             const {index, url} = errorReport
@@ -381,10 +399,9 @@ export class Shabah {
                 downloadId: downloadQueueId
             })
         }
-        updateDownloadIndex(downloadsIndex, retryDownloadIndex)
         const self = this
         await Promise.all([
-            this.persistDownloadIndices(downloadsIndex),
+            this.putDownloadIndex(retryDownloadIndex),
             ...removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url))
         ])
         await this.downloadManager.queueDownload(
@@ -423,7 +440,7 @@ export class Shabah {
         return Promise.all([
             this.fileCache.deleteAllFiles(),
             this.virtualFileCache.deleteAllFiles(),
-            this.messageConsumer.deleteAllMessages()
+            this.clientMessageChannel.deleteAllMessages()
         ] as const)
     }
 
@@ -484,25 +501,23 @@ export class Shabah {
         )
     }
 
-    private async removeCargoFromDownloadQueue(
-        canonicalUrl: string
-    ): Promise<StatusCode> {
+    private async removeCargoFromDownloadQueue(canonicalUrl: string): Promise<StatusCode> {
         const targetIndex = await this.getDownloadIndexByCanonicalUrl(
             canonicalUrl
         )
         if (!targetIndex) {
             return STATUS_CODES.remoteResourceNotFound
         }
-        const targetSegmentIndex = targetIndex.segments.findIndex(
-            (segment) => segment.canonicalUrl === canonicalUrl
-        )
-        targetIndex.segments.splice(targetSegmentIndex, 1)
-        const indexes = await this.getDownloadIndices()
-        if (targetIndex.segments.length < 1) {
-            removeDownloadIndex(indexes, canonicalUrl)
-            this.downloadManager.cancelDownload(targetIndex.id)
+        const promises: Promise<unknown>[] = []
+        if (targetIndex.segments.length < 2) {
+            promises.push(
+                this.deleteDownloadIndex(canonicalUrl),
+                this.downloadManager.cancelDownload(targetIndex.id)
+            )
+        } else {
+            promises.push(this.removeDownloadSegment(canonicalUrl))
         }
-        this.persistDownloadIndices(indexes)
+        await Promise.all(promises)
         return STATUS_CODES.ok
     }
 
@@ -571,8 +586,8 @@ export class Shabah {
     async getDownloadIndexByCanonicalUrl(
         canonicalUrl: string
     ): Promise<DownloadIndex | null> {
-        const indexes = await this.getDownloadIndices()
-        const targetIndex = indexes.downloads.findIndex((index) => {
+        const indexes = await this.backendMessageChannel.getAllMessages()
+        const targetIndex = indexes.findIndex((index) => {
             const {segments} = index
             const targetIndex = segments.findIndex(
                 (segment) => segment.canonicalUrl === canonicalUrl
@@ -582,15 +597,29 @@ export class Shabah {
         if (targetIndex < 0) {
             return null
         }
-        return indexes.downloads[targetIndex]
+        return indexes[targetIndex]
     }
 
-    async putDownloadIndex(
-        updatedIndex: Omit<DownloadIndex, "startedAt">
-    ) {
-        const downloadsIndex = await this.getDownloadIndices()
-        updateDownloadIndex(downloadsIndex, updatedIndex)
-        return this.persistDownloadIndices(downloadsIndex)
+    async putDownloadIndex(updatedIndex: DownloadIndex): Promise<boolean> {
+        return this.backendMessageChannel.createMessage(updatedIndex)
+    }
+
+    private async removeDownloadSegment(canonicalUrl: string): Promise<Ok<StatusCode>> {
+        const target = await this.getDownloadIndexByCanonicalUrl(
+            canonicalUrl
+        )
+        if (!target) {
+            return io.ok(STATUS_CODES.remoteResourceNotFound)
+        }
+        const segmentIndex = target.segments.findIndex(
+            (segment) => segment.canonicalUrl === canonicalUrl 
+        )
+        if (segmentIndex < 0) {
+            return io.ok(STATUS_CODES.downloadSegmentNotFound)
+        }
+        target.segments.splice(segmentIndex, 1)
+        await this.putDownloadIndex(target)
+        return io.ok(STATUS_CODES.ok)
     }
 
     async deleteDownloadIndex(canonicalUrl: string) {
@@ -600,29 +629,8 @@ export class Shabah {
         if (!target) {
             return io.ok(STATUS_CODES.remoteResourceNotFound)
         }
-        const indexes = await this.getDownloadIndices()
-        removeDownloadIndex(indexes, canonicalUrl)
-        this.persistDownloadIndices(indexes)
+        await this.backendMessageChannel.deleteMessage(target.id)
         return io.ok(STATUS_CODES.ok)
-    }
-
-    async getDownloadIndices() {
-        if (this.downloadIndicesCache) {
-            return this.downloadIndicesCache
-        }
-        return this.refreshDownloadIndicies()
-    }
-
-    private async persistDownloadIndices(indices: DownloadIndexCollection) {
-        const {origin, virtualFileCache} = this
-        return await saveDownloadIndices(indices, origin, virtualFileCache)
-    }
-
-    private async refreshDownloadIndicies() {
-        const {origin, virtualFileCache} = this
-        const indices = await getDownloadIndices(origin, virtualFileCache)
-        this.downloadIndicesCache = indices
-        return indices
     }
 
     // progress listening interfaces
@@ -652,9 +660,8 @@ export class Shabah {
     }
 
     async consumeQueuedMessages(): Promise<StatusCode> {
-        const {messageConsumer} = this
-        const messages = await messageConsumer.getAllMessages()
-        
+        const {clientMessageChannel} = this
+        const messages = await clientMessageChannel.getAllMessages()
         if (messages.length < 1) {
             return STATUS_CODES.noMessagesFound
         }
@@ -683,10 +690,9 @@ export class Shabah {
             }
         }
         
-        await Promise.all([
-            ...messages.map((message) => messageConsumer.deleteMessage(message)),
-            this.refreshDownloadIndicies()
-        ])
+        await Promise.all(
+            messages.map((message) => clientMessageChannel.deleteMessage(message.downloadId))
+        )
 
         if (notFoundCount === stateUpdateCount) {
             return STATUS_CODES.allMessagesAreOrphaned

@@ -25,7 +25,8 @@ const rpc = new wRpc<SandboxFunctions>({
                 event.waitUntil(handler(event))
             })
         }
-    }
+    },
+    state: {}
 })
 
 const config = {log: true}

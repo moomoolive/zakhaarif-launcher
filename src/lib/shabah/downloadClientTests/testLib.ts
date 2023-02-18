@@ -1,10 +1,11 @@
 import {Shabah} from "../downloadClient"
-import {CACHED, CargoIndex, CargoState, DownloadClientCargoIndexStorage, DownloadClientMessage, DownloadClientMessageConsumer, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
+import {BackendMessageChannel, CACHED, CargoIndex, CargoState, DownloadClientCargoIndexStorage, DownloadClientMessage, ClientMessageChannel, DownloadIndex, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
 import {DownloadManager} from "../backend"
 import { cleanPermissions } from "../../utils/security/permissionsSummary"
 import {UpdateCheckConfig, UpdateCheckResponse} from "../updateCheckStatus"
 import { Cargo } from "../../cargo"
 import { Permissions } from "../../types/permissions"
+import { getFileNameFromUrl } from "../../utils/urls/getFilenameFromUrl"
 
 const addUrlToResponse = (response: Response, url: string) => {
     Object.defineProperty(response, "url", {value: url})
@@ -205,13 +206,24 @@ const dependencies = ({
 
     let clientMessages: Record<string, DownloadClientMessage> = {}
 
-    const messageConsumer: DownloadClientMessageConsumer = {
+    const messageConsumer: ClientMessageChannel = {
+        createMessage: async (message) => {
+            clientMessages[message.downloadId] = message
+            return true
+        },
         getAllMessages: async () => Object.values(clientMessages),
-        deleteMessage: async (targetMessage) => {
-            if (!(targetMessage.downloadId in clientMessages)) {
+        getMessage: async (downloadId) => {
+            const message = clientMessages[downloadId]
+            if (!message) {
+                return null
+            }
+            return message
+        },
+        deleteMessage: async (downloadId) => {
+            if (!(downloadId in clientMessages)) {
                 return false
             }
-            delete clientMessages[targetMessage.downloadId]
+            delete clientMessages[downloadId]
             return true
         },
         deleteAllMessages: async () => {
@@ -239,10 +251,40 @@ const dependencies = ({
         }
     }
 
+    let backendMessageRecord: Record<string, DownloadIndex> = {}
+    
+    const backendMessageChannel: BackendMessageChannel = {
+        createMessage: async (message) => {
+            backendMessageRecord[message.id] = message
+            return true
+        },
+        getAllMessages: async () => Object.values(backendMessageRecord),
+        getMessage: async (id) => {
+            const message = backendMessageRecord[id]
+            if (!message) {
+                return null
+            }
+            return message
+        },
+        deleteMessage: async (id: string) => {
+            delete backendMessageRecord[id]
+            return true
+        },
+        deleteAllMessages: async () => {
+            backendMessageRecord = {}
+            return true
+        }
+    }
+
     const [innerVirtualCache, virtualFileCache] = createCache({}, cacheQuota) 
 
     return {
-        adaptors: {networkRequest, fileCache, downloadManager},
+        adaptors: {
+            networkRequest, 
+            fileCache, 
+            downloadManager,
+            virtualFileCache
+        },
         caches: {networkCache, innerFileCache, innerVirtualCache},
         downloadState,
         internalCargoStore: store,
@@ -250,7 +292,8 @@ const dependencies = ({
         messageConsumer,
         clientMessages,
         indexStorage,
-        virtualFileCache
+        virtualFileCache,
+        backendMessageChannel
     }
 }
 
@@ -263,7 +306,7 @@ export const createClient = (
         adaptors, 
         messageConsumer, 
         indexStorage,
-        virtualFileCache
+        backendMessageChannel
     } = deps
     return {
         ...deps, 
@@ -271,9 +314,9 @@ export const createClient = (
             origin,
             adaptors, 
             permissionsCleaner: cleanPermissions,
-            messageConsumer,
+            clientMessageChannel: messageConsumer,
             indexStorage,
-            ...(config?.createVirtualCache ? {virtualFileCache} : {})
+            backendMessageChannel
         })
     }
 }
@@ -289,10 +332,10 @@ export const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
         newCargo = null,
         originalNewCargoResponse = new Response(),
         previousCargo = null,
-        
+        oldManifestName = "",
+        manifestName = "",
         downloadableResources = [],
         resourcesToDelete = [],
-
         diskInfo = {used: 0, total: 0, left: 0},
     } = config
     return new UpdateCheckResponse({
@@ -308,6 +351,8 @@ export const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
         resolvedUrl,
         canonicalUrl,
         status,
+        oldManifestName,
+        manifestName
     })
 }
 
@@ -319,20 +364,23 @@ export const cargoToCargoIndex = (
         resolvedUrl,
         bytes = 0,
         state = CACHED,
-        downloadId = NO_UPDATE_QUEUED
+        downloadId = NO_UPDATE_QUEUED,
+        manifestName = ""
     }: Partial<{
         tag: number
         resolvedUrl: string
         bytes: number
         state: CargoState,
-        downloadId: string
+        downloadId: string,
+        manifestName: string
     }> = {}
 ) => {
+    const _resolvedUrl = resolvedUrl || canonicalUrl
     const index: CargoIndex = {
         tag,
         name: cargo.name,
         logo: cargo.crateLogoUrl,
-        resolvedUrl: resolvedUrl || canonicalUrl,
+        resolvedUrl: _resolvedUrl,
         canonicalUrl,
         bytes,
         entry: cargo.entry,
@@ -341,7 +389,8 @@ export const cargoToCargoIndex = (
         state,
         created: Date.now(),
         updated: Date.now(),
-        downloadId: downloadId
+        downloadId: downloadId,
+        manifestName: manifestName || getFileNameFromUrl(_resolvedUrl)
     }
     return index
 }

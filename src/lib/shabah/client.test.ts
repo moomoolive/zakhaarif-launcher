@@ -103,7 +103,8 @@ describe("diff cargos function", () => {
         for (const canonicalUrl of tests) {
             const response = await checkForUpdates({
                 canonicalUrl, 
-                oldResolvedUrl: "", 
+                oldResolvedUrl: "",
+                oldManifestName: ""
             }, ...adaptors)
             expect(response.code).toBe(STATUS_CODES.malformedUrl)
             expect(response.errors.length).toBeGreaterThan(0)
@@ -121,7 +122,8 @@ describe("diff cargos function", () => {
         for (const canonicalUrl of tests) {
             const response = await checkForUpdates({
                 canonicalUrl, 
-                oldResolvedUrl: "", 
+                oldResolvedUrl: "",
+                oldManifestName: ""
             }, ...adaptors)
             expect(response.code).toBe(STATUS_CODES.invalidManifestUrl)
             expect(response.errors.length).toBeGreaterThan(0)
@@ -139,8 +141,8 @@ describe("diff cargos function", () => {
         const canonicalUrl = origin + "/" + MANIFEST_NAME
         const res = await checkForUpdates({
             canonicalUrl, 
-            oldResolvedUrl: "", 
-                
+            oldResolvedUrl: "",
+            oldManifestName: ""
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -165,6 +167,7 @@ describe("diff cargos function", () => {
             const res = await checkForUpdates({
                 canonicalUrl, 
                 oldResolvedUrl: "", 
+                oldManifestName: ""
             }, ...adaptors)
             expect(res.downloadableResources.length).toBe(0)
             expect(res.errors.length).toBeGreaterThan(0)
@@ -193,7 +196,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: "", 
-                
+                oldManifestName: ""
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -217,8 +220,8 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates(
             {
                 canonicalUrl, 
-                oldResolvedUrl: "", 
-                
+                oldResolvedUrl: "",
+                oldManifestName: "" 
             }
         , ...adaptors)
         expect(res.downloadableResources.length).toBe(0)
@@ -257,6 +260,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: "", 
+            oldManifestName: ""
         }, ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.downloadableResources.length).toBe(0)
@@ -287,6 +291,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: "", 
+            oldManifestName: ""
         }, ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.code).toBe(STATUS_CODES.preflightVerificationFailed)
@@ -324,6 +329,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: "", 
+            oldManifestName: ""
         }, ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.code).toBe(STATUS_CODES.preflightVerificationFailed)
@@ -362,6 +368,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl,
             oldResolvedUrl: origin + "/",
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
         expect(res.errors.length).toBe(0)
@@ -404,7 +411,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.code).toBe(STATUS_CODES.ok)
@@ -454,6 +461,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: "", 
+            oldManifestName: ""
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.ok)
         expect(res.downloadableResources.length).toBe(manifest.files.length)
@@ -498,6 +506,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: origin + "/", 
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.networkError)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -532,6 +541,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: origin + "/", 
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.badHttpCode)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -568,7 +578,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.code).toBe(STATUS_CODES.encodingNotAcceptable)
@@ -605,7 +615,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.code).toBe(STATUS_CODES.invalidManifestEncoding)
@@ -642,7 +652,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.code).toBe(STATUS_CODES.manifestIsUpToDate)
@@ -700,6 +710,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: origin + "/", 
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.code).toBe(STATUS_CODES.preflightVerificationFailed)
@@ -760,7 +771,8 @@ describe("diff cargos function", () => {
         })
         const res = await checkForUpdates({
             canonicalUrl, 
-            oldResolvedUrl: origin + "/", 
+            oldResolvedUrl: origin + "/",
+            oldManifestName: MANIFEST_NAME 
         }, ...adaptors)
         expect(res.errors.length).toBeGreaterThan(0)
         expect(res.code).toBe(STATUS_CODES.preflightVerificationFailed)
@@ -822,6 +834,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: origin + "/",
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.preflightVerificationFailed)
         expect(res.errors.length).toBeGreaterThan(0)
@@ -884,7 +897,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -958,7 +971,7 @@ describe("diff cargos function", () => {
             {
                 canonicalUrl, 
                 oldResolvedUrl: origin + "/", 
-                
+                oldManifestName: MANIFEST_NAME
             }
         , ...adaptors)
         expect(res.errors.length).toBe(0)
@@ -1071,6 +1084,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
             canonicalUrl, 
             oldResolvedUrl: origin + "/", 
+            oldManifestName: MANIFEST_NAME
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.ok)
         expect(res.errors.length).toBe(0)
@@ -1146,7 +1160,7 @@ describe("diff cargos function", () => {
         const res = await checkForUpdates({
                 canonicalUrl, 
                 oldResolvedUrl: "", 
-                
+                oldManifestName: ""
         }, ...adaptors)
         expect(res.code).toBe(STATUS_CODES.ok)
         expect(res.downloadableResources.length).toBe(manifest.files.length)

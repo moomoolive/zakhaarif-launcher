@@ -58,7 +58,8 @@ const ExtensionShellPage = () => {
         permissions: [],
         state: CACHED,
         created: 0,
-        updated: 0
+        updated: 0,
+        manifestName: ""
     })
     const sandbox = useRef<JsSandbox | null>(null)
     const cleanupExtension = useRef(() => {

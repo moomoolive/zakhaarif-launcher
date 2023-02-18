@@ -669,7 +669,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         state: CACHED,
         created: 0,
         updated: 0,
-        downloadId: ""
+        downloadId: "",
+        manifestName: ""
     },
     {
         tag: 1,
@@ -684,7 +685,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         state: CACHED,
         created: 0,
         updated: 0,
-        downloadId: ""
+        downloadId: "",
+        manifestName: ""
     },
     {
         tag: 2,
@@ -699,7 +701,8 @@ const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
         state: CACHED,
         created: 0,
         updated: 0,
-        downloadId: ""
+        downloadId: "",
+        manifestName: ""
     },
 ]
 

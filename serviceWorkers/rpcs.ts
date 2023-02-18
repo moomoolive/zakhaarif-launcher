@@ -5,21 +5,24 @@ export type GlobalConfig = {
     createdAt: number
 }
 
-export type ServiceWorkerRpcState = {
-    configRef: GlobalConfig
+export type ServiceWorkerRpcDependencies = {
     persistConfig: (config: GlobalConfig) => Promise<boolean>
 }
 
-export const createServiceWorkerRpcs = (state: ServiceWorkerRpcState) => {
-    const {persistConfig} = state
-    return {
-        config: () => state,
-        logger: (verbose: boolean) => {
-            state.configRef.log = verbose
-            persistConfig(state.configRef)
-            return true
-        }
-    } as const
+export type ServiceWorkerRpcs = {
+    config: (_: null, state: GlobalConfig) => GlobalConfig,
+    logger: (verbose: boolean, state: GlobalConfig) => boolean
 }
 
-export type ServiceWorkerRpcs = ReturnType<typeof createServiceWorkerRpcs>
+export function createServiceWorkerRpcs(
+    params: ServiceWorkerRpcDependencies
+): ServiceWorkerRpcs {
+    return {
+        config: (_: null, state: GlobalConfig) => state,
+        logger: (verbose: boolean, state: GlobalConfig) => {
+            state.log = verbose
+            params.persistConfig(state)
+            return true
+        }
+    }
+}

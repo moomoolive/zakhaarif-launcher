@@ -1,7 +1,15 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "../downloadClient"
-import {CACHED, DownloadSegment, FAILED, getErrorDownloadIndex, NO_UPDATE_QUEUED, ResourceMap, saveErrorDownloadIndex, UPDATING} from "../backend"
-import { Cargo} from "../../cargo"
+import {
+    CACHED, 
+    DownloadSegment, 
+    FAILED, 
+    getErrorDownloadIndex, 
+    ResourceMap, 
+    saveErrorDownloadIndex, 
+    UPDATING
+} from "../backend"
+import {Cargo} from "../../cargo"
 import { Permissions } from "../../types/permissions"
 import {createClient, cargoToCargoIndex} from "./testLib"
 
@@ -239,7 +247,7 @@ describe("download retries", () => {
                 cacheFiles: {},
                 networkFiles: {},
             })
-            const {client, downloadState, adaptors} = downloadClient
+            const {client, downloadState, adaptors, virtualFileCache} = downloadClient
             for (const {origin} of testCase) {
                 const canonicalUrl = origin + "/"
                 const resolvedUrl = canonicalUrl
@@ -276,11 +284,9 @@ describe("download retries", () => {
                 await saveErrorDownloadIndex(
                     resolvedUrl, 
                     errorDownloadIndex, 
-                    adaptors.fileCache
+                    virtualFileCache
                 )
-                const errorIndex = await getErrorDownloadIndex(
-                    resolvedUrl, adaptors.fileCache
-                )
+                const errorIndex = await getErrorDownloadIndex(resolvedUrl, virtualFileCache)
                 expect(!!errorIndex).toBe(true)
                 const cargo = new Cargo({
                     name: origin + "-cargo"
@@ -314,7 +320,7 @@ describe("download retries", () => {
                 expect(cargoIndexFoundAfterMutation?.state).toBe(UPDATING)
                 expect(cargoIndexFoundAfterMutation?.downloadId).toBe(downloadState.queuedDownloads[0].id)
                 const errorIndexAfterMutation = await getErrorDownloadIndex(
-                    resolvedUrl, adaptors.fileCache
+                    resolvedUrl, virtualFileCache
                 )
                 expect(!!errorIndexAfterMutation).toBe(false)
             }
@@ -339,7 +345,7 @@ describe("download retries", () => {
                 cacheFiles: {},
                 networkFiles: {},
             })
-            const {client, downloadState, adaptors} = downloadClient
+            const {client, downloadState, adaptors, virtualFileCache} = downloadClient
             const queuedDownloads = []
             for (const {origin} of testCase) {
                 const canonicalUrl = origin + "/"
@@ -383,10 +389,10 @@ describe("download retries", () => {
                 await saveErrorDownloadIndex(
                     resolvedUrl, 
                     errorDownloadIndex, 
-                    adaptors.fileCache
+                    virtualFileCache
                 )
                 const errorIndex = await getErrorDownloadIndex(
-                    resolvedUrl, adaptors.fileCache
+                    resolvedUrl, virtualFileCache
                 )
                 expect(!!errorIndex).toBe(true)
                 const cargo = new Cargo({
@@ -425,7 +431,7 @@ describe("download retries", () => {
                     expect(cargoIndexFoundAfterMutation?.state).toBe(UPDATING)
                     expect(cargoIndexFoundAfterMutation?.downloadId).toBe(downloadState.queuedDownloads[0].id)
                     const errorIndexAfterMutation = await getErrorDownloadIndex(
-                        resolvedUrl, adaptors.fileCache
+                        resolvedUrl, virtualFileCache
                     )
                     expect(!!errorIndexAfterMutation).toBe(false)
                 }

@@ -1,16 +1,18 @@
 import {Shabah} from "../shabah/downloadClient"
 import { webAdaptors } from "../shabah/adaptors/web-preset"
-import { APP_CACHE, DOWNLOAD_CLIENT_QUEUE } from "../../config"
+import { APP_CACHE, BACKEND_CHANNEL_NAME, DOWNLOAD_CLIENT_CHANNEL_NAME, VIRTUAL_FILE_CACHE } from "../../config"
 import { cleanPermissions } from "./security/permissionsSummary"
 import type {ServiceWorkerRpcs} from "../../../serviceWorkers/rpcs"
 import {wRpc} from "../wRpc/simple"
 import {createAppRpcs, DownloadProgressListener} from "./appRpc"
 import {EventListenerRecord} from "./eventListener"
 import { AppDatabase } from "../database/AppDatabase"
-import { DownloadClientMessage, downloadClientMessageUrl } from "../shabah/backend"
 import {FEATURE_CHECK} from "./featureCheck"
 import {VERBOSE_LAUNCHER_LOGS} from "./localStorageKeys"
 import { Logger } from "../types/app"
+import {
+    createBackendChannel, createClientChannel
+} from "../utils/shabahChannels"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener
@@ -72,7 +74,7 @@ export class AppStore {
         reject: (reason?: unknown) => void
         promise: Promise<boolean>
     }
-    serviceWorkerTerminal: wRpc<ServiceWorkerRpcs>
+    serviceWorkerTerminal: wRpc<ServiceWorkerRpcs, {}>
     database: AppDatabase
     readonly browserFeatures: typeof FEATURE_CHECK
     logger: AppLogger
@@ -99,34 +101,11 @@ export class AppStore {
         
         this.downloadClient = new Shabah({
             origin: location.origin,
-            adaptors: webAdaptors(APP_CACHE),
+            adaptors: webAdaptors(APP_CACHE, VIRTUAL_FILE_CACHE),
             permissionsCleaner: cleanPermissions,
             indexStorage: database.cargoIndexes,
-            messageConsumer: {
-                getAllMessages: async () => {
-                    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
-                    const files = await targetCache.keys()
-                    const messageFiles = await Promise.all(
-                        files.map((request) => targetCache.match(request.url))
-                    )
-                    const filteredMessages: Response[] = []
-                    for (const file of messageFiles) {
-                        if (file) {
-                            filteredMessages.push(file)
-                        } 
-                    }
-                    const messages = await Promise.all(
-                        filteredMessages.map((message) => message.json() as Promise<DownloadClientMessage>)
-                    )
-                    return messages as ReadonlyArray<DownloadClientMessage>
-                },
-                deleteMessage: async (message) => {
-                    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
-                    targetCache.delete(downloadClientMessageUrl(message))
-                    return true
-                },
-                deleteAllMessages: async () => caches.delete(DOWNLOAD_CLIENT_QUEUE)
-            }
+            clientMessageChannel: createClientChannel(DOWNLOAD_CLIENT_CHANNEL_NAME),
+            backendMessageChannel: createBackendChannel(BACKEND_CHANNEL_NAME)
         })
         
         this.sandboxInitializePromise = {
@@ -148,7 +127,8 @@ export class AppStore {
                 }
             }),
             messageInterceptor: {addEventListener: () => {}},
-            messageTarget: {postMessage: () => {}}
+            messageTarget: {postMessage: () => {}},
+            state: {}
         })
     }
 

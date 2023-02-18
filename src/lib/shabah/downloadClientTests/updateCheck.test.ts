@@ -152,7 +152,8 @@ describe("checking for cargo updates", () => {
                         canonicalUrl,
                         await (cacheFiles[cargoUrl]()!).json(),
                         {
-                            resolvedUrl: cargoOrigin + "/"
+                            resolvedUrl: cargoOrigin + "/",
+                            manifestName: MANIFEST_NAME
                         }
                     ),
                 )
@@ -254,7 +255,10 @@ describe("checking for cargo updates", () => {
                     cargoToCargoIndex(
                         canonicalUrl,
                         await (cacheFiles[cargoUrl]()!).json(),
-                        {resolvedUrl: cargoOrigin + "/"}
+                        {
+                            resolvedUrl: cargoOrigin + "/",
+                            manifestName: MANIFEST_NAME
+                        }
                     ),
     
                 )
@@ -516,7 +520,8 @@ describe("checking for cargo updates", () => {
         const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
         await client.putCargoIndex(
             cargoToCargoIndex(canonicalUrl, oldCargo, {
-                resolvedUrl: cargoOrigin + "/"
+                resolvedUrl: cargoOrigin + "/",
+                manifestName: MANIFEST_NAME
             }),
         )
         const response = await client.checkForUpdates(
@@ -574,7 +579,8 @@ describe("checking for cargo updates", () => {
             const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
             await client.putCargoIndex(
                 cargoToCargoIndex(canonicalUrl, oldCargo, {
-                    resolvedUrl: cargoOrigin + "/"
+                    resolvedUrl: cargoOrigin + "/",
+                    manifestName: MANIFEST_NAME
                 }),
 
             )
@@ -836,7 +842,8 @@ describe("checking for cargo updates", () => {
             const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
             await client.putCargoIndex(
                 cargoToCargoIndex(canonicalUrl, oldCargo, {
-                    resolvedUrl: cargoOrigin + "/"
+                    resolvedUrl: cargoOrigin + "/",
+                    manifestName: MANIFEST_NAME
                 }),
             )
             const response = await client.checkForUpdates(
@@ -990,7 +997,8 @@ describe("checking for cargo updates", () => {
             const redirectCanonicalUrl = redirectOrigin + "/" + MANIFEST_NAME
             await client.putCargoIndex(
                 cargoToCargoIndex(redirectCanonicalUrl, oldCargo, {
-                    resolvedUrl: cargoOrigin + "/"
+                    resolvedUrl: cargoOrigin + "/",
+                    manifestName: MANIFEST_NAME
                 }),
 
             )

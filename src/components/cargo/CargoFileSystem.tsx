@@ -1,20 +1,18 @@
-import { Cargo } from "../../lib/cargo"
+import {Cargo} from "../../lib/cargo"
 import type {CargoIndex} from "../../lib/shabah/downloadClient"
-import { Permissions } from "../../lib/types/permissions"
+import {Permissions} from "../../lib/types/permissions"
 import {useEffect, useMemo, useRef, useState} from "react"
-import {Tooltip, Button, Skeleton} from "@mui/material"
+import {Tooltip, Button} from "@mui/material"
 import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "../../lib/utils/dates"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import {faFile, faFolder, faFolderTree, faPuzzlePiece} from "@fortawesome/free-solid-svg-icons"
+import {faFolder, faFolderTree, faPuzzlePiece} from "@fortawesome/free-solid-svg-icons"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import {urlToMime, Mime} from "../../lib/miniMime"
 import {useAppContext} from "../../routes/store"
 import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
-import LoadingIcon from "../LoadingIcon"
-import { getFileNameFromUrl } from "../../lib/utils/urls/getFilenameFromUrl"
 import {CargoFileSystemSkeleton} from "./CargoFileSystemSkeleton"
 
 type FileSystemMemberProps = {
@@ -198,7 +196,7 @@ export const CargoFileSystem = ({
         }
 
         rootDirectory.files.push({
-            name: getFileNameFromUrl(cargoIndex.canonicalUrl),
+            name: cargoIndex.manifestName,
             bytes: cargoBytes
         })
         calculateDirectorySize(rootDirectory)

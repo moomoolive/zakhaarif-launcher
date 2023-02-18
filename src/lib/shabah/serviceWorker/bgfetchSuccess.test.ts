@@ -3,137 +3,17 @@ import {
     makeBackgroundFetchHandler, ProgressUpdateRecord
 } from "./backgroundFetchHandler"
 import {
-    emptyDownloadIndex,
-    updateDownloadIndex,
-    saveDownloadIndices,
     ResourceMap,
     NO_UPDATE_QUEUED,
     DownloadSegment,
     CACHED,
-    UPDATING,
-    DownloadClientMessage
+    DownloadIndex
 } from "../backend"
 import {urlToMime} from "../../miniMime/index"
-import {
-    BackgroundFetchUIEventCore,
-    BackgroundFetchResult,
-} from "../../types/serviceWorkers"
 import { nanoid } from "nanoid"
-
-const createBgFetchEvent = ({
-    id, 
-    result = "success", 
-    fetchResult = {},
-    recordsAvailable = true
-}: {
-    id: string
-    result?: BackgroundFetchResult
-    fetchResult?: Record<string, Response>,
-    recordsAvailable?: boolean
-}) => {
-    const output = {
-        ui: {
-            updateCalled: false,
-            state: null as unknown
-        },
-        finishPromise: Promise.resolve(null as unknown)
-    }
-    const results = Object.keys(fetchResult).map(url => {
-        return {
-            request: new Request(url),
-            responseReady: Promise.resolve(fetchResult[url])
-        } as const
-    })
-    return {
-        output,
-        event: {
-            waitUntil: async (p) => { output.finishPromise = p },
-            registration: {
-                id,
-                uploaded: 0,
-                uploadTotal: 0,
-                downloaded: 0,
-                downloadTotal: 0,
-                result,
-                failureReason: "",
-                recordsAvailable,
-                abort: async () => true,
-                matchAll: async () => results,
-                addEventListener: () => {},
-                onprogress: () => {}
-            },
-            updateUI: async (input) => {
-                if (output.ui.updateCalled) {
-                    throw new Error("updateUI already called")
-                }
-                output.ui.updateCalled = true
-                output.ui.state = input
-            }
-        } as BackgroundFetchUIEventCore
-    }
-}
-
-const createDownloadIndex = ({
-    id = "pkg", 
-    title = "none", 
-    name = "",
-    bytes = 0, 
-    canonicalUrl = "", 
-    map = {}, 
-    version = "0.1.0",
-    resourcesToDelete = [],
-    downloadedResources = [],
-    canRevertToPreviousVersion = false,
-    previousVersion = "none", 
-    resolvedUrl = "",
-    previousId = ""
-} = {}) => {
-    const putIndex = {
-        id, 
-        previousId,
-        title, 
-        bytes,
-        segments: [{
-            name,
-            map, 
-            canonicalUrl, 
-            version, 
-            previousVersion, 
-            resolvedUrl,
-            bytes,
-            resourcesToDelete,
-            downloadedResources,
-            canRevertToPreviousVersion
-        }]
-    }
-    return putIndex
-}
-
-const createBgFetchArgs = (initFiles: Record<string, Response>) => {
-    const cache = {
-        getFile: async (url: string) => initFiles[url],
-        putFile: async (url: string, file: Response) => { 
-            initFiles[url] = file
-            return true
-        },
-        queryUsage: async () => ({usage: 0, quota: 0}),
-        deleteFile: async () => true,
-        deleteAllFiles: async () => true,
-        requestPersistence: async () => true,
-        isPersisted: async () => true,
-        listFiles: async () => [],
-    }
-    const clientMessages: DownloadClientMessage[] = []
-    return {
-        fileCache: cache, 
-        internalRecord: initFiles,
-        messageDownloadClient: async (message: DownloadClientMessage) => {
-            clientMessages.push(message)
-            return true
-        },
-        clientMessages
-    }
-}
+import {
+    createBgFetchArgs, createBgFetchEvent, createDownloadIndex
+} from "./testLib"
 
 describe("background fetch success handler", () => {
     it("successful fetches should not cache responses not found in download index map", async () => {
@@ -142,13 +22,13 @@ describe("background fetch success handler", () => {
         const {
             fileCache, 
             internalRecord, 
-            messageDownloadClient,
-            clientMessages
+            clientMessageChannel,
+            messageConsumer,
+            virtualFileCache
         } = createBgFetchArgs({})
-        const downloadIndices = emptyDownloadIndex()
         const canonicalUrl = remoteOrigin
         const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
+        await messageConsumer.createMessage(createDownloadIndex({
             id: downloadId,
             title: "unknown",
             version: "0.1.0",
@@ -158,13 +38,14 @@ describe("background fetch success handler", () => {
             map: {},
             bytes: 0
         }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
         const handler = makeBackgroundFetchHandler({
             origin, 
             fileCache,
-            messageDownloadClient,
+            clientMessageChannel,
             log: () => {},
-            type: "success"
+            type: "success",
+            backendMessageChannel: messageConsumer,
+            virtualFileCache
         })
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
@@ -186,6 +67,7 @@ describe("background fetch success handler", () => {
         ).toBe(0)
         expect(output.ui.updateCalled).toBe(true)
         expect(!!output.ui.state).toBe(true)
+        const clientMessages = await clientMessageChannel.getAllMessages()
         expect(clientMessages.length).toBe(1)
         expect(clientMessages[0].stateUpdates.length).toBe(1)
         expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
@@ -215,12 +97,12 @@ describe("background fetch success handler", () => {
         const {
             fileCache, 
             internalRecord, 
-            messageDownloadClient,
-            clientMessages
+            clientMessageChannel,
+            messageConsumer,
+            virtualFileCache
         } = createBgFetchArgs({})
-        const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
+        await messageConsumer.createMessage(createDownloadIndex({
             id: downloadId,
             title: "unknown",
             version: "0.1.0",
@@ -240,7 +122,6 @@ describe("background fetch success handler", () => {
             }, {} as ResourceMap),
             bytes: 0
         }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -256,7 +137,9 @@ describe("background fetch success handler", () => {
             fileCache, 
             log: () => {},
             type: "success",
-            messageDownloadClient,
+            clientMessageChannel,
+            backendMessageChannel: messageConsumer,
+            virtualFileCache
         })
         await handler(event)
         expect(Object.keys(internalRecord).length).toBe(
@@ -264,6 +147,7 @@ describe("background fetch success handler", () => {
         )
         expect(output.ui.updateCalled).toBe(true)
         expect(!!output.ui.state).toBe(true)
+        const clientMessages = await clientMessageChannel.getAllMessages()
         expect(clientMessages.length).toBe(1)
         expect(clientMessages[0].stateUpdates.length).toBe(1)
         expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
@@ -289,15 +173,14 @@ describe("background fetch success handler", () => {
             requestUrl: remoteRootUrl + name,
             mime: urlToMime(name) || "text/plain"
         }) as const)
-        const cargoId = 0
         const canonicalUrl = remoteOrigin
         const {
-            fileCache, internalRecord, messageDownloadClient,
-            clientMessages
+            fileCache, internalRecord, clientMessageChannel,
+            messageConsumer,
+            virtualFileCache
         } = createBgFetchArgs({})
-        const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
+        await messageConsumer.createMessage(createDownloadIndex({
             id: downloadId,
             title: "unknown",
             version: "0.1.0",
@@ -317,7 +200,6 @@ describe("background fetch success handler", () => {
             }, {} as ResourceMap),
             bytes: 0
         }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -333,7 +215,9 @@ describe("background fetch success handler", () => {
             fileCache, 
             log: () => {},
             type: "success",
-            messageDownloadClient
+            clientMessageChannel,
+            backendMessageChannel: messageConsumer,
+            virtualFileCache
         })
         await handler(event)
         expect(Object.keys(internalRecord).length).toBe(
@@ -341,6 +225,7 @@ describe("background fetch success handler", () => {
         )
         expect(output.ui.updateCalled).toBe(true)
         expect(!!output.ui.state).toBe(true)
+        const clientMessages = await clientMessageChannel.getAllMessages()
         expect(clientMessages.length).toBe(1)
         expect(clientMessages[0].stateUpdates.length).toBe(1)
         expect(clientMessages[0].stateUpdates[0]).toStrictEqual({
@@ -404,18 +289,19 @@ describe("background fetch success handler", () => {
             const {
                 fileCache, 
                 internalRecord, 
-                messageDownloadClient,
-                clientMessages
+                clientMessageChannel,
+                messageConsumer,
+                virtualFileCache
             } = createBgFetchArgs({})
             const downloadId = nanoid(21)
-            const queuedDownload = {
+            const queuedDownload: DownloadIndex = {
                 id: downloadId, 
                 previousId: "",
                 title: "random-update" + Math.random(), 
                 bytes: 0,
-                segments: [] as DownloadSegment[]
+                segments: [] as DownloadSegment[],
+                startedAt: Date.now()
             }
-            const downloadIndices = emptyDownloadIndex()
             const allFileCacheMeta = []
             for (const {origin, files} of testCase) {
                 const canonicalUrl = origin
@@ -452,15 +338,8 @@ describe("background fetch success handler", () => {
                     canRevertToPreviousVersion: false
                 })
             }
-            updateDownloadIndex(
-                downloadIndices, 
-                queuedDownload
-            )
-            await saveDownloadIndices(
-                downloadIndices, 
-                mainOrigin, 
-                fileCache
-            )
+            
+            await messageConsumer.createMessage(queuedDownload)
 
             const prevFilecount = Object.keys(internalRecord).length
             
@@ -480,9 +359,11 @@ describe("background fetch success handler", () => {
             const handler = makeBackgroundFetchHandler({
                 origin: mainOrigin, 
                 fileCache, 
-                messageDownloadClient,
+                clientMessageChannel,
                 log: () => {},
-                type: "success"
+                type: "success",
+                backendMessageChannel: messageConsumer,
+                virtualFileCache
             })
             await handler(event)
             expect(Object.keys(internalRecord).length).toBe(
@@ -490,6 +371,7 @@ describe("background fetch success handler", () => {
             )
             expect(output.ui.updateCalled).toBe(true)
             expect(!!output.ui.state).toBe(true)
+            const clientMessages = await clientMessageChannel.getAllMessages()
             expect(clientMessages.length).toBe(1)
             expect(clientMessages[0].stateUpdates.length).toBe(testCase.length)
 
@@ -524,12 +406,12 @@ describe("background fetch success handler", () => {
         }) as const)
 
         const {
-            fileCache, internalRecord, messageDownloadClient,
-            clientMessages
+            fileCache, internalRecord, clientMessageChannel,
+            messageConsumer,
+            virtualFileCache
         } = createBgFetchArgs({})
-        const downloadIndices = emptyDownloadIndex()
         const downloadId = nanoid(21)
-        updateDownloadIndex(downloadIndices, createDownloadIndex({
+        await messageConsumer.createMessage(createDownloadIndex({
             id: downloadId,
             title: "unknown",
             version: "0.1.0",
@@ -549,8 +431,6 @@ describe("background fetch success handler", () => {
             }, {} as ResourceMap),
             bytes: 0
         }))
-        await saveDownloadIndices(downloadIndices, origin, fileCache)
-        const cargoId = 0
         const prevFilecount = Object.keys(internalRecord).length
         const {event, output} = createBgFetchEvent({
             id: downloadId, 
@@ -563,12 +443,14 @@ describe("background fetch success handler", () => {
         })
         const progressEvents: ProgressUpdateRecord[] = []
         const handler = makeBackgroundFetchHandler({
+            virtualFileCache,
             origin, 
             fileCache,
-            messageDownloadClient,
+            clientMessageChannel,
             log: () => {},
             type: "success",
-            onProgress: (update) => progressEvents.push(update)
+            onProgress: (update) => progressEvents.push(update),
+            backendMessageChannel: messageConsumer
         })
         await handler(event)
         expect(Object.keys(internalRecord).length).toBe(
@@ -587,6 +469,7 @@ describe("background fetch success handler", () => {
             downloadId: downloadId,
             canonicalUrls: [canonicalUrl]
         })
+        const clientMessages = await clientMessageChannel.getAllMessages()
         expect(clientMessages.length).toBe(1)
         expect(clientMessages[0].stateUpdates).length(1)
         expect(clientMessages[0].stateUpdates[0]).toStrictEqual({

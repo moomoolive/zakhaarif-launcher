@@ -27,6 +27,7 @@ const mockSandboxDependencies: SandboxDependencies = {
         created: 0,
         updated: 0,
         downloadId: "",
+        manifestName: ""
     },
     cargo: new Cargo(),
     // a quick hack for now

@@ -1,4 +1,9 @@
-import {APP_CACHE, DOWNLOAD_CLIENT_QUEUE} from "../src/config"
+import {
+    APP_CACHE, 
+    DOWNLOAD_CLIENT_CHANNEL_NAME, 
+    BACKEND_CHANNEL_NAME,
+    VIRTUAL_FILE_CACHE
+} from "../src/config"
 import type {
     BackgroundFetchEventHandlerSetters
 } from "../src/lib/types/serviceWorkers"
@@ -11,7 +16,7 @@ import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
 import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
 import {wRpc} from "../src/lib/wRpc/simple"
 import type {AppRpcs} from "../src/lib/utils/appRpc"
-import { DownloadClientMessage, downloadClientMessageUrl } from "../src/lib/shabah/backend"
+import {createBackendChannel, createClientChannel} from "../src/lib/utils/shabahChannels"
 
 const sw = globalThis.self as unknown as (
     ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
@@ -73,11 +78,9 @@ const logger = (...msgs: any[]) => {
     }
 }
 
-const rpc = new wRpc<AppRpcs>({
-    responses: createServiceWorkerRpcs({
-        configRef: config,
-        persistConfig,
-    }),
+const rpc = new wRpc<AppRpcs, GlobalConfig>({
+    state: config,
+    responses: createServiceWorkerRpcs({persistConfig}),
     messageInterceptor: {
         addEventListener: (_, handler) => {
             sw.onmessage = (event) => event.waitUntil(handler(event))
@@ -97,22 +100,23 @@ const notifyDownloadProgress = async (update: ProgressUpdateRecord) => {
     rpc.execute("notifyDownloadProgress", update)
 }
 
-const messageDownloadClient = async (message: DownloadClientMessage) => {
-    const targetCache = await caches.open(DOWNLOAD_CLIENT_QUEUE)
-    await targetCache.put(
-        downloadClientMessageUrl(message),
-        new Response(JSON.stringify(message), {status: 200, statusText: "OK"})
-    )
-    return true
-}
+const virtualFileCache = webCacheFileCache(VIRTUAL_FILE_CACHE)
+const clientMessageChannel = createClientChannel(DOWNLOAD_CLIENT_CHANNEL_NAME)
+const backendMessageChannel = createBackendChannel(BACKEND_CHANNEL_NAME)
+
+const bgFetchDependencies = {
+    virtualFileCache,
+    clientMessageChannel,
+    backendMessageChannel,
+    onProgress: notifyDownloadProgress,
+    log: logger,
+    origin: sw.location.origin,
+    fileCache
+} as const
 
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
-    origin: sw.location.origin,
-    fileCache,
-    log: logger,
+    ...bgFetchDependencies,
     type: "success",
-    onProgress: notifyDownloadProgress,
-    messageDownloadClient
 })
 
 sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
@@ -120,23 +124,15 @@ sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(ev
 sw.onbackgroundfetchclick = () => sw.clients.openWindow("/")
 
 const bgFetchAbortHandle = makeBackgroundFetchHandler({
-    origin: sw.location.origin,
-    fileCache,
-    log: logger,
+    ...bgFetchDependencies,
     type: "abort",
-    onProgress: notifyDownloadProgress,
-    messageDownloadClient
 })
 
 sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
 
 const bgFetchFailHandle = makeBackgroundFetchHandler({
-    origin: sw.location.origin,
-    fileCache,
-    log: logger,
+    ...bgFetchDependencies,
     type: "fail",
-    onProgress: notifyDownloadProgress,
-    messageDownloadClient
 })
 
 sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))

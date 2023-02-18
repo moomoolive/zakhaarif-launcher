@@ -289,6 +289,7 @@ describe("reading and writing download indexes", () => {
             previousId: "",
             bytes: 0,
             title: "update 1",
+            startedAt: Date.now(),
             segments: [
                 {
                     resolvedUrl: canonicalUrl,
@@ -321,6 +322,7 @@ describe("reading and writing download indexes", () => {
             previousId: '',
             bytes: 0,
             title: "update 1",
+            startedAt: Date.now(),
             segments: [
                 {
                     resolvedUrl: canonicalUrl,
@@ -347,6 +349,7 @@ describe("reading and writing download indexes", () => {
             previousId: "",
             bytes: 0,
             title: "update 1",
+            startedAt: Date.now(),
             segments: [
                 {
                     resolvedUrl: changedVersion,
@@ -379,6 +382,7 @@ describe("reading and writing download indexes", () => {
             previousId: "",
             bytes: 0,
             title: "update 1",
+            startedAt: Date.now(),
             segments: [
                 {
                     resolvedUrl: canonicalUrl,

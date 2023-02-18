@@ -151,7 +151,7 @@ const NewGamePage = () => {
                         }}
                         disabled={loading}
                     >
-                        {loading? <span className="animate-spin text-blue-500">
+                        {loading? <span className="animate-spin">
                             <LoadingIcon/>
                         </span> : "Start"}
                     </Button>

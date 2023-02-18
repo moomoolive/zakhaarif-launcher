@@ -24,6 +24,8 @@ export type UpdateCheckConfig = {
     resourcesToDelete: ReadonlyArray<RequestableResource>
     diskInfo: RawDiskMetadata
     status?: StatusCode
+    manifestName: string
+    oldManifestName: string
 }
 
 export class UpdateCheckResponse {
@@ -59,7 +61,9 @@ export class UpdateCheckResponse {
     readonly statusText: DebugStatusName
     readonly downloadableResources: ReadonlyArray<RequestableResource>
     readonly resourcesToDelete: ReadonlyArray<RequestableResource>
-    
+    readonly manifestName: string
+    readonly oldManifestName: string
+
     private readonly diskInfo: RawDiskMetadata
 
     constructor(config: UpdateCheckConfig) {
@@ -76,6 +80,8 @@ export class UpdateCheckResponse {
         this.diskInfo = config.diskInfo
         this.status = config.status || STATUS_CODES.ok
         this.statusText = debugStatusCode(this.status)
+        this.manifestName = config.manifestName
+        this.oldManifestName = config.oldManifestName
     }
 
     errorOccurred() {

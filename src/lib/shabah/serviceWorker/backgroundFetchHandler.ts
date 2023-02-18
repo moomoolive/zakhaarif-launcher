@@ -1,7 +1,4 @@
 import {
-    getDownloadIndices,
-    removeDownloadIndex,
-    saveDownloadIndices,
     FileCache,
     removeSlashAtEnd,
     DownloadIndex,
@@ -11,7 +8,9 @@ import {
     CACHED,
     ABORTED,
     FAILED,
-    DownloadClientMessage
+    DownloadClientMessage,
+    BackendMessageChannel,
+    ClientMessageChannel
 } from "../backend"
 import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
 
@@ -25,12 +24,13 @@ export type ProgressUpdateRecord = {
 
 export type BackgroundFetchSuccessOptions = {
     fileCache: FileCache
-    virtualFileCache?: FileCache
+    virtualFileCache: FileCache
+    backendMessageChannel: BackendMessageChannel
     origin: string,
     log: (...msgs: any[]) => void
     type: BackgroundFetchEventName
     onProgress?: (progressUpdate: ProgressUpdateRecord) => unknown
-    messageDownloadClient: (message: DownloadClientMessage) => Promise<boolean>
+    clientMessageChannel: ClientMessageChannel
 }
 
 export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
@@ -44,29 +44,23 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         log, 
         type: eventType, 
         onProgress = () => {},
-        messageDownloadClient
+        clientMessageChannel,
+        backendMessageChannel,
+        virtualFileCache
     } = options
     const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
-    const virtualFileCache = options.virtualFileCache || fileCache
     return async (
         event: BackgroundFetchHandlerEvent
     ) => {
         const bgfetch = event.registration
         log(eventName, "registration:", bgfetch)
         const downloadQueueId = bgfetch.id
-        const downloadIndices = await getDownloadIndices(
-            origin, virtualFileCache
-        )
-        const downloadIndexPosition = downloadIndices.downloads.findIndex(
-            (index) => index.id === downloadQueueId
-        )
-        log(eventName, `found download_index=${downloadIndexPosition > -1}`)
-        if (downloadIndexPosition < 0) {
+        const targetDownloadIndex = await backendMessageChannel.getMessage(downloadQueueId)
+        log(eventName, `found download_index=${!!targetDownloadIndex}`)
+        if (!targetDownloadIndex) {
             log(eventName, `Background fetch does not exist in records (id=${downloadQueueId}). Ignoring handler!`)
             return
         }
-        const targetDownloadIndex = downloadIndices.downloads[downloadIndexPosition]
-
         const fetchedResources = await bgfetch.matchAll()
         log(
             eventName,
@@ -92,6 +86,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         const orphanedResources = new Map<string, boolean>()
         
         const downloadClientMessage: DownloadClientMessage = {
+            id: downloadQueueId,
             timestamp: Date.now(),
             downloadId: downloadQueueId,
             stateUpdates: []
@@ -264,7 +259,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             log(eventName, "successfully saved error log")
         }
 
-        await messageDownloadClient(downloadClientMessage)
+        await clientMessageChannel.createMessage(downloadClientMessage)
 
         orphanedResources.forEach((value, key) => {
             if (!value) {
@@ -283,9 +278,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             `processed ${resourcesProcessed} out of ${totalResources}. orphan_count=${orphanCount}, fail_count=${failCount}.${orphanCount > 0 ? " Releasing orphans!" : ""}`
         )
         
-        removeDownloadIndex(downloadIndices, downloadQueueId)
-        await saveDownloadIndices(downloadIndices, origin, virtualFileCache)
-        log(eventName, "successfully persisted changes")
+        await backendMessageChannel.deleteMessage(downloadQueueId)
+
         // "abort" does not have update-ui
         // https://developer.chrome.com/blog/background-fetch/#service-worker-events
         const eventHasUiUpdate = (

@@ -7,7 +7,8 @@ import {CargoState} from "../lib/shabah/downloadClient"
 export const makeTestCargoIndexes = (): CargoIndex[] => {
     const data: CargoIndex[] = []
     for (let i = 0; i < 5_000; i++) {
-        const canonicalUrl = faker.internet.url() + "/default.huzma.json"
+        const manifestName = "default.huzma.json"
+        const canonicalUrl = faker.internet.url() + "/" + manifestName
         const created = new Date(
             faker.datatype.datetime({
                 min: 0,
@@ -27,7 +28,8 @@ export const makeTestCargoIndexes = (): CargoIndex[] => {
             state: faker.datatype.number({min: 1, max: 4}) as CargoState,
             downloadId: "",
             created,
-            updated: created
+            updated: created,
+            manifestName
         }
         data.push(next)
     }

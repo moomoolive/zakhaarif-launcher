@@ -188,6 +188,7 @@ describe("executing updates", () => {
                 previousId: "",
                 bytes: 0,
                 title: "update 1",
+                startedAt: Date.now(),
                 segments: [
                     {
                         resolvedUrl: updateResponse.resolvedUrl,
@@ -285,7 +286,7 @@ describe("executing updates", () => {
         }
     })
 
-    it("if update is valid, a download and cargo index should be created, and cargo.json should be cached", async () => {
+    it("if update is valid, a download and cargo index should be created, and manifest should be cached", async () => {
         const origin = "https://my-mamas-house.com"
         const ENTRY_NAME = "index.js"
         const cases = [
@@ -329,7 +330,8 @@ describe("executing updates", () => {
                 newCargo: new Cargo({entry: "index.js"}),
                 originalNewCargoResponse: new Response(),
                 downloadableResources,
-                resourcesToDelete: []
+                resourcesToDelete: [],
+                manifestName: MANIFEST_NAME
             })
             const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(
                 updateResponse.canonicalUrl
@@ -348,9 +350,7 @@ describe("executing updates", () => {
             expect(!!cargoIndex).toBe(true)
             expect(cargoIndex?.state).toBe(UPDATING)
             expect(cargoIndex?.entry).toBe(ENTRY_NAME)
-            expect(!!(innerFileCache.getFile(
-                updateResponse.resolvedUrl + MANIFEST_NAME
-            ))).toBe(true)
+            expect(innerFileCache.getFile(updateResponse.resolvedUrl + MANIFEST_NAME)).not.toBe(undefined)
             expect(queueResponse.ok).toBe(true)
             expect(queueResponse.data).toBe(Shabah.STATUS.updateQueued)
             expect(downloadState.queuedDownloads.length).toBe(1)
@@ -554,7 +554,8 @@ describe("executing updates", () => {
                     newCargo: new Cargo(),
                     originalNewCargoResponse: new Response(),
                     downloadableResources,
-                    resourcesToDelete
+                    resourcesToDelete,
+                    manifestName: MANIFEST_NAME
                 })
                 updateResponses.push(response)
                 const downloadIndexExists = !!(await client.getDownloadIndexByCanonicalUrl(

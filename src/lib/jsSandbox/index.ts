@@ -74,9 +74,10 @@ export class JsSandbox {
 
     private createRpc(state: RpcState): wRpc<{}, RpcState> {
         const self = this
+        const responses = createRpcFunctions(state)
         return new wRpc({
             state,
-            responses: createRpcFunctions(state),
+            responses,
             messageTarget: {
                 postMessage: (data, transferables) => {
                     self.iframeElement.contentWindow?.postMessage(

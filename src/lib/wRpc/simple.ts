@@ -84,17 +84,17 @@ type MessageInterceptor = {
     ) => any
 }
 
-type RpcArguments<State extends object> = {
+type RpcConfig<State extends object> = {
     messageTarget: MessagableEntity
     responses: TerminalActions<State>,
     messageInterceptor: MessageInterceptor
-    state?: State
+    state: State
 }
 
 const emptyTransferArray = [] as Transferable[]
 
 export class wRpc<
-    RecipentActions extends TerminalOutboundActions = {},
+    RecipentActions extends TerminalOutboundActions,
     State extends object = {},
 > {
     static transfer = transferData
@@ -115,8 +115,8 @@ export class wRpc<
         responses,
         messageTarget,
         messageInterceptor,
-        state = {} as State
-    }: RpcArguments<State>) {
+        state
+    }: RpcConfig<State>) {
         this.state = state
         this.messageInterceptor = messageInterceptor
         this.messageTarget = messageTarget

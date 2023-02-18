@@ -38,7 +38,8 @@ const toCargoIndex = (
     resolvedUrl: string,
     cargo: Cargo<Permissions>,
     isExtension: boolean,
-    bytes: number
+    bytes: number,
+    manifestName: string,
 ): CargoIndex => {
     return {
         tag: isExtension ? EXTENSION_CARGO_TAG : MOD_CARGO_TAG,
@@ -47,6 +48,7 @@ const toCargoIndex = (
         resolvedUrl,
         canonicalUrl,
         bytes,
+        manifestName,
         entry: cargo.entry,
         version: cargo.version,
         permissions: cargo.permissions,
@@ -264,7 +266,8 @@ export const Installer = ({
                             installResponse.checkResponse.resolvedUrl,
                             installResponse.checkResponse.newCargo as Cargo<Permissions>,
                             installResponse.isExtension,
-                            installResponse.checkResponse.bytesToDownload()
+                            installResponse.checkResponse.bytesToDownload(),
+                            installResponse.checkResponse.manifestName
                         )}
                         safeExternalNavigation
                     />

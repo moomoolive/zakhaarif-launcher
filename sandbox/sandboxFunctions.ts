@@ -12,8 +12,11 @@ const window = self as unknown as {
         postMessage: (data: unknown, origin: string, transferables: Transferable[]) => unknown
     }
     addEventListener: (name: "message", handler: (event: WindowMessageEvent) => any) => unknown
+    top: object
 }
-const {parent} = window
+
+const {top, parent} = window
+const addListener = window.addEventListener
 
 export const controllerRpc = new wRpc<ExtensionShellFunctions>({
     responses: {},
@@ -24,9 +27,15 @@ export const controllerRpc = new wRpc<ExtensionShellFunctions>({
     },
     messageInterceptor: {
         addEventListener: (_, handler) => {
-            window.addEventListener("message", handler)
+            addListener("message", (event) => {
+                if (event.source !== top) {
+                    return
+                }
+                handler(event)
+            })
         }
-    }
+    },
+    state: {}
 })
 
 export const serviceWorkerToSandboxRpc = {

@@ -58,6 +58,7 @@ describe("consuming messages", () => {
             expect(persistedCargoindex?.canonicalUrl).toBe(canonicalUrl)
             const downloadId = nanoid(6)
             testClient.clientMessages[downloadId] = ({
+                id: downloadId,
                 timestamp: Date.now(),
                 downloadId,
                 stateUpdates: [
@@ -98,6 +99,7 @@ describe("consuming messages", () => {
             expect(persistedCargoindex?.state).toBe(CACHED)
             const downloadId = nanoid(6)
             testClient.clientMessages[downloadId] = ({
+                id: downloadId,
                 timestamp: Date.now(),
                 downloadId,
                 stateUpdates: [
@@ -147,6 +149,7 @@ describe("consuming messages", () => {
             expect(persistedCargoindex?.state).toBe(CACHED)
             expect(persistedCargoindex?.downloadId).toBe(downloadId)
             testClient.clientMessages[downloadId] = {
+                id: downloadId,
                 timestamp: Date.now(),
                 downloadId,
                 stateUpdates: [{canonicalUrl, state: FAILED}]
@@ -213,6 +216,7 @@ describe("consuming messages", () => {
                 expect(persistedCargoindex?.state).toBe(CACHED)
                 expect(persistedCargoindex?.downloadId).toBe(downloadId)
                 testClient.clientMessages[downloadId] = {
+                    id: downloadId,
                     timestamp: Date.now(),
                     downloadId,
                     stateUpdates: [{canonicalUrl: url, state: FAILED}]
@@ -282,6 +286,7 @@ describe("consuming messages", () => {
                 expect(persistedCargoindex?.state).toBe(CACHED)
                 const downloadId = nanoid(6)
                 testClient.clientMessages[downloadId] = {
+                    id: downloadId,
                     timestamp: Date.now(),
                     downloadId,
                     stateUpdates: [{canonicalUrl: url, state: FAILED}]

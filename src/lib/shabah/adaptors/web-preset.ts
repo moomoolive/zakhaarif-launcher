@@ -1,11 +1,16 @@
 import {webBackgroundFetchDownloadManager} from "./downloadManager/backgroundFetch"
 import {webCacheFileCache} from "./fileCache/webCache"
 import {webFetch} from "./networkRequest/webFetch"
+import type {DownloadClientAdaptors} from "./utilities"
 
-export const webAdaptors = (cacheName: string) => {
+export const webAdaptors = (
+    fileCacheName: string,
+    virtualFileCacheName: string
+): DownloadClientAdaptors => {
     return {
-        fileCache: webCacheFileCache(cacheName),
+        fileCache: webCacheFileCache(fileCacheName),
         networkRequest: webFetch(),
-        downloadManager: webBackgroundFetchDownloadManager()
+        downloadManager: webBackgroundFetchDownloadManager(),
+        virtualFileCache: webCacheFileCache(virtualFileCacheName)
     }
 }

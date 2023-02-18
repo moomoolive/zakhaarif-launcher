@@ -33,7 +33,8 @@ const rpc = new wRpc<ServiceWorkerFunctions>({
         addEventListener(_, handler) {
             navigator.serviceWorker.addEventListener("message", handler)
         }
-    }
+    },
+    state: {}
 })
 const initialState = await controllerRpc.execute("getInitialState")
 if (!initialState) {
@@ -44,10 +45,11 @@ if (!initialState) {
 const rootElement = document.createElement("div")
 rootElement.setAttribute("id", "root")
 document.body.appendChild(rootElement)
+const emptyTransfer = [] as Transferable[]
 const extensionArguments: MainScriptArguments = {
     rootElement,
     messageAppShell: (name, data = null, transferables = emptyTransfer) => {
-        return controllerRpc.execute(name, data, transferables)
+        return (controllerRpc.execute as Function)(name, data, transferables)
     },
     initialState
 }
@@ -72,5 +74,4 @@ if (!script || !("main" in script)) {
 }
 
 const {main} = script
-const emptyTransfer = [] as Transferable[]
 main(extensionArguments)

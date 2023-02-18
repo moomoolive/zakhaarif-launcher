@@ -6,7 +6,6 @@ import {urlToMime} from "../../lib/miniMime/index"
 import {
     FileCache, 
     FetchFunction,
-    stringBytes,
     serviceWorkerPolicies,
     ResourceMap
 } from "./backend"
@@ -14,6 +13,8 @@ import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import {isUrl} from "../utils/urls/isUrl"
+import {stringBytes} from "../utils/stringBytes"
+import {getFileNameFromUrl} from "../utils/urls/getFilenameFromUrl"
 
 export type RequestableResource = {
     requestUrl: string
@@ -56,7 +57,8 @@ export const STATUS_CODES = {
     malformedUrl: 118,
     errorIndexNotFound: 119,
     allMessagesAreOrphaned: 120,
-    someMessagesAreOrphaned: 121
+    someMessagesAreOrphaned: 121,
+    downloadSegmentNotFound: 122
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
@@ -74,6 +76,7 @@ class CargoFetchResponse {
     response: Response | null
     resolvedUrl: string
     code: StatusCode
+    manifestName: string
 
     constructor({
         error = "",
@@ -81,7 +84,8 @@ class CargoFetchResponse {
         text = "",
         response = null,
         resolvedUrl = "",
-        code = STATUS_CODES.ok
+        code = STATUS_CODES.ok,
+        manifestName = ""
     }: Partial<CargoFetchResponse>) {
         this.error = error
         this.cargo = cargo
@@ -89,6 +93,7 @@ class CargoFetchResponse {
         this.response = response
         this.resolvedUrl = resolvedUrl
         this.code = code
+        this.manifestName = manifestName
     }
 }
 
@@ -156,7 +161,8 @@ const fetchCargo = async (
         cargo: newCargoPkg, 
         text: newCargoText.data,
         response: newCargoResponseCopy,
-        resolvedUrl: baseUrl
+        resolvedUrl: baseUrl,
+        manifestName: getFileNameFromUrl(newCargoRes.url)
     })
 }
 
@@ -178,6 +184,7 @@ type DownloadResponse = {
     previousVersionExists: boolean
     previousCargo: null | Cargo
     code: StatusCode
+    manifestName: string
 }
 
 const downloadResponse = ({
@@ -191,8 +198,9 @@ const downloadResponse = ({
     cargoManifestBytes = 0,
     previousVersionExists = true,
     previousCargo = null,
-    code = STATUS_CODES.ok
-}: Partial<DownloadResponse>) => ({
+    code = STATUS_CODES.ok,
+    manifestName = ""
+}: Partial<DownloadResponse>): DownloadResponse => ({
     downloadableResources, 
     errors,
     bytesToDownload,
@@ -203,7 +211,8 @@ const downloadResponse = ({
     cargoManifestBytes,
     previousVersionExists,
     previousCargo,
-    code
+    code,
+    manifestName
 })
 
 const downloadError = (
@@ -286,11 +295,12 @@ const verifyAllRequestableFiles = async (
 
 type CargoReference = {
     canonicalUrl: string
-    oldResolvedUrl: string
+    oldResolvedUrl: string,
+    oldManifestName: string
 }
 
 export const checkForUpdates = async (
-    {oldResolvedUrl, canonicalUrl}: CargoReference, 
+    {oldResolvedUrl, canonicalUrl, oldManifestName}: CargoReference, 
     fetchFn: FetchFunction,
     fileCache: FileCache
 ) => {
@@ -320,10 +330,8 @@ export const checkForUpdates = async (
         )
     }
     
-    const manifestName = urlSegments[urlSegments.length - 1]
-
     const oldResolvedRootUrl = addSlashToEnd(oldResolvedUrl)
-    const cargoUrl = oldResolvedRootUrl + manifestName
+    const cargoUrl = oldResolvedRootUrl + oldManifestName
 
     const storedCargoRes = await fileCache.getFile(cargoUrl)
     const newCargoUrl = canonicalUrl
@@ -338,7 +346,8 @@ export const checkForUpdates = async (
             text, 
             response,
             resolvedUrl: finalUrl,
-            code
+            code,
+            manifestName
         } = await fetchCargo(
             newCargoUrl, canonicalUrl, fetchFn
         )
@@ -386,9 +395,10 @@ export const checkForUpdates = async (
             )
             file.bytes = bytes
         })
-        const bytesToDownload = filesToDownload.reduce((total, file) => {
-            return total + file.bytes
-        }, 0)
+        const bytesToDownload = filesToDownload.reduce(
+            (total, file) => total + file.bytes, 
+            0
+        )
         return downloadResponse({
             bytesToDownload,
             downloadableResources: filesToDownload,
@@ -402,7 +412,8 @@ export const checkForUpdates = async (
             totalBytes: bytesToDownload,
             cargoManifestBytes: stringBytes(text),
             previousVersionExists: false,
-            code: STATUS_CODES.ok
+            code: STATUS_CODES.ok,
+            manifestName
         })
     }
 
@@ -421,7 +432,8 @@ export const checkForUpdates = async (
         text, 
         response, 
         resolvedUrl: finalUrl,
-        code
+        code,
+        manifestName
     } = await fetchCargo(
         newCargoUrl, canonicalUrl, fetchFn
     )
@@ -510,7 +522,8 @@ export const checkForUpdates = async (
                 resolvedUrl: oldResolvedUrl
             },
             previousCargo: oldCargo.pkg,
-            code: STATUS_CODES.ok
+            code: STATUS_CODES.ok,
+            manifestName
         })
     }
 
@@ -594,6 +607,7 @@ export const checkForUpdates = async (
         },
         previousCargo: oldCargo.pkg,
         code: STATUS_CODES.ok,
+        manifestName
     })
 }
 

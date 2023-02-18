@@ -34,12 +34,14 @@ describe("terminal communication", () => {
             responses: terminalOneActions,
             messageTarget: t2Worker,
             messageInterceptor: t2Worker,
+            state: {}
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker
+            messageInterceptor: t1Worker,
+            state: {}
         })
 
         expect(await terminal1.execute("ping")).toBe(3)
@@ -75,12 +77,14 @@ describe("terminal communication", () => {
             responses: terminalOneActions,
             messageTarget: t2Worker,
             messageInterceptor: t2Worker,
+            state: {}
         })
 
         const t2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
             messageInterceptor: t1Worker,
+            state: {}
         })
 
         expect(await t1.execute("complexAction", ["meapo"])).toBeInstanceOf(Map)
@@ -116,12 +120,14 @@ describe("terminal communication", () => {
             responses: terminalOneActions,
             messageTarget: t2Worker,
             messageInterceptor: t2Worker,
+            state: {},
         })
 
         const t2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker
+            messageInterceptor: t1Worker,
+            state: {}
         })
 
         expect(await t1.execute("complexAction", ["meapo"])).toBeInstanceOf(Map)
@@ -132,7 +138,105 @@ describe("terminal communication", () => {
     })
 })
 
-describe("error handline", () => {
+describe("terminal state", () => {
+    it("terminal state should be passed to all terminal functions", async () => {
+        
+        const mockState = {
+            cool: 1,
+            yes: "str",
+            config: true
+        }
+
+        const terminalOneActions = {
+            ping: (...args: unknown[]) => {
+                expect(args[1]).toStrictEqual(mockState)
+                return true
+            },
+            doCoolStuff: (param: ArrayBuffer, state: typeof mockState) => {
+                expect(state).toStrictEqual(mockState)
+                expect(param).toBeInstanceOf(ArrayBuffer)
+                return wRpc.transfer(param, [param])
+            }
+        } as const
+        
+        const terminalTwoActions = {
+            complexAction: (names: string[], state: typeof mockState) => {
+                expect(state).toStrictEqual(mockState)
+                expect(names).toStrictEqual(["meapo"])
+                return new Map()
+            }
+        }
+        
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const t1 = new wRpc<typeof terminalTwoActions, typeof mockState>({
+            responses: terminalOneActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
+            state: {...mockState},
+        })
+
+        const t2 = new wRpc<typeof terminalOneActions, typeof mockState>({
+            responses: terminalTwoActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker,
+            state: {...mockState}
+        })
+
+        expect(await t1.execute("complexAction", ["meapo"])).toBeInstanceOf(Map)
+        
+        const buffer = new ArrayBuffer(100)
+        const res = await t2.execute("doCoolStuff", buffer, [buffer])
+        expect(res).toBeInstanceOf(ArrayBuffer)
+
+        expect(await t2.execute("ping")).toBe(true)
+    })
+
+    it("state should persist for lifetime of terminal", async () => {
+        const mockState = {pingCount: 0}
+        const terminalOneActions = {
+            pingIncrement: (_: null, state: typeof mockState) => {
+                return state.pingCount++
+            },
+        } as const
+        
+        const terminalTwoActions = {
+            laterPing: (_: null, state: typeof mockState) => {
+                return state.pingCount
+            }
+        }
+        
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const t1 = new wRpc<typeof terminalTwoActions, typeof mockState>({
+            responses: terminalOneActions,
+            messageTarget: t2Worker,
+            messageInterceptor: t2Worker,
+            state: {...mockState},
+        })
+
+        const t2 = new wRpc<typeof terminalOneActions, typeof mockState>({
+            responses: terminalTwoActions,
+            messageTarget: t1Worker,
+            messageInterceptor: t1Worker,
+            state: {...mockState}
+        })
+
+        for (let i = 0; i < 5; i++) {
+            expect(await t2.execute("pingIncrement")).toBe(i)
+        }
+
+        expect(await t1.execute("laterPing")).toBe(0)
+    })
+})
+
+describe("error handling", () => {
     it("if rpc encounters exception, exception should be returned to caller, contained where rpc took place, and prevent hanging between rpcs", async () => {
         const terminalOneActions = {
             ping: () => {
@@ -157,12 +261,14 @@ describe("error handline", () => {
             responses: terminalOneActions,
             messageTarget: t2Worker,
             messageInterceptor: t2Worker,
+            state: {},
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
             messageInterceptor: t1Worker,
+            state: {}
         })
 
         expect(
@@ -197,12 +303,14 @@ describe("error handline", () => {
             responses: terminalOneActions,
             messageTarget: t2Worker,
             messageInterceptor: t2Worker,
+            state: {},
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
             messageInterceptor: t1Worker,
+            state: {}
         })
 
         expect(
