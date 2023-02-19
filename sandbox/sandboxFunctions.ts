@@ -8,14 +8,13 @@ type WindowMessageEvent = {
 }
 
 const window = self as unknown as {
-    parent : {
+    readonly top : {
         postMessage: (data: unknown, origin: string, transferables: Transferable[]) => unknown
     }
     addEventListener: (name: "message", handler: (event: WindowMessageEvent) => any) => unknown
-    top: object
 }
 
-const {top, parent} = window
+const {top} = window
 const addListener = window.addEventListener
 
 type ControllerRpcState = {
@@ -36,13 +35,13 @@ export const controllerRpc = new wRpc<
     responses: sandboxResponses,
     messageTarget: {
         postMessage: (data, transferables) => {
-            parent.postMessage(data, "*", transferables)
+            top.postMessage(data, "*", transferables)
         }
     },
     messageInterceptor: {
         addEventListener: (_, handler) => {
             addListener("message", (event) => {
-                if (event.source !== top) {
+                if (event.source !== (top as object)) {
                     return
                 }
                 handler({data: event.data})

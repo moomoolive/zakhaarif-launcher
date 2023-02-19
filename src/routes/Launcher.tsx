@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, ReactNode } from 'react'
 import {
   Button, 
   Menu,
@@ -15,6 +15,7 @@ import {
   faTerminal, 
   faFolderMinus,
   faGear,
+  faCube,
 } from "@fortawesome/free-solid-svg-icons"
 import {faChrome} from "@fortawesome/free-brands-svg-icons"
 import {Shabah} from "../lib/shabah/downloadClient"
@@ -28,6 +29,15 @@ import LoadingIcon from '../components/LoadingIcon'
 import { UpdateCheckResponse } from '../lib/shabah/updateCheckStatus'
 import { sleep } from '../lib/utils/sleep'
 import { ABORTED, FAILED, UPDATING } from '../lib/shabah/backend'
+import {BYTES_PER_GB} from '../lib/utils/consts/storage'
+import { roundDecimal } from '../lib/math/rounding'
+
+const toGigabytes = (bytes: number, minimum: number): number => {
+  const rawGigabytes = bytes / BYTES_PER_GB
+  const rounded = roundDecimal(rawGigabytes, 2)
+  const minimumOrGreater = Math.max(rounded, minimum)
+  return minimumOrGreater
+}
 
 const UnsupportedFeatures = (): JSX.Element => {
   const {browserFeatures} = useAppContext()
@@ -113,15 +123,7 @@ const UnsupportedFeatures = (): JSX.Element => {
   </>
 }
 
-type PwaInstallPrompt = {
-  prompt: () => void
-  userChoice: () => Promise<"accepted" | "dismissed">
-}
-
-type PwaInstallEvent = Event & PwaInstallPrompt
-
-const APP_TITLE = "Game Launcher"
-let pwaInstallPrompt = null as null | PwaInstallEvent
+const APP_TITLE = import.meta.env.VITE_APP_TITLE
 
 type LauncherState = (
   "uninstalled"
@@ -130,6 +132,8 @@ type LauncherState = (
   | "loading"
   | "ignorable-error"
 )
+
+const NO_DOWNLOAD_LISTENER = "none"
 
 const LauncherRoot = (): JSX.Element => {
   const confirm = useGlobalConfirm()
@@ -143,6 +147,9 @@ const LauncherRoot = (): JSX.Element => {
   const [currentAppVersion, setCurrentAppVersion] = useState(Shabah.NO_PREVIOUS_INSTALLATION)
   const [launcherState, setLauncherState] = useState<LauncherState>("uninstalled")
   const [startButtonText, setStartButtonText] = useState("Install") 
+  const [downloadMetadata, setDownloadMetadata] = useState({
+    downloaded: 0, total: 0
+  })
 
   const updatingCorePackages = useRef<string[]>([])
   const {current: launchApp} = useRef(() => {
@@ -152,8 +159,22 @@ const LauncherRoot = (): JSX.Element => {
   const {current: allFeaturesSupported} = useRef(
     app.browserFeatures.every((feature) => feature.supported)
   )
-
-  const closeSettings = () => setSettingsMenuElement(null)
+  const downloadListenerRef = useRef(-1)
+  const downloadId = useRef(NO_DOWNLOAD_LISTENER)
+  const {current: createDownloadListener} = useRef(() => {
+    const milliseconds = 1_000
+    downloadListenerRef.current = window.setInterval(async () => {
+      if (downloadId.current === NO_DOWNLOAD_LISTENER) {
+        return
+      }
+      const state = await downloadClient.getDownloadStateById(downloadId.current)
+      if (!state) {
+        return
+      }
+      setDownloadMetadata({downloaded: state.downloaded, total: state.total})
+    }, milliseconds)
+  })
+  const {current: closeSettings} = useRef(() => setSettingsMenuElement(null))
 
   const retryFailedDownloads = async (): Promise<void> => {
     const standardCargos = await Promise.all(STANDARD_CARGOS.map(
@@ -186,7 +207,10 @@ const LauncherRoot = (): JSX.Element => {
   }
 
   const gatherAssets = async (): Promise<void> => {
-    if (import.meta.env.PROD && !!sessionStorage.getItem(APP_LAUNCHED)) {
+    if (
+      import.meta.env.PROD 
+      && !!sessionStorage.getItem(APP_LAUNCHED)
+    ) {
       launchApp()
       return
     }
@@ -272,7 +296,8 @@ const LauncherRoot = (): JSX.Element => {
 
     if (queueResponse.data === Shabah.STATUS.noDownloadbleResources) {
       setProgressMsg("Installing...")
-      window.setTimeout(launchApp, 3_000)
+      await sleep(3_000)
+      launchApp()
       return
     }
 
@@ -296,6 +321,13 @@ const LauncherRoot = (): JSX.Element => {
     document.title = "Updating..."
     setCurrentAppVersion(launcher.versions().old)
     
+    const [firstSegment] = updatesAvailable
+    const downloadState = await downloadClient.getDownloadState(firstSegment.canonicalUrl)
+    if (downloadState) {
+      downloadId.current = downloadState.id
+      createDownloadListener()
+    }
+
     if (
       import.meta.env.PROD
       && !window.localStorage.getItem(ASKED_TO_PERSIST)
@@ -321,11 +353,16 @@ const LauncherRoot = (): JSX.Element => {
       if (type === "install") {
         document.title = "Installing..."
         setProgressMsg("Installing...")
+        setDownloadMetadata((previous) => {
+          return {downloaded: previous.total, total: previous.total}
+        })
+        await sleep(2_000)
+        setDownloadMetadata({downloaded: 0, total: 0})
         return
       }
 
       await downloadClient.consumeQueuedMessages()
-      await sleep(3_000)
+      await sleep(4_000)
       
       if (type === "abort" || type === "fail") {
         setLauncherState("error")
@@ -338,6 +375,7 @@ const LauncherRoot = (): JSX.Element => {
     return () => {
       document.title = APP_TITLE
       app.removeEventListener("downloadprogress", handerId)
+      window.clearInterval(downloadListenerRef.current)
     }
   }, [])
 
@@ -349,7 +387,7 @@ const LauncherRoot = (): JSX.Element => {
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl),
       downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[2].canonicalUrl),
     ] as const)
-    const [launcherStatus] = statuses
+    const [launcherStatus, gameStatus, modStatus] = statuses
     
     const notInstalled = statuses.some((cargo) => !cargo)
     const isUpdating = statuses.some((cargo) => cargo?.state === UPDATING)
@@ -382,9 +420,16 @@ const LauncherRoot = (): JSX.Element => {
 
     if (isUpdating) {
       setLauncherState("loading")
-      updatingCorePackages.current = statuses
-        .map((cargo) => cargo?.canonicalUrl || "")
-        .filter((url) => url.length > 0)
+      const validUrls = statuses.map((cargo) => cargo?.canonicalUrl || "")
+      updatingCorePackages.current = validUrls.filter((url) => url.length > 0)
+      const targetDownloadId = (
+        launcherStatus.downloadId
+        || gameStatus?.downloadId
+        || modStatus?.downloadId
+        || NO_DOWNLOAD_LISTENER
+      )
+      downloadId.current = targetDownloadId
+      createDownloadListener()
       return
     }
 
@@ -537,10 +582,29 @@ const LauncherRoot = (): JSX.Element => {
                       {progressMsg}
                     </div>
                   </Collapse>
+
+                  <Collapse 
+                    in={
+                      launcherState === "loading" 
+                      && downloadMetadata.total > 0
+                    }
+                  >
+                      <div className="mt-4 text-sm">
+                        <span className="mr-2 text-blue-500">
+                          <FontAwesomeIcon icon={faCube}/>
+                        </span>
+
+                        <span>
+                          {`${toGigabytes(downloadMetadata.downloaded, downloadMetadata.downloaded === downloadMetadata.total ? 0.01 : 0.0).toFixed(2)} GB`}
+                        </span>
+                        
+                        <span className="text-neutral-400">
+                          {`/${toGigabytes(downloadMetadata.total, 0.01).toFixed(2)} GB`}
+                        </span>
+                      </div>
+                  </Collapse>
                 </div>
             </>}
-            
-            
 
            <Tooltip
             placement="top"

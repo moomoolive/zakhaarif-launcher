@@ -440,7 +440,8 @@ export class Shabah {
         return Promise.all([
             this.fileCache.deleteAllFiles(),
             this.virtualFileCache.deleteAllFiles(),
-            this.clientMessageChannel.deleteAllMessages()
+            this.clientMessageChannel.deleteAllMessages(),
+            this.backendMessageChannel.deleteAllMessages()
         ] as const)
     }
 
@@ -657,6 +658,16 @@ export class Shabah {
         ) 
         const {previousVersion, version} = downloadIndex.segments[segmentIndex]
         return {...response, previousVersion, version}
+    }
+
+    async getDownloadStateById(downloadId: string): Promise<DownloadState | null> {
+        const managerResponse = await io.wrap(
+            this.downloadManager.getDownloadState(downloadId)
+        )
+        if (!managerResponse.ok || !managerResponse.data) {
+            return null
+        }
+        return managerResponse.data
     }
 
     async consumeQueuedMessages(): Promise<StatusCode> {
