@@ -6,6 +6,10 @@ import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
 import type {CargoIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
 import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
+import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
+import { MILLISECONDS_PER_SECOND } from "../utils/consts/time"
+import { io } from "../monads/result"
+import { stringEqualConstantTimeCompare } from "../utils/security/strings"
 
 export type SandboxFunctions = AllRpcs
 
@@ -22,6 +26,8 @@ type JsSandboxOptions = {
     downloadClient: Shabah
 }
 
+const SANDBOX_PING_INTERVAL = 20 * MILLISECONDS_PER_SECOND
+
 export class JsSandbox {
     private frameListener: (message: MessageEvent<unknown>) => void
     private iframeElement: HTMLIFrameElement
@@ -31,7 +37,9 @@ export class JsSandbox {
     private readonly originalPermissions: PermissionsSummary
     private reconfiguredPermissions: PermissionsSummary | null
     private initialized: boolean
-    private rpc: wRpc<{}, RpcState>
+    private rpc: wRpc<SandboxResponses, RpcState>
+    private extensionPingTimerId: number
+    private latestPingResponse: number
     
     readonly id: string
     readonly name: string
@@ -70,9 +78,24 @@ export class JsSandbox {
         this.iframeElement = document.createElement("iframe")
         this.frameListener = () => {}
         this.rpc = this.createRpc(this.state)
+        this.extensionPingTimerId = -1
+        this.latestPingResponse = Date.now() + SANDBOX_PING_INTERVAL
     }
 
-    private createRpc(state: RpcState): wRpc<{}, RpcState> {
+    private async pingExtension(): Promise<boolean> {
+        const response = await io.wrap(this.rpc.execute("ping"))
+        this.state.logger.info(`extension returned ping. ok=${response.ok}`)
+        if (!response.ok || typeof response.data !== "string") {
+            return false
+        }
+        if (!stringEqualConstantTimeCompare(response.data, this.state.authToken)) {
+            return false
+        }
+        this.latestPingResponse = Date.now()
+        return true
+    }
+
+    private createRpc(state: RpcState): wRpc<SandboxResponses, RpcState> {
         const self = this
         const responses = createRpcFunctions(state)
         return new wRpc({
@@ -81,13 +104,16 @@ export class JsSandbox {
             messageTarget: {
                 postMessage: (data, transferables) => {
                     self.iframeElement.contentWindow?.postMessage(
-                        data, "*", transferables
+                        data, "*",  transferables
                     )
                 }
             },
             messageInterceptor: {
                 addEventListener: (_, handler) => {
                     const listener = (event: MessageEvent) => {
+                        if (event.source !== self.iframeElement.contentWindow) {
+                            return
+                        }
                         handler({data: event.data})
                     }
                     self.frameListener = listener
@@ -175,6 +201,31 @@ export class JsSandbox {
         }
         const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
         iframe.src = `${sandboxOrigin}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
+        
+        window.clearInterval(this.extensionPingTimerId)
+        const self = this
+        const pingHandler = async () => {
+            const now = Date.now()
+            const {latestPingResponse} = self
+            const difference = now - latestPingResponse
+            if (
+                difference >= SANDBOX_PING_INTERVAL
+                || !this.state.readyForDisplay
+            ) {
+                self.state.createFatalErrorMessage(
+                    "A fatal error has occurred",
+                    "Extension is irresponsive"
+                )
+                self.state.logger.error(
+                    `Extension did not respond to ping within ${SANDBOX_PING_INTERVAL / MILLISECONDS_PER_SECOND} seconds. Extension is most likely not operational.`
+                )
+                return
+            }
+            self.pingExtension()
+        }
+        this.extensionPingTimerId = window.setInterval(
+            pingHandler, SANDBOX_PING_INTERVAL
+        )
         return iframe
     }
 
@@ -201,17 +252,20 @@ export class JsSandbox {
         window.removeEventListener("message", callback)
         this.iframeElement.remove()
         this.dependencies.logger.info(`cleaned up all resources associated with sandbox "${this.id}"`)
+        window.clearInterval(this.extensionPingTimerId)
         return true
     }
 
     private async mutatePermissions(canonicalUrls: string[]): Promise<boolean> {
         const {originalPermissions} = this
+        this.dependencies.logger.info("extension has requested permission reconfiguration")
         if (
             this.persistentState.configuredPermissions
             || !this.initialized
             || originalPermissions.embedExtensions.length < 1
             || originalPermissions.embedExtensions[0] !== ALLOW_ALL_PERMISSIONS
         ) {
+            this.dependencies.logger.warn("extension reconfiguration failed!")
             return false
         }
         const configuredPermissions = {
@@ -224,6 +278,7 @@ export class JsSandbox {
         const merged =  mergePermissionSummaries(
             this.reconfiguredPermissions, {cargos}
         )
+        this.dependencies.logger.info("newly configured permissions =", merged)
         this.persistentState.configuredPermissions = true
         const iframeArguments = this.iframeArguments(
             merged, location.origin,

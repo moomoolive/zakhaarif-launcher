@@ -18,8 +18,22 @@ const window = self as unknown as {
 const {top, parent} = window
 const addListener = window.addEventListener
 
-export const controllerRpc = new wRpc<ExtensionShellFunctions>({
-    responses: {},
+type ControllerRpcState = {
+    authToken: string
+}
+
+const sandboxResponses = {
+    ping: (_: null, state: ControllerRpcState) => {
+        return state.authToken
+    }
+}
+
+export type SandboxResponses = typeof sandboxResponses
+
+export const controllerRpc = new wRpc<
+    ExtensionShellFunctions, ControllerRpcState
+>({
+    responses: sandboxResponses,
     messageTarget: {
         postMessage: (data, transferables) => {
             parent.postMessage(data, "*", transferables)
@@ -31,11 +45,11 @@ export const controllerRpc = new wRpc<ExtensionShellFunctions>({
                 if (event.source !== top) {
                     return
                 }
-                handler(event)
+                handler({data: event.data})
             })
         }
     },
-    state: {}
+    state: {authToken: ""}
 })
 
 export const serviceWorkerToSandboxRpc = {

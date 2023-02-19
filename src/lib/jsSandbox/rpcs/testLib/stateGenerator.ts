@@ -6,6 +6,7 @@ import {PermissionsList} from "../../../cargo"
 import {Permissions} from "../../../types/permissions"
 import { CACHED } from "../../../shabah/backend"
 import type {AppDatabase} from "../../../database/AppDatabase"
+import { Shabah } from "../../../shabah/downloadClient"
 
 const mockSandboxDependencies: SandboxDependencies = {
     displayExtensionFrame: () => {},
@@ -32,6 +33,7 @@ const mockSandboxDependencies: SandboxDependencies = {
     cargo: new Cargo(),
     // a quick hack for now
     database: {} as unknown as AppDatabase,
+    downloadClient: {} as unknown as Shabah,
     recommendedStyleSheetUrl: "",
     origin: "",
     logger: {
@@ -65,7 +67,9 @@ type DependencyOverwrite = {
     permissions?: PermissionsList<Permissions>
 }
 
-export const cloneDeps = (overwrite: DependencyOverwrite = {}) => {
+export const cloneDeps = (
+    overwrite: DependencyOverwrite = {}
+) => {
     const {
         sandboxDependencies: sDeps, 
         persistentState: pState,

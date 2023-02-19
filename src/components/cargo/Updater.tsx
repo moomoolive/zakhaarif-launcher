@@ -286,18 +286,24 @@ export const CargoUpdater = ({
                             <div className="text-xs text-yellow-300 pb-1">
                                 {"New Permissions:"}
                             </div>
-                            <div
-                                className="overflow-y-scroll overflow-x-clip"
-                                style={{maxHeight: "80px"}}
-                            >
-                                {cargoUpdateResponse.permissions.diffedPermissions.added.map((permission, index) => {
-                                    return <div
-                                        key={`new-permission-${index}`}
-                                    >
-                                        <PermissionsDisplay permission={permission}/>
-                                    </div>
-                                })}
-                            </div>
+                            {cargoUpdateResponse.permissions.diffedPermissions.added.length < 1 ? <>
+                                <div className="text-green-500 text-sm">
+                                    No new permissions required
+                                </div>
+                            </> : <>
+                                <div
+                                    className="overflow-y-scroll overflow-x-clip"
+                                    style={{maxHeight: "80px"}}
+                                >
+                                    {cargoUpdateResponse.permissions.diffedPermissions.added.map((permission, index) => {
+                                        return <div
+                                            key={`new-permission-${index}`}
+                                        >
+                                            <PermissionsDisplay permission={permission}/>
+                                        </div>
+                                    })}
+                                </div>
+                            </>}
 
                             <Collapse in={updateError.length > 0}>
                                 <div className="w-full text-sm text-center text-red-500 mb-1">

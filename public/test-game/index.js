@@ -10,13 +10,19 @@ export const main = async (args) => {
     const gameId = parseInt(inputId, 10)
     if (isNaN(gameId)) {
         console.error("inputted game id is not a number. game_id =", queryState)
-        messageAppShell("signalFatalError", authToken)
+        messageAppShell("signalFatalError", {
+            extensionToken: authToken,
+            details: "invalid game save ID"
+        })
         return
     }
     const gameSave = await messageAppShell("getSaveFile", gameId)
     if (!gameSave) {
         console.error("inputted game id doesn't exist", gameId)
-        messageAppShell("signalFatalError", authToken)
+        messageAppShell("signalFatalError", {
+            extensionToken: authToken,
+            details: "game save doesn't exist"
+        })
         return
     }
     console.log("game save found", gameSave)
@@ -47,7 +53,6 @@ export const main = async (args) => {
     }
     await Promise.all(importUrls.map((url) => import(url)))
     console.info("creating worker")
-    
     const file = await fetch(new URL("./worker.js", import.meta.url))
     const blobUrl = URL.createObjectURL(await file.blob())
     const worker = new Worker(blobUrl, {

@@ -142,7 +142,7 @@ const NewGamePage = () => {
                             )
                             const [{id: gameId}] = await Promise.all([
                                 database.gameSaves.create(saveParams),
-                                sleep(2_000)
+                                sleep(1_000)
                             ] as const)
                             logger.info("successfully created save!")
                             setLoading(false)

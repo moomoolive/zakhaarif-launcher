@@ -109,7 +109,8 @@ export class wRpc<
     private messageContainer: MessageContainer
     private messageTarget: MessagableEntity
     private messageInterceptor: MessageInterceptor
-    private state: State
+    
+    state: State
 
     constructor({
         responses,

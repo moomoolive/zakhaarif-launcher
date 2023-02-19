@@ -13,7 +13,10 @@ if (window.self === window.top) {
 }
 
 if (!("serviceWorker" in navigator)) {
-    await controllerRpc.execute("signalFatalError", "")
+    await controllerRpc.execute("signalFatalError", {
+        extensionToken: "",
+        details: "Service worker not supported"
+    })
     throw new Error("sandbox requires service worker to function")
 }
 
@@ -38,9 +41,14 @@ const rpc = new wRpc<ServiceWorkerFunctions>({
 })
 const initialState = await controllerRpc.execute("getInitialState")
 if (!initialState) {
-    await controllerRpc.execute("signalFatalError", "")
+    await controllerRpc.execute("signalFatalError", {
+        extensionToken: "",
+        details: `initial state is invalid, got ${initialState}`
+    })
     throw new Error("passed initial state was invalid")
 }
+
+controllerRpc.state.authToken = initialState.authToken
 
 const rootElement = document.createElement("div")
 rootElement.setAttribute("id", "root")
@@ -68,8 +76,19 @@ const script = await (async (url: string) => {
     }
 })(root?.getAttribute("entry") || "none")
 
-if (!script || !("main" in script)) {
-    controllerRpc.execute("signalFatalError", initialState.authToken)
+if (!script) {
+    controllerRpc.execute("signalFatalError", {
+        extensionToken: initialState.authToken,
+        details: "couldn't find extension entry"
+    })
+    throw new Error("extension entry does not exist")
+}
+
+if (!("main" in script)) {
+    controllerRpc.execute("signalFatalError", {
+        extensionToken: initialState.authToken,
+        details: "'main' function is not exported from entry"
+    })
     throw new Error("no main function exported from module")
 }
 

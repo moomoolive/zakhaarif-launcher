@@ -43,7 +43,8 @@ const ExtensionShellPage = () => {
     const [errorMessage, setErrorMessage] = useState("An error occurred...")
     const [loading, setLoading] = useState(true)
     const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
-    
+
+    const errorDetailsRef = useRef("")
     const extensionCargo = useRef(new Cargo<Permissions>())
     const extensionCargoIndex = useRef<CargoIndex>({
         tag: -1,
@@ -67,7 +68,7 @@ const ExtensionShellPage = () => {
         if (sandbox.current) {
             sandbox.current.destroy()
         }
-        console.info("All extension resouces cleaned up")
+        logger.info("All extension resouces cleaned up")
     })
     const appendSandboxToDom = useRef(async (sandboxContainer: HTMLElement) => {
         const jsSandbox = sandbox.current
@@ -189,7 +190,8 @@ const ExtensionShellPage = () => {
                 database,
                 minimumLoadTime: 10_000,
                 queryState: searchParams.get("state") || "",
-                createFatalErrorMessage: (msg) => {
+                createFatalErrorMessage: (msg, details) => {
+                    errorDetailsRef.current = details
                     setErrorMessage(msg)
                     setShowRestartExtension(true)
                     setError(true)
@@ -197,7 +199,8 @@ const ExtensionShellPage = () => {
                 confirmExtensionExit: closeExtension,
                 cargo: extensionCargo.current,
                 cargoIndex: extensionCargoIndex.current,
-                recommendedStyleSheetUrl: rawCssExtension
+                recommendedStyleSheetUrl: rawCssExtension,
+                downloadClient
             },
         })
         sandbox.current = jsSandbox
@@ -217,9 +220,20 @@ const ExtensionShellPage = () => {
                         <div className="text-xl text-neutral-100 mb-2">
                             {errorMessage}
                         </div>
-                        <div className="text-xs text-neutral-500">
-                            Check browser console for more info
-                        </div>
+                        {errorDetailsRef.current.length < 1 ? <>
+                            <div className="text-xs text-neutral-500">
+                                Check browser console for more info
+                            </div>
+                        </> : <div className="w-4/5 mx-auto">
+                            <div className="text-sm mb-2 text-neutral-400">
+                                {errorDetailsRef.current}
+                            </div>
+
+                            <div className="text-sm text-neutral-500">
+                                Check console for more info
+                            </div>
+                        </div>}
+                        
                     </div>
                     
                     <div>

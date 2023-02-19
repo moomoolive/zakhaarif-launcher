@@ -9,51 +9,13 @@ import {EventListenerRecord} from "./eventListener"
 import { AppDatabase } from "../database/AppDatabase"
 import {FEATURE_CHECK} from "./featureCheck"
 import {VERBOSE_LAUNCHER_LOGS} from "./localStorageKeys"
-import { Logger } from "../types/app"
+import {AppLogger} from "./appLogger"
 import {
     createBackendChannel, createClientChannel
 } from "../utils/shabahChannels"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener
-}
-
-type AppLoggerConfig = {
-    silent: boolean
-    name: string
-}
-
-export class AppLogger implements Logger {
-    silent: boolean
-    name: string
-
-    constructor(config: AppLoggerConfig) {
-        const {silent, name} = config
-        this.silent = silent
-        this.name = name
-    }
-
-    private prefix() {
-        return `[${this.name}]`
-    }
-
-    isSilent(): boolean {
-        return this.silent
-    }
-
-    info(...messages: unknown[]): void {
-        if (!this.silent) {
-            console.info(this.prefix(), ...messages)
-        }
-    }
-
-    warn(...messages: unknown[]): void {
-        console.warn(this.prefix(), ...messages)
-    }
-
-    error(...messages: unknown[]): void {
-        console.error(this.prefix(), ...messages)
-    }
 }
 
 export type EventName = keyof EventMap

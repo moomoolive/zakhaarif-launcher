@@ -1,6 +1,5 @@
 import {RpcState} from "../state"
 import {TransferValue, wRpc} from "../../../wRpc/simple"
-import { APP_CACHE } from "../../../../config"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
 import { stringEqualConstantTimeCompare } from "../../../utils/security/strings"
 
@@ -15,8 +14,7 @@ export async function getFile(url: string, state: RpcState): Promise<TransferVal
         state.logger.warn(`provided url was not a string, got "${betterTypeof(url)}"`)
         return null
     }
-    const cache = await caches.open(APP_CACHE)
-    const file = await cache.match(url)
+    const file = await state.downloadClient.getCachedFile(url)
     if (!file || !file.body) {
         return null
     }
@@ -59,25 +57,45 @@ export function secureContextEstablished(_: null, state: RpcState): boolean {
     return true
 }
 
-export function signalFatalError(extensionToken: string, state: RpcState): boolean {
-    if (!state.secureContextEstablished) {
-        state.logger.warn("cannot signal fatal error before establishing secure context")
-        return false
-    }
-    
-    if (typeof extensionToken !== "string") {
-        state.logger.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
+type FatalErrorConfig = {
+    extensionToken: string
+    details: string
+}
+
+export function signalFatalError(params: FatalErrorConfig, state: RpcState): boolean {
+    if (
+        typeof params !== "object"
+        || params === null
+        || Array.isArray(params)
+    ) {
+        state.logger.warn(`fatalErrorConfig must be an object, got "${betterTypeof(params)}"`)
         return false
     }
 
-    if (!stringEqualConstantTimeCompare(extensionToken, state.authToken)) {
+    if (typeof params.extensionToken !== "string") {
+        state.logger.warn(`fatalErrorConfig.extensionToken must be a string, got "${betterTypeof(params.extensionToken)}"`)
+        return false
+    }
+    
+
+    if (typeof params.details !== "string") {
+        state.logger.warn(`fatalErrorConfig.details must be a string, got "${betterTypeof(params.details)}"`)
+        return false
+    }
+
+    const {extensionToken, details} = params
+
+    if (
+        state.secureContextEstablished
+        && !stringEqualConstantTimeCompare(extensionToken, state.authToken)
+    ) {
         state.logger.warn("application signaled fatal error but provided wrong auth token")
         return false
     }
 
     state.fatalErrorOccurred = true
     state.logger.error("extension encountered fatal error")
-    state.createFatalErrorMessage("Encountered a fatal error")
+    state.createFatalErrorMessage("Encountered a fatal error", details)
     return true
 }
 
@@ -85,10 +103,10 @@ export function readyForDisplay(_: null, state: RpcState): boolean {
     if (state.readyForDisplay || state.fatalErrorOccurred) {
         return false
     }
-    console.info("Extension requested to show display")
+    state.logger.info("Extension requested to show display")
     state.readyForDisplay = true
     state.minimumLoadTimePromise.then(() => {
-        console.info("Opening extension frame")
+        state.logger.info("opening extension frame")
         state.displayExtensionFrame()
     })
     return true
@@ -104,9 +122,11 @@ export async function exit(extensionToken: string, state: RpcState): Promise<boo
         state.logger.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
         return false
     }
+
     if (!stringEqualConstantTimeCompare(extensionToken, state.authToken)) {
         return false
     }
+    
     await state.confirmExtensionExit()
     return true
 }

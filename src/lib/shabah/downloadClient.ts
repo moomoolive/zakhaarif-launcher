@@ -634,7 +634,7 @@ export class Shabah {
     }
 
     // progress listening interfaces
-    async getDownloadState(canonicalUrl: string): Promise<null | DownloadStateSummary> {
+    async getDownloadState(canonicalUrl: string): Promise<DownloadStateSummary | null> {
         const [cargoIndex, downloadIndex] = await Promise.all([
             this.getCargoIndexByCanonicalUrl(canonicalUrl),
             this.getDownloadIndexByCanonicalUrl(canonicalUrl)

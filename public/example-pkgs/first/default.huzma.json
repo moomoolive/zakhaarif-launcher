@@ -1,7 +1,7 @@
 {
     "schema": "0.1.0",
     "name": "First",
-    "version": "1.5.3",
+    "version": "1.5.4",
     "entry": "entry.js",
     "files": ["entry.js"],
     "invalidation": "url-diff",

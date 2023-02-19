@@ -1,7 +1,5 @@
 import {useState, useMemo, useRef, useEffect, ReactNode} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
-import {ErrorOverlay} from "../components/ErrorOverlay"
 import {
     Button, 
     Tooltip,
@@ -26,7 +24,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {useAppContext} from "./store"
-import {io} from "../lib/monads/result"
 import {Shabah, CargoIndex} from "../lib/shabah/downloadClient"
 import {Cargo} from "../lib/cargo/index"
 import {
@@ -37,9 +34,7 @@ import {
 } from "../components/FilterChevron"
 import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
-import {isMod} from "../lib/utils/cargos"
 import type {Permissions} from "../lib/types/permissions"
-import type { DeepReadonly } from "../lib/types/utility"
 import { sleep } from "../lib/utils/sleep"
 import type { FileDetails } from "../components/cargo/CargoFileSystem"
 import { FileSystemBreadcrumbs } from "../components/cargo/FileSystemBreadcrumbs"
@@ -48,15 +43,11 @@ import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
 import { ADDONS_INFO_MODAL, ADDONS_MODAL, ADDONS_UPDATE_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
-import LoadingIcon from "../components/LoadingIcon"
-import { ABORTED, CACHED, FAILED, UPDATING } from "../lib/shabah/backend"
-import { ERROR_CODES_START } from "../lib/shabah/client"
-import { useAsyncState } from "../hooks/promise"
 import { roundDecimal } from "../lib/math/rounding"
 import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
 import { useDebounce } from "../hooks/debounce"
-//import { makeTestCargoIndexes } from "../testScripts/dummyCargoIndexes"
 import {CargoFileSystemSkeleton} from "../components/cargo/CargoFileSystemSkeleton"
+import {debugStatusCode} from "../lib/shabah/debug"
 
 const FileOverlay = lazyComponent(
     async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
@@ -367,7 +358,8 @@ const AddOns = (): JSX.Element => {
             const consumeResponse = await downloadClient.consumeQueuedMessages()
             logger.info(
                 `consumed incoming messages. Consume operation returned with code`, 
-                consumeResponse
+                consumeResponse,
+                `("${(debugStatusCode(consumeResponse))}")`
             )
 
             const urlMap = new Map(canonicalUrls.map((url) => [url, 1]))

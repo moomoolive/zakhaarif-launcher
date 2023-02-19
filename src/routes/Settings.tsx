@@ -1,4 +1,4 @@
-import {ReactNode, useEffect, useState, useRef} from "react"
+import {ReactNode, useEffect, useState, useRef, useMemo} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {useAppContext} from "./store"
 import {useAsyncState} from "../hooks/promise"
@@ -14,24 +14,15 @@ import {
     faFaceLaughSquint,
     faScrewdriver,
     faAngleRight,
-    faCheck,
     faUser,
     faHandshakeAngle,
     IconDefinition,
-    faHeartBroken,
     faGamepad
 } from "@fortawesome/free-solid-svg-icons"
-import {Divider, IconButton, Tooltip, TextField, Switch} from "@mui/material"
-import {PROFILE_NAME, ALLOW_UNSAFE_PACKAGES, VERBOSE_LAUNCHER_LOGS} from "../lib/utils/localStorageKeys"
-import { useDebounce } from "../hooks/debounce"
-import { useGlobalConfirm } from "../hooks/globalConfirm"
-import LoadingIcon from "../components/LoadingIcon"
-import { useEffectAsync } from "../hooks/effectAsync"
-import { io } from "../lib/monads/result"
-import { faNodeJs, faNpm } from "@fortawesome/free-brands-svg-icons"
-import {bismillah} from "../lib/utils/consts/arabic"
+import {Divider, IconButton, Tooltip} from "@mui/material"
 import { SETTINGS_TAB } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
+import {SubPageList} from "./SettingsTabs/index"
 
 type SettingRouteProps = {
     children: ReactNode
@@ -72,8 +63,10 @@ type MiniRoutes = {
     readonly [key: string]: () => JSX.Element
 }
 
+const DO_NOT_DISPLAY_TAB = "none"
+
 type MiniRouterProps<Routes extends MiniRoutes> = {
-    displayLocation: keyof Routes | "none"
+    displayLocation: keyof Routes | typeof DO_NOT_DISPLAY_TAB
     routes: Routes
     FallbackRoute: (props: {className: string, onAnimationEnd: () => void}) => JSX.Element
     returnToHome: () => void
@@ -97,7 +90,7 @@ function MiniRouter<Routes extends MiniRoutes>({
         }
     }, [displayLocation, renderedLocation])
 
-    if (renderedLocation === "none") {
+    if (renderedLocation === DO_NOT_DISPLAY_TAB) {
         if (transition === fadeOut) {
             setTransition(fadeIn)
             setRenderedLocation(displayLocation)
@@ -143,256 +136,6 @@ type SettingSubsection = {
     contentStyles?: Partial<{width: string}>
 }
 
-type CreditElement = {
-    name: string
-    type: "npm" | "node"
-    url: string
-}
-
-const CREDITS_DIV_ID = "credits-compiled"
-
-const SubPageList = {
-    userProfile: () => {
-        const optionsDebounce = useDebounce(500)
-
-        const [profileName, setProfileName] = useState((() => {
-            const previous = localStorage.getItem(PROFILE_NAME) || ""
-            if (previous.length > 0) {
-                return previous
-            }
-            return "default"
-        })())
-        const [peristenceLoading, setPersistenceLoading] = useState(false)
-
-        return <div>
-            <div>
-                <TextField
-                    id="profile-name-input"
-                    name="profile-name"
-                    label="Profile Name"
-                    value={profileName}
-                    onChange={(event) => {
-                        setProfileName(event.target.value)
-                        setPersistenceLoading(true)
-                        optionsDebounce(() => {
-                            localStorage.setItem(PROFILE_NAME, event.target.value)
-                            setPersistenceLoading(false)
-                        })
-                    }}
-                    helperText={
-                        peristenceLoading 
-                            ? <span className="animate-pulse">{"Loading..."}</span>
-                            : <span className="text-green-500">
-                                <span className="mr-2">
-                                    <FontAwesomeIcon icon={faCheck}/> 
-                                </span>
-                                Saved
-                            </span>
-                    }
-                />
-            </div>
-        </div>
-    },
-    acknowledgments: () => {
-        const [credits, setCredits] = useState<CreditElement[]>([])
-        const [loading, setLoading] = useState(true)
-        const [error, setError] = useState(false)
-        const creditScrollerIntervalRef = useRef(-1)
-
-        useEffectAsync(async () => {
-            const creditsResponse = await io.wrap(fetch("/credits.json"))
-            if (!creditsResponse.ok) {
-                setError(true)
-                return
-            }
-            const credits = await io.wrap(creditsResponse.data.json())
-            if (!credits.ok) {
-                setError(true)
-                return
-            }
-            setError(false)
-            setCredits(credits.data)
-            setLoading(false)
-        }, [])
-
-        useEffect(() => {
-            if (credits.length < 1) {
-                return
-            }
-            const creditsDiv = document.getElementById(CREDITS_DIV_ID)
-            if (!creditsDiv) {
-                return
-            }
-            const milliseconds = 16
-            const scrollerState = {
-                previousScroll: -1
-            }
-            creditScrollerIntervalRef.current = window.setInterval(() => {
-                if (scrollerState.previousScroll === creditsDiv.scrollTop) {
-                    window.clearInterval(creditScrollerIntervalRef.current)
-                    return
-                }
-                scrollerState.previousScroll = creditsDiv.scrollTop
-                creditsDiv.scrollTop += 1
-            }, milliseconds)
-            return () => window.clearInterval(creditScrollerIntervalRef.current)
-        }, [credits])
-
-        return <div className="w-full h-full">
-            {!error && loading ? <>
-                <div className="w-full flex items-center justify-center">
-                    <div>
-                        <div className="animate-spin text-4xl text-blue-500">
-                            <LoadingIcon/>
-                        </div>
-                    </div>
-                </div>
-            </> : <>
-                {error ? <>
-                    <div className="w-full text-center flex items-center justify-center">
-                        <div className="w-full">
-                            <div className="text-4xl mb-2 text-red-500">
-                                <FontAwesomeIcon icon={faHeartBroken}/>
-                            </div>
-                            <div className="w-4/5 mx-auto max-w-md">
-                                {"Error occurred!"}
-                                <div className="text-neutral-400 text-xs mt-1">
-                                    {"Never wanted to give credits to others anyways..."}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </> : <>
-                    <div className="w-11/12 border-b-2 border-solid border-neutral-600 pb-2 text-xs md:text-sm text-neutral-400">
-                        {"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source projects (and their dependencies)."}
-                    </div>
-                    <div 
-                        id={CREDITS_DIV_ID}
-                        className="w-full h-10/12 px-2 py-3 overflow-x-clip overflow-y-scroll"
-                    >
-                        <div className="mb-5 text-center text-lg text-neutral-400">
-                            {bismillah}
-                        </div>
-                        {credits.map((credit, index) => {
-                            const {name, url, type} = credit
-                            return <a
-                                href={url}
-                                rel="noopener"
-                                target="_blank"
-                                key={`credit-${index}`}
-                                id={`credit-link-${index}`}
-                            >
-                                <button className="w-full flex mb-3 hover:text-green-500">
-                                    <div className="mr-2">
-                                        {((source: typeof type) => {
-                                            switch (source) {
-                                                case "node":
-                                                    return <span className="text-green-600 mx-0.5">
-                                                        <FontAwesomeIcon icon={faNodeJs}/>
-                                                    </span>
-                                                case "npm":
-                                                default:
-                                                    return <span className="text-red-500">
-                                                        <FontAwesomeIcon icon={faNpm}/>
-                                                    </span>
-                                            }
-                                        })(type)}
-                                    </div>
-                                    <div>
-                                        {name}
-                                    </div>
-                                </button>
-                            </a>
-                        })}
-                        <div className="mb-3 text-neutral-200">
-                            {"All the folks who maintain the web standards and browsers"}
-                        </div>
-                        <div className="mb-3 text-neutral-400">
-                            {"And probably many, many more..."}
-                        </div>
-                    </div>
-                </>}
-            </>}
-        </div>
-    },
-    developerOptions: () => {
-        const confirm = useGlobalConfirm()
-        const {logger} = useAppContext()
-        
-        const [unsafePermissions, setUnsafePermissions] = useState(
-            !!localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
-        )
-        const [verboseLogs, setVerboseLogs] = useState(
-            localStorage.getItem(VERBOSE_LAUNCHER_LOGS) === "true"
-        )
-
-        return <div>
-            <div className="mb-8">
-                <div>
-                    <Switch 
-                        id="unsafe-permissions-switch"
-                        name="unsafe-permissions"
-                        color="success"
-                        checked={verboseLogs}
-                        onChange={async (event) => {
-                            if (event.target.checked) {
-                                logger.silent = false
-                                console.info("[🐸 Frogger]: Logging has been turned on!")
-                                setVerboseLogs(true)
-                                localStorage.setItem(VERBOSE_LAUNCHER_LOGS, "true")
-                            } else {
-                                console.info("[🐸 Frogger]: Logging has been switched off. Goodbye!")
-                                logger.silent = true
-                                setVerboseLogs(false)
-                                localStorage.setItem(VERBOSE_LAUNCHER_LOGS, "false")
-                            } 
-                        }}
-                        inputProps={{'aria-label': 'controlled'}}
-                    />
-                    <span>
-                        {"Launcher Logs"}
-                    </span>
-                </div>
-            </div>
-            
-            <div className="mx-2">
-                <Divider/>
-            </div>
-            
-            <div className="mx-2.5 mt-2 mb-1">
-                <div className="text-sm text-red-500">
-                    {"Unsafe Options"}
-                </div>
-            </div>
-
-            <div>
-                <Switch 
-                    id="unsafe-permissions-switch"
-                    name="unsafe-permissions"
-                    color="error"
-                    checked={unsafePermissions}
-                    onChange={async (event) => {
-                        if (
-                            event.target.checked 
-                            && (await confirm({title: "Are you sure you want to allow unsafe packages?", description: "This should only be used for development purposes. Use this option at your own risk!", confirmButtonColor: "error"}))
-                        ) {
-                            setUnsafePermissions(true)
-                            localStorage.setItem(ALLOW_UNSAFE_PACKAGES, "true")
-                        } else {
-                            setUnsafePermissions(false)
-                            localStorage.removeItem(ALLOW_UNSAFE_PACKAGES)
-                        } 
-                    }}
-                    inputProps={{'aria-label': 'controlled'}}
-                />
-                <span>
-                    {"Allow Unsafe Packages"}
-                </span>
-            </div>
-        </div>
-    }
-}
-
 const CoolEscapeButton = ({className = ""}= {}): JSX.Element => {
     return <div className={"text-right " + className}>
         <Link to="/start">
@@ -410,7 +153,9 @@ const CoolEscapeButton = ({className = ""}= {}): JSX.Element => {
     </div>
 }
 
-type SettingsTab = keyof typeof SubPageList | "none"
+type SettingsTab = keyof typeof SubPageList | typeof DO_NOT_DISPLAY_TAB
+
+const NO_CLIPBOARD_ACTION = "no-clipboard"
 
 const SettingsPage = (): JSX.Element => {
     const navigate = useNavigate()
@@ -418,7 +163,7 @@ const SettingsPage = (): JSX.Element => {
     const [searchParams, setSearchParams] = useSearchParams()
 
     const {current: setSubpage} = useRef((key: SettingsTab) => {
-        if (key === "none") {
+        if (key === DO_NOT_DISPLAY_TAB) {
             searchParams.delete(SETTINGS_TAB)
         } else {
             searchParams.set(SETTINGS_TAB, key)
@@ -428,12 +173,12 @@ const SettingsPage = (): JSX.Element => {
 
     const [launcherMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[0].canonicalUrl))
     const [gameMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
-    const [clipboardActionId, setClipboardActionId] = useState("none")
+    const [clipboardActionId, setClipboardActionId] = useState(NO_CLIPBOARD_ACTION)
 
     const onClipboardAction = (actionId: string) => {
         setClipboardActionId(actionId)
         const milliseconds = 1_000
-        window.setTimeout(() => setClipboardActionId("none"), milliseconds)
+        window.setTimeout(() => setClipboardActionId(NO_CLIPBOARD_ACTION), milliseconds)
     }
     
     const versionText = launcherMetadata.loading
@@ -454,6 +199,17 @@ const SettingsPage = (): JSX.Element => {
         window.addEventListener("keyup", handler)
         return () => window.removeEventListener("keyup", handler)
     }, [])
+
+    const displayLocation = useMemo(() => {
+        if (!searchParams.has(SETTINGS_TAB)) {
+            return DO_NOT_DISPLAY_TAB
+        }
+        const tab = searchParams.get(SETTINGS_TAB) || ""
+        if (!(tab in SubPageList)) {
+            return DO_NOT_DISPLAY_TAB
+        }
+        return tab as keyof typeof SubPageList     
+    }, [searchParams])
 
     return <div className="w-screen h-screen flex items-center justify-center">
         <div className="relative z-0 w-full md:w-1/3 h-full flex items-center justify-end">
@@ -646,12 +402,9 @@ const SettingsPage = (): JSX.Element => {
                     </div>
                 </div>
             </div>}
-            displayLocation={((searchParams.get(SETTINGS_TAB) || "") in SubPageList) 
-                ? searchParams.get(SETTINGS_TAB) as keyof typeof SubPageList 
-                : "none"
-            }
+            displayLocation={displayLocation}
             routes={SubPageList}
-            returnToHome={() => setSubpage("none")}
+            returnToHome={() => setSubpage(DO_NOT_DISPLAY_TAB)}
         />
     </div>
 }
