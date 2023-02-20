@@ -1,6 +1,11 @@
 import {Shabah} from "../shabah/downloadClient"
 import { webAdaptors } from "../shabah/adaptors/web-preset"
-import { APP_CACHE, BACKEND_CHANNEL_NAME, DOWNLOAD_CLIENT_CHANNEL_NAME, VIRTUAL_FILE_CACHE } from "../../config"
+import {
+    APP_CACHE, 
+    BACKEND_CHANNEL_NAME, 
+    DOWNLOAD_CLIENT_CHANNEL_NAME, 
+    VIRTUAL_FILE_CACHE
+} from "../../config"
 import { cleanPermissions } from "./security/permissionsSummary"
 import type {ServiceWorkerRpcs} from "../../../serviceWorkers/rpcs"
 import {wRpc} from "../wRpc/simple"
@@ -10,9 +15,7 @@ import { AppDatabase } from "../database/AppDatabase"
 import {FEATURE_CHECK} from "./featureCheck"
 import {VERBOSE_LAUNCHER_LOGS} from "./localStorageKeys"
 import {AppLogger} from "./appLogger"
-import {
-    createBackendChannel, createClientChannel
-} from "../utils/shabahChannels"
+import {createBackendChannel, createClientChannel} from "../utils/shabahChannels"
 
 export type EventMap = {
     downloadprogress: DownloadProgressListener

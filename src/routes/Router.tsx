@@ -11,6 +11,13 @@ import {AppShellContext, useAppContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
 import MadeWith from "./MadeWith"
+import type { 
+    TerminalEngine as TerminalEngineType, 
+    CommandDefinition 
+} from "../lib/terminalEngine"
+import { useEffectAsync } from "../hooks/effectAsync"
+import terminalLoadingElement from "../components/loadingElements/terminal"
+import { VERBOSE_LAUNCHER_LOGS } from "../lib/utils/localStorageKeys"
 
 type LazyRouteLoader<T> = () => Promise<{ default: LazyComponent<T> }>
 
@@ -36,7 +43,7 @@ const NotFound = lazyRoute(() => import("./NotFound"))
 const fadeOut = 2
 const fadeIn = 1
 
-const PageDisplay = () => {
+function PageDisplay(): JSX.Element {
     const location = useLocation()
     const appContext = useAppContext()
 
@@ -68,16 +75,16 @@ const PageDisplay = () => {
         const milliseconds = 32
         window.setTimeout(() => {
             const sandbox = document.createElement("iframe")
-            console.info("Registering sandbox worker...")
+            appContext.logger.info("Registering sandbox iframe...")
             const handler = (event: MessageEvent) => {
                 const {data} = event
                 if (typeof data !== "string" || data !== "finished") {
-                    console.warn("iframe message is incorrectly encoded")
+                    appContext.logger.warn("sandbox message is incorrectly encoded")
                     appContext.sandboxInitializePromise.resolve(false)
                     return
                 }
                 appContext.sandboxInitializePromise.resolve(true)
-                console.info("Sandbox worker registered! Removing iframe!")
+                appContext.logger.info("Sandbox iframe registered! Removing iframe!")
                 window.removeEventListener("message", handler)
                 document.body.removeChild(sandbox)
             }
@@ -130,21 +137,78 @@ const PageDisplay = () => {
     </div>
 }
 
-type AppShellProps = {
-    setTerminalVisibility: (value: boolean) => void
-}
 
-export const AppRouter = ({setTerminalVisibility}: AppShellProps) => {
+const Terminal = lazyComponent(
+    async () => (await import("../components/Terminal")).Terminal,
+    {loadingElement: terminalLoadingElement}
+)
+
+export function AppRouter(): JSX.Element {
+    const [showTerminal, setShowTerminal] = useState(false)
+    const [terminalEngine, setTerminalEngine] = useState<TerminalEngineType | null>(null)
+    
     const {current: globalState} = useRef(new AppStore({
-        setTerminalVisibility
+        setTerminalVisibility: setShowTerminal
     }))
+    const terminalReadyRef = useRef(false)
 
     useEffect(() => {
         globalState.initialize()
         return () => { globalState.destroy() }
-      }, [])
+    }, [])
+
+    useEffectAsync(async () => {
+        if (!showTerminal || terminalReadyRef.current) {
+            return
+        }
+        const [commandsStandardLibrary, terminalLibrary] = await Promise.all([
+            import("../lib/utils/terminalStandardLibrary"),
+            import("../lib/terminalEngine/index")
+        ] as const)
+        const {TerminalEngine} = terminalLibrary
+        const engine = new TerminalEngine()
+        setTerminalEngine(engine)
+        const {createCommands} = commandsStandardLibrary 
+        
+        const commands = createCommands({
+            setShowTerminal,
+            source: "std",
+            setLogState: (silent) => {
+                globalState.logger.silent = silent
+                localStorage.setItem(VERBOSE_LAUNCHER_LOGS, JSON.stringify(!silent))
+            },
+            setServiceWorkerLogState: (silent) => {
+                globalState.serviceWorkerTerminal.execute("logger", !silent)
+            }
+        })
+
+        for (let i = 0; i < commands.length; i++) {
+            engine.addCommand(
+                commands[i] as CommandDefinition
+            )
+        }
+        terminalReadyRef.current = true
+    }, [showTerminal])
+
+    useEffect(() => {
+        const handler = (event: KeyboardEvent) => {
+            if (event.key === "`") {
+                setShowTerminal((previous) => !previous)
+            }
+        }
+        window.addEventListener("keyup", handler)
+        return () => window.removeEventListener("keyup", handler)
+    }, [])
 
     return <BrowserRouter>
+        
+        {showTerminal ? <>
+            <Terminal
+              engine={terminalEngine}
+              onClose={() => setShowTerminal(false)}
+            />
+        </> : <></>}
+
         <AppShellContext.Provider value={globalState}>
             <PageDisplay/>
         </AppShellContext.Provider>

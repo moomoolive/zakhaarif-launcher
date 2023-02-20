@@ -638,7 +638,7 @@ const TerminalCore = ({
                                 className={`${msg.type === TerminalMsg.TYPES.error ? "text-red-500" : ""} ${msg.type === TerminalMsg.TYPES.warn ? "text-yellow-500" : ""}`}
                                 dangerouslySetInnerHTML={{
                                     __html: msg.type === TerminalMsg.TYPES.command
-                                        ? `<span class="mr-1"><span class="text-green-400">root</span><span class="mx-0.5">:</span><span class="text-blue-500">~/<span>$</span></span></span>${msg.text}`
+                                        ? `<span class="mr-1"><span class="text-green-400">${user}</span><span class="mx-0.5">:</span><span class="text-blue-500">~/<span>$</span></span></span>${msg.text}`
                                         : msg.text
                                 }}
                             />

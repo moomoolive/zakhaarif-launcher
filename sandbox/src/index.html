@@ -11,7 +11,7 @@
     />
 </head>
 <body>
-    <script type="module" defer>var e="mirror-sw.compiled.js";var i=async()=>{if(console.info("[SANDBOX]: registering worker..."),window.top===window.self&&console.warn("sandbox is not loaded in iframe! Place this in a sandboxed iframe for better security!"),!navigator.serviceWorker)throw new Error("current browser doesn't support service workers");let r=await navigator.serviceWorker.register(e);(!navigator.serviceWorker.controller||!r.active)&&console.warn("service worker controller not found"),await Promise.all((await caches.keys()).map(o=>caches.delete(o))),top?.postMessage("finished","*")};i();
+    <script type="module" defer>var a="mirror-sw.compiled.js";var i=async()=>{if(window.top===window.self&&console.warn("sandbox is not loaded in iframe! Place this in a sandboxed iframe for better security!"),!navigator.serviceWorker)throw new Error("current browser doesn't support service workers");console.info("[SANDBOX]: registering service worker..."),(await navigator.serviceWorker.register(a)).active||console.warn("service worker controller not found");let o=await caches.keys(),s=[];if("databases"in indexedDB){let t=(await(async()=>{try{return await indexedDB.databases()}catch{return[]}})()).map(r=>r.name||"");s.push(...t.filter(r=>r.length>0))}await Promise.all([...o.map(e=>caches.delete(e)),...s.map(e=>indexedDB.deleteDatabase(e)),navigator.serviceWorker.ready]),window.setTimeout(()=>{console.info("[SANDBOX]: service worker registered successfully"),top?.postMessage("finished","*")},2e3)};i();
 </script>
 </body>
 </html>

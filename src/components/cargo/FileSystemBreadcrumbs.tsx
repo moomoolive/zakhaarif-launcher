@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom"
 import { EXTENSION_SHELL_TARGET } from "../../lib/utils/searchParameterKeys"
 import { UPDATING } from "../../lib/shabah/backend"
 import { nanoid } from "nanoid"
+import { LAUNCHER_CARGO } from "../../standardCargos"
 
 const ROOT_DIRECTORY_PATH: RootDirectoryPath = "#"
 
@@ -328,6 +329,7 @@ export const FileSystemBreadcrumbs = ({
 
                         <MenuItem
                             className="hover:text-red-500"
+                            disabled={targetCargo.canonicalUrl === LAUNCHER_CARGO.canonicalUrl}
                             onClick={async () => {
                                 const target = targetCargo
                                 const isStandard = isStandardCargo(targetCargo)

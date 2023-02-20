@@ -26,7 +26,7 @@ const CONFIG_URL =  `${sw.location.origin}/__sw-config__.json`
 
 let config: GlobalConfig = {
     version: 1,
-    log: true,
+    log: false,
     updatedAt: -1,
     createdAt: Date.now()
 }
