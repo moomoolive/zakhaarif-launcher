@@ -1,6 +1,6 @@
 import {nanoid} from "nanoid"
 import {describe, it, expect} from "vitest"
-import {Cargo} from "../../cargo"
+import {HuzmaManifest} from "huzma"
 import {Permissions} from "../../types/permissions"
 import {CACHED, FAILED, NO_UPDATE_QUEUED} from "../backend"
 import {Shabah} from "../downloadClient"
@@ -17,7 +17,7 @@ describe("consuming messages", () => {
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
             const {client, internalCargoStore} = testClient
-            const cargo = new Cargo<Permissions>({
+            const cargo = new HuzmaManifest<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
             const cargoIndex = cargoToCargoIndex(canonicalUrl, cargo)
@@ -46,7 +46,7 @@ describe("consuming messages", () => {
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
             const {client, internalCargoStore} = testClient
-            const cargo = new Cargo<Permissions>({
+            const cargo = new HuzmaManifest<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
             const cargoIndex = cargoToCargoIndex(canonicalUrl, cargo)
@@ -84,7 +84,7 @@ describe("consuming messages", () => {
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
             const {client, internalCargoStore} = testClient
-            const cargo = new Cargo<Permissions>({
+            const cargo = new HuzmaManifest<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
             const cargoIndex = cargoToCargoIndex(canonicalUrl, cargo, {
@@ -132,7 +132,7 @@ describe("consuming messages", () => {
         for (const {canonicalUrl} of tests) {
             const testClient = createClient(mainOrigin, {})
             const {client, internalCargoStore} = testClient
-            const cargo = new Cargo<Permissions>({
+            const cargo = new HuzmaManifest<Permissions>({
                 name: "pkg-" + Math.trunc(Math.random() * 1_000)
             })
             const downloadId = nanoid()
@@ -199,7 +199,7 @@ describe("consuming messages", () => {
             const {client, internalCargoStore} = testClient
             const allUrls = [...extraCargos, canonicalUrl]
             for (const url of allUrls) {
-                const cargo = new Cargo<Permissions>({
+                const cargo = new HuzmaManifest<Permissions>({
                     name: "pkg-" + Math.trunc(Math.random() * 1_000)
                 })
                 const downloadId = nanoid()
@@ -271,7 +271,7 @@ describe("consuming messages", () => {
             const {client, internalCargoStore} = testClient
             const allUrls = [...extraCargos, canonicalUrl]
             for (const url of allUrls) {
-                const cargo = new Cargo<Permissions>({
+                const cargo = new HuzmaManifest<Permissions>({
                     name: "pkg-" + Math.trunc(Math.random() * 1_000)
                 })
                 const cargoIndex = cargoToCargoIndex(url, cargo, {

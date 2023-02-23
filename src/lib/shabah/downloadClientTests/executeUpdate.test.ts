@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "../downloadClient"
 import {CACHED, NO_UPDATE_QUEUED, UPDATING} from "../backend"
-import { Cargo, MANIFEST_FILE_SUFFIX, NULL_FIELD } from "../../cargo"
+import { 
+    HuzmaManifest, 
+    MANIFEST_FILE_SUFFIX, 
+    NULL_FIELD 
+} from "huzma"
 import {createClient, createUpdateCheck} from "./testLib"
 
 const MANIFEST_NAME = "stable" + MANIFEST_FILE_SUFFIX
@@ -127,7 +131,7 @@ describe("executing updates", () => {
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
                 diskInfo: storage,
-                newCargo: new Cargo(),
+                newCargo: new HuzmaManifest(),
                 originalNewCargoResponse: new Response(),
                 downloadableResources,
                 resourcesToDelete: []
@@ -176,7 +180,7 @@ describe("executing updates", () => {
             const updateResponse = createUpdateCheck({
                 status: Shabah.STATUS.ok,
                 diskInfo: storage,
-                newCargo: new Cargo(),
+                newCargo: new HuzmaManifest(),
                 originalNewCargoResponse: new Response(),
                 
                     downloadableResources,
@@ -258,7 +262,7 @@ describe("executing updates", () => {
                 canonicalUrl,
                 
                 diskInfo: storage,
-                newCargo: new Cargo(),
+                newCargo: new HuzmaManifest(),
                 originalNewCargoResponse: new Response(),
                 
                     downloadableResources,
@@ -327,7 +331,7 @@ describe("executing updates", () => {
                 resolvedUrl,
                 canonicalUrl,
                 diskInfo: storage,
-                newCargo: new Cargo({entry: "index.js"}),
+                newCargo: new HuzmaManifest({entry: "index.js"}),
                 originalNewCargoResponse: new Response(),
                 downloadableResources,
                 resourcesToDelete: [],
@@ -398,7 +402,7 @@ describe("executing updates", () => {
                     canonicalUrl,
                 
                 diskInfo: storage,
-                newCargo: new Cargo({entry: NULL_FIELD}),
+                newCargo: new HuzmaManifest({entry: NULL_FIELD}),
                 originalNewCargoResponse: new Response(),
                 
                     downloadableResources,
@@ -476,7 +480,7 @@ describe("executing updates", () => {
                 resolvedUrl: canonicalUrl,
                 canonicalUrl,
                 diskInfo: storage,
-                newCargo: new Cargo(),
+                newCargo: new HuzmaManifest(),
                 originalNewCargoResponse: new Response(),
                 downloadableResources,
                 resourcesToDelete
@@ -551,7 +555,7 @@ describe("executing updates", () => {
                     resolvedUrl,
                     canonicalUrl,
                     diskInfo: storage,
-                    newCargo: new Cargo(),
+                    newCargo: new HuzmaManifest(),
                     originalNewCargoResponse: new Response(),
                     downloadableResources,
                     resourcesToDelete,
@@ -649,7 +653,7 @@ describe("executing updates", () => {
                     resolvedUrl: canonicalUrl,
                     canonicalUrl,
                     diskInfo: {used: 100, total: 20_000, left: 19_900},
-                    newCargo: new Cargo(),
+                    newCargo: new HuzmaManifest(),
                     originalNewCargoResponse: new Response(),
                     downloadableResources: [],
                     resourcesToDelete

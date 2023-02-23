@@ -3,7 +3,7 @@ import {ALLOW_BLOB_URLS_CSP, ALLOW_DATA_URLS_CSP, createContentSecurityPolicy, g
 import {wRpc} from "../wRpc/simple"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
 import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
-import type {CargoIndex, Shabah} from "../shabah/downloadClient"
+import type {ManifestIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
 import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
 import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
@@ -125,12 +125,12 @@ export class JsSandbox {
 
     private async getCargoIndexesFromDb(
         canonicalUrls: string[]
-    ): Promise<CargoIndex[]> {
+    ): Promise<ManifestIndex[]> {
         const targetCargos = await this.dependencies
             .database
             .cargoIndexes
             .getManyIndexes(canonicalUrls)
-        const cargos: CargoIndex[] = []
+        const cargos: ManifestIndex[] = []
         for (let i = 0; i < targetCargos.length; i++) {
             const cargo = targetCargos[i]
             if (!cargo) {

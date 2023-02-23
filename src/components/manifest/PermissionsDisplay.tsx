@@ -13,10 +13,10 @@ import {
     faLocationDot,
     faFloppyDisk
 } from "@fortawesome/free-solid-svg-icons"
-import {Cargo} from "../../lib/cargo/index"
+import {HuzmaManifest} from "huzma"
 import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
 
-type PermissionsArray = Cargo<Permissions>["permissions"]
+type PermissionsArray = HuzmaManifest<Permissions>["permissions"]
 
 type PermissionsIconProps = {
     permission: PermissionsArray[number]

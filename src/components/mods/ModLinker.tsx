@@ -22,8 +22,7 @@ import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {useAppContext} from "../../routes/store"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {STANDARD_CARGOS} from "../../standardCargos"
-import type {CargoIndex} from "../../lib/shabah/downloadClient"
-import {Cargo, NULL_MANIFEST_VERSION} from "../../lib/cargo/index"
+import type {ManifestIndex} from "../../lib/shabah/downloadClient"
 import { EXTENSION_CARGO_TAG, MOD_CARGO_TAG } from "../../config"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 import { DESCENDING_ORDER, FilterOrder } from "../FilterChevron"
@@ -33,7 +32,7 @@ import { Paginator } from "../Paginator"
 import { useDebounce } from "../../hooks/debounce"
 
 type LinkableModProps = {
-    mod: CargoIndex
+    mod: ManifestIndex
     actionIcon: ReactNode
 }
 
@@ -108,8 +107,8 @@ const unlinkedModsSkeleton = <div>
 
 export type ModLinkerProps = {
     onClose: () => void
-    linkedMods: CargoIndex[]
-    setLinkedMods: (newMods: CargoIndex[]) => void
+    linkedMods: ManifestIndex[]
+    setLinkedMods: (newMods: ManifestIndex[]) => void
 }
 
 export const ModLinker = ({
@@ -132,7 +131,7 @@ export const ModLinker = ({
     const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
     const [cacheBusterId, setCacheBusterId] = useState(0)
     const [cargoQuery, setCargoQuery] = useState({
-        results: [] as CargoIndex[],
+        results: [] as ManifestIndex[],
         sort: "",
         order: DESCENDING_ORDER as FilterOrder,
         offset: 0,

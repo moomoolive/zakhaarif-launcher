@@ -24,8 +24,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
 import {useAppContext} from "./store"
-import {Shabah, CargoIndex} from "../lib/shabah/downloadClient"
-import {Cargo} from "../lib/cargo/index"
+import {Shabah, ManifestIndex} from "../lib/shabah/downloadClient"
+import {HuzmaManifest} from "huzma"
 import {
     ASCENDING_ORDER,
     DESCENDING_ORDER,
@@ -36,9 +36,9 @@ import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOv
 import {lazyComponent} from "../components/Lazy"
 import type {Permissions} from "../lib/types/permissions"
 import { sleep } from "../lib/utils/sleep"
-import type { FileDetails } from "../components/cargo/CargoFileSystem"
-import { FileSystemBreadcrumbs } from "../components/cargo/FileSystemBreadcrumbs"
-import type {CargoDirectory} from "../components/cargo/CargoFileSystem"
+import type { FileDetails } from "../components/manifest/CargoFileSystem"
+import { FileSystemBreadcrumbs } from "../components/manifest/FileSystemBreadcrumbs"
+import type {CargoDirectory} from "../components/manifest/CargoFileSystem"
 import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
 import { ADDONS_INFO_MODAL, ADDONS_MODAL, ADDONS_UPDATE_MODAL, ADDONS_VIEWING_CARGO } from "../lib/utils/searchParameterKeys"
@@ -46,30 +46,30 @@ import {useSearchParams} from "../hooks/searchParams"
 import { roundDecimal } from "../lib/math/rounding"
 import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
 import { useDebounce } from "../hooks/debounce"
-import {CargoFileSystemSkeleton} from "../components/cargo/CargoFileSystemSkeleton"
+import {CargoFileSystemSkeleton} from "../components/manifest/CargoFileSystemSkeleton"
 import {debugStatusCode} from "../lib/shabah/debug"
 
 const FileOverlay = lazyComponent(
-    async () => (await import("../components/cargo/FileOverlay")).FileOverlay,
+    async () => (await import("../components/manifest/FileOverlay")).FileOverlay,
     {loadingElement: FullScreenOverlayLoading}
 )
 const CargoInfo = lazyComponent(
-    async () => (await import("../components/cargo/CargoInfo")).CargoInfo,
+    async () => (await import("../components/manifest/CargoInfo")).CargoInfo,
     {loadingElement: FullScreenOverlayLoading}
 )
 const Installer = lazyComponent(
-    async () => (await import("../components/cargo/Installer")).Installer,
+    async () => (await import("../components/manifest/Installer")).Installer,
     {loadingElement: FullScreenOverlayLoading}
 )
 const StatusAlert = lazyComponent(
     async () => (await import("../components/StatusAlert")).StatusAlert
 )
 const CargoUpdater = lazyComponent(
-    async () => (await import("../components/cargo/Updater")).CargoUpdater,
+    async () => (await import("../components/manifest/Updater")).CargoUpdater,
     {loadingElement: FullScreenOverlayLoading}
 )
 const CargoFileSystem = lazyComponent(
-    async () => (await import ("../components/cargo/CargoFileSystem")).CargoFileSystem,
+    async () => (await import ("../components/manifest/CargoFileSystem")).CargoFileSystem,
     {loadingElement: CargoFileSystemSkeleton}
 )
 const CargoListSkeleton = <div className="w-full h-5/6 overflow-y-scroll">
@@ -89,7 +89,7 @@ const CargoListSkeleton = <div className="w-full h-5/6 overflow-y-scroll">
     })}
 </div>
 const CargoList = lazyComponent(
-    async () => (await import("../components/cargo/CargoList")).CargoList,
+    async () => (await import("../components/manifest/CargoList")).CargoList,
     {loadingElement: CargoListSkeleton}
 )
 const LargeMenu = lazyComponent(
@@ -101,7 +101,7 @@ const SmallMenu = lazyComponent(
     {loadingElement: <div style={{height: "50px"}}/>}
 )
 const RecoveryModal = lazyComponent(
-    async () => (await import("../components/cargo/RecoveryModal")).RecoveryModal,
+    async () => (await import("../components/manifest/RecoveryModal")).RecoveryModal,
     {loadingElement: FullScreenOverlayLoading}
 )
 
@@ -156,7 +156,7 @@ const AddOns = (): JSX.Element => {
     const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null)
     const [modalShown, setModalShown] = useState<ShownModal>("")
     const [offset, setOffset] = useState(0)
-    const [targetIndex, setTargetIndex] = useState<CargoIndex | null>(null)
+    const [targetIndex, setTargetIndex] = useState<ManifestIndex | null>(null)
     const [cacheBusterId, setCacheBusterId] = useState(0)
     const [storageUsage, setStorageUsage] = useState({used: 0, left: 0, total: 0})
     const [cargoCount, setCargoCount] = useState(0)
@@ -173,7 +173,7 @@ const AddOns = (): JSX.Element => {
         }
         setOffset(0)
     })
-    const targetCargoRef = useRef(new Cargo<Permissions>())
+    const targetCargoRef = useRef(new HuzmaManifest<Permissions>())
     const {current: setSearchKey} = useRef((key: string, value: string) => {
         searchParams.set(key, value)
         setSearchParams(new URLSearchParams(searchParams))
@@ -232,7 +232,7 @@ const AddOns = (): JSX.Element => {
     }, [searchParams])
 
     const [cargoQuery, setCargoQuery] = useState({
-        results: [] as CargoIndex[],
+        results: [] as ManifestIndex[],
         more: true,
         order: -1 as FilterOrder,
         filter: "",
@@ -344,7 +344,7 @@ const AddOns = (): JSX.Element => {
         setTargetIndex(index)
         setFilterConfig({type: "name", order: DESCENDING_ORDER})
         viewingCargoBytes.current = cargo.data.bytes
-        targetCargoRef.current = new Cargo(cargo.data.pkg as Cargo<Permissions>)
+        targetCargoRef.current = new HuzmaManifest(cargo.data.pkg as HuzmaManifest<Permissions>)
     }, [searchParams])
 
     useEffect(() => {

@@ -1,8 +1,7 @@
-import { Cargo } from "../../../cargo"
 import {createRpcState} from "../index"
 import {SandboxDependencies, RpcPersistentState} from "../state"
 import {generatePermissionsSummary, cleanPermissions} from "../../../utils/security/permissionsSummary"
-import {PermissionsList} from "../../../cargo"
+import {PermissionsList, HuzmaManifest} from "huzma"
 import {Permissions} from "../../../types/permissions"
 import { CACHED } from "../../../shabah/backend"
 import type {AppDatabase} from "../../../database/AppDatabase"
@@ -30,7 +29,7 @@ const mockSandboxDependencies: SandboxDependencies = {
         downloadId: "",
         manifestName: ""
     },
-    cargo: new Cargo(),
+    cargo: new HuzmaManifest(),
     // a quick hack for now
     database: {} as unknown as AppDatabase,
     downloadClient: {} as unknown as Shabah,

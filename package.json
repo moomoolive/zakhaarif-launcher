@@ -1,7 +1,7 @@
 {
   "name": "g-wrapper",
   "private": true,
-  "version": "0.1.0-prealpha.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "main-server": "vite",
@@ -18,7 +18,6 @@
     "test-watch": "vitest watch",
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --minify --outfile=./public/sw.compiled.js",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.compiled.js",
-    "cargo-cli": "node ./src/lib/cargo/cli.mjs",
     "check-types": "tsc",
     "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst",
     "compile-credits": "node ./cli/compileCredits.mjs"
@@ -37,6 +36,7 @@
     "babylonjs-loaders": "^5.38.0",
     "babylonjs-materials": "^5.38.0",
     "dexie": "^3.2.2",
+    "huzma": "^0.1.0",
     "material-ui-confirm": "^3.0.7",
     "nanoid": "^4.0.0",
     "react": "^18.2.0",

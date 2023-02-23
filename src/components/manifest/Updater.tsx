@@ -2,7 +2,7 @@ import { Tooltip, IconButton, Button, Divider, Collapse } from "@mui/material"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faThumbsUp, faXmark} from "@fortawesome/free-solid-svg-icons"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
-import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
+import {ManifestIndex, Shabah} from "../../lib/shabah/downloadClient"
 import { useRef, useState, ReactNode } from "react"
 import { UpdateCheckResponse } from "../../lib/shabah/updateCheckStatus"
 import { useEffectAsync } from "../../hooks/effectAsync"
@@ -19,7 +19,7 @@ import {
 } from "../../lib/utils/security/permissionsSummary"
 import { ALLOW_UNSAFE_PACKAGES } from "../../lib/utils/localStorageKeys"
 import { isExtension } from "../../lib/utils/cargos"
-import { Cargo } from "../../lib/cargo"
+import { HuzmaManifest } from "huzma"
 import { Permissions } from "../../lib/types/permissions"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import { PermissionsDisplay } from "./PermissionsDisplay"
@@ -39,8 +39,8 @@ type UpdateResponse = {
 
 export type CargoUpdaterProps = {
     onClose: () => void
-    cargoIndex: CargoIndex
-    cargo: Cargo<Permissions>
+    cargoIndex: ManifestIndex
+    cargo: HuzmaManifest<Permissions>
     createAlert: (message: ReactNode) => void
     onUpdateCargo: (update: UpdateCheckResponse, title: string) => Promise<boolean>
 }

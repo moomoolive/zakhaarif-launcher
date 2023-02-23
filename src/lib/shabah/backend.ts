@@ -1,15 +1,4 @@
 import type {Mime} from "../miniMime/index"
-export {
-    serviceWorkerCacheHitHeader,
-    serviceWorkerErrorCatchHeader,
-    serviceWorkerPolicies,
-    serviceWorkerPolicyHeader,
-    NETWORK_FIRST_POLICY,
-    NETWORK_ONLY_POLICY,
-    CACHE_FIRST_POLICY,
-    CACHE_ONLY_POLICY
-} from "./serviceWorkerMeta"
-export type {ServiceWorkerPolicy} from "./serviceWorkerMeta"
 
 export type FileCache = {
     getFile: (url: string) => Promise<Response | null>
@@ -146,7 +135,7 @@ export const UPDATING = 2
 export const FAILED = 3
 export const ABORTED = 4
 
-export type CargoState = (
+export type ManifestState = (
     typeof CACHED 
     | typeof UPDATING
     | typeof FAILED 
@@ -159,7 +148,7 @@ export type DownloadClientMessage = {
     downloadId: string
     stateUpdates: Array<{
         canonicalUrl: string
-        state: CargoState
+        state: ManifestState
     }>
 }
 
@@ -179,15 +168,15 @@ export type ClientMessageChannel = ThreadSafeMessageChannel<DownloadClientMessag
 
 export type BackendMessageChannel = ThreadSafeMessageChannel<DownloadIndex>
 
-export type DownloadClientCargoIndexStorage = {
-    getIndex: (canonicalUrl: string) => Promise<CargoIndex | null>
-    putIndex: (index: CargoIndex) => Promise<boolean>
+export type DownloadClientManifestIndexStorage = {
+    getIndex: (canonicalUrl: string) => Promise<ManifestIndex | null>
+    putIndex: (index: ManifestIndex) => Promise<boolean>
     deleteIndex: (canonicalUrl: string) => Promise<boolean>
 }
 
 export type Permissions = {key: string, value: string[]}[]
 
-export type CargoIndex = {
+export type ManifestIndex = {
     name: string
     tag: number
     logo: string
@@ -198,12 +187,12 @@ export type CargoIndex = {
     entry: string
     version: string
     permissions: Permissions
-    state: CargoState
+    state: ManifestState
     downloadId: string
     created: number
     updated: number
 }
 
-export type CargoIndexWithoutMeta = Omit<CargoIndex, "updated" | "created">
+export type ManifestIndexWithoutMeta = Omit<ManifestIndex, "updated" | "created">
 
 export const NO_UPDATE_QUEUED = ""

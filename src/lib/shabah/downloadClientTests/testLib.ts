@@ -1,9 +1,9 @@
 import {Shabah} from "../downloadClient"
-import {BackendMessageChannel, CACHED, CargoIndex, CargoState, DownloadClientCargoIndexStorage, DownloadClientMessage, ClientMessageChannel, DownloadIndex, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
+import {BackendMessageChannel, CACHED, ManifestIndex, ManifestState, DownloadClientManifestIndexStorage, DownloadClientMessage, ClientMessageChannel, DownloadIndex, FileCache, NO_UPDATE_QUEUED, UPDATING} from "../backend"
 import {DownloadManager} from "../backend"
 import { cleanPermissions } from "../../utils/security/permissionsSummary"
 import {UpdateCheckConfig, UpdateCheckResponse} from "../updateCheckStatus"
-import { Cargo } from "../../cargo"
+import { HuzmaManifest } from "huzma"
 import { Permissions } from "../../types/permissions"
 import { getFileNameFromUrl } from "../../utils/urls/getFilenameFromUrl"
 
@@ -232,9 +232,9 @@ const dependencies = ({
         }
     }
 
-    const store: Record<string, CargoIndex> = {}
+    const store: Record<string, ManifestIndex> = {}
 
-    const indexStorage: DownloadClientCargoIndexStorage = {
+    const indexStorage: DownloadClientManifestIndexStorage = {
         getIndex: async (canonicalUrl) => {
             if (!(canonicalUrl in store)) {
                 return null
@@ -358,7 +358,7 @@ export const createUpdateCheck = (config: Partial<UpdateCheckConfig>) => {
 
 export const cargoToCargoIndex = (
     canonicalUrl: string,
-    cargo: Cargo<Permissions>, 
+    cargo: HuzmaManifest<Permissions>, 
     {
         tag = 0,
         resolvedUrl,
@@ -370,13 +370,13 @@ export const cargoToCargoIndex = (
         tag: number
         resolvedUrl: string
         bytes: number
-        state: CargoState,
+        state: ManifestState,
         downloadId: string,
         manifestName: string
     }> = {}
 ) => {
     const _resolvedUrl = resolvedUrl || canonicalUrl
-    const index: CargoIndex = {
+    const index: ManifestIndex = {
         tag,
         name: cargo.name,
         logo: cargo.crateLogoUrl,

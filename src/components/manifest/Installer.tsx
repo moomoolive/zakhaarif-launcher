@@ -19,9 +19,9 @@ import {
     hasUnsafePermissions
 } from "../../lib/utils/security/permissionsSummary"
 import { CargoSummary } from "./CargoSummary"
-import {Cargo, MANIFEST_FILE_SUFFIX} from "../../lib/cargo"
+import {HuzmaManifest, MANIFEST_FILE_SUFFIX} from "huzma"
 import type {Permissions} from "../../lib/types/permissions"
-import {CargoIndex, Shabah} from "../../lib/shabah/downloadClient"
+import {ManifestIndex, Shabah} from "../../lib/shabah/downloadClient"
 import { MOD_CARGO_TAG, EXTENSION_CARGO_TAG } from "../../config"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import { sleep } from "../../lib/utils/sleep"
@@ -36,11 +36,11 @@ import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../../lib/utils/searchParame
 const toCargoIndex = (
     canonicalUrl: string,
     resolvedUrl: string,
-    cargo: Cargo<Permissions>,
+    cargo: HuzmaManifest<Permissions>,
     isExtension: boolean,
     bytes: number,
     manifestName: string,
-): CargoIndex => {
+): ManifestIndex => {
     return {
         tag: isExtension ? EXTENSION_CARGO_TAG : MOD_CARGO_TAG,
         name: cargo.name,
@@ -260,11 +260,11 @@ export const Installer = ({
                     </Collapse>
                     
                     <CargoSummary 
-                        cargo={installResponse.checkResponse.newCargo as Cargo<Permissions>}
+                        cargo={installResponse.checkResponse.newCargo as HuzmaManifest<Permissions>}
                         cargoIndex={toCargoIndex(
                             installResponse.checkResponse.canonicalUrl,
                             installResponse.checkResponse.resolvedUrl,
-                            installResponse.checkResponse.newCargo as Cargo<Permissions>,
+                            installResponse.checkResponse.newCargo as HuzmaManifest<Permissions>,
                             installResponse.isExtension,
                             installResponse.checkResponse.bytesToDownload(),
                             installResponse.checkResponse.manifestName

@@ -5,7 +5,7 @@ import {
     serviceWorkerCacheHitHeader, 
     serviceWorkerErrorCatchHeader,
     serviceWorkerPolicies
-} from "../backend"
+} from "../serviceWorkerMeta"
 
 
 const requestInfoToUrl = (request: RequestInfo | URL) => {

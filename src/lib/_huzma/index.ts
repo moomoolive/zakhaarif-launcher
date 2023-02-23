@@ -1,18 +1,74 @@
 import {SemVer} from "small-semver"
-import {type} from "../utils/betterTypeof"
-import {stripRelativePath} from "../utils/urls/stripRelativePath"
+import {
+    NULL_FIELD,
+    ALL_SCHEMA_VERSIONS,
+    LATEST_SCHEMA_VERSION
+} from "./consts"
 
-export const MANIFEST_FILE_SUFFIX = ".huzma.json"
-export const NULL_FIELD = ""
-export const ALL_SCHEMA_VERSIONS = {"0.1.0": 1} as const
-export const LATEST_SCHEMA_VERSION = "0.1.0"
+export {
+    NULL_FIELD,
+    ALL_SCHEMA_VERSIONS,
+    LATEST_SCHEMA_VERSION,
+    MANIFEST_FILE_SUFFIX
+} from "./consts"
+
+type ExpandedInbuiltTypes = (
+    "string" 
+    | "number" 
+    | "bigint" 
+    | "boolean" 
+    | "symbol" 
+    | "undefined" 
+    | "function" 
+    | "object" 
+    | "null" 
+    | "array"
+)
+
+function type(val: unknown): ExpandedInbuiltTypes {
+    const t = typeof val
+    if (t !== "object") {
+        return t
+    } else if (val === null) {
+        return "null"
+    } else if (Array.isArray(val)) {
+        return "array"
+    } else {
+        return "object"
+    }
+}
+
+function stripRelativePath(url: string): string {
+    if (url.length < 1) {
+        return ""
+    }
+    if (
+        !url.startsWith("/")
+        && !url.startsWith("./") 
+        && !url.startsWith("../")
+    ) {
+        return url
+    }
+    const split = url.split("/")
+    let urlStart = -1
+    for (let i = 0; i < split.length; i++) {
+        const path = split[i]
+        if (path !== "" && path !== "." && path !== "..") {
+            urlStart = i
+            break
+        }
+    }
+    if (urlStart < 0) {
+        return ""
+    }
+    return split.slice(urlStart).join("/")
+}
 
 export type SchemaVersion = keyof typeof ALL_SCHEMA_VERSIONS
 export type NullField = typeof NULL_FIELD
 export type RepoType = "git" | "other" | NullField
 export type ValidDefaultStrategies = ("url-diff" | "purge")
 export type InvalidationStrategy = ValidDefaultStrategies | "default"
-export type MiniCodeManifest = { version: string }
 
 type PermissionsListRaw = ReadonlyArray<
     string | {key: string, value: Array<string> | ReadonlyArray<string>}
@@ -50,16 +106,14 @@ export type PermissionsList<
     P extends PermissionsListRaw = {key: string, value: string[]}[]
 > = Array<FillEmptyPermissions<P>[number]>
 
-type CargoPartial= Partial<
-    Omit<Cargo, "files" | "authors" | "repo" | "permissions">
+type HuzmaManifestPartial= Partial<
+    Omit<HuzmaManifest, "files" | "authors" | "repo" | "permissions">
 >
 
-export type CargoMeta = Record<string, string>
-
-type CargoOptions<
+type ManifestOptions<
     Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
 > = (
-    CargoPartial & Partial<{
+    HuzmaManifestPartial & Partial<{
         authors: Array<Partial<{
             name: string, 
             email: string, 
@@ -78,7 +132,7 @@ type CargoOptions<
 
 export const NULL_MANIFEST_VERSION = "0.0.0"
 
-export class Cargo<
+export class HuzmaManifest<
     Permissions extends PermissionsListRaw = ReadonlyArray<{key: string, value: string[]}>
 > {
     // required fields
@@ -122,7 +176,7 @@ export class Cargo<
         homepageUrl = NULL_FIELD,
         permissions = [],
         metadata = {}
-    }: CargoOptions<Permissions> = {}) {
+    }: ManifestOptions<Permissions> = {}) {
         this.homepageUrl = homepageUrl
         this.repo = {
             type: repo?.type || "other",
@@ -192,13 +246,11 @@ const typevalid = <T extends Record<string, unknown>>(
     return false
 }
 
-export const dummyManifest = () => ({
-    pkg: new Cargo(), 
-    errors: [] as string[], 
-    semanticVersion: SemVer.null()
-})
-
-export type ValidatedCodeManfiest = ReturnType<typeof dummyManifest>
+export type ValidatedCodeManfiest = {
+    pkg: HuzmaManifest,
+    errors: string [],
+    semanticVersion: SemVer
+}
 
 const toInvalidation = (invalidation: string) => {
     switch (invalidation) {
@@ -210,10 +262,15 @@ const toInvalidation = (invalidation: string) => {
     }
 }
 
-export const validateManifest = <T>(cargo: T) => {
-    const out = dummyManifest()
+export function validateManifest<T>(cargo: T): ValidatedCodeManfiest {
+    
+    const out: ValidatedCodeManfiest = {
+        pkg: new HuzmaManifest(),
+        errors: [],
+        semanticVersion: SemVer.null()
+    }
     const {pkg, errors} = out
-    const c = cargo as CargoOptions
+    const c = cargo as ManifestOptions
     const baseType = type(c)
     if (baseType !== "object") {
         errors.push(`expected cargo to be type "object" got "${baseType}"`)
@@ -371,10 +428,16 @@ export const validateManifest = <T>(cargo: T) => {
     return out
 }
 
-export const cargoIsUpdatable = (
+export type ManifestUpdateResponse = {
+    oldManifest: ValidatedCodeManfiest
+    newManifest: ValidatedCodeManfiest
+    updateAvailable: boolean
+}
+
+export function manifestIsUpdatable(
     newManifest: unknown, 
     oldManifest: unknown
-) => {
+): ManifestUpdateResponse {
     const validatedOld = validateManifest(oldManifest)
     const validatedNew = validateManifest(newManifest)
     const out = {
@@ -408,7 +471,7 @@ type FileRef = {
     bytes: number
 }
 
-export class CargoUpdateDetails {
+class HuzmaUpdateDetails {
     add: FileRef[]
     delete: FileRef[]
 
@@ -418,12 +481,12 @@ export class CargoUpdateDetails {
     }
 }
 
-export const diffManifestFiles = (
-    newCargo: Cargo, 
-    oldCargo: Cargo,
+export function diffManifestFiles(
+    newCargo: HuzmaManifest, 
+    oldCargo: HuzmaManifest,
     defaultInvalidation: ValidDefaultStrategies
-) => {
-    const updates = new CargoUpdateDetails([], [])
+): HuzmaUpdateDetails {
+    const updates = new HuzmaUpdateDetails([], [])
     const newFiles: Record<string, ValidDefaultStrategies> = {}
     for (let i = 0; i < newCargo.files.length; i++) {
         const {name, invalidation} = newCargo.files[i]

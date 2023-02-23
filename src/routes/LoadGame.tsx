@@ -19,7 +19,7 @@ import { SAVE_EXISTS } from "../lib/utils/localStorageKeys"
 import { ASCENDING_ORDER, DESCENDING_ORDER, FilterChevron, FilterOrder } from "../components/FilterChevron"
 import { useNavigate } from "react-router-dom"
 import { isMod } from "../lib/utils/cargos"
-import {CargoIndex} from "../lib/shabah/downloadClient"
+import {ManifestIndex} from "../lib/shabah/downloadClient"
 import { sleep } from "../lib/utils/sleep"
 
 const FILTERS = [
@@ -78,7 +78,7 @@ const LoadGamePage = (): JSX.Element => {
     const [modLinkerSaveId, setModLinkerSaveId] = useState(DO_NOT_SHOW_LINKER)
     const [currentFilter, setCurrentFilter] = useState<FilterType>("updatedAt")
     const [order, setOrder] = useState<FilterOrder>(DESCENDING_ORDER)
-    const [linkedMods, setLinkedMods] = useState<CargoIndex[]>([])
+    const [linkedMods, setLinkedMods] = useState<ManifestIndex[]>([])
 
     const filteredSaves = useMemo(() => {
         const savesList = [...saves]
@@ -111,7 +111,7 @@ const LoadGamePage = (): JSX.Element => {
         if (saveIndex < 0) {
             return
         }
-        const linked: CargoIndex[] = []
+        const linked: ManifestIndex[] = []
         const targetSave = saves[saveIndex]
         const modIndexes = await database.cargoIndexes.getManyIndexes(
             targetSave.mods.canonicalUrls

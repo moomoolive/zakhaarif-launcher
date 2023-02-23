@@ -1,13 +1,9 @@
 import {useAppContext} from "./store"
-import {CargoIndex} from "../lib/shabah/downloadClient"
-import { useEffect, useMemo, useState, useRef } from "react"
+import {ManifestIndex} from "../lib/shabah/downloadClient"
+import { useEffect, useState, useRef } from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {io} from "../lib/monads/result"
-import {FullScreenLoadingOverlay} from "../components/LoadingOverlay"
-import {ErrorOverlay} from "../components/ErrorOverlay"
 import {Link} from "react-router-dom"
 import {
-    Button, 
     IconButton, 
     Tooltip,
     InputAdornment,
@@ -17,14 +13,12 @@ import {
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faMagnifyingGlass} from "@fortawesome/free-solid-svg-icons"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
-import {CargoIcon} from "../components/cargo/Icon"
+import {CargoIcon} from "../components/manifest/Icon"
 import {FilterOrder, FilterChevron, DESCENDING_ORDER, ASCENDING_ORDER} from "../components/FilterChevron"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { sleep } from "../lib/utils/sleep"
-import LoadingIcon from "../components/LoadingIcon"
 import { roundDecimal } from "../lib/math/rounding"
 import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
-import { useAsyncState } from "../hooks/promise"
 import { Paginator } from "../components/Paginator"
 import { useDebounce } from "../hooks/debounce"
 import { EXTENSION_CARGO_TAG } from "../config"
@@ -79,7 +73,7 @@ const ExtensionsListPage = (): JSX.Element => {
     const [queryTime, setQueryTime] = useState(0)
     const [extensionCount, setExtensionCount] = useState(0)
     const [cargoQuery, setCargoQuery] = useState({
-        results: [] as CargoIndex[],
+        results: [] as ManifestIndex[],
         sort: "",
         order: DESCENDING_ORDER as FilterOrder,
         offset: 0,
@@ -267,7 +261,7 @@ const ExtensionsListPage = (): JSX.Element => {
                                 className="mr-5 sm:mr-8 mb-1"
                             >
                                 <Link 
-                                    to={((cargoIndex: CargoIndex) => {
+                                    to={((cargoIndex: ManifestIndex) => {
                                         const entry = cargoIndex.canonicalUrl
                                         switch (cargoIndex.canonicalUrl) {
                                             case import.meta.env.VITE_APP_LAUNCHER_CARGO_URL:

@@ -2,9 +2,11 @@ import {describe, it, expect} from "vitest"
 import {checkForUpdates, STATUS_CODES} from "./client"
 import {FetchFunction, FileCache} from "./backend"
 import {ResultType, io} from "../monads/result"
-import {Cargo} from "../cargo/index"
-import {LATEST_SCHEMA_VERSION} from "../cargo/index"
-import { MANIFEST_FILE_SUFFIX } from "../cargo/index"
+import { 
+    MANIFEST_FILE_SUFFIX, 
+    HuzmaManifest,
+    LATEST_SCHEMA_VERSION 
+ } from "huzma"
 
 type FileRecord = Record<string, () => ResultType<Response>>
 
@@ -83,7 +85,7 @@ const fetchFnAndFileCache = (
     return [fetchFn, fileCache] as const
 }
 
-const cargoPkg = new Cargo({
+const cargoPkg = new HuzmaManifest({
     schema: LATEST_SCHEMA_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 

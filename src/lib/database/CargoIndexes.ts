@@ -1,12 +1,12 @@
 import type {Database} from "./innerDatabase"
-import type {CargoIndex} from "../shabah/downloadClient"
+import type {ManifestIndex} from "../shabah/downloadClient"
 import {Timestamps, QueryParams} from "./utilities"
 import {io} from "../monads/result"
 import { EXTENSION_CARGO_TAG, MOD_CARGO_TAG } from "../../config"
 import {ASCENDING_ORDER, FilterOrder} from "../../components/FilterChevron"
 import Dexie from "dexie"
 
-type AppCargoIndexV1 = Omit<CargoIndex, ("created" | "updated")>
+type AppCargoIndexV1 = Omit<ManifestIndex, ("created" | "updated")>
 
 export type AppCargoIndex = AppCargoIndexV1 & Timestamps
 
@@ -41,7 +41,7 @@ export class CargoIndexes {
         return response.data
     }
 
-    async getManyIndexes(canonicalUrls: string[]): Promise<Array<CargoIndex | null>> {
+    async getManyIndexes(canonicalUrls: string[]): Promise<Array<ManifestIndex | null>> {
         if (canonicalUrls.length < 1) {
             return []
         }
@@ -49,12 +49,12 @@ export class CargoIndexes {
         return response.map((cargo) => cargo || null)
     }
     
-    async putIndex(index: CargoIndex): Promise<boolean> {
+    async putIndex(index: ManifestIndex): Promise<boolean> {
         const response = await io.wrap(this.db.appCargoIndexes.put(index))
         return response.ok
     }
 
-    async bulkPut(indexes: CargoIndex[]): Promise<boolean> {
+    async bulkPut(indexes: ManifestIndex[]): Promise<boolean> {
         const response = await io.wrap(
             this.db.appCargoIndexes.bulkPut(indexes)
         )
@@ -85,7 +85,7 @@ export class CargoIndexes {
     similaritySearchWithTag(
         tag: number,
         params: SimilaritySearchParams
-    ): Promise<CargoIndex[]> {
+    ): Promise<ManifestIndex[]> {
         const {text, order, sort, limit} = params
         const baseQuery = this.db.appCargoIndexes.orderBy(sort)
         const ordered = order === ASCENDING_ORDER
@@ -114,7 +114,7 @@ export class CargoIndexes {
         return this.db.appCargoIndexes.count()
     }
 
-    orderedQuery(params: QueryParams<AppCargoIndexedFields>): Promise<CargoIndex[]> {
+    orderedQuery(params: QueryParams<AppCargoIndexedFields>): Promise<ManifestIndex[]> {
         const {limit, offset, sort, order} = params
         const initialQuery = this.db.appCargoIndexes
             .where(sort)
@@ -136,7 +136,7 @@ export class CargoIndexes {
         return index.updated
     }
 
-    similaritySearch(params: SimilaritySearchParams): Promise<CargoIndex[]> {
+    similaritySearch(params: SimilaritySearchParams): Promise<ManifestIndex[]> {
         const {text, order, sort, limit} = params
         const normalizedQuery = text.toLowerCase()
         const baseQuery = this.db.appCargoIndexes

@@ -2,16 +2,16 @@ import {Tooltip} from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft,} from "@fortawesome/free-solid-svg-icons"
 import {IconButton} from "@mui/material"
-import {Cargo} from "../../lib/cargo/index"
-import {CargoIndex} from "../../lib/shabah/downloadClient"
+import {HuzmaManifest} from "huzma"
+import {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {Permissions,} from "../../lib/types/permissions"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
 import {CargoSummary} from "./CargoSummary"
 
 export type CargoInfoProps = {
     onClose: () => void
-    cargo: Cargo<Permissions>
-    cargoIndex: CargoIndex
+    cargo: HuzmaManifest<Permissions>
+    cargoIndex: ManifestIndex
 }
 
 export const CargoInfo = ({

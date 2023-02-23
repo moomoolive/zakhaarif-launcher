@@ -4,8 +4,8 @@ import {
     ALLOW_ALL_PERMISSIONS,
     permissionsMeta
 } from "../../types/permissions"
-import {PermissionsList} from "../../cargo/index"
-import { CargoIndex } from "../../shabah/downloadClient"
+import {PermissionsList} from "huzma"
+import { ManifestIndex } from "../../shabah/downloadClient"
 import { isUrl } from "../urls/isUrl"
 
 const permissionsSummary = (allowAll: boolean) => {
@@ -319,7 +319,7 @@ export const iframeSandbox = (
 }
 
 type CargoIndexes = {
-    cargos: CargoIndex[]
+    cargos: ManifestIndex[]
 }
 
 export const mergePermissionSummaries = (

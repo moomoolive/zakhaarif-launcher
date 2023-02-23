@@ -1,13 +1,13 @@
 import {describe, it, expect} from "vitest"
 import {Shabah} from "../downloadClient"
-import {Cargo, MANIFEST_FILE_SUFFIX, } from "../../cargo"
+import {HuzmaManifest, MANIFEST_FILE_SUFFIX, } from "huzma"
 import {Permissions} from "../../types/permissions"
 import {SemVer} from "small-semver"
 import {createClient, cargoToCargoIndex} from "./testLib"
 
 const MANIFEST_NAME = "stable" + MANIFEST_FILE_SUFFIX
 
-const mockCargo = new Cargo<Permissions>({
+const mockCargo = new HuzmaManifest<Permissions>({
     name: "test",
     version: "0.1.0",
     schema: "0.1.0",

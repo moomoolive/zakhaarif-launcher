@@ -10,11 +10,13 @@ import {
     faGlobe
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider} from "@mui/material"
-import {Cargo} from "../../lib/cargo/index"
-import {NULL_FIELD as CARGO_NULL_FIELD} from "../../lib/cargo/index"
-import {CargoIcon} from "../../components/cargo/Icon"
+import {
+    HuzmaManifest,
+    NULL_FIELD as CARGO_NULL_FIELD
+} from "huzma"
+import {CargoIcon} from "../../components/manifest/Icon"
 import {isStandardCargo} from "../../lib/utils/cargos"
-import {CargoIndex} from "../../lib/shabah/downloadClient"
+import {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {reactiveDate} from "../../lib/utils/dates"
 import {MOD_CARGO_TAG, EXTENSION_CARGO_TAG} from "../../config"
 import {Permissions, permissionsMeta, ALLOW_ALL_PERMISSIONS} from "../../lib/types/permissions"
@@ -28,8 +30,8 @@ type PreventableEvent = {
 }
 
 export type CargoSummaryProps = {
-    cargo: Cargo<Permissions>
-    cargoIndex: CargoIndex
+    cargo: HuzmaManifest<Permissions>
+    cargoIndex: ManifestIndex
     showModificationMetadata?: boolean
     showImportLinkCopy?: boolean
     safeExternalNavigation?: boolean

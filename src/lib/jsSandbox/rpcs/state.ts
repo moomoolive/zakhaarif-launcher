@@ -1,6 +1,6 @@
 import type {DeepReadonly} from "../../types/utility"
-import {Cargo} from "../../cargo/index"
-import {CargoIndex, Shabah} from "../../shabah/downloadClient"
+import {HuzmaManifest} from "huzma"
+import {ManifestIndex, Shabah} from "../../shabah/downloadClient"
 import {Permissions} from "../../types/permissions"
 import type {AppDatabase} from "../../database/AppDatabase"
 import {PermissionsSummary} from "../../utils/security/permissionsSummary"
@@ -12,8 +12,8 @@ export type SandboxDependencies = DeepReadonly<{
     queryState: string
     createFatalErrorMessage: (msg: string, details: string) => void
     confirmExtensionExit: () => Promise<void>
-    cargoIndex: CargoIndex
-    cargo: Cargo<Permissions>
+    cargoIndex: ManifestIndex
+    cargo: HuzmaManifest<Permissions>
     recommendedStyleSheetUrl: string
     database: AppDatabase
     origin: string

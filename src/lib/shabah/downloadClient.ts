@@ -7,12 +7,11 @@ import {
 } from "./client"
 import {io, Ok} from "../monads/result"
 import {
-    CargoIndexWithoutMeta,
+    ManifestIndexWithoutMeta,
     headers,
     FetchFunction,
     FileCache,
     DownloadManager,
-    serviceWorkerPolicies,
     DownloadState,
     getErrorDownloadIndex,
     rootDocumentFallBackUrl,
@@ -25,13 +24,13 @@ import {
     ABORTED,
     FAILED,
     ClientMessageChannel,
-    DownloadClientCargoIndexStorage,
-    CargoIndex,
+    DownloadClientManifestIndexStorage,
+    ManifestIndex,
     BackendMessageChannel
 } from "./backend"
+import {serviceWorkerPolicies} from "./serviceWorkerMeta"
 import {BYTES_PER_MB} from "../utils/consts/storage"
-import {NULL_FIELD} from "../cargo/index"
-import {Cargo} from "../cargo/index"
+import {NULL_FIELD, HuzmaManifest} from "huzma"
 import {resultJsonParse} from "../monads/utils/jsonParse"
 import {GeneralPermissions} from "../utils/security/permissionsSummary"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
@@ -41,7 +40,7 @@ import { nanoid } from "nanoid"
 import { getFileNameFromUrl } from "../utils/urls/getFilenameFromUrl"
 import {stringBytes} from "../utils/stringBytes"
 
-export type {CargoIndex, CargoState} from "./backend"
+export type {ManifestIndex, ManifestState} from "./backend"
 
 const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 
@@ -60,7 +59,7 @@ export type ShabahConfig = {
     },
     clientMessageChannel: ClientMessageChannel
     backendMessageChannel: BackendMessageChannel
-    indexStorage: DownloadClientCargoIndexStorage
+    indexStorage: DownloadClientManifestIndexStorage
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
 
@@ -82,7 +81,7 @@ export class Shabah {
     private downloadManager: DownloadManager
     private clientMessageChannel: ClientMessageChannel
     private backendMessageChannel: BackendMessageChannel
-    private indexStorage: DownloadClientCargoIndexStorage
+    private indexStorage: DownloadClientManifestIndexStorage
     private permissionsCleaner: null | (
         (permissions: GeneralPermissions) => GeneralPermissions
     )
@@ -468,7 +467,7 @@ export class Shabah {
         }
         return io.ok({
             name: manifestName,
-            pkg: new Cargo(cargoFileJson.data as Cargo),
+            pkg: new HuzmaManifest(cargoFileJson.data as HuzmaManifest),
             bytes: stringBytes(cargoFileText.data)
         })
     }
@@ -552,11 +551,11 @@ export class Shabah {
         return io.ok(await this.deleteCargoIndex(cargoIndex.canonicalUrl))
     }
 
-    async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<CargoIndex | null> {
+    async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<ManifestIndex | null> {
         return await this.indexStorage.getIndex(canonicalUrl)
     }
 
-    async putCargoIndex(newIndex: CargoIndexWithoutMeta): Promise<StatusCode> {
+    async putCargoIndex(newIndex: ManifestIndexWithoutMeta): Promise<StatusCode> {
         const previousIndex = await this.indexStorage.getIndex(newIndex.canonicalUrl)
         if (!previousIndex) {
             await this.indexStorage.putIndex({

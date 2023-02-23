@@ -4,7 +4,7 @@ import {
     DownloadIndex,
     saveErrorDownloadIndex,
     DownloadSegment,
-    CargoState,
+    ManifestState,
     CACHED,
     ABORTED,
     FAILED,
@@ -202,7 +202,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                 start += maxFileProcessed
                 end = Math.min(len, end + maxFileProcessed)
             }
-            let state: CargoState = CACHED
+            let state: ManifestState = CACHED
             const resourcesFailed = processingStats.failedResources > 0
             if (eventType === "abort" && resourcesFailed) {
                 state = ABORTED

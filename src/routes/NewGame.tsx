@@ -15,7 +15,7 @@ import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppContext} from "./store"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
-import type {CargoIndex} from "../lib/shabah/downloadClient"
+import type {ManifestIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
 import {MANUAL_SAVE} from "../lib/database/GameSaves"
 import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
@@ -31,7 +31,7 @@ const NewGamePage = () => {
 
     const [gameName, setGameName] = useState(`unnamed-${(Math.trunc(Math.random() * 99_999)).toString()}`)
     const [showModLinker, setShowModLinker] = useState(false)
-    const [linkedMods, setLinkedMods] = useState([] as CargoIndex[])
+    const [linkedMods, setLinkedMods] = useState([] as ManifestIndex[])
     const [loading, setLoading] = useState(false)
 
     useEffectAsync(async () => {

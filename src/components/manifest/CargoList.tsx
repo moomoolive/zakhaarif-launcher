@@ -1,4 +1,4 @@
-import type {CargoIndex, CargoState} from "../../lib/shabah/downloadClient"
+import type {ManifestIndex, ManifestState} from "../../lib/shabah/downloadClient"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import { reactiveDate } from "../../lib/utils/dates"
 import { isMod } from "../../lib/utils/cargos"
@@ -58,7 +58,7 @@ const CargoIndexSummary = ({
 }
 
 type CargoSummaryIconProps = {
-    cargoState: CargoState, 
+    cargoState: ManifestState, 
     isAMod: boolean
 }
 
@@ -100,7 +100,7 @@ const CargoSummaryIcon = ({cargoState, isAMod}: CargoSummaryIconProps): JSX.Elem
 
 export type CargoListProps = {
     onViewCargo: (url: string) => void
-    cargosIndexes: CargoIndex[]
+    cargosIndexes: ManifestIndex[]
     hasMore: boolean,
     onPaginate: () => void
 }
@@ -112,7 +112,7 @@ export const CargoList = ({
     onPaginate
 }: CargoListProps): JSX.Element => {
 
-    const {current: cargoStatus} = useRef((cargoState: CargoState) => {
+    const {current: cargoStatus} = useRef((cargoState: ManifestState) => {
         switch (cargoState) {
             case ABORTED:
             case FAILED:

@@ -1,16 +1,16 @@
 import {describe, it, expect} from "vitest"
 import {
-    cargoIsUpdatable, 
-    Cargo, 
+    manifestIsUpdatable, 
+    HuzmaManifest, 
     NULL_MANIFEST_VERSION,
-    LATEST_SCHEMA_VERSION, NULL_FIELD,
     InvalidationStrategy
 } from "./index"
+import {LATEST_SCHEMA_VERSION, NULL_FIELD,} from "./consts"
 import {diffManifestFiles, validateManifest} from "./index"
 import {SemVer} from "small-semver"
 
 const entry = "index.js"
-const manifest = new Cargo({
+const manifest = new HuzmaManifest({
     schema: LATEST_SCHEMA_VERSION,
     version: "0.1.0", 
     name: "test-pkg", 
@@ -24,7 +24,7 @@ describe("cargo update detection function", () => {
         for (let i = 0; i < 3; i++) {
             const newPkg = structuredClone(manifest)
             newPkg.version = `0.1.${i + 1}`
-            const res = cargoIsUpdatable(newPkg, oldPkg)
+            const res = manifestIsUpdatable(newPkg, oldPkg)
             expect(res.updateAvailable).toBe(true)
         }
     })
@@ -34,7 +34,7 @@ describe("cargo update detection function", () => {
         newPkg.version = NULL_MANIFEST_VERSION
         const oldPkg = structuredClone(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
-        const res = cargoIsUpdatable(newPkg, oldPkg)
+        const res = manifestIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
     })
 
@@ -42,7 +42,7 @@ describe("cargo update detection function", () => {
         const oldPkg = manifest
         const newPkg = structuredClone(manifest)
         newPkg.version = NULL_MANIFEST_VERSION
-        const res = cargoIsUpdatable(newPkg, oldPkg)
+        const res = manifestIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(false)
     })
 
@@ -51,7 +51,7 @@ describe("cargo update detection function", () => {
         newPkg.version = "0.1.0"
         const oldPkg = structuredClone(manifest)
         oldPkg.version = NULL_MANIFEST_VERSION
-        const res = cargoIsUpdatable(newPkg, oldPkg)
+        const res = manifestIsUpdatable(newPkg, oldPkg)
         expect(res.updateAvailable).toBe(true)
     })
 
@@ -59,7 +59,7 @@ describe("cargo update detection function", () => {
         {
             const oldPkg = manifest
             const newPkg = {}
-            const res = cargoIsUpdatable(newPkg, oldPkg)
+            const res = manifestIsUpdatable(newPkg, oldPkg)
             expect(res.updateAvailable).toBe(false)
             expect(res.oldManifest.errors.length).toBe(0)
             expect(res.newManifest.errors.length).toBeGreaterThan(0)
@@ -67,7 +67,7 @@ describe("cargo update detection function", () => {
         {
             const oldPkg = {}
             const newPkg = manifest
-            const res = cargoIsUpdatable(newPkg, oldPkg)
+            const res = manifestIsUpdatable(newPkg, oldPkg)
             expect(res.updateAvailable).toBe(false)
             expect(res.oldManifest.errors.length).toBeGreaterThan(0)
             expect(res.newManifest.errors.length).toBe(0)
@@ -224,7 +224,7 @@ describe("manifest validation function", () => {
     })
 
     it("should return error if one of required fields is missing", () => {
-        const del = <T extends keyof Cargo>(k: T) => {
+        const del = <T extends keyof HuzmaManifest>(k: T) => {
             const v = structuredClone(manifest)
             delete v[k]
             return validateManifest(v)
@@ -344,7 +344,7 @@ describe("manifest validation function", () => {
     })
 
     it("should return no errors when missing one optional field", () => {
-        const del = <T extends keyof Cargo>(k: T) => {
+        const del = <T extends keyof HuzmaManifest>(k: T) => {
             const v = structuredClone(manifest)
             delete v[k]
             return validateManifest(v)

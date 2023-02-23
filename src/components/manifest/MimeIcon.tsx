@@ -2,7 +2,7 @@ import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faImage,faFilm, faFile, faCube} from "@fortawesome/free-solid-svg-icons"
 import {faJs, faCss3, faHtml5} from "@fortawesome/free-brands-svg-icons"
 import type {Mime} from "../../lib/miniMime/index"
-import { MANIFEST_FILE_SUFFIX } from "../../lib/cargo"
+import { MANIFEST_FILE_SUFFIX } from "huzma"
 
 export type MimeIconProps = {
     filename: string

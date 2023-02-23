@@ -1,5 +1,5 @@
-import {Cargo} from "../../lib/cargo"
-import type {CargoIndex} from "../../lib/shabah/downloadClient"
+import {HuzmaManifest} from "huzma"
+import type {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {Permissions} from "../../lib/types/permissions"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {Tooltip, Button} from "@mui/material"
@@ -149,8 +149,8 @@ const cleanDirectory = (): CargoDirectory => {
 }
 
 export type CargoFileSystemProps = {
-    cargoIndex: CargoIndex | null
-    cargo: Cargo<Permissions>
+    cargoIndex: ManifestIndex | null
+    cargo: HuzmaManifest<Permissions>
     cargoBytes: number
     searchText: string
     lastPackageUpdate: number

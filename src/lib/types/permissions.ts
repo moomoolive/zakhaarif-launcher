@@ -1,4 +1,4 @@
-import type {PermissionsList} from "../cargo/index"
+import type {PermissionsList} from "huzma"
 
 export const ALLOW_ALL_PERMISSIONS = "allowAll"
 export const ALLOW_ALL_EMBEDS = ALLOW_ALL_PERMISSIONS

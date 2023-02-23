@@ -1,5 +1,5 @@
 import { ERROR_CODES_START, RequestableResource, StatusCode, STATUS_CODES } from "./client"
-import {Cargo} from "../cargo"
+import {HuzmaManifest} from "huzma"
 import { NO_INSTALLATION } from "./utility"
 import { DeepReadonly } from "../types/utility"
 import {readableByteCount} from "../utils/storage/friendlyBytes"
@@ -17,9 +17,9 @@ export type UpdateCheckConfig = {
     resolvedUrl: string
     canonicalUrl: string
     errors: ReadonlyArray<string>
-    newCargo: DeepReadonly<Cargo> | null
+    newCargo: DeepReadonly<HuzmaManifest> | null
     originalNewCargoResponse: Response
-    previousCargo: DeepReadonly<Cargo> | null
+    previousCargo: DeepReadonly<HuzmaManifest> | null
     downloadableResources: ReadonlyArray<RequestableResource>
     resourcesToDelete: ReadonlyArray<RequestableResource>
     diskInfo: RawDiskMetadata
@@ -53,10 +53,10 @@ export class UpdateCheckResponse {
     readonly originalResolvedUrl: string
     readonly resolvedUrl: string
     readonly canonicalUrl: string
-    readonly newCargo: DeepReadonly<Cargo> | null
+    readonly newCargo: DeepReadonly<HuzmaManifest> | null
     readonly originalNewCargoResponse: Response
     readonly errors: ReadonlyArray<string>
-    readonly previousCargo: DeepReadonly<Cargo> | null
+    readonly previousCargo: DeepReadonly<HuzmaManifest> | null
     readonly status: StatusCode
     readonly statusText: DebugStatusName
     readonly downloadableResources: ReadonlyArray<RequestableResource>

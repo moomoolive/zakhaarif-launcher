@@ -22,12 +22,12 @@ import {
     UNSAFE_INLINE_CSP
 } from "./permissionsSummary"
 import { ALLOW_ALL_PERMISSIONS, permissionsMeta } from "../../types/permissions"
-import {CargoIndex} from "../../shabah/downloadClient"
-import { NULL_FIELD } from "../../cargo/index"
+import {ManifestIndex} from "../../shabah/downloadClient"
+import { NULL_FIELD } from "huzma"
 import { CACHED } from "../../shabah/backend"
 
 const emptyCargoIndices = () => {
-    return {cargos: [] as CargoIndex[]}
+    return {cargos: [] as ManifestIndex[]}
 }
 
 describe("filtering malicous csp values", () => {
@@ -655,7 +655,7 @@ describe("unsafe permissions detector", () => {
     })
 })
 
-const DUMMY_CARGOS: [CargoIndex, CargoIndex, CargoIndex] = [
+const DUMMY_CARGOS: [ManifestIndex, ManifestIndex, ManifestIndex] = [
     {
         tag: 0,
         name: "cool1",

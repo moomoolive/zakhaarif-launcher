@@ -17,9 +17,9 @@ import { useAppContext } from "../../routes/store"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 import {isExtension, isInErrorState, isStandardCargo} from "../../lib/utils/cargos"
 import type {CargoDirectory, RootDirectoryPath} from "./CargoFileSystem"
-import type {CargoIndex} from "../../lib/shabah/downloadClient"
+import type {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {CargoIcon} from "./Icon"
-import { NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD } from "../../lib/cargo"
+import { NULL_FIELD as CARGO_NULL_FIELD } from "huzma"
 import { useNavigate } from "react-router-dom"
 import { EXTENSION_SHELL_TARGET } from "../../lib/utils/searchParameterKeys"
 import { UPDATING } from "../../lib/shabah/backend"
@@ -32,7 +32,7 @@ type FileSystemBreadcrumbsProps = {
     isViewingCargo: boolean
     cargoFound: boolean
     directoryPath: CargoDirectory[]
-    targetCargo: CargoIndex | null
+    targetCargo: ManifestIndex | null
     onBackToCargos: () => unknown
     mutateDirectoryPath: (newValue: CargoDirectory[]) => unknown
     onShowCargoInfo: () => unknown

@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faBug, faDownload, faRotate, faThumbsUp, faTrash} from "@fortawesome/free-solid-svg-icons"
 import LoadingIcon from "../LoadingIcon"
 import { ReactNode, useRef, useState } from "react"
-import {CargoIndex} from "../../lib/shabah/downloadClient"
+import {ManifestIndex} from "../../lib/shabah/downloadClient"
 import { useEffectAsync } from "../../hooks/effectAsync"
 import { isInErrorState } from "../../lib/utils/cargos"
 import { useCloseOnEscape } from "../../hooks/closeOnEscape"
@@ -11,7 +11,7 @@ import { sleep } from "../../lib/utils/sleep"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
 
 export type RecoveryModalProps = {
-    cargoIndex: CargoIndex
+    cargoIndex: ManifestIndex
     onClose: () => unknown
     onCreateAlert: (type: "success" | "error", content: ReactNode) => unknown
     onRetryDownload: (canonicalUrl: string, title: string) => Promise<boolean>

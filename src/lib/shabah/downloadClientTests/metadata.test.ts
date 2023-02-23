@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {Shabah} from "../downloadClient"
 import {NO_UPDATE_QUEUED, UPDATING} from "../backend"
-import {Cargo, MANIFEST_FILE_SUFFIX} from "../../cargo/index"
+import {HuzmaManifest, MANIFEST_FILE_SUFFIX} from "huzma"
 import { Permissions } from "../../types/permissions"
 import {createClient, cargoToCargoIndex, createUpdateCheck} from "./testLib"
 
@@ -11,7 +11,7 @@ describe("reading and updating cargo indexes", () => {
     it("cargo index can be created", async () => {
         const canonicalUrl = "https://mymamashouse.com"
         const {client} = createClient(canonicalUrl)
-        const cargo = new Cargo<Permissions>({name: "my-cargo"})
+        const cargo = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const index = cargoToCargoIndex(canonicalUrl, cargo)
         await client.putCargoIndex(
             index,
@@ -25,7 +25,7 @@ describe("reading and updating cargo indexes", () => {
     it("calling put on an already existent index overwrites it", async () => {
         const canonicalUrl = "https://mymamashouse.com"
         const {client} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const initial = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const index = cargoToCargoIndex(canonicalUrl, initial)
         await client.putCargoIndex(
             index,
@@ -34,7 +34,7 @@ describe("reading and updating cargo indexes", () => {
             canonicalUrl
         )
         expect(foundInitial?.name).toBe(initial.name)
-        const updated =  cargoToCargoIndex(canonicalUrl, new Cargo({name: "cargo"}))
+        const updated =  cargoToCargoIndex(canonicalUrl, new HuzmaManifest({name: "cargo"}))
         await client.putCargoIndex(
             updated,
         )
@@ -47,7 +47,7 @@ describe("reading and updating cargo indexes", () => {
     it("cargo indexes can be deleted", async () => {
         const canonicalUrl = "https://mymamashouse.com"
         const {client} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const initial = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const index = cargoToCargoIndex(canonicalUrl, initial)
         await client.putCargoIndex(
             index,
@@ -69,7 +69,7 @@ describe("reading and updating cargo indexes", () => {
         const canonicalUrl = origin + "/"
         const resolvedUrl = canonicalUrl
         const {client, canceledDownloads} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const initial = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const updateResponse = createUpdateCheck({
             tag: 0,
             canonicalUrl,
@@ -121,7 +121,7 @@ describe("reading and updating cargo indexes", () => {
         const secondOrigin = "https://mydadashouse.com"
         const secondCanonicalUrl = secondOrigin + "/"
         const {client, canceledDownloads} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const initial = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const updateResponse = createUpdateCheck({
             tag: 0,
             canonicalUrl,
@@ -195,7 +195,7 @@ describe("reading and updating cargo indexes", () => {
     it("attempting to delete a non-existent indexes does nothing", async () => {
         const canonicalUrl = "https://mymamashouse.com"
         const {client} = createClient(canonicalUrl)
-        const initial = new Cargo<Permissions>({name: "my-cargo"})
+        const initial = new HuzmaManifest<Permissions>({name: "my-cargo"})
         const index = cargoToCargoIndex(canonicalUrl, initial)
         await client.putCargoIndex(
             index,
@@ -221,9 +221,9 @@ describe("reading and updating cargo indexes", () => {
             {name: "style.css", bytes: 0, invalidation: "default"},
             {name: "pic.png", bytes: 0, invalidation: "default"},
         ]
-        const cargoToDelete = new Cargo<Permissions>({
+        const cargoToDelete = new HuzmaManifest<Permissions>({
             name: "my-cargo",
-            files: files as Cargo["files"]
+            files: files as HuzmaManifest["files"]
         })
         const cacheFiles = files.reduce((total, next) => {
             const {name, bytes} = next
@@ -426,7 +426,7 @@ describe("finding full cargos", () => {
     it("if cargo is found and is valid, a parsed version should be returned", async () => {
         const origin = "https://a-new-website-.com"
         const canonicalUrl = origin + "/" + MANIFEST_NAME
-        const cargo = new Cargo<Permissions>({name: "good cargo"})
+        const cargo = new HuzmaManifest<Permissions>({name: "good cargo"})
         const {client} = createClient(origin, {
             cacheFiles: {
                 [`${origin}/${MANIFEST_NAME}`]: () => {
@@ -494,7 +494,7 @@ describe("querying download state", () => {
                 canonicalUrl,
                 status: Shabah.STATUS.ok,
                 diskInfo: {used: 0, total: 10_000, left: 10_000},
-                newCargo: new Cargo(),
+                newCargo: new HuzmaManifest(),
                 originalNewCargoResponse: new Response(),
                 downloadableResources,
                 resourcesToDelete: []

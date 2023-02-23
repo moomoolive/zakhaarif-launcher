@@ -9,7 +9,7 @@ import {
     saveErrorDownloadIndex, 
     UPDATING
 } from "../backend"
-import {Cargo} from "../../cargo"
+import {HuzmaManifest} from "huzma"
 import { Permissions } from "../../types/permissions"
 import {createClient, cargoToCargoIndex} from "./testLib"
 
@@ -119,12 +119,12 @@ describe("download retries", () => {
             const {client, downloadState} = downloadClient
             for (const {origin} of testCase) {
                 const canonicalUrl = origin + "/"
-                const cargo = new Cargo({
+                const cargo = new HuzmaManifest({
                     name: origin + "-cargo"
                 })
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
-                    cargo as Cargo<Permissions>
+                    cargo as HuzmaManifest<Permissions>
                 )
                 await client.putCargoIndex(cargoIndex)
                 const cargoIndexFound = await client.getCargoIndexByCanonicalUrl(
@@ -183,12 +183,12 @@ describe("download retries", () => {
             const {client, downloadState} = downloadClient
             for (const {origin} of testCase) {
                 const canonicalUrl = origin + "/"
-                const cargo = new Cargo({
+                const cargo = new HuzmaManifest({
                     name: origin + "-cargo"
                 })
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
-                    cargo as Cargo<Permissions>,
+                    cargo as HuzmaManifest<Permissions>,
                     {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)
@@ -288,12 +288,12 @@ describe("download retries", () => {
                 )
                 const errorIndex = await getErrorDownloadIndex(resolvedUrl, virtualFileCache)
                 expect(!!errorIndex).toBe(true)
-                const cargo = new Cargo({
+                const cargo = new HuzmaManifest({
                     name: origin + "-cargo"
                 })
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
-                    cargo as Cargo<Permissions>,
+                    cargo as HuzmaManifest<Permissions>,
                     {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)
@@ -395,12 +395,12 @@ describe("download retries", () => {
                     resolvedUrl, virtualFileCache
                 )
                 expect(!!errorIndex).toBe(true)
-                const cargo = new Cargo({
+                const cargo = new HuzmaManifest({
                     name: origin + "-cargo"
                 })
                 const cargoIndex = cargoToCargoIndex(
                     canonicalUrl,
-                    cargo as Cargo<Permissions>,
+                    cargo as HuzmaManifest<Permissions>,
                     {state: FAILED}
                 )
                 await client.putCargoIndex(cargoIndex)

@@ -1,11 +1,11 @@
-import type {CargoIndex} from "../lib/shabah/downloadClient"
+import type {ManifestIndex} from "../lib/shabah/downloadClient"
 import {faker} from "@faker-js/faker"
 import { EXTENSION_CARGO_TAG, MOD_CARGO_TAG } from "../config"
-import { NULL_FIELD } from "../lib/cargo"
-import {CargoState} from "../lib/shabah/downloadClient"
+import { NULL_FIELD } from "huzma"
+import {ManifestState} from "../lib/shabah/downloadClient"
 
-export const makeTestCargoIndexes = (): CargoIndex[] => {
-    const data: CargoIndex[] = []
+export const makeTestHuzmaIndexes = (): ManifestIndex[] => {
+    const data: ManifestIndex[] = []
     for (let i = 0; i < 5_000; i++) {
         const manifestName = "default.huzma.json"
         const canonicalUrl = faker.internet.url() + "/" + manifestName
@@ -15,7 +15,7 @@ export const makeTestCargoIndexes = (): CargoIndex[] => {
                 max: Date.now()
             })
         ).getTime()
-        const next: CargoIndex = {
+        const next: ManifestIndex = {
             name: faker.random.words(),
             canonicalUrl,
             resolvedUrl: canonicalUrl,
@@ -25,7 +25,7 @@ export const makeTestCargoIndexes = (): CargoIndex[] => {
             entry: NULL_FIELD,
             version: faker.system.semver(),
             permissions: [],
-            state: faker.datatype.number({min: 1, max: 4}) as CargoState,
+            state: faker.datatype.number({min: 1, max: 4}) as ManifestState,
             downloadId: "",
             created,
             updated: created,

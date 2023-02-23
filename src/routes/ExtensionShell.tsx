@@ -7,7 +7,11 @@ import {Button, Tooltip} from "@mui/material"
 import {wRpc} from "../lib/wRpc/simple"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAppContext} from "./store"
-import {Cargo, NULL_FIELD as CARGO_NULL_FIELD, NULL_FIELD} from "../lib/cargo/index"
+import {
+    HuzmaManifest, 
+    NULL_FIELD as CARGO_NULL_FIELD, 
+    NULL_FIELD
+} from "huzma"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
 import rawCssExtension from "../index.css?url"
@@ -18,7 +22,7 @@ import {
 } from "../lib/utils/security/permissionsSummary"
 import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
-import { CACHED, CargoIndex } from "../lib/shabah/backend"
+import { CACHED, ManifestIndex } from "../lib/shabah/backend"
 
 export type ExtensionShellFunctions = SandboxFunctions
 export type ControllerRpc = wRpc<ExtensionShellFunctions>
@@ -45,8 +49,8 @@ const ExtensionShellPage = () => {
     const [extensionEntry, setExtensionEntry] = useState({url: "", retry: 0})
 
     const errorDetailsRef = useRef("")
-    const extensionCargo = useRef(new Cargo<Permissions>())
-    const extensionCargoIndex = useRef<CargoIndex>({
+    const extensionCargo = useRef(new HuzmaManifest<Permissions>())
+    const extensionCargoIndex = useRef<ManifestIndex>({
         tag: -1,
         name: "tmp",
         downloadId: "",
@@ -126,7 +130,7 @@ const ExtensionShellPage = () => {
         )
         if (cargoResponse.ok) {
             await sandboxInitializePromise.promise
-            extensionCargo.current = cargoResponse.data.pkg as Cargo<Permissions>
+            extensionCargo.current = cargoResponse.data.pkg as HuzmaManifest<Permissions>
             extensionCargoIndex.current = meta
             const url = meta.resolvedUrl + meta.entry
             setExtensionEntry({url, retry: 0})

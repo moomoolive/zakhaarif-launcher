@@ -1,14 +1,18 @@
 import {io} from "../../lib/monads/result"
-import {MANIFEST_FILE_SUFFIX} from "../../lib/cargo/index"
-import {validateManifest, diffManifestFiles, Cargo} from "../../lib/cargo/index"
+import {
+    validateManifest, 
+    diffManifestFiles, 
+    HuzmaManifest,
+    MANIFEST_FILE_SUFFIX
+} from "huzma"
 import {SemVer} from "small-semver"
 import {urlToMime} from "../../lib/miniMime/index"
 import {
     FileCache, 
     FetchFunction,
-    serviceWorkerPolicies,
     ResourceMap
 } from "./backend"
+import {serviceWorkerPolicies,} from "./serviceWorkerMeta"
 import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
@@ -71,7 +75,7 @@ const cargoHeaders = {
 
 class CargoFetchResponse {
     error: string
-    cargo: {pkg: Cargo, errors: string[] ,semanticVersion: SemVer} | null
+    cargo: {pkg: HuzmaManifest, errors: string[] ,semanticVersion: SemVer} | null
     text: string
     response: Response | null
     resolvedUrl: string
@@ -153,7 +157,7 @@ const fetchCargo = async (
     if (baseUrl.length < 1) {
         return new CargoFetchResponse({
             code: STATUS_CODES.invalidRedirect,
-            error: `Cargo request redirected to empty url`
+            error: `HuzmaManifest request redirected to empty url`
         })
     }
     return new CargoFetchResponse({
@@ -173,7 +177,7 @@ type DownloadResponse = {
     newCargo: {
         response: Response
         text: string
-        parsed: Cargo
+        parsed: HuzmaManifest
         canonicalUrl: string
         resolvedUrl: string
     } | null
@@ -182,7 +186,7 @@ type DownloadResponse = {
     bytesToDelete: number
     cargoManifestBytes: number
     previousVersionExists: boolean
-    previousCargo: null | Cargo
+    previousCargo: null | HuzmaManifest
     code: StatusCode
     manifestName: string
 }
@@ -219,7 +223,7 @@ const downloadError = (
     msg: string,
     code: StatusCode,
     previousVersionExists = true,
-    previousCargo = null as null | Cargo
+    previousCargo = null as null | HuzmaManifest
 ) => {
     return downloadResponse({
         errors: [msg], 
@@ -230,7 +234,7 @@ const downloadError = (
 }
 
 const versionUpToDate = ({
-    previousCargo = null as null | Cargo
+    previousCargo = null as null | HuzmaManifest
 } = {}) => downloadResponse({
     code: STATUS_CODES.manifestIsUpToDate,
     previousCargo
@@ -419,7 +423,7 @@ export const checkForUpdates = async (
 
     // if cargo has been saved before assume that it's
     // encoded correctly
-    const oldCargoPkg = await storedCargoRes.json() as Cargo
+    const oldCargoPkg = await storedCargoRes.json() as HuzmaManifest
     const oldCargoSemanticVersion = SemVer.fromString(oldCargoPkg.version)!
     const oldCargo = {
         pkg: oldCargoPkg,
