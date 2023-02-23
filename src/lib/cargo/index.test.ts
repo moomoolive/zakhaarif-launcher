@@ -7,7 +7,7 @@ import {
     InvalidationStrategy
 } from "./index"
 import {diffManifestFiles, validateManifest} from "./index"
-import {SemVer} from "../smallSemver/index"
+import {SemVer} from "small-semver"
 
 const entry = "index.js"
 const manifest = new Cargo({

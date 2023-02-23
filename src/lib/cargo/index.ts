@@ -1,4 +1,4 @@
-import {SemVer} from "../smallSemver/index"
+import {SemVer} from "small-semver"
 import {type} from "../utils/betterTypeof"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 

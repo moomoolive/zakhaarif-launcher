@@ -2,7 +2,7 @@ import {describe, it, expect} from "vitest"
 import {Shabah} from "../downloadClient"
 import {Cargo, MANIFEST_FILE_SUFFIX, } from "../../cargo"
 import {Permissions} from "../../types/permissions"
-import {SemVer} from "../../smallSemver"
+import {SemVer} from "small-semver"
 import {createClient, cargoToCargoIndex} from "./testLib"
 
 const MANIFEST_NAME = "stable" + MANIFEST_FILE_SUFFIX

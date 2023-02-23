@@ -1,7 +1,7 @@
 import {io} from "../../lib/monads/result"
 import {MANIFEST_FILE_SUFFIX} from "../../lib/cargo/index"
 import {validateManifest, diffManifestFiles, Cargo} from "../../lib/cargo/index"
-import {SemVer} from "../../lib/smallSemver/index"
+import {SemVer} from "small-semver"
 import {urlToMime} from "../../lib/miniMime/index"
 import {
     FileCache, 

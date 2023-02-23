@@ -43,6 +43,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.5",
     "simplex-noise": "^4.0.1",
+    "small-semver": "^0.1.0",
     "wasm-check": "^2.1.2",
     "zod": "^3.20.2"
   },
