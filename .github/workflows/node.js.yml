@@ -7,12 +7,18 @@ on:
     branches: ["master"]
 
 jobs:
-  build:
+  ci-runner:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
       - name: build_step
         run: npm i
-      - name: run ci runner
-        run: npm run ci
+      - name: type_checking
+        run: npm run type-check
+      - name: testing
+        run: npm run test

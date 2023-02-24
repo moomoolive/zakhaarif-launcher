@@ -10,10 +10,10 @@
     "type-check": "npm run type-check-main && npm run type-check-sw",
     "build": "npm run build-sandbox && npm run build-main",
     "build-main": "npm run compile-credits && npm run sw && vite build && node ./src/build/headers.mjs",
+    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox && node ./sandbox/build/headers.mjs",
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
-    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox",
     "preview": "vite build --outDir dist-preview && vite preview --outDir dist-preview",
     "sw": "npm run sw-prod && npm run sw-dev",
     "test-watch": "vitest watch",
@@ -22,8 +22,7 @@
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --outfile=./public/dev-sw.compiled.js",
     "check-types": "tsc",
     "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst",
-    "compile-credits": "node ./cli/compileCredits.mjs",
-    "ci": "npm run type-check && npm run test"
+    "compile-credits": "node ./cli/compileCredits.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
