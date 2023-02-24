@@ -34,7 +34,6 @@ ${SANDBOX_ORIGIN}/*
 
 const CLOUDFLARE_HEADER_FILE = "_headers"
 console.log("creating deployment headers...")
-console.log("deployment headers =", file)
 
 await fs.writeFile(`dist/${CLOUDFLARE_HEADER_FILE}`, file)
 
