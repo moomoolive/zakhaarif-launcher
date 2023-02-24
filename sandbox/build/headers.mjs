@@ -11,6 +11,7 @@ const file = `
 ${HEADERS_FOR_ALL_URLS}
     Cross-Origin-Embedder-Policy: require-corp
     Cross-Origin-Opener-Policy: same-origin
+    Cross-Origin-Resource-Policy: cross-origin
     X-Content-Type-Options: nosniff
     X-Frame-Options: deny
     Vary: Origin
