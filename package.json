@@ -1,8 +1,7 @@
 {
-  "name": "g-wrapper",
+  "name": "zakhaarif-launcher",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "main-server": "vite",
     "dev": "npm run compile-credits && npm run sw && npm run main-server",
