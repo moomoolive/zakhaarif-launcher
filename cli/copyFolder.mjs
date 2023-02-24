@@ -1,4 +1,3 @@
-import {parseArgs} from "node:util"
 import fs from "fs-extra"
 import commandLineArgs from "command-line-args"
 
