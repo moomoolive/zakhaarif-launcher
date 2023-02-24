@@ -26,7 +26,7 @@ export const webCacheFileCache = (cacheName: string) => {
             return {quota, usage}
         },
         isPersisted: async () => await navigator.storage.persisted(),
-        requestPersistence: async () => await navigator.storage.persist(),
+        requestPersistence: async () => await (navigator.storage as unknown as { persist: () => Promise<boolean> }).persist(),
     }
     return cache
 }
