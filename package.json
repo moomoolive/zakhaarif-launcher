@@ -7,7 +7,7 @@
     "dev": "npm run compile-credits && npm run sw && npm run main-server",
     "type-check": "tsc",
     "build": "npm run build-sandbox && npm run build-main",
-    "build-main": "npm run compile-credits && npm run sw && vite build",
+    "build-main": "npm run compile-credits && npm run sw && vite build && node ./src/build/headers.mjs",
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
