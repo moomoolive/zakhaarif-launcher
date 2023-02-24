@@ -4,10 +4,10 @@ const HEADERS_FOR_ALL_URLS = "/*"
 
 const file = `
 ${HEADERS_FOR_ALL_URLS}
-    Cross-Origin-Embedder-Policy: require-corp;
-    Cross-Origin-Opener-Policy: same-origin;
-    X-Content-Type-Options: nosniff;
-    X-Frame-Options: deny;
+    Cross-Origin-Embedder-Policy: require-corp
+    Cross-Origin-Opener-Policy: same-origin
+    X-Content-Type-Options: nosniff
+    X-Frame-Options: deny
 `.trim()
 
 const CLOUDFLARE_HEADER_FILE = "_headers"
