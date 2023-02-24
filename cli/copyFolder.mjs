@@ -1,13 +1,12 @@
 import {parseArgs} from "node:util"
 import fs from "fs-extra"
+import commandLineArgs from "command-line-args"
 
 (async () => {
-    const {values: {source = "", dest = ""}} = parseArgs({
-        options: {
-            source: {type: "string"},
-            dest: {type: "string"}
-        }
-    })
+    const {source = "", dest = ""} = commandLineArgs([
+        {name: "source", type: String},
+        {name: "dest", type: String}
+    ])
 
     if (!source || !dest) {
         console.error(`source and dest option must be specified`)

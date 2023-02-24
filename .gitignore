@@ -12,6 +12,7 @@ lerna-debug.log*
 # Build Artifacts
 **/*.compiled.*
 node_modules
+dist-sandbox
 dist
 dist-ssr
 *.local

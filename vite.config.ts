@@ -44,7 +44,7 @@ export default defineConfig({
   build: {
     manifest: "build-manifest.json",
     target: "es2020",
-    outDir: "dist/main",
+    outDir: "dist",
     rollupOptions: {
       output: {
         manualChunks: {
