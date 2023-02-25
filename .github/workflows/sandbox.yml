@@ -7,7 +7,7 @@ on:
     branches: ["master"]
 
 jobs:
-  ci-runner:
+  sandbox-deployment:
     runs-on: ubuntu-latest
 
     steps:
