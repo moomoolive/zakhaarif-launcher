@@ -261,7 +261,15 @@ const verifyAllRequestableFiles = async (
             if (!isUrl(url)) {
                 return {url, reason: "malformed url"}
             }
-            const response = await io.wrap(fetchFn(url, {method: "HEAD"}))
+            const response = await io.wrap(fetchFn(url, {
+                method: "HEAD",
+                headers: {
+                    // do not transform content (eg. gzip, brotli-compress)
+                    // so that metadata is not obfstcated
+                    "Cache-Control": "no-transform",
+                    ...serviceWorkerPolicies.networkOnly
+                }
+            }))
             if (!response.ok) {
                 latestFailMessage = "network error"
                 continue

@@ -18,6 +18,7 @@ dist-ssr
 *.local
 bundle-anaylsis/
 dist-preview
+**/*.js.map
 
 # Editor directories and files
 .vscode/*
