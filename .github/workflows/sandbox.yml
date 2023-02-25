@@ -16,8 +16,9 @@ jobs:
         with:
           node-version: 18
           cache: "npm"
-      - name: build step
+      - name: install dependencies
         run: npm i
+      - name: build
         run: npm run build-sandbox
       - name: install deployment tools
         run: npm i -g wrangler@2
