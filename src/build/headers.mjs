@@ -7,11 +7,12 @@ const SANDBOX_ORIGIN = process.env.SANDBOX_ORIGIN || "none"
 const HEADERS_FOR_ALL_URLS = "/*"
 const HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS = "https://:project.pages.dev/*"
 
+// X-Content-Type-Options: nosniff
+
 const file = `
 ${HEADERS_FOR_ALL_URLS}
     Cross-Origin-Embedder-Policy: require-corp
     Cross-Origin-Opener-Policy: same-origin
-    X-Content-Type-Options: nosniff
     X-Frame-Options: deny
     Vary: Origin
 
