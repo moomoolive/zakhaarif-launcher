@@ -10,7 +10,7 @@
     "type-check": "npm run type-check-main && npm run type-check-sw",
     "build": "npm run build-main && npm run build-sandbox",
     "build-main": "npm run compile-credits && npm run sw && vite build && node ./src/build/headers.mjs",
-    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist/sandbox && node ./sandbox/build/headers.mjs",
+    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox && node ./sandbox/build/headers.mjs",
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
