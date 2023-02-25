@@ -69,7 +69,7 @@ export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]
 
 const cargoHeaders = {
     ...serviceWorkerPolicies.networkOnly,
-    pragma: "no-cache",
+    //pragma: "no-cache",
     "cache-control": "no-cache"
 } as const
 
