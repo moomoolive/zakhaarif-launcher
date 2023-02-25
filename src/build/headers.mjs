@@ -11,16 +11,19 @@ const HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS = "https://:project.pages.dev/*"
 
 const file = `
 ${HEADERS_FOR_ALL_URLS}
-    Cross-Origin-Embedder-Policy: require-corp
-    Cross-Origin-Opener-Policy: same-origin
-    X-Frame-Options: deny
     Vary: Origin
+    ! X-Content-Type-Options
 
 ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
     X-Robots-Tag: noindex
 
 https://${DEV_DEPLOYMENT_ORIGIN}/*
     Access-Control-Allow-Origin: https://${DEV_DEPLOYMENT_ORIGIN}
+
+${MAIN_ORIGIN}/
+    Cross-Origin-Embedder-Policy: require-corp
+    Cross-Origin-Opener-Policy: same-origin
+    X-Frame-Options: deny
 
 ${MAIN_ORIGIN}/*
     Access-Control-Allow-Origin: ${MAIN_ORIGIN}
