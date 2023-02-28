@@ -175,11 +175,25 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                         orphanedResources.set(targetUrl, false)
                         errorDownloadSegment.downloadedResources.push(targetUrl)
                         processingStats.resourcesProcessed++
-                        const {bytes} = targetResource
+                        const {bytes, mime} = targetResource
                         if (response.ok) {
                             return fileCache.putFile(
                                 resource.request.url,
-                                response
+                                new Response(response.body, {
+                                    status: response.status,
+                                    statusText: response.statusText,
+                                    // most headers are more or less
+                                    // useless when file is cached, 
+                                    // so we'll discard most of them 
+                                    // to save disk space
+                                    headers: {
+                                        "Content-Length": bytes.toString(),
+                                        "Content-Type": (
+                                            response.headers.get("content-type") 
+                                            || mime
+                                        ) 
+                                    }
+                                })
                             )
                         }
 

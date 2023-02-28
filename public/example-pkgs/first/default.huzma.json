@@ -1,5 +1,5 @@
 {
-    "schema": "0.1.0",
+    "schema": 2,
     "name": "First",
     "version": "1.5.4",
     "entry": "entry.js",

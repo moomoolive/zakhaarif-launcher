@@ -1,6 +1,6 @@
 import {describe, it, expect} from "vitest"
 import {Shabah} from "../downloadClient"
-import {HuzmaManifest, MANIFEST_FILE_SUFFIX, LATEST_SCHEMA_VERSION} from "huzma"
+import {HuzmaManifest, MANIFEST_FILE_SUFFIX, LATEST_SCHEMA_VERSION, BYTES_NOT_INCLUDED} from "huzma"
 import {Permissions} from "../../types/permissions"
 import {SemVer} from "small-semver"
 import {createClient, cargoToCargoIndex} from "./testLib"
@@ -277,64 +277,6 @@ describe("checking for cargo updates", () => {
             if (perviousCargoExists) {
                 expect(response.previousVersionExists()).toBe(true)
             }
-        }
-    })
-
-    it("if one of files listed in cargo is unreachable, returns a bad http code, or does not have 'content-length' header, an errorOccurred should be true", async () => {
-        const origin = "https://my-mamas.com"
-        const cargoOrigin = "https://my-house.com"
-        const testCargo = structuredClone(mockCargo)
-        const testFile1 = "index.js"
-        const testFile2 = "styles.css"
-        testCargo.files.push(
-            {name: testFile1, bytes: 0, invalidation: "default"},
-            {name: testFile2, bytes: 0, invalidation: "default"},
-        )
-        const cases = [
-            {
-                file1: badHttpResponse(404),
-                file2: okResponse() 
-            },
-            {
-                file1: networkError(),
-                file2: okResponse()
-            },
-            {
-                file1: okResponse(),
-                file2: badHttpResponse(404)
-            },
-            {
-                file1: okResponse(),
-                file2: networkError()
-            },
-            {
-                file1: networkError(),
-                file2: networkError()
-            },
-            {
-                file1: badHttpResponse(500),
-                file2: badHttpResponse(404)
-            },
-        ] as const
-        for (const {file1, file2} of cases) {
-            const {client} = createClient(origin, {
-                networkFiles: {
-                    [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
-                        return new Response(
-                            JSON.stringify(testCargo),
-                            {status: 200}
-                        )
-                    },
-                    [`${cargoOrigin}/${testFile1}`]: file1,
-                    [`${cargoOrigin}/${testFile2}`]: file2
-                }
-            })
-            const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
-            const response = await client.checkForUpdates(
-                {canonicalUrl, tag: 0}
-            )
-            expect(response.errorOccurred()).toBe(true)
-            expect(response.status).toBe(Shabah.STATUS.preflightVerificationFailed)
         }
     })
 
@@ -1054,6 +996,125 @@ describe("checking for cargo updates", () => {
                     .find((file) => file.requestUrl === url)
                 expect(!!file).toBe(true)
             }
+        }
+    })
+})
+
+const okWithoutContentLength = ({body = "", status = 200} = {}) => {
+    return () => new Response(body, {status})
+}
+
+describe("asset preflight verification", () => {
+    it("if one of files listed in cargo is unreachable, returns a bad http code, or does not have 'content-length' header, an errorOccurred should be true", async () => {
+        const origin = "https://my-mamas.com"
+        const cargoOrigin = "https://my-house.com"
+        const testCargo = structuredClone(mockCargo)
+        const testFile1 = "index.js"
+        const testFile2 = "styles.css"
+        testCargo.files.push(
+            {name: testFile1, bytes: BYTES_NOT_INCLUDED, invalidation: "default"},
+            {name: testFile2, bytes: BYTES_NOT_INCLUDED, invalidation: "default"},
+        )
+        const cases = [
+            {
+                file1: badHttpResponse(404),
+                file2: okResponse() 
+            },
+            {
+                file1: networkError(),
+                file2: okResponse()
+            },
+            {
+                file1: okResponse(),
+                file2: badHttpResponse(404)
+            },
+            {
+                file1: okResponse(),
+                file2: networkError()
+            },
+            {
+                file1: networkError(),
+                file2: networkError()
+            },
+            {
+                file1: badHttpResponse(500),
+                file2: badHttpResponse(404)
+            },
+            {
+                file1: okResponse(),
+                file2: okWithoutContentLength()
+            },
+            {
+                file1: okWithoutContentLength(),
+                file2: okResponse()
+            },
+        ] as const
+        for (const {file1, file2} of cases) {
+            const {client} = createClient(origin, {
+                networkFiles: {
+                    [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                        return new Response(
+                            JSON.stringify(testCargo),
+                            {status: 200}
+                        )
+                    },
+                    [`${cargoOrigin}/${testFile1}`]: file1,
+                    [`${cargoOrigin}/${testFile2}`]: file2
+                }
+            })
+            const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
+            const response = await client.checkForUpdates(
+                {canonicalUrl, tag: 0}
+            )
+            expect(response.errorOccurred()).toBe(true)
+            expect(response.status).toBe(Shabah.STATUS.preflightVerificationFailed)
+        }
+    })
+    
+    it("if manifest provides fallback bytes of listed files and server does not return 'content-length' header, an error should not be returned", async () => {
+        const origin = "https://my-mamas.com"
+        const cargoOrigin = "https://my-house.com"
+        const testCargo = structuredClone(mockCargo)
+        const testFile1 = "index.js"
+        const testFile2 = "styles.css"
+        testCargo.files.push(
+            {name: testFile1, bytes: 20, invalidation: "default"},
+            {name: testFile2, bytes: 50, invalidation: "default"},
+        )
+        const cases = [
+            {
+                file1: okResponse(),
+                file2: okWithoutContentLength()
+            },
+            {
+                file1: okWithoutContentLength(),
+                file2: okResponse()
+            },
+            {
+                file1: okWithoutContentLength(),
+                file2: okWithoutContentLength()
+            },
+        ] as const
+        for (const {file1, file2} of cases) {
+            const {client} = createClient(origin, {
+                networkFiles: {
+                    [`${cargoOrigin}/${MANIFEST_NAME}`]: () => {
+                        return new Response(
+                            JSON.stringify(testCargo),
+                            {status: 200}
+                        )
+                    },
+                    [`${cargoOrigin}/${testFile1}`]: file1,
+                    [`${cargoOrigin}/${testFile2}`]: file2
+                }
+            })
+            const canonicalUrl = cargoOrigin + "/" + MANIFEST_NAME
+            const response = await client.checkForUpdates(
+                {canonicalUrl, tag: 0}
+            )
+            expect(response.errorOccurred()).toBe(false)
+            expect(response.status).not.toBe(Shabah.STATUS.preflightVerificationFailed)
+            expect(response.status).toBe(Shabah.STATUS.ok)
         }
     })
 })

@@ -5,7 +5,8 @@ import {ResultType, io} from "../monads/result"
 import { 
     MANIFEST_FILE_SUFFIX, 
     HuzmaManifest,
-    LATEST_SCHEMA_VERSION 
+    LATEST_SCHEMA_VERSION, 
+    BYTES_NOT_INCLUDED
  } from "huzma"
 
 type FileRecord = Record<string, () => ResultType<Response>>
@@ -302,6 +303,9 @@ describe("diff cargos function", () => {
 
     it("if cargo has not been downloaded before and new cargo is found new cargo file urls returns a valid http response without the 'content-length' header, an error should be returned", async () => {
         const manifest = structuredClone(cargoPkg)
+        manifest.files = manifest.files.map(
+            (file) => ({...file, bytes: BYTES_NOT_INCLUDED})
+        )
         const cargoString = JSON.stringify(manifest)
         
         const origin = "https://mywebsite.com/pkg"
@@ -784,14 +788,14 @@ describe("diff cargos function", () => {
         const oldCargo = structuredClone(cargoPkg)
         oldCargo.version = "0.1.2"
         const expiredResources = [
-            {name: "perf.3.wasm", bytes: 20_000, invalidation: "default"}
+            {name: "perf.3.wasm", bytes: BYTES_NOT_INCLUDED, invalidation: "default"}
         ] as const
         oldCargo.files.push(...expiredResources)
         const newCargo = structuredClone(cargoPkg)
         newCargo.version = "0.1.3"
         const newResources = [
-            {name: "rand.5.js", bytes: 600, invalidation: "default"},
-            {name: "styles.6.css", bytes: 1_100, invalidation: "default"},
+            {name: "rand.5.js", bytes: BYTES_NOT_INCLUDED, invalidation: "default"},
+            {name: "styles.6.css", bytes: BYTES_NOT_INCLUDED, invalidation: "default"},
         ] as const
         newCargo.files.push(...newResources)
         const origin = "https://mywebsite.com/pkg"

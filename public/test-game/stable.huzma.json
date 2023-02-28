@@ -1,11 +1,11 @@
 {
-    "schema": "0.1.0",
+    "schema": 2,
     "name": "Game",
     "version": "0.1.0",
     "entry": "index.js",
     "files": [
-        "index.js",
-        "worker.js"
+        {"name": "index.js", "bytes": 2466},
+        {"name": "worker.js", "bytes": 133}
     ],
     "invalidation": "url-diff",
     "authors": [

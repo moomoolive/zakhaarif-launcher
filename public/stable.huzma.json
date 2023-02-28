@@ -1,16 +1,16 @@
 {
-    "schema": "0.1.0",
+    "schema": 2,
     "name": "Launcher",
     "version": "0.1.0-prealpha.0",
     "files": [
-        "bg-fetch-test/entry.js",
-        "bg-fetch-test/asset.svg",
-        "bg-fetch-test/yeah.html",
-        "bg-fetch-test/random-style.css",
-        "bg-fetch-test/cool.png",
-        "bg-fetch-test/bird-svgrepo.svg",
-        "bg-fetch-test/random.jpg",
-        "bg-fetch-test/cool.json"
+        {"name": "bg-fetch-test/entry.js", "bytes": 63},
+        {"name": "bg-fetch-test/asset.svg", "bytes": 1565},
+        {"name": "bg-fetch-test/yeah.html", "bytes": 263},
+        {"name": "bg-fetch-test/random-style.css", "bytes": 25},
+        {"name": "bg-fetch-test/cool.png", "bytes": 13190},
+        {"name": "bg-fetch-test/bird-svgrepo.svg", "bytes": 26801},
+        {"name": "bg-fetch-test/random.jpg", "bytes": 15153},
+        {"name": "bg-fetch-test/cool.json", "bytes": 13}
     ],
     "authors": [
         {"name": "Mostafa Elbannan"}

@@ -3,7 +3,8 @@ import {
     validateManifest, 
     diffManifestFiles, 
     HuzmaManifest,
-    MANIFEST_FILE_SUFFIX
+    MANIFEST_FILE_SUFFIX,
+    BYTES_NOT_INCLUDED
 } from "huzma"
 import {SemVer} from "small-semver"
 import {urlToMime} from "../../lib/miniMime/index"
@@ -250,25 +251,28 @@ type PreflightErrorResponse = {
     filesWithBytes: Map<string, number>
 }
 
+type FileMeta = {
+    url: string,
+    bytes: number
+}
+
 const verifyAllRequestableFiles = async (
-    fileUrls: string[], 
+    fileUrls: FileMeta[], 
     fetchFn: FetchFunction
 ): Promise<PreflightErrorResponse> => {
     const filesWithBytes: Map<string, number> = new Map()
-    const preFlightResponses: PreflightResponse[] = await Promise.all(fileUrls.map(async (url) => {
+    const preFlightResponses: PreflightResponse[] = await Promise.all(fileUrls.map(async (meta) => {
+        const {url, bytes: fallbackBytes} = meta
+        
         let latestFailMessage = ""
+        
         for (let i = 0; i < 3; i++) {
             if (!isUrl(url)) {
                 return {url, reason: "malformed url"}
             }
             const response = await io.wrap(fetchFn(url, {
                 method: "HEAD",
-                headers: {
-                    // do not transform content (eg. gzip, brotli-compress)
-                    // so that metadata is not obfstcated
-                    "Cache-Control": "no-transform",
-                    ...serviceWorkerPolicies.networkOnly
-                }
+                headers: {...serviceWorkerPolicies.networkOnly}
             }))
             if (!response.ok) {
                 latestFailMessage = "network error"
@@ -283,14 +287,22 @@ const verifyAllRequestableFiles = async (
             }
             const contentLength = response.data.headers.get("content-length")
             
-            if (contentLength === null) {
-                return {url, reason: "missing 'content-length' header"}
-            }
             const mime = response.data.headers.get("content-type")
             if (mime === null) {
                 return {url, reason: "missing 'content-type' header"}
             }
-            const bytes = parseInt(contentLength, 10)
+
+            if (
+                contentLength === null
+                && fallbackBytes === BYTES_NOT_INCLUDED
+            ) {
+                return {url, reason: "server did not provide 'content-length' header, and fallback length was not provided"}
+            }
+            
+            const bytes = contentLength === null
+                ? fallbackBytes
+                : parseInt(contentLength, 10)
+            
             if (isNaN(bytes)) {
                 return {url, reason: "'content-length' header returned an invalid number (NaN)"} 
             }
@@ -378,7 +390,9 @@ export const checkForUpdates = async (
             } as RequestableResource
         })
         const filePreflightResponses = await verifyAllRequestableFiles(
-            filesToDownload.map((file) => file.requestUrl),
+            filesToDownload.map(
+                (file) => ({url: file.requestUrl, bytes: file.bytes})
+            ),
             fetchFn
         )
         if (filePreflightResponses.errorUrls.length > 0) {
@@ -474,7 +488,9 @@ export const checkForUpdates = async (
             } as RequestableResource
         })
         const filePreflightResponses = await verifyAllRequestableFiles(
-            filesToDownload.map((file) => file.requestUrl),
+            filesToDownload.map(
+                (file) => ({url: file.requestUrl, bytes: file.bytes})
+            ),
             fetchFn
         )
         filesToDownload.forEach((file) => {
@@ -553,7 +569,9 @@ export const checkForUpdates = async (
         }
     })
     const filePreflightResponses = await verifyAllRequestableFiles(
-        filesToDownload.map((file) => file.requestUrl),
+        filesToDownload.map(
+            (file) => ({url: file.requestUrl, bytes: file.bytes})
+        ),
         fetchFn
     )
     if (filePreflightResponses.errorUrls.length > 0) {
