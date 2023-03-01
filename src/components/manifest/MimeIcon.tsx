@@ -50,7 +50,7 @@ export const MimeIcon = ({
             return <span className={`${className} text-yellow-500`}>
                 {"{ }"}
             </span>
-        case "text/javascript":
+        case "application/javascript":
             return <span className={`${className} text-yellow-500`}>
                 <FontAwesomeIcon 
                     icon={faJs}

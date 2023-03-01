@@ -10,6 +10,7 @@ import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
 import { MILLISECONDS_PER_SECOND } from "../utils/consts/time"
 import { io } from "../monads/result"
 import { stringEqualConstantTimeCompare } from "../utils/security/strings"
+import { removeZipExtension } from "../utils/urls/removeZipExtension"
 
 export type SandboxFunctions = AllRpcs
 
@@ -72,7 +73,7 @@ export class JsSandbox {
             permissionsSummary,
         )
         this.state = state
-        this.entry = entryUrl
+        this.entry = removeZipExtension(entryUrl)
         this.id = id
         this.name = name
         this.iframeElement = document.createElement("iframe")

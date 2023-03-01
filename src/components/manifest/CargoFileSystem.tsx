@@ -14,6 +14,7 @@ import {MimeIcon} from "./MimeIcon"
 import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
 import {CargoFileSystemSkeleton} from "./CargoFileSystemSkeleton"
+import { removeZipExtension } from "../../lib/utils/urls/removeZipExtension"
 
 type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
@@ -82,7 +83,7 @@ const addFileToDirectory = (
     const isFile = splitPath.length === 1
     const {bytes} = file
     if (isFile) {
-        const name = splitPath.at(-1)!
+        const name = removeZipExtension(splitPath.at(-1)!)
         directory.files.push({name, bytes})
         return
     }

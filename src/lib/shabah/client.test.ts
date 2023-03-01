@@ -8,6 +8,7 @@ import {
     LATEST_SCHEMA_VERSION, 
     BYTES_NOT_INCLUDED
  } from "huzma"
+import { ZIP_EXTENSION_LENGTH } from "../utils/urls/removeZipExtension"
 
 type FileRecord = Record<string, () => ResultType<Response>>
 
@@ -1190,5 +1191,188 @@ describe("diff cargos function", () => {
                 })
             ])
         )
+    })
+})
+
+
+describe("handling zip files", () => {
+    it("zipped file's storageUrl should strip zip extension", async () => {
+        const tests = [
+            "index.js.gz", // gzip
+        ] as const
+        
+        for (const zipFile of tests) {
+            const manifest = structuredClone(cargoPkg)
+            manifest.entry = zipFile
+            manifest.files = [
+                {name: zipFile, bytes: BYTES_NOT_INCLUDED, invalidation: "default"}
+            ]
+            const cargoString = JSON.stringify(manifest)
+            const origin = "https://mywebsite.com/pkg"
+            const contentLength = ["10"] as const
+            const adaptors = fetchFnAndFileCache({}, {
+                [`${origin}/${MANIFEST_NAME}`]: () => {
+                    return io.ok(new Response(cargoString, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": "1",
+                            "Content-Type": "application/json"
+                        }
+                    }))
+                },
+                [`${origin}/${zipFile}`]: () => {
+                    return io.ok(new Response(cargoString, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": contentLength[0],
+                            "Content-Type": "text/javascript"
+                        }
+                    }))
+                }
+            })
+            const canonicalUrl = origin + "/" + MANIFEST_NAME
+            const res = await checkForUpdates({
+                canonicalUrl, 
+                oldResolvedUrl: origin + "/", 
+                oldManifestName: MANIFEST_NAME
+            }, ...adaptors)
+            expect(res.code).toBe(STATUS_CODES.ok)
+            expect(res.downloadableResources.length).toBe(manifest.files.length)
+            const zipExtension = zipFile.slice(-ZIP_EXTENSION_LENGTH)
+            expect(res.downloadableResources[0].requestUrl.slice(-ZIP_EXTENSION_LENGTH)).toBe(zipExtension)
+            expect(res.downloadableResources[0].storageUrl.slice(-ZIP_EXTENSION_LENGTH)).not.toBe(zipExtension)
+            expect(res.downloadableResources[0].storageUrl).includes(zipFile.slice(0, -ZIP_EXTENSION_LENGTH))
+            expect(res.errors.length).toBe(0)
+            expect(res.resoucesToDelete.length).toBe(0)
+            expect(res.bytesToDownload).toBe(parseInt(contentLength[0], 10))
+            expect(res.newCargo?.parsed.files || []).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        name: zipFile, 
+                        bytes: parseInt(contentLength[0], 10),
+                    })
+                ])
+            )
+        }
+    })
+
+    it("error will not be thrown if zip file does not have the 'content-type' header", async () => {
+        const tests = [
+            "index.js.gz", // gzip
+        ] as const
+        
+        for (const zipFile of tests) {
+            const manifest = structuredClone(cargoPkg)
+            manifest.entry = zipFile
+            manifest.files = [
+                {name: zipFile, bytes: BYTES_NOT_INCLUDED, invalidation: "default"}
+            ]
+            const cargoString = JSON.stringify(manifest)
+            const origin = "https://mywebsite.com/pkg"
+            const contentLength = ["10"] as const
+            const adaptors = fetchFnAndFileCache({}, {
+                [`${origin}/${MANIFEST_NAME}`]: () => {
+                    return io.ok(new Response(cargoString, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": "1",
+                            "Content-Type": "application/json"
+                        }
+                    }))
+                },
+                [`${origin}/${zipFile}`]: () => {
+                    return io.ok(new Response(cargoString, {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": contentLength[0],
+                        }
+                    }))
+                }
+            })
+            const canonicalUrl = origin + "/" + MANIFEST_NAME
+            const response = await checkForUpdates({
+                canonicalUrl, 
+                oldResolvedUrl: origin + "/", 
+                oldManifestName: MANIFEST_NAME
+            }, ...adaptors)
+            expect(response.errors.length).toBe(0)
+            expect(response.code).toBe(STATUS_CODES.ok)
+        }
+    })
+
+    it("if zip file must be deleted, delete url should strip zip extension", async () => {
+        const tests = [
+            "index.js.gz", // gzip
+        ] as const
+        
+        for (const zipFile of tests) {
+            const manifest = structuredClone(cargoPkg)
+            manifest.entry = zipFile
+            manifest.files = [
+                {name: zipFile, bytes: BYTES_NOT_INCLUDED, invalidation: "default"}
+            ]
+            const newCargo = structuredClone(cargoPkg)
+            newCargo.version = "2.0.0"
+            const origin = "https://mywebsite.com/pkg"
+            const contentLength = ["10"] as const
+            const adaptors = fetchFnAndFileCache({
+                [`${origin}/${MANIFEST_NAME}`]: () => {
+                    return io.ok(new Response(JSON.stringify(manifest), {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": "1",
+                            "Content-Type": "application/json"
+                        }
+                    }))
+                },
+                [`${origin}/${zipFile}`]: () => {
+                    return io.ok(new Response("console.log('hi')", {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": contentLength[0],
+                        }
+                    }))
+                }
+            }, {
+                [`${origin}/${MANIFEST_NAME}`]: () => {
+                    return io.ok(new Response(JSON.stringify(newCargo), {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": "1",
+                            "Content-Type": "application/json"
+                        }
+                    }))
+                },
+                [`${origin}/index.js`]: () => {
+                    return io.ok(new Response("console.log('hi')", {
+                        status: 200,
+                        statusText: "OK",
+                        headers: {
+                            "Content-Length": contentLength[0],
+                            "Content-Type": "text/javascript",
+                        }
+                    }))
+                }
+            })
+            const canonicalUrl = origin + "/" + MANIFEST_NAME
+            const response = await checkForUpdates({
+                canonicalUrl, 
+                oldResolvedUrl: origin + "/", 
+                oldManifestName: MANIFEST_NAME
+            }, ...adaptors)
+            expect(response.errors.length).toBe(0)
+            expect(response.code).toBe(STATUS_CODES.ok)
+            expect(response.resoucesToDelete).length(1)
+            const extension = zipFile.slice(-ZIP_EXTENSION_LENGTH)
+            expect(response.resoucesToDelete[0].storageUrl.slice(-ZIP_EXTENSION_LENGTH)).not.toBe(extension)
+            expect(response.resoucesToDelete[0].storageUrl).includes(zipFile.slice(0, -ZIP_EXTENSION_LENGTH))
+        }
     })
 })

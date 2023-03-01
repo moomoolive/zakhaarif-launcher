@@ -63,7 +63,7 @@ export const extensionToMime = (extension: string) => {
 			return "image/jpeg"
 		case "js":
 		case "mjs":
-			return "text/javascript"
+			return "application/javascript"
 		case "json":
 			return "application/json"
 		case "jsonld":
@@ -241,6 +241,7 @@ export type Mime = (
 	"application/epub+zip" |
 	"application/gzip" |
 	"application/java-archive" |
+	"application/javascript" |
 	"application/json" |
 	"application/ld+json" |
 	"application/msword" |
@@ -300,7 +301,6 @@ export type Mime = (
 	"text/css" |
 	"text/csv" |
 	"text/html" |
-	"text/javascript" |
 	"text/plain" |
 	"video/3gpp" |
 	"video/3gpp2" |

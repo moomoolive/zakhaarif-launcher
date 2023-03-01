@@ -4,7 +4,6 @@ import {
     diffManifestFiles, 
     HuzmaManifest,
     MANIFEST_FILE_SUFFIX,
-    BYTES_NOT_INCLUDED
 } from "huzma"
 import {SemVer} from "small-semver"
 import {urlToMime} from "../../lib/miniMime/index"
@@ -20,6 +19,7 @@ import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import {isUrl} from "../utils/urls/isUrl"
 import {stringBytes} from "../utils/stringBytes"
 import {getFileNameFromUrl} from "../utils/urls/getFilenameFromUrl"
+import {removeZipExtension} from "../utils/urls/removeZipExtension"
 
 export type RequestableResource = {
     requestUrl: string
@@ -292,10 +292,7 @@ const verifyAllRequestableFiles = async (
                 return {url, reason: "missing 'content-type' header"}
             }
 
-            if (
-                contentLength === null
-                && fallbackBytes === BYTES_NOT_INCLUDED
-            ) {
+            if (contentLength === null) {
                 return {url, reason: "server did not provide 'content-length' header, and fallback length was not provided"}
             }
             
@@ -385,7 +382,7 @@ export const checkForUpdates = async (
             const fileUrl = finalUrl + filename
             return {
                 requestUrl: fileUrl,
-                storageUrl: fileUrl,
+                storageUrl: removeZipExtension(fileUrl),
                 bytes: f.bytes
             } as RequestableResource
         })
@@ -483,7 +480,7 @@ export const checkForUpdates = async (
             const fileUrl = finalUrl + stripRelativePath(file.name)
             return {
                 requestUrl: fileUrl,
-                storageUrl: fileUrl,
+                storageUrl: removeZipExtension(fileUrl),
                 bytes: file.bytes
             } as RequestableResource
         })
@@ -524,7 +521,7 @@ export const checkForUpdates = async (
             const fileUrl = oldResolvedRootUrl + stripRelativePath(file.name)
             return {
                 requestUrl: fileUrl,
-                storageUrl: fileUrl,
+                storageUrl: removeZipExtension(fileUrl),
                 bytes: file.bytes
             } as RequestableResource
         })
@@ -564,7 +561,7 @@ export const checkForUpdates = async (
         const fileUrl = finalUrl + stripRelativePath(file.name)
         return {
             requestUrl: fileUrl,
-            storageUrl: fileUrl,
+            storageUrl: removeZipExtension(fileUrl),
             bytes: file.bytes
         }
     })
@@ -612,11 +609,14 @@ export const checkForUpdates = async (
         (total, f) => total + f.bytes,
         0
     )
-    const filesToDelete = diff.delete.map((file) => ({
-        requestUrl: oldResolvedRootUrl + stripRelativePath(file.name),
-        storageUrl: oldResolvedRootUrl + stripRelativePath(file.name),
-        bytes: file.bytes
-    }))
+    const filesToDelete = diff.delete.map((file) => {
+        const fileUrl = oldResolvedRootUrl + stripRelativePath(file.name)
+        return {
+            requestUrl: fileUrl,
+            storageUrl: removeZipExtension(fileUrl),
+            bytes: file.bytes
+        }
+    })
     const bytesToDelete = filesToDelete.reduce(
         (total, f) => total + f.bytes,
         0
@@ -647,7 +647,7 @@ export const createResourceMap = (
     const map = {} as ResourceMap
     for (let i = 0; i < resources.length; i++) {
         const {storageUrl, requestUrl, bytes} = resources[i]
-        const mime = urlToMime(requestUrl)
+        const mime = urlToMime(storageUrl)
         map[requestUrl] = {
             storageUrl,
             bytes,

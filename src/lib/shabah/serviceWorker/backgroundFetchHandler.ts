@@ -13,6 +13,9 @@ import {
     ClientMessageChannel
 } from "../backend"
 import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWorkers"
+import { isZipFile } from "../../utils/urls/removeZipExtension"
+import { decompressFile } from "./decompression"
+import type {DecompressionStreamConstructor} from "../../types/streams"
 
 export type BackgroundFetchEventName = "success" | "abort" | "fail"
 
@@ -31,6 +34,7 @@ export type BackgroundFetchSuccessOptions = {
     type: BackgroundFetchEventName
     onProgress?: (progressUpdate: ProgressUpdateRecord) => unknown
     clientMessageChannel: ClientMessageChannel
+    decompressionConstructor?: DecompressionStreamConstructor
 }
 
 export type BackgroundFetchHandlerEvent = BackgroundFetchEvent & {
@@ -46,7 +50,8 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
         onProgress = () => {},
         clientMessageChannel,
         backendMessageChannel,
-        virtualFileCache
+        virtualFileCache,
+        decompressionConstructor
     } = options
     const eventName = `[🐕‍🦺 bg-fetch ${eventType}]`
     return async (
@@ -175,25 +180,43 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
                         orphanedResources.set(targetUrl, false)
                         errorDownloadSegment.downloadedResources.push(targetUrl)
                         processingStats.resourcesProcessed++
-                        const {bytes, mime} = targetResource
+                        const {bytes, mime, storageUrl} = targetResource
                         if (response.ok) {
+                            const contentType = isZipFile(resource.request.url)
+                                ? mime
+                                : response.headers.get("content-type") || mime
+                            const config = {
+                                status: response.status,
+                                statusText: response.statusText,
+                                // most headers are more or less
+                                // useless when file is cached, 
+                                // so we'll discard most of them 
+                                // to save disk space
+                                headers: {
+                                    "Content-Length": bytes.toString(),
+                                    "Content-Type": contentType
+                                }
+                            }
+                            if (
+                                !decompressionConstructor
+                                || !isZipFile(resource.request.url) 
+                                || !response.body
+                            ) {
+                                return fileCache.putFile(
+                                    storageUrl,
+                                    new Response(response.body, config)
+                                )
+                            }
+                            log(eventName, `${resource.request.url} is a zip file, will be mapped to ${storageUrl} after transform. Decompressing now...`)
+                            const transformedBodyBytes = await decompressFile(
+                                resource.request.url, 
+                                response,
+                                decompressionConstructor
+                            )
+                            config.headers["Content-Length"] = transformedBodyBytes.byteLength.toString()
                             return fileCache.putFile(
-                                resource.request.url,
-                                new Response(response.body, {
-                                    status: response.status,
-                                    statusText: response.statusText,
-                                    // most headers are more or less
-                                    // useless when file is cached, 
-                                    // so we'll discard most of them 
-                                    // to save disk space
-                                    headers: {
-                                        "Content-Length": bytes.toString(),
-                                        "Content-Type": (
-                                            response.headers.get("content-type") 
-                                            || mime
-                                        ) 
-                                    }
-                                })
+                                storageUrl,
+                                new Response(transformedBodyBytes, config)
                             )
                         }
 

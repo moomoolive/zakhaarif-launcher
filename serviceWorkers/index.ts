@@ -17,16 +17,23 @@ import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
 import {wRpc} from "../src/lib/wRpc/simple"
 import type {AppRpcs} from "../src/lib/utils/appRpc"
 import {createBackendChannel, createClientChannel} from "../src/lib/utils/shabahChannels"
+import type {CompressionStreams} from "../src/lib/types/streams"
 
 const sw = globalThis.self as unknown as (
-    ServiceWorkerGlobalScope & BackgroundFetchEventHandlerSetters
+    ServiceWorkerGlobalScope 
+    & BackgroundFetchEventHandlerSetters
+    & CompressionStreams
 )
+
+if (typeof sw.DecompressionStream === "undefined") {
+    console.warn("decompression streams are not supported")
+}
 
 const CONFIG_URL =  `${sw.location.origin}/__sw-config__.json`
 
 let config: GlobalConfig = {
     version: 1,
-    log: false,
+    log: sw.location.origin.includes("http://localhost:5173"),
     updatedAt: -1,
     createdAt: Date.now()
 }
@@ -111,7 +118,8 @@ const bgFetchDependencies = {
     onProgress: notifyDownloadProgress,
     log: logger,
     origin: sw.location.origin,
-    fileCache
+    fileCache,
+    decompressionConstructor: sw.DecompressionStream
 } as const
 
 const bgFetchSuccessHandle = makeBackgroundFetchHandler({
