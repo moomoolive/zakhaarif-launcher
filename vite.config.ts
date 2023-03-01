@@ -37,7 +37,7 @@ const removeGzipContentType = () => ({
       res.setHeader("Content-Type", "application/x-gzip")
       // force dev server not to set content-encoding
       // to gzip as we'll be decompressing manually
-      res.setHeader("Content-Encoding", "custom")
+      res.setHeader("Content-Encoding", "manual-gzip")
       serveStaticFile(req, res, next)
     })
   }
