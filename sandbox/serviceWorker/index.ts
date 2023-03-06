@@ -1,4 +1,4 @@
-import {wRpc} from "../../src/lib/wRpc/simple"
+import {wRpc} from "w-worker-rpc"
 import {createFetchHandler} from "./fetchHandler"
 import type {CallableFunctions as SandboxFunctions} from "../sandboxFunctions"
 

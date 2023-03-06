@@ -4,7 +4,7 @@ import {useEffectAsync} from "../hooks/effectAsync"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
-import {wRpc} from "../lib/wRpc/simple"
+import {wRpc} from "w-worker-rpc"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAppContext} from "./store"
 import {

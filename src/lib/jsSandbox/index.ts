@@ -1,6 +1,6 @@
 import {ALLOW_ALL_PERMISSIONS} from "../types/permissions"
 import {ALLOW_BLOB_URLS_CSP, ALLOW_DATA_URLS_CSP, createContentSecurityPolicy, generatePermissionsSummary, iframeAllowlist, iframeSandbox} from "../utils/security/permissionsSummary"
-import {wRpc} from "../wRpc/simple"
+import {wRpc} from "w-worker-rpc"
 import {PermissionsSummary, mergePermissionSummaries} from "../utils/security/permissionsSummary"
 import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
 import type {ManifestIndex, Shabah} from "../shabah/downloadClient"

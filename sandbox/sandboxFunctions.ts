@@ -1,4 +1,4 @@
-import {wRpc, MessagableEntity} from "../src/lib/wRpc/simple"
+import {wRpc, MessagableEntity} from "w-worker-rpc"
 import type {ExtensionShellFunctions} from "../src/routes/ExtensionShell"
 
 type WindowMessageEvent = {

@@ -8,7 +8,7 @@ import {
 } from "../../config"
 import { cleanPermissions } from "./security/permissionsSummary"
 import type {ServiceWorkerRpcs} from "../../../serviceWorkers/rpcs"
-import {wRpc} from "../wRpc/simple"
+import {wRpc} from "w-worker-rpc"
 import {createAppRpcs, DownloadProgressListener} from "./appRpc"
 import {EventListenerRecord} from "./eventListener"
 import { AppDatabase } from "../database/AppDatabase"

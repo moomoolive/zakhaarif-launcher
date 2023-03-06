@@ -46,6 +46,7 @@
     "react-router-dom": "^6.4.5",
     "simplex-noise": "^4.0.1",
     "small-semver": "^0.1.0",
+    "w-worker-rpc": "^0.1.2",
     "wasm-check": "^2.1.2",
     "zod": "^3.20.2"
   },

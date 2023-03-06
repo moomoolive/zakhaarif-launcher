@@ -1,2 +1,2 @@
 export const INDEX_HTML_LENGTH = 1347
-export const SECURE_MJS_LENGTH = 4869
+export const SECURE_MJS_LENGTH = 5213

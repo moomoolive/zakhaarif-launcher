@@ -1,5 +1,5 @@
 import {RpcState} from "../state"
-import {TransferValue, wRpc} from "../../../wRpc/simple"
+import {TransferValue, wRpc} from "w-worker-rpc"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
 import { stringEqualConstantTimeCompare } from "../../../utils/security/strings"
 

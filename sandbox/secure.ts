@@ -1,4 +1,4 @@
-import {wRpc} from "../src/lib/wRpc/simple"
+import {wRpc} from "w-worker-rpc"
 import type {ServiceWorkerFunctions} from "./serviceWorkerFunctions"
 import {serviceWorkerToSandboxRpc, controllerRpc} from "./sandboxFunctions"
 import type {ExtensionModule, MainScriptArguments} from "../src/lib/types/extensions"
