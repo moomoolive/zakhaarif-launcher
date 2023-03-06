@@ -12,10 +12,8 @@ const window = self as unknown as {
         postMessage: (data: unknown, origin: string, transferables: Transferable[]) => unknown
     }
     addEventListener: (name: "message", handler: (event: WindowMessageEvent) => any) => unknown
+    removeEventListener: (name: "message", handler: (event: WindowMessageEvent) => any) => unknown
 }
-
-const {top} = window
-const addListener = window.addEventListener
 
 type ControllerRpcState = {
     authToken: string
@@ -27,7 +25,11 @@ const sandboxResponses = {
     }
 }
 
+const {top, addEventListener, removeEventListener} = window
+
 export type SandboxResponses = typeof sandboxResponses
+
+let callback: Parameters<typeof window["addEventListener"]>[1] = () => {}
 
 export const controllerRpc = new wRpc<
     ExtensionShellFunctions, ControllerRpcState
@@ -36,16 +38,18 @@ export const controllerRpc = new wRpc<
     messageTarget: {
         postMessage: (data, transferables) => {
             top.postMessage(data, "*", transferables)
-        }
-    },
-    messageInterceptor: {
-        addEventListener: (_, handler) => {
-            addListener("message", (event) => {
+        },
+        addEventListener(_, handler) {
+            callback = (event) => {
                 if (event.source !== (top as object)) {
                     return
                 }
                 handler({data: event.data})
-            })
+            }
+            addEventListener("message", callback)
+        },
+        removeEventListener(_, __) {
+            removeEventListener("message", callback)
         }
     },
     state: {authToken: ""}

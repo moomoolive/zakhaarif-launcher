@@ -31,10 +31,11 @@ const rpc = new wRpc<ServiceWorkerFunctions>({
         postMessage(data, transferables) {
             sw?.postMessage(data, transferables)
         },
-    },
-    messageInterceptor: {
         addEventListener(_, handler) {
             navigator.serviceWorker.addEventListener("message", handler)
+        },
+        removeEventListener(_, handler) {
+            navigator.serviceWorker.removeEventListener("message", handler)
         }
     },
     state: {}

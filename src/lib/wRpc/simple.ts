@@ -1,26 +1,4 @@
-// a random number
-const TDATA = 1_432_234
-
-export interface TransferValue<T> {
-    value: T
-    transferables: Transferable[]
-    __x_tdata__: typeof TDATA
-}
-
-const transferData = <T>(value: T, transferables: Transferable[]) => ({
-    value, 
-    transferables,
-    __x_tdata__: TDATA
-} as TransferValue<T>)
-
-type TransferableReturn<T> = ReturnType<typeof transferData<T>>
-
-const isTransferable = (data: unknown) => (
-    typeof data === "object"
-    && data !== null
-    && ("__x_tdata__" in data) 
-    && data?.__x_tdata__ === TDATA
-)
+import {transferData, TransferValue} from "./transfer"
 
 type RpcResponse<State extends object> = (
     (() => any)
@@ -42,7 +20,7 @@ export type TerminalActions<State extends object> = {
     readonly [key: string]: RpcResponse<State>
 }
 
-type TransferableFunctionReturn<T> = T extends TransferableReturn<infer ValueType>
+type TransferableFunctionReturn<T> = T extends TransferValue<infer ValueType>
     ? ValueType
     : T
 
@@ -70,24 +48,21 @@ export const OUTBOUND_MESSAGE = -1
 export const ERROR_RESPONSE_HANDLE = "__x_rpc_error__"
 export const RESPONSE_HANDLE = "__x_rpc_response__"
 
+export type MessageHandler = (event: {data: unknown, source: MessagableEntity} | {data: unknown}) => unknown
+
 export type MessagableEntity = {
-    postMessage: (data: any, transferables: Transferable[]) => any
+    postMessage: (data: any, transferables: Transferable[]) => unknown
+    addEventListener: (event: "message", handler: MessageHandler) => unknown
+    removeEventListener: (event: "message", handler: MessageHandler) => unknown
 }
 
-type MessageInterceptor = {
-    addEventListener: (
-        event: "message", 
-        handler: (event: 
-            {data: any, source: MessagableEntity}
-            | {data: any}
-        ) => any
-    ) => any
+export type MessageTarget = {
+    postMessage: (data: any, transferables: Transferable[]) => unknown
 }
 
 type RpcConfig<State extends object> = {
     messageTarget: MessagableEntity
     responses: TerminalActions<State>,
-    messageInterceptor: MessageInterceptor
     state: State
 }
 
@@ -108,26 +83,26 @@ export class wRpc<
     private actionsIndex: Map<string, RpcResponse<State>>
     private messageContainer: MessageContainer
     private messageTarget: MessagableEntity
-    private messageInterceptor: MessageInterceptor
+    private messageHandlerRef: MessageHandler
     
     state: State
 
     constructor({
         responses,
         messageTarget,
-        messageInterceptor,
         state
     }: RpcConfig<State>) {
+        const self = this
         this.state = state
-        this.messageInterceptor = messageInterceptor
         this.messageTarget = messageTarget
-        this.messageInterceptor.addEventListener("message", (event) => {
+        this.messageHandlerRef = (event) => {
             self.consumeMessage(
-                event.data,
+                event.data as MessageContainer,
                 ("source" in event) ? event.source || null : null
             )
-        })
-        const self = this
+        }
+        this.messageTarget.addEventListener("message", self.messageHandlerRef)
+        
         this.idCount = 0
         this.queue = []
         this.messageContainer = {
@@ -145,16 +120,18 @@ export class wRpc<
         }
     }
 
-    replaceSources(
-        messageTarget: MessagableEntity,
-        messageInterceptor: MessageInterceptor
-    ): boolean {
+    cleanup(): boolean {
+        this.messageTarget.removeEventListener("message", this.messageHandlerRef)
+        return true
+    }
+
+    replaceMessageTarget(messageTarget: MessagableEntity): boolean {
         const self = this
-        this.messageInterceptor = messageInterceptor
+        this.cleanup()
         this.messageTarget = messageTarget
-        this.messageInterceptor.addEventListener("message", (event) => {
+        this.messageTarget.addEventListener("message", (event) => {
             self.consumeMessage(
-                event.data,
+                event.data as MessageContainer,
                 ("source" in event) ? event.source || null : null
             )
         })
@@ -163,7 +140,7 @@ export class wRpc<
 
     async executeWithSource<T extends keyof RecipentActions>(
         name: T & string,
-        source: MessagableEntity,
+        source: MessageTarget,
         data: Parameters<RecipentActions[T]>[0] extends undefined ? null : Parameters<RecipentActions[T]>[0], 
         transferables?: Transferable[]
     ) {
@@ -192,7 +169,7 @@ export class wRpc<
     }
 
     private outboundMessage(
-        source: MessagableEntity,
+        source: MessageTarget,
         handle: string,
         data: unknown = null,
         transferables: Transferable[] = emptyTransferArray
@@ -216,13 +193,17 @@ export class wRpc<
         respondingTo: number, 
         data: unknown
     ) {
-        const transfer = isTransferable(data)
+        const transfer = (
+            typeof data === "object"
+            && data !== null
+            && (data as TransferValue<unknown>).__x_tdata__ === true
+        )
         this.transferMessage(
             source,
             RESPONSE_HANDLE, 
             respondingTo, 
-            transfer ? (data as TransferableReturn<any>).value : data, 
-            transfer ? (data as TransferableReturn<any>).transferables : emptyTransferArray
+            transfer ? (data as TransferValue<any>).value : data, 
+            transfer ? (data as TransferValue<any>).transferables : emptyTransferArray
         )
     }
 
@@ -240,7 +221,7 @@ export class wRpc<
     }
 
     private transferMessage(
-        source: MessagableEntity | null,
+        source: MessageTarget | null,
         handle: string,
         respondingTo: number, 
         data: unknown,
@@ -299,7 +280,10 @@ export class wRpc<
             return
         }
 
-        if (message.respondingTo === OUTBOUND_MESSAGE) {
+        if (
+            message.respondingTo === OUTBOUND_MESSAGE 
+            && message.data !== undefined
+        ) {
             const handler = this.actionsIndex.get(message.handle)!
             try {
                 const data = await handler(message.data, this.state) ?? null
@@ -315,5 +299,22 @@ export class wRpc<
         }
         console.warn("incoming message is neither a response to a previous message or a request to perform an action. ignoring message", message)
         return
+    }
+
+    addResponses(
+        responses: TerminalActions<State>, 
+        {allowOverwrite = false} = {}
+    ): boolean {
+        const actionKeys = Object.keys(responses)
+        let added = false
+        for (let index = 0; index < actionKeys.length; index++) {
+            const element = actionKeys[index]
+            if (!allowOverwrite && this.actionsIndex.has(element)) {
+                continue
+            }
+            added = true
+            this.actionsIndex.set(element, responses[element])
+        }
+        return added
     }
 }

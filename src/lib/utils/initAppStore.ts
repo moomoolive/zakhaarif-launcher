@@ -91,33 +91,40 @@ export class AppStore {
                     return self.eventListenerMap.downloadprogress.getAll()
                 }
             }),
-            messageInterceptor: {addEventListener: () => {}},
-            messageTarget: {postMessage: () => {}},
+            messageTarget: {
+                postMessage: () => {},
+                addEventListener: () => {},
+                removeEventListener: () => {}
+            },
             state: {}
         })
     }
 
     initialize(): boolean {
         const self = this
-        this.serviceWorkerTerminal.replaceSources(
-            {
-                postMessage: (data, transferables) => {
-                    const target = navigator.serviceWorker.controller
-                    if (!target) {
-                        return
-                    }
-                    target.postMessage(data, transferables)
+        this.serviceWorkerTerminal.replaceMessageTarget({
+            postMessage(data, transferables) {
+                const target = navigator.serviceWorker.controller
+                if (!target) {
+                    return
                 }
+                target.postMessage(data, transferables)
             },
-            {
-                addEventListener: async (_, handler) => {
-                    const event = "service-worker-message"
-                    self.globalListeners.push({event, handler})
-                    const sw = navigator.serviceWorker
-                    sw.addEventListener("message", handler)
+            addEventListener(_, handler) {
+                const event = "service-worker-message"
+                self.globalListeners.push({event, handler})
+                navigator.serviceWorker.addEventListener("message", handler)
+            },
+            removeEventListener(_, handler) {
+                navigator.serviceWorker.removeEventListener("message", handler)
+                const mutateIndex = self.globalListeners.findIndex(
+                    (listener) => listener.handler === handler
+                )
+                if (mutateIndex > -1) {
+                    self.globalListeners.splice(mutateIndex, 1)
                 }
             }
-        )
+        })
         return true
     }
 

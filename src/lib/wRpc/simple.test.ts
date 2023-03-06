@@ -2,16 +2,20 @@ import {expect, describe, it} from "vitest"
 import {wRpc} from "./simple"
 
 const mockWorker = () => ({
-    _adjacentWorker: null as null | {
-        _recieveMessage: (data: any) => any
-    },
-    _callback: null as null | Function,
     postMessage(data: any) {
         this._adjacentWorker?._recieveMessage(data)
     },
     addEventListener(_: "message", callback: Function) {
         this._callback = callback
     },
+    removeEventListener(_: "message", callback: Function) {
+
+    },
+
+    _adjacentWorker: null as null | {
+        _recieveMessage: (data: any) => any
+    },
+    _callback: (() => {}) as Function,
     _recieveMessage(data: any) {
         if (this._callback) {
             this._callback({data})
@@ -33,14 +37,12 @@ describe("terminal communication", () => {
         const terminal1 = new wRpc<typeof terminalTwoActions>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {}
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {}
         })
 
@@ -76,14 +78,12 @@ describe("terminal communication", () => {
         const t1 = new wRpc<typeof terminalTwoActions>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {}
         })
 
         const t2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {}
         })
 
@@ -119,14 +119,12 @@ describe("terminal communication", () => {
         const t1 = new wRpc<typeof terminalTwoActions>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {},
         })
 
         const t2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {}
         })
 
@@ -175,14 +173,12 @@ describe("terminal state", () => {
         const t1 = new wRpc<typeof terminalTwoActions, typeof mockState>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {...mockState},
         })
 
         const t2 = new wRpc<typeof terminalOneActions, typeof mockState>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {...mockState}
         })
 
@@ -217,14 +213,12 @@ describe("terminal state", () => {
         const t1 = new wRpc<typeof terminalTwoActions, typeof mockState>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {...mockState},
         })
 
         const t2 = new wRpc<typeof terminalOneActions, typeof mockState>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {...mockState}
         })
 
@@ -260,14 +254,12 @@ describe("error handling", () => {
         const terminal1 = new wRpc<typeof terminalTwoActions>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {},
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {}
         })
 
@@ -302,14 +294,12 @@ describe("error handling", () => {
         const terminal1 = new wRpc<typeof terminalTwoActions>({
             responses: terminalOneActions,
             messageTarget: t2Worker,
-            messageInterceptor: t2Worker,
             state: {},
         })
 
         const terminal2 = new wRpc<typeof terminalOneActions>({
             responses: terminalTwoActions,
             messageTarget: t1Worker,
-            messageInterceptor: t1Worker,
             state: {}
         })
 
@@ -319,5 +309,81 @@ describe("error handling", () => {
         expect(
             async () => await terminal2.execute("ping")
         ).rejects.toThrow()
+    })
+})
+
+describe("terminal rpcs can be added after initialization", () => {
+    it("calling new rpc function after being added should not return error", async () => {
+        const terminalOneActions = {ping: () => 2}
+        
+        const terminalTwoActions = {ping: () => 3}
+        const t2AdditionalActions = {ping2: () => 4}
+
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const terminal1 = new wRpc<
+            typeof terminalTwoActions
+            & typeof t2AdditionalActions
+        >({
+            responses: terminalOneActions,
+            messageTarget: t2Worker,
+            state: {}
+        })
+
+        const terminal2 = new wRpc<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            messageTarget: t1Worker,
+            state: {}
+        })
+
+        expect(await terminal1.execute("ping")).toBe(3)
+        expect(await terminal2.execute("ping")).toBe(2)
+
+        expect(async () => terminal1.execute("ping2")).rejects.toThrow()
+
+        const addResponse = terminal2.addResponses(t2AdditionalActions)
+        expect(addResponse).toBe(true)
+
+        expect(await terminal1.execute("ping2")).toBe(4)
+    })
+
+    it("if allow overwrite option is set to false, then overwrite should not be allowed", async () => {
+        const terminalOneActions = {ping: () => 2}
+        
+        const terminalTwoActions = {ping: () => 3}
+        const t2AdditionalActions = {ping: () => 4}
+
+        const t1Worker = mockWorker()
+        const t2Worker = mockWorker()
+        t1Worker._adjacentWorker = t2Worker
+        t2Worker._adjacentWorker = t1Worker
+
+        const terminal1 = new wRpc<
+            typeof terminalTwoActions
+            & typeof t2AdditionalActions
+        >({
+            responses: terminalOneActions,
+            messageTarget: t2Worker,
+            state: {}
+        })
+
+        const terminal2 = new wRpc<typeof terminalOneActions>({
+            responses: terminalTwoActions,
+            messageTarget: t1Worker,
+            state: {}
+        })
+
+        expect(await terminal1.execute("ping")).toBe(3)
+        expect(await terminal2.execute("ping")).toBe(2)
+
+        const addResponse = terminal2.addResponses(t2AdditionalActions, {
+            allowOverwrite: false
+        })
+        expect(addResponse).toBe(false)
+
+        expect(await terminal1.execute("ping")).toBe(3)
     })
 })

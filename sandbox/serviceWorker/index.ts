@@ -16,14 +16,18 @@ const sandboxToServiceWorkerRpc = {} as const
 
 export type CallableFunctions = typeof sandboxToServiceWorkerRpc
 
+let handlerRef: Parameters<typeof sw.addEventListener<"message">>[1] = () => {}
+
 const rpc = new wRpc<SandboxFunctions>({
     responses: sandboxToServiceWorkerRpc,
-    messageTarget: {postMessage: () => {}},
-    messageInterceptor: {
+    messageTarget: {
+        postMessage: () => {},
         addEventListener: (_, handler) => {
-            sw.addEventListener("message", (event) => {
-                event.waitUntil(handler(event))
-            })
+            handlerRef = (event) => event.waitUntil(handler(event) as Promise<unknown>)
+            sw.addEventListener("message", handlerRef)
+        },
+        removeEventListener() {
+            sw.removeEventListener("message", handlerRef)
         }
     },
     state: {}

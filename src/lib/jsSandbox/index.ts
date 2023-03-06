@@ -107,9 +107,7 @@ export class JsSandbox {
                     self.iframeElement.contentWindow?.postMessage(
                         data, "*",  transferables
                     )
-                }
-            },
-            messageInterceptor: {
+                },
                 addEventListener: (_, handler) => {
                     const listener = (event: MessageEvent) => {
                         if (event.source !== self.iframeElement.contentWindow) {
@@ -119,8 +117,11 @@ export class JsSandbox {
                     }
                     self.frameListener = listener
                     window.addEventListener("message", listener)
+                },
+                removeEventListener() {
+                    window.removeEventListener("message", self.frameListener)
                 }
-            }
+            },
         })
     }
 

@@ -20,7 +20,6 @@ ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
 
 ${ALL_GZIPPED_CONTENT}
     Content-Encoding: manual-gzip
-    ! Accept-Ranges
 
 https://${DEV_DEPLOYMENT_ORIGIN}/*
     Access-Control-Allow-Origin: https://${DEV_DEPLOYMENT_ORIGIN}

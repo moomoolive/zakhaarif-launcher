@@ -14,7 +14,7 @@ import {
 import {makeFetchHandler} from "../src/lib/shabah/serviceWorker/fetchHandler"
 import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
 import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
-import {wRpc} from "../src/lib/wRpc/simple"
+import {wRpc, MessageHandler} from "../src/lib/wRpc/simple"
 import type {AppRpcs} from "../src/lib/utils/appRpc"
 import {createBackendChannel, createClientChannel} from "../src/lib/utils/shabahChannels"
 import type {CompressionStreams} from "../src/lib/types/streams"
@@ -85,20 +85,23 @@ const logger = (...msgs: any[]) => {
     }
 }
 
+let handlerRef: Parameters<typeof sw.addEventListener<"message">>[1] = () => {}
 const rpc = new wRpc<AppRpcs, GlobalConfig>({
     state: config,
     responses: createServiceWorkerRpcs({persistConfig}),
-    messageInterceptor: {
-        addEventListener: (_, handler) => {
-            sw.onmessage = (event) => event.waitUntil(handler(event))
-        }
-    },
     messageTarget: {
         postMessage: async (data, transferables) => {
             const clients = await sw.clients.matchAll()
             for (const client of clients) {
                 client.postMessage(data, transferables)
             }
+        },
+        addEventListener: (_, handler) => {
+            handlerRef = (event: ExtendableMessageEvent) => event.waitUntil(handler(event) as Promise<unknown>)
+            sw.addEventListener("message", handlerRef)
+        },
+        removeEventListener() {
+            sw.removeEventListener("message", handlerRef)
         }
     }
 })
