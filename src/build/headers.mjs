@@ -6,9 +6,6 @@ const SANDBOX_ORIGIN = process.env.SANDBOX_ORIGIN || "none"
 
 const HEADERS_FOR_ALL_URLS = "/*"
 const HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS = "https://:project.pages.dev/*"
-const ALL_GZIPPED_CONTENT = "/*.gz"
-
-// X-Content-Type-Options: nosniff
 
 const file = `
 ${HEADERS_FOR_ALL_URLS}
@@ -17,9 +14,6 @@ ${HEADERS_FOR_ALL_URLS}
 
 ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
     X-Robots-Tag: noindex
-
-${ALL_GZIPPED_CONTENT}
-    Content-Encoding: manual-gzip
 
 https://${DEV_DEPLOYMENT_ORIGIN}/*
     Access-Control-Allow-Origin: https://${DEV_DEPLOYMENT_ORIGIN}
@@ -41,7 +35,8 @@ ${SANDBOX_ORIGIN}/*
 
 
 const CLOUDFLARE_HEADER_FILE = "_headers"
-console.log("creating deployment headers...")
+console.info("creating deployment headers...")
+console.info("generated headers", file)
 
 await fs.writeFile(`dist/${CLOUDFLARE_HEADER_FILE}`, file)
 
