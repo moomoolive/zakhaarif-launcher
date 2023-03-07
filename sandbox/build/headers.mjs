@@ -13,7 +13,6 @@ ${HEADERS_FOR_ALL_URLS}
     Cross-Origin-Opener-Policy: same-origin
     Cross-Origin-Resource-Policy: cross-origin
     X-Content-Type-Options: nosniff
-    X-Frame-Options: deny
     Vary: Origin
 
 ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
