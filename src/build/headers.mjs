@@ -13,10 +13,7 @@ ${HEADERS_FOR_ALL_URLS}
 
 ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
     X-Robots-Tag: noindex
-
-https://${DEV_DEPLOYMENT_ORIGIN}/*
-    Access-Control-Allow-Origin: https://${DEV_DEPLOYMENT_ORIGIN}
-
+    
 ${MAIN_ORIGIN}/
     Cross-Origin-Embedder-Policy: require-corp
     Cross-Origin-Opener-Policy: same-origin
