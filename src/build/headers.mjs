@@ -1,6 +1,5 @@
 import fs from "fs/promises"
 
-const DEV_DEPLOYMENT_ORIGIN = process.env.DEV_DEPLOYMENT_ORIGIN || "none"
 const MAIN_ORIGIN = process.env.MAIN_ORIGIN || "none"
 
 const HEADERS_FOR_ALL_URLS = "/*"

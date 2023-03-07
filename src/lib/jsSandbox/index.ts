@@ -9,7 +9,6 @@ import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
 import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
 import { MILLISECONDS_PER_SECOND } from "../utils/consts/time"
 import { io } from "../monads/result"
-import { stringEqualConstantTimeCompare } from "../utils/security/strings"
 import { removeZipExtension } from "../utils/urls/removeZipExtension"
 
 export type SandboxFunctions = AllRpcs
@@ -86,10 +85,7 @@ export class JsSandbox {
     private async pingExtension(): Promise<boolean> {
         const response = await io.wrap(this.rpc.execute("ping"))
         this.state.logger.info(`extension returned ping. ok=${response.ok}`)
-        if (!response.ok || typeof response.data !== "string") {
-            return false
-        }
-        if (!stringEqualConstantTimeCompare(response.data, this.state.authToken)) {
+        if (!response.ok || response.data !== 1) {
             return false
         }
         this.latestPingResponse = Date.now()

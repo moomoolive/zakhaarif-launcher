@@ -33,7 +33,7 @@ const rpc = new wRpc<SandboxFunctions>({
     state: {}
 })
 
-const config = {log: true}
+const config = {log: false}
 
 const DEV_MODE = sw.location.origin.startsWith("http://locahost")
 

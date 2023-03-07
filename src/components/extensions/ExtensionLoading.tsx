@@ -23,11 +23,13 @@ export type ExtensionLoadingScreenProps = {
     isRetry: boolean
 }
 
+export const MESSAGES_LOAD_TIME = 3_500
+
 export const ExtensionLoadingScreen = ({onClose, isRetry}: ExtensionLoadingScreenProps) => {
     const [messageIndex, setMessageIndex] = useState(0)
 
     useEffect(() => {
-        const milliseconds = 5_000
+        const milliseconds = MESSAGES_LOAD_TIME
         let currentMessageIndex = messageIndex
         const timerId = window.setInterval(() => {
             if (currentMessageIndex + 1 < EXTENSION_LOADING_MESSAGES.length) {

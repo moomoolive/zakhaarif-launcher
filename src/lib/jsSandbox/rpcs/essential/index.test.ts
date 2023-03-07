@@ -17,13 +17,6 @@ describe("getting initial state", () => {
         const initalState = getInitialState(null, state)
         expect(initalState).not.toBe(null)
     })
-
-    it("initial state should return null if secure context is established", () => {
-        const {state} = cloneDeps({})
-        state.secureContextEstablished = true
-        const initalState = getInitialState(null, state)
-        expect(initalState).toBe(null)
-    })
 })
 
 describe("signaling fatal errors", () => {
@@ -46,31 +39,16 @@ describe("signaling fatal errors", () => {
         const incorrectAuthToken = "rand"
         expect(incorrectAuthToken).not.toBe(state.authToken)
         const response = signalFatalError({
-            extensionToken: incorrectAuthToken,
             details: ""
         }, state)
         expect(response).toBe(true)
         expect(state.fatalErrorOccurred).toBe(true)
     })
 
-    it("if secure context is established, valid input is provided, and auth token is incorrect, should return false", () => {
-        const {state} = cloneDeps({})
-        state.secureContextEstablished = true
-        const incorrectAuthToken = "rand"
-        expect(incorrectAuthToken).not.toBe(state.authToken)
-        const response = signalFatalError({
-            extensionToken: incorrectAuthToken,
-            details: ""
-        }, state)
-        expect(response).toBe(false)
-        expect(state.fatalErrorOccurred).toBe(false)
-    })
-
     it("if secure context is established, valid input is provided, and auth token is correct, should return true", () => {
         const {state} = cloneDeps({})
         state.secureContextEstablished = true
         const response = signalFatalError({
-            extensionToken: state.authToken,
             details: ""
         }, state)
         expect(response).toBe(true)
@@ -108,38 +86,13 @@ describe("exiting extension", () => {
     it("if fatal error has been signaled, should return false", async () => {
         const {state} = cloneDeps({})
         state.fatalErrorOccurred = true
-        const response = await exit(state.authToken, state)
+        const response = await exit(null, state)
         expect(response).toBe(false)
     })
 
-    it("if non string extension token is input, should return false", async () => {
-        const tests = [1n, 3, false, true, "hi", {}, [], null] as const
-        
-        for (const test of tests) {
-            const {state} = cloneDeps({})
-            const response = await exit(test as any, state)
-            expect(response).toBe(false)
-        }
-    })
-
-    it("if incorrect extension token is input, should return false", async () => {
-        const tests = [
-            "herro",
-            "yes-man",
-            "a cool token",
-            "adfasljkfkasdfj38901u0"
-        ] as const
-        
-        for (const test of tests) {
-            const {state} = cloneDeps({})
-            const response = await exit(test, state)
-            expect(response).toBe(false)
-        }
-    })
-
-    it("if correct extension token is input, should return true", async () => {
+    it("if fatal has not been signaled, should return true", async () => {
         const {state} = cloneDeps({})
-        const response = await exit(state.authToken, state)
+        const response = await exit(null, state)
         expect(response).toBe(true)
     })
 })

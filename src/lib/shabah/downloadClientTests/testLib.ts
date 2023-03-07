@@ -12,7 +12,7 @@ const addUrlToResponse = (response: Response, url: string) => {
     return response
 }
 
-type FileHandlers = Record<string, () => (Response | null)>
+export type FileHandlers = Record<string, () => (Response | null)>
 type AccessLog = Readonly<{
     url: string
     time: number
@@ -53,6 +53,10 @@ class MockCache {
 
     deleteAll() {
         this.cache = {}
+    }
+
+    list() {
+        return Object.keys(this.cache)
     }
 }
 

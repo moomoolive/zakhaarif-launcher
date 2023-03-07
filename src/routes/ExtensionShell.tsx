@@ -13,7 +13,7 @@ import {
     NULL_FIELD
 } from "huzma"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
-import {ExtensionLoadingScreen} from "../components/extensions/ExtensionLoading"
+import {ExtensionLoadingScreen, MESSAGES_LOAD_TIME} from "../components/extensions/ExtensionLoading"
 import rawCssExtension from "../index.css?url"
 import type {Permissions} from "../lib/types/permissions"
 import {
@@ -25,7 +25,6 @@ import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 import { CACHED, ManifestIndex } from "../lib/shabah/backend"
 
 export type ExtensionShellFunctions = SandboxFunctions
-export type ControllerRpc = wRpc<ExtensionShellFunctions>
 
 const EXTENSION_IFRAME_ID = "extension-frame"
 const NO_EXTENSION_URL = ""
@@ -192,7 +191,7 @@ const ExtensionShellPage = () => {
                     setLoading(false)
                 },
                 database,
-                minimumLoadTime: 10_000,
+                minimumLoadTime: 5_000,
                 queryState: searchParams.get("state") || "",
                 createFatalErrorMessage: (msg, details) => {
                     errorDetailsRef.current = details

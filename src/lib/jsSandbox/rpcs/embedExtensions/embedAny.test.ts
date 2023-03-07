@@ -56,7 +56,7 @@ describe("rpcs for embedding any extension", () => {
         })
         const rpcs = embedAnyExtensionRpcs(state)
         persistentState.configuredPermissions = true
-        const response = rpcs.reconfigurePermissions({canonicalUrls: [], authToken: ""}, state)
+        const response = rpcs.reconfigurePermissions({canonicalUrls: []}, state)
         expect(response).toBe(false)
         expect(embedUrlsCalled).toBe(false)
     })
@@ -67,10 +67,10 @@ describe("rpcs for embedding any extension", () => {
             "hi", Symbol(), 
             {canonicalUrls: null},
             {authToken: null},
-            {canonicalUrls: [], authToken: null},
-            {canonicalUrls: {}, authToken: ""},
-            {canonicalUrls: "hi", authToken: ""},
-            {canonicalUrls: undefined, authToken: ""}
+            {canonicalUrls: Symbol()},
+            {canonicalUrls: {}},
+            {canonicalUrls: "hi"},
+            {canonicalUrls: undefined}
         ] as const
 
         for (const test of tests) {
@@ -86,35 +86,6 @@ describe("rpcs for embedding any extension", () => {
             })
             const rpcs = embedAnyExtensionRpcs(state)
             const response = rpcs.reconfigurePermissions(test as any, state)
-            expect(response).toBe(false)
-        }
-    })
-
-    it("attempting to call reconfigurePermissions with wrong auth token should return false", () => {
-        const tests = [
-            "",
-            "adfjlaksjafldfjkaslk",
-            "password",
-            "hey"
-        ] as const
-        for (const test of tests) {
-            let embedUrlsCalled = false
-            const {state} = cloneDeps({
-                permissions: [
-                    {key: "embedExtensions", value: [ALLOW_ALL_EMBEDS]}
-                ],
-                persistentState: {
-                    configuredPermissions: false,
-                    setEmbedUrls: () => { embedUrlsCalled = true }
-                }
-            })
-            const rpcs = embedAnyExtensionRpcs(state)
-            expect(test).not.toBe(state.authToken)
-            const params = {
-                canonicalUrls: [],
-                authToken: test
-            }
-            const response = rpcs.reconfigurePermissions(params, state)
             expect(response).toBe(false)
         }
     })

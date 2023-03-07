@@ -1,7 +1,7 @@
 {
     "schema": 2,
     "name": "Launcher",
-    "version": "0.1.0-prealpha.0",
+    "version": "0.1.0",
     "files": [
         "bg-fetch-test/entry.js",
         "bg-fetch-test/asset.svg",

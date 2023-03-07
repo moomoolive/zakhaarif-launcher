@@ -32,7 +32,6 @@ import {
     FilterOrder, 
     FilterChevron
 } from "../components/FilterChevron"
-import FullScreenOverlayLoading from "../components/loadingElements/fullscreenOverlay"
 import {lazyComponent} from "../components/Lazy"
 import type {Permissions} from "../lib/types/permissions"
 import { sleep } from "../lib/utils/sleep"
@@ -49,24 +48,30 @@ import { useDebounce } from "../hooks/debounce"
 import {CargoFileSystemSkeleton} from "../components/manifest/CargoFileSystemSkeleton"
 import {debugStatusCode} from "../lib/shabah/debug"
 
+const fullScreenLoadingOverlay = <div
+    className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center"
+>
+    <div className="w-5/6 max-w-md py-3 rounded bg-neutral-800 animate-fade-in-left animate-pulse"/>
+</div>
+
 const FileOverlay = lazyComponent(
     async () => (await import("../components/manifest/FileOverlay")).FileOverlay,
-    {loadingElement: FullScreenOverlayLoading}
+    {loadingElement: fullScreenLoadingOverlay}
 )
 const CargoInfo = lazyComponent(
     async () => (await import("../components/manifest/CargoInfo")).CargoInfo,
-    {loadingElement: FullScreenOverlayLoading}
+    {loadingElement: fullScreenLoadingOverlay}
 )
 const Installer = lazyComponent(
     async () => (await import("../components/manifest/Installer")).Installer,
-    {loadingElement: FullScreenOverlayLoading}
+    {loadingElement: fullScreenLoadingOverlay}
 )
 const StatusAlert = lazyComponent(
     async () => (await import("../components/StatusAlert")).StatusAlert
 )
 const CargoUpdater = lazyComponent(
     async () => (await import("../components/manifest/Updater")).CargoUpdater,
-    {loadingElement: FullScreenOverlayLoading}
+    {loadingElement: fullScreenLoadingOverlay}
 )
 const CargoFileSystem = lazyComponent(
     async () => (await import ("../components/manifest/CargoFileSystem")).CargoFileSystem,
@@ -102,7 +107,7 @@ const SmallMenu = lazyComponent(
 )
 const RecoveryModal = lazyComponent(
     async () => (await import("../components/manifest/RecoveryModal")).RecoveryModal,
-    {loadingElement: FullScreenOverlayLoading}
+    {loadingElement: fullScreenLoadingOverlay}
 )
 
 type ShownModal = (
@@ -415,7 +420,8 @@ const AddOns = (): JSX.Element => {
                 onInstallCargo={async (update, title) => {
                     const status = await downloadClient.executeUpdates(
                         [update],
-                        title
+                        title,
+                        {backgroundDownload: false}
                     )
                     app.logger.info("new install status", status)                    
                     setCargoCount((previous) => previous + 1)
@@ -455,7 +461,8 @@ const AddOns = (): JSX.Element => {
             onUpdateCargo={async (update, title) => {
                 const status = await downloadClient.executeUpdates(
                     [update],
-                    title
+                    title,
+                    {backgroundDownload: false}
                 )
                 logger.info("update queue status", status)
                 const ok = !(status.data >= Shabah.ERROR_CODES_START)
@@ -677,6 +684,10 @@ const AddOns = (): JSX.Element => {
                             }}
                             onBackToCargos={onBackToCargos}
                             mutateDirectoryPath={setDirectoryPath}
+                            onCreateAlert={(type, content) => {
+                                setAlertConfig({type, content})
+                            }}
+                            onClearAlert={clearAlert}
                         />
                     </> : <>
                         {queryLoading ? <>

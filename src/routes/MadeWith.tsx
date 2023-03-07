@@ -10,9 +10,11 @@ import {useEffect} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import { Tooltip } from "@mui/material"
 import { SETTINGS_TAB } from "../lib/utils/searchParameterKeys"
+import { useToMainMenu } from "../hooks/toMainMenu"
 
 const AppLaunchPage = () => {
     const navigate = useNavigate()
+    useToMainMenu()
 
     useEffect(() => {
         const milliseconds = 3_000
@@ -71,7 +73,7 @@ const AppLaunchPage = () => {
                     </div>
                 
                     <div className={`text-green-500 text-6xl mb-4 mr-8`}>
-                        <Link to={`/settings?${SETTINGS_TAB}=acknowledgments`}>
+                        <Link to={`/settings?${SETTINGS_TAB}=acknowledgments`} target="_blank">
                             <Tooltip title="Many other open-source projects">
                                 <FontAwesomeIcon icon={faOsi}/>
                             </Tooltip>

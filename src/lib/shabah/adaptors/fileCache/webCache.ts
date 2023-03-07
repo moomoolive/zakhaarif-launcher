@@ -22,6 +22,15 @@ export const webCacheFileCache = (cacheName: string) => {
         },
         deleteAllFiles: async () => await caches.delete(cacheName),
         queryUsage: async () => {
+            if (!("estimate" in navigator.storage)) {
+                // as of writing this safari (desktop & ios)
+                // don't show developers how much storage they
+                // can use. However it seems that safari generally
+                // allows some thing like 1GB for every web-app
+                // reference: https://web.dev/storage-for-the-web/#how-much
+                const oneGigabyte = 1_000_000_000
+                return {quota: oneGigabyte, usage: 0}
+            }
             const {quota = 0, usage = 0} = await navigator.storage.estimate()
             return {quota, usage}
         },

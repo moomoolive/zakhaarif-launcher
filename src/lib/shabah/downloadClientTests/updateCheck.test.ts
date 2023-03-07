@@ -1000,12 +1000,8 @@ describe("checking for cargo updates", () => {
     })
 })
 
-const okWithoutContentLength = ({body = "", status = 200} = {}) => {
-    return () => new Response(body, {status})
-}
-
 describe("asset preflight verification", () => {
-    it("if one of files listed in cargo is unreachable, returns a bad http code, or does not have 'content-length' header, an errorOccurred should be true", async () => {
+    it("if one of files listed in cargo is unreachable, returns a bad http code, an errorOccurred should be true", async () => {
         const origin = "https://my-mamas.com"
         const cargoOrigin = "https://my-house.com"
         const testCargo = structuredClone(mockCargo)
@@ -1039,14 +1035,6 @@ describe("asset preflight verification", () => {
             {
                 file1: badHttpResponse(500),
                 file2: badHttpResponse(404)
-            },
-            {
-                file1: okResponse(),
-                file2: okWithoutContentLength()
-            },
-            {
-                file1: okWithoutContentLength(),
-                file2: okResponse()
             },
         ] as const
         for (const {file1, file2} of cases) {

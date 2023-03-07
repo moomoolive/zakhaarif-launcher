@@ -1,10 +1,9 @@
-/**
- * @param {import("../../src/lib/types/extensions").MainScriptArguments} args 
- * @returns 
- */
-export const main = async (args) => {
+import type {MainScriptArguments} from "../../src/lib/types/extensions"
+import { ZakhaarifModule} from "../common/types"
+
+export const main = async (args: MainScriptArguments) => {
     console.info("[GAME LOADED] 😭 game loaded... with args =", args)
-    const {messageAppShell, initialState} = args
+    const {messageAppShell, initialState, rootElement} = args
     const {queryState, recommendedStyleSheetUrl} = initialState
     const inputId = queryState.length < 1 ? "-1" : queryState
     const gameId = parseInt(inputId, 10)
@@ -24,35 +23,39 @@ export const main = async (args) => {
     console.log("game save found", gameSave)
     if (!initialState.configuredPermissions) {
         const {canonicalUrls} = gameSave.mods
-        console.log("Configuring permissions. cargos", canonicalUrls)
+        console.info("Configuring permissions. cargos", canonicalUrls)
         await messageAppShell("reconfigurePermissions", {canonicalUrls})
         return
     }
-    console.log("Permissions configured! starting game!")
+    console.info("Permissions configured! starting game!")
     const cssSheet = document.createElement("link")
     cssSheet.rel = "stylesheet"
     cssSheet.crossOrigin = ""
     cssSheet.href = recommendedStyleSheetUrl
     cssSheet.id = "main-style-sheet"
     document.head.appendChild(cssSheet)
-    console.log("attempting to import mods")
-    /** @type {string[]} */
-    const importUrls = []
+    console.info("attempting to import mods")
+    const importUrls: string[] = []
     console.log(gameSave.mods)
     for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
         const resolved = gameSave.mods.resolvedUrls[i]
         const entry = gameSave.mods.entryUrls[i]
         importUrls.push(resolved + entry)
     }
-    await Promise.all(importUrls.map((url) => import(url)))
-    console.info("creating worker")
-    const file = await fetch(new URL("./worker.js", import.meta.url))
-    const blobUrl = URL.createObjectURL(await file.blob())
-    const worker = new Worker(blobUrl, {
-        type: "module",
-        name: "test-worker"
-    })
-    worker.postMessage("hello there")
-    const res = await messageAppShell("readyForDisplay")
-    console.info("controller res", res)
+    const imports: {mod: ZakhaarifModule, url: string}[] = await Promise.all(
+        importUrls.map(async (url) => ({mod: await import(url), url}))
+    )
+    console.info(`Found ${imports.length} imports`)
+    
+    const rootCanvas = document.createElement("canvas")
+    rootCanvas.id = "root-canvas"
+    rootElement.appendChild(rootCanvas)
+
+    for (const {mod, url} of imports) {
+        if (!("pkg" in mod)) {
+            console.error(`import ${url} does not export a member called 'pkg'. ignoring...`)
+            continue
+        }
+        mod.pkg.init(rootCanvas)
+    }
 }

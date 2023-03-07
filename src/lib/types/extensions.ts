@@ -1,13 +1,15 @@
-import type {ControllerRpc, ExtensionShellFunctions} from "../../routes/ExtensionShell"
+import type {ExtensionShellFunctions} from "../../routes/ExtensionShell"
+import type {TerminalActions, wRpc} from "w-worker-rpc"
+import type {InitialExtensionState} from "../jsSandbox/rpcs/essential/index"
 
-export type MessageAppShell = ControllerRpc["execute"]
+export type MessageAppShell = wRpc<ExtensionShellFunctions, {}>["execute"]
 
 export type MainScriptArguments = {
     rootElement: HTMLDivElement
+    initialState: InitialExtensionState
     messageAppShell: MessageAppShell
-    initialState: NonNullable<
-        ReturnType<ExtensionShellFunctions["getInitialState"]>
-    >
+    addRpcResponses: (responses: TerminalActions<{}>) => boolean
+    logPrivateDeps: () => void
 }
 
 export type ExtensionModule = {

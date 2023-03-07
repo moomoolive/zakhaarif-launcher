@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, ReactNode } from 'react'
+import { useState, useEffect, useRef} from 'react'
 import {
   Button, 
   Menu,
@@ -11,7 +11,6 @@ import {
   faTimes, 
   faCheck, 
   faCodeBranch,
-  faLink, 
   faTerminal, 
   faFolderMinus,
   faGear,
@@ -68,10 +67,7 @@ const UnsupportedFeatures = (): JSX.Element => {
     <div className="text-sm text-yellow-500 mb-3 mt-6">
       {`Your ${requirementText} ${insufficentSoftware && insufficentHardware ? "don't" : "doesn't"} support all required features.`}<br/>
       {insufficentSoftware ? <>
-        {"Try using the latest version of Chrome"}
-        <span className="ml-2">
-          <FontAwesomeIcon icon={faChrome}/>
-        </span>
+        {"Try using the latest version of Chrome, Firefox, or Safari"}
       </> : ""}
     </div>
 
@@ -283,25 +279,30 @@ const LauncherRoot = (): JSX.Element => {
     }
 
     await downloadClient.cacheRootDocumentFallback()
-    setProgressMsg(`Update Found! Queuing...`)
+    setProgressMsg(`Update Found! Updating...`)
+    document.title = "Updating..."
     updatingCorePackages.current = updatesAvailable.map(
       (update) => update.canonicalUrl
     )
     const queueResponse = await downloadClient.executeUpdates(
       updatesAvailable,
       "game core",
+      {backgroundDownload: false}
     )
 
     logger.info("queue response", queueResponse)
 
     if (queueResponse.data === Shabah.STATUS.noDownloadbleResources) {
       setProgressMsg("Installing...")
-      await sleep(3_000)
+      await sleep(1_500)
       launchApp()
       return
     }
 
-    const updateQueued = queueResponse.data === Shabah.STATUS.updateQueued
+    const updateQueued = (
+      queueResponse.data === Shabah.STATUS.updateQueued
+      || queueResponse.data === Shabah.STATUS.ok
+    )
     if (!updateQueued && !previousVersionsExist) {
       setLauncherState("error")
       setDownloadError("Couldn't Queue Update")
@@ -327,6 +328,10 @@ const LauncherRoot = (): JSX.Element => {
       downloadId.current = downloadState.id
       createDownloadListener()
     }
+
+    setProgressMsg("Installing...")
+    await sleep(1_500)
+    launchApp()
 
     if (
       import.meta.env.PROD
@@ -488,25 +493,6 @@ const LauncherRoot = (): JSX.Element => {
                       Terminal
                     </div>
                   </MenuItem>
-                  
-                  {/**
-                   * <MenuItem 
-                    onClick={() => {
-                        
-                    }}
-                    className="hover:text-green-500"
-                  >
-                    <div className="text-sm">
-                      <span className="mr-2 text-xs">
-                          <FontAwesomeIcon
-                            icon={faLink}
-                          />
-                      </span>
-                      Create Desktop Link
-                    </div>
-                  </MenuItem>
-                   */}
-                  
 
                   <MenuItem 
                     className="hover:text-yellow-500"

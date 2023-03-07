@@ -1,7 +1,6 @@
 import {RpcState} from "../state"
 import {TransferValue, wRpc} from "w-worker-rpc"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
-import { stringEqualConstantTimeCompare } from "../../../utils/security/strings"
 
 type FileTransfer = {
     readonly type: string;
@@ -24,19 +23,15 @@ export async function getFile(url: string, state: RpcState): Promise<TransferVal
     return wRpc.transfer(transfer, [file.body])
 }
 
-type InitialExtensionState = {
-    configuredPermissions: boolean;
-    queryState: string;
-    authToken: string;
-    rootUrl: string;
-    recommendedStyleSheetUrl: string;
+export type InitialExtensionState = {
+    configuredPermissions: boolean
+    queryState: string
+    rootUrl: string
+    recommendedStyleSheetUrl: string
 } 
 
-export function getInitialState(_: null, state: RpcState): InitialExtensionState | null {
-    if (state.secureContextEstablished) {
-        return null
-    }
-    const {queryState, authToken, cargoIndex} = state
+export function getInitialState(_: null, state: RpcState): InitialExtensionState {
+    const {queryState, cargoIndex} = state
     const {resolvedUrl} = cargoIndex
     const {recommendedStyleSheetUrl: rawCssExtension} = state
     const cssExtension = rawCssExtension.startsWith("https://") || rawCssExtension.startsWith("http://")
@@ -46,7 +41,6 @@ export function getInitialState(_: null, state: RpcState): InitialExtensionState
     return {
         configuredPermissions,
         queryState, 
-        authToken, 
         rootUrl: resolvedUrl,
         recommendedStyleSheetUrl: `${state.origin}/${cssExtension}`
     }
@@ -58,7 +52,6 @@ export function secureContextEstablished(_: null, state: RpcState): boolean {
 }
 
 type FatalErrorConfig = {
-    extensionToken: string
     details: string
 }
 
@@ -72,26 +65,12 @@ export function signalFatalError(params: FatalErrorConfig, state: RpcState): boo
         return false
     }
 
-    if (typeof params.extensionToken !== "string") {
-        state.logger.warn(`fatalErrorConfig.extensionToken must be a string, got "${betterTypeof(params.extensionToken)}"`)
-        return false
-    }
-    
-
     if (typeof params.details !== "string") {
         state.logger.warn(`fatalErrorConfig.details must be a string, got "${betterTypeof(params.details)}"`)
         return false
     }
 
-    const {extensionToken, details} = params
-
-    if (
-        state.secureContextEstablished
-        && !stringEqualConstantTimeCompare(extensionToken, state.authToken)
-    ) {
-        state.logger.warn("application signaled fatal error but provided wrong auth token")
-        return false
-    }
+    const {details} = params
 
     state.fatalErrorOccurred = true
     state.logger.error("extension encountered fatal error")
@@ -112,18 +91,9 @@ export function readyForDisplay(_: null, state: RpcState): boolean {
     return true
 }
 
-export async function exit(extensionToken: string, state: RpcState): Promise<boolean> {
+export async function exit(_: null, state: RpcState): Promise<boolean> {
     if (state.fatalErrorOccurred) {
         state.logger.warn("cannot exit program if fatal error has already been signaled")
-        return false
-    }
-    
-    if (typeof extensionToken !== "string") {
-        state.logger.warn(`extension token must be a string, got "${betterTypeof(extensionToken)}"`)
-        return false
-    }
-
-    if (!stringEqualConstantTimeCompare(extensionToken, state.authToken)) {
         return false
     }
     

@@ -1,7 +1,7 @@
 import {HuzmaManifest} from "huzma"
 import {ManifestIndex, Shabah} from "../../lib/shabah/downloadClient"
 import {Permissions} from "../../lib/types/permissions"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {ReactNode, useEffect, useMemo, useRef, useState} from "react"
 import {Tooltip, Button} from "@mui/material"
 import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
 import {reactiveDate} from "../../lib/utils/dates"
@@ -15,6 +15,7 @@ import type {FilterOrder} from "../FilterChevron"
 import { useDebounce } from "../../hooks/debounce"
 import {CargoFileSystemSkeleton} from "./CargoFileSystemSkeleton"
 import { removeZipExtension } from "../../lib/utils/urls/removeZipExtension"
+import { MILLISECONDS_PER_SECOND } from "../../lib/utils/consts/time"
 
 type FileSystemMemberProps = {
     onClick: () => void | Promise<void>
@@ -161,6 +162,8 @@ export type CargoFileSystemProps = {
     onOpenFileModal: (details: FileDetails) => void
     onBackToCargos: () => void
     mutateDirectoryPath: (newValue: CargoDirectory[]) => unknown
+    onCreateAlert: (type: "info", content: ReactNode) => unknown
+    onClearAlert: () => unknown
 }
 
 export const CargoFileSystem = ({
@@ -174,7 +177,9 @@ export const CargoFileSystem = ({
     directoryPath,
     onOpenFileModal,
     onBackToCargos,
-    mutateDirectoryPath
+    mutateDirectoryPath,
+    onClearAlert,
+    onCreateAlert
 }: CargoFileSystemProps): JSX.Element => {
     const confirm = useGlobalConfirm()
     const {downloadClient, logger} = useAppContext()
@@ -362,17 +367,21 @@ export const CargoFileSystem = ({
                         : cleanedPathEnd
                     const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
                     let fileResponse = await downloadClient.getCachedFile(fullPath)
+                    
                     if (!fileResponse || !fileResponse.ok) {
+                        onCreateAlert("info", "fetching file...")
                         const networkResponse = await fetch(fullPath, {
                             method: "GET",
                             headers: Shabah.POLICIES.networkFirst
                         })
                         if (!networkResponse || !networkResponse.ok) {
                             logger.warn(`file ${fullPath} was not found although it should be cached!`)
+                            onClearAlert()
                             await confirm({title: "Could not find file!"})
                             return
                         }
                         fileResponse = networkResponse
+                        setTimeout(onClearAlert, MILLISECONDS_PER_SECOND * 1)
                     }
                     onOpenFileModal({
                         name: file.name,

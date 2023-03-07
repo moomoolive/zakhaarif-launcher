@@ -10,7 +10,7 @@ import {createClient, createUpdateCheck} from "./testLib"
 
 const MANIFEST_NAME = "stable" + MANIFEST_FILE_SUFFIX
 
-describe("executing updates", () => {
+describe("executing background updates", () => {
     it("attempting to queue a download with an empty array does not queue a download", async () => {
         const mainOrigin = "https://yo-mama.com"
         const {client, downloadState} = createClient(mainOrigin, {

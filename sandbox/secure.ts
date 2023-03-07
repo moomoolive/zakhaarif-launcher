@@ -13,10 +13,7 @@ if (window.self === window.top) {
 }
 
 if (!("serviceWorker" in navigator)) {
-    await controllerRpc.execute("signalFatalError", {
-        extensionToken: "",
-        details: "Service worker not supported"
-    })
+    await controllerRpc.execute("signalFatalError", {details: "Service worker not supported"})
     throw new Error("sandbox requires service worker to function")
 }
 
@@ -25,31 +22,21 @@ const [registration] = await Promise.all([
     navigator.serviceWorker.register(SERVICE_WORKER_FILE)
 ] as const)
 const {active: sw} = registration
-const rpc = new wRpc<ServiceWorkerFunctions>({
+const swRpc = new wRpc<ServiceWorkerFunctions>({
     responses: serviceWorkerToSandboxRpc,
     messageTarget: {
-        postMessage(data, transferables) {
+        postMessage: (data, transferables) => {
             sw?.postMessage(data, transferables)
         },
-        addEventListener(_, handler) {
+        addEventListener: (_, handler) => {
             navigator.serviceWorker.addEventListener("message", handler)
         },
-        removeEventListener(_, handler) {
+        removeEventListener: (_, handler) => {
             navigator.serviceWorker.removeEventListener("message", handler)
         }
     },
     state: {}
 })
-const initialState = await controllerRpc.execute("getInitialState")
-if (!initialState) {
-    await controllerRpc.execute("signalFatalError", {
-        extensionToken: "",
-        details: `initial state is invalid, got ${initialState}`
-    })
-    throw new Error("passed initial state was invalid")
-}
-
-controllerRpc.state.authToken = initialState.authToken
 
 const rootElement = document.createElement("div")
 rootElement.setAttribute("id", "root")
@@ -57,14 +44,20 @@ document.body.appendChild(rootElement)
 const emptyTransfer = [] as Transferable[]
 const extensionArguments: MainScriptArguments = {
     rootElement,
+    initialState: await controllerRpc.execute("getInitialState"),
     messageAppShell: (name, data = null, transferables = emptyTransfer) => {
         return (controllerRpc.execute as Function)(name, data, transferables)
     },
-    initialState
+    addRpcResponses: (responses) => {
+        return controllerRpc.addResponses(responses, {allowOverwrite: false})
+    },
+    logPrivateDeps: () => {
+        console.info("private deps", {swRpc, controllerRpc})
+    }
 }
-await controllerRpc.execute("secureContextEstablished")
 
-// all security stuff should be done before this point
+await controllerRpc.execute("secureContextEstablished")
+// all security should be done before this point
 
 const root = document.getElementById("root-script")
 const script = await (async (url: string) => {
@@ -72,14 +65,13 @@ const script = await (async (url: string) => {
         console.info("importing", url)
         return await import(url) as ExtensionModule
     } catch (error) {
-        console.error("encouintered error when importing module", error)
+        console.error("encountered error when importing module", error)
         return null
     }
-})(root?.getAttribute("entry") || "none")
+})(root?.getAttribute("entry") || "")
 
 if (!script) {
     controllerRpc.execute("signalFatalError", {
-        extensionToken: initialState.authToken,
         details: "couldn't find extension entry"
     })
     throw new Error("extension entry does not exist")
@@ -87,11 +79,9 @@ if (!script) {
 
 if (!("main" in script)) {
     controllerRpc.execute("signalFatalError", {
-        extensionToken: initialState.authToken,
         details: "'main' function is not exported from entry"
     })
     throw new Error("no main function exported from module")
 }
 
-const {main} = script
-main(extensionArguments)
+script.main(extensionArguments)

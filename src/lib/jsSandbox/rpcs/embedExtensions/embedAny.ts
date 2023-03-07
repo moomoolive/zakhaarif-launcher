@@ -1,10 +1,8 @@
 import {RpcState} from "../state"
 import {ALLOW_ALL_PERMISSIONS} from "../../../types/permissions"
-import { stringEqualConstantTimeCompare } from "../../../utils/security/strings"
 
 type ReconfigurationConfig = {
-    canonicalUrls: string[], 
-    authToken: string
+    canonicalUrls: string[],
 }
 
 export function reconfigurePermissions(
@@ -18,16 +16,13 @@ export function reconfigurePermissions(
     if (
         typeof parameters !== "object"
         || parameters === null
-        || typeof parameters.authToken !== "string"
         || !Array.isArray(parameters.canonicalUrls)
     ) {
         state.logger.warn("could not configure permissions because input is invalid. input =", parameters)
         return false
     }
-    const {canonicalUrls, authToken} = parameters
-    if (!stringEqualConstantTimeCompare(authToken, state.authToken)) {
-        return false
-    }
+    const {canonicalUrls} = parameters
+    
     const urls = canonicalUrls.filter((url) => typeof url === "string")
     state.persistentState.setEmbedUrls(urls)
     return true

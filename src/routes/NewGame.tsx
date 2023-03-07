@@ -46,6 +46,41 @@ const NewGamePage = () => {
         setLinkedMods([standardMod])
     }, [])
 
+    const onSave = async () => {
+        if (!await confirm({title: "Are you sure you want to create a new game?"})) {
+            return
+        }
+        setLoading(true)
+        const mods = linkedMods.reduce((total, next) => {
+            total.canonicalUrls.push(next.canonicalUrl)
+            total.resolvedUrls.push(next.resolvedUrl)
+            total.entryUrls.push(next.entry)
+            return total
+        }, {
+            canonicalUrls: [] as string[],
+            resolvedUrls: [] as string[],
+            entryUrls: [] as string[],
+        })
+        const saveParams = {
+            name: gameName,
+            type: MANUAL_SAVE,
+            mods,
+            content: {}
+        } as const
+        logger.info(
+            "creating new save file with params", 
+            saveParams
+        )
+        const [{id: gameId}] = await Promise.all([
+            database.gameSaves.create(saveParams),
+            sleep(1_000)
+        ] as const)
+        logger.info("successfully created save!")
+        setLoading(false)
+        window.localStorage.setItem(SAVE_EXISTS, "1")
+        navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
+    }
+
     return <div 
         className="fixed z-0 w-screen h-screen flex items-center justify-center top-0 left-0"
     >
@@ -78,10 +113,10 @@ const NewGamePage = () => {
             <form 
                 onSubmit={async (event) => {
                     event.preventDefault()
-                    if (!await confirm({title: "Are you sure you want to create a new game?"})) {
+                    if (loading) {
                         return
                     }
-                    navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`)
+                    onSave()
                 }}
             >
                 <div className="mb-1">
@@ -118,37 +153,7 @@ const NewGamePage = () => {
                         fullWidth
                         variant="contained"
                         type="submit"
-                        onClick={async () => {
-                            setLoading(true)
-                            const mods = linkedMods.reduce((total, next) => {
-                                total.canonicalUrls.push(next.canonicalUrl)
-                                total.resolvedUrls.push(next.resolvedUrl)
-                                total.entryUrls.push(next.entry)
-                                return total
-                            }, {
-                                canonicalUrls: [] as string[],
-                                resolvedUrls: [] as string[],
-                                entryUrls: [] as string[],
-                            })
-                            const saveParams = {
-                                name: gameName,
-                                type: MANUAL_SAVE,
-                                mods,
-                                content: {}
-                            } as const
-                            logger.info(
-                                "creating new save file with params", 
-                                saveParams
-                            )
-                            const [{id: gameId}] = await Promise.all([
-                                database.gameSaves.create(saveParams),
-                                sleep(1_000)
-                            ] as const)
-                            logger.info("successfully created save!")
-                            setLoading(false)
-                            window.localStorage.setItem(SAVE_EXISTS, "1")
-                            navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
-                        }}
+                        onClick={onSave}
                         disabled={loading}
                     >
                         {loading? <span className="animate-spin">

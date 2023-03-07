@@ -16,8 +16,9 @@ import {BackgroundFetchEvent, UpdateUIMethod} from "../../../lib/types/serviceWo
 import { isZipFile } from "../../utils/urls/removeZipExtension"
 import { decompressFile } from "./decompression"
 import type {DecompressionStreamConstructor} from "../../types/streams"
+import {InstallEventName, installCore} from "./installCore"
 
-export type BackgroundFetchEventName = "success" | "abort" | "fail"
+export type BackgroundFetchEventName = InstallEventName
 
 export type ProgressUpdateRecord = {
     type: BackgroundFetchEventName | "install"
@@ -86,6 +87,28 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
 
         const updateTitle = targetDownloadIndex.title
         let totalResources = fetchedResources.length
+
+        const installResponse = await installCore({
+            eventName,
+            eventType,
+            fileCache,
+            virtualFileCache,
+            fetchedResources,
+            downloadIndex: targetDownloadIndex,
+            downloadQueueId,
+            decompressionConstructor,
+            log,
+            origin
+        })
+
+        const {
+            resourcesProcessed, 
+            failCount,
+            orphanedResources,
+            downloadClientMessage
+        } = installResponse
+
+        /*
         let resourcesProcessed = 0
         let failCount = 0
         const orphanedResources = new Map<string, boolean>()
@@ -96,7 +119,6 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             downloadId: downloadQueueId,
             stateUpdates: []
         }
-
         for (const downloadSegement of targetDownloadIndex.segments) {
             const {canonicalUrl} = downloadSegement
             
@@ -295,6 +317,7 @@ export const makeBackgroundFetchHandler = (options: BackgroundFetchSuccessOption
             )
             log(eventName, "successfully saved error log")
         }
+        */
 
         await clientMessageChannel.createMessage(downloadClientMessage)
 

@@ -20,9 +20,7 @@ type ControllerRpcState = {
 }
 
 const sandboxResponses = {
-    ping: (_: null, state: ControllerRpcState) => {
-        return state.authToken
-    }
+    ping: () => 1
 }
 
 const {top, addEventListener, removeEventListener} = window
@@ -39,7 +37,7 @@ export const controllerRpc = new wRpc<
         postMessage: (data, transferables) => {
             top.postMessage(data, "*", transferables)
         },
-        addEventListener(_, handler) {
+        addEventListener: (_, handler) => {
             callback = (event) => {
                 if (event.source !== (top as object)) {
                     return
@@ -48,7 +46,7 @@ export const controllerRpc = new wRpc<
             }
             addEventListener("message", callback)
         },
-        removeEventListener(_, __) {
+        removeEventListener: () => {
             removeEventListener("message", callback)
         }
     },

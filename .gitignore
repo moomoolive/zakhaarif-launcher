@@ -19,6 +19,7 @@ dist-ssr
 bundle-anaylsis/
 dist-preview
 **/*.js.map
+public/huzem/**
 
 # Editor directories and files
 .vscode/*

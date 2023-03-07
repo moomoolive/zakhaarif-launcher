@@ -106,44 +106,48 @@ const rpc = new wRpc<AppRpcs, GlobalConfig>({
     }
 })
 
-const notifyDownloadProgress = async (update: ProgressUpdateRecord) => {
-    rpc.execute("notifyDownloadProgress", update)
+// backgroundfetch supported
+if ("onbackgroundfetchsuccess" in sw) {
+    const notifyDownloadProgress = async (update: ProgressUpdateRecord) => {
+        rpc.execute("notifyDownloadProgress", update)
+    }
+    
+    const virtualFileCache = webCacheFileCache(VIRTUAL_FILE_CACHE)
+    const clientMessageChannel = createClientChannel(DOWNLOAD_CLIENT_CHANNEL_NAME)
+    const backendMessageChannel = createBackendChannel(BACKEND_CHANNEL_NAME)
+    
+    const bgFetchDependencies = {
+        virtualFileCache,
+        clientMessageChannel,
+        backendMessageChannel,
+        onProgress: notifyDownloadProgress,
+        log: logger,
+        origin: sw.location.origin,
+        fileCache,
+        decompressionConstructor: sw.DecompressionStream
+    } as const
+
+    const bgFetchSuccessHandle = makeBackgroundFetchHandler({
+        ...bgFetchDependencies,
+        type: "success",
+    })
+    
+    sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
+    
+    sw.onbackgroundfetchclick = () => sw.clients.openWindow("/")
+    
+    const bgFetchAbortHandle = makeBackgroundFetchHandler({
+        ...bgFetchDependencies,
+        type: "abort",
+    })
+    
+    sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
+    
+    const bgFetchFailHandle = makeBackgroundFetchHandler({
+        ...bgFetchDependencies,
+        type: "fail",
+    })
+    
+    sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))
 }
 
-const virtualFileCache = webCacheFileCache(VIRTUAL_FILE_CACHE)
-const clientMessageChannel = createClientChannel(DOWNLOAD_CLIENT_CHANNEL_NAME)
-const backendMessageChannel = createBackendChannel(BACKEND_CHANNEL_NAME)
-
-const bgFetchDependencies = {
-    virtualFileCache,
-    clientMessageChannel,
-    backendMessageChannel,
-    onProgress: notifyDownloadProgress,
-    log: logger,
-    origin: sw.location.origin,
-    fileCache,
-    decompressionConstructor: sw.DecompressionStream
-} as const
-
-const bgFetchSuccessHandle = makeBackgroundFetchHandler({
-    ...bgFetchDependencies,
-    type: "success",
-})
-
-sw.onbackgroundfetchsuccess = (event) => event.waitUntil(bgFetchSuccessHandle(event))
-
-sw.onbackgroundfetchclick = () => sw.clients.openWindow("/")
-
-const bgFetchAbortHandle = makeBackgroundFetchHandler({
-    ...bgFetchDependencies,
-    type: "abort",
-})
-
-sw.onbackgroundfetchabort = (event) => event.waitUntil(bgFetchAbortHandle(event))
-
-const bgFetchFailHandle = makeBackgroundFetchHandler({
-    ...bgFetchDependencies,
-    type: "fail",
-})
-
-sw.onbackgroundfetchfail = (event) => event.waitUntil(bgFetchFailHandle(event))

@@ -63,7 +63,8 @@ export const STATUS_CODES = {
     errorIndexNotFound: 119,
     allMessagesAreOrphaned: 120,
     someMessagesAreOrphaned: 121,
-    downloadSegmentNotFound: 122
+    downloadSegmentNotFound: 122,
+    liveFetchFailed: 123
 } as const
 
 export type StatusCode = typeof STATUS_CODES[keyof typeof STATUS_CODES]

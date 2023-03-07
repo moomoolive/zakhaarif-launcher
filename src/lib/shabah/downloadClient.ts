@@ -39,6 +39,8 @@ import {UpdateCheckResponse} from "./updateCheckStatus"
 import { nanoid } from "nanoid"
 import { getFileNameFromUrl } from "../utils/urls/getFilenameFromUrl"
 import {stringBytes} from "../utils/stringBytes"
+import { BackgroundFetchRecord } from "../types/serviceWorkers"
+import { installCore, InstallEventName } from "./serviceWorker/installCore"
 
 export type {ManifestIndex, ManifestState} from "./backend"
 
@@ -47,6 +49,22 @@ const SYSTEM_RESERVED_BYTES = 200 * BYTES_PER_MB
 type DownloadStateSummary = DownloadState & {
     previousVersion: string
     version: string
+}
+
+export const archivedCargoIndexesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__archived-cargo-indexes__.json`
+
+const provisionDownloadId = () => nanoid(9)
+
+type DownloadParams = {
+    backgroundDownload: boolean
+}
+
+type DownloadConfig = {
+    filesToRequest: string[]
+    downloadQueueId: string
+    title: string,
+    params: DownloadParams
+    downloadIndex: DownloadIndex
 }
 
 export type ShabahConfig = {
@@ -62,10 +80,6 @@ export type ShabahConfig = {
     indexStorage: DownloadClientManifestIndexStorage
     permissionsCleaner?: (permissions: GeneralPermissions) => GeneralPermissions
 }
-
-export const archivedCargoIndexesUrl = (origin: string) => `${removeSlashAtEnd(origin)}/__archived-cargo-indexes__.json`
-
-const provisionDownloadId = () => nanoid(9)
 
 export class Shabah {
     static readonly NO_PREVIOUS_INSTALLATION = NO_INSTALLATION
@@ -171,6 +185,7 @@ export class Shabah {
     async executeUpdates(
         updates: UpdateCheckResponse[],
         title: string,
+        {backgroundDownload = true}: Partial<DownloadParams> = {}
     ): Promise<Ok<StatusCode>> {
         if (updates.length < 1) {
             return io.ok(STATUS_CODES.zeroUpdatesProvided)
@@ -272,7 +287,9 @@ export class Shabah {
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
                 tag: update.tag,
-                state: /*!resourcesToRequest*/ true ? CACHED : UPDATING,
+                state: !resourcesToRequest || !backgroundDownload 
+                    ? CACHED 
+                    : UPDATING,
                 permissions: update.newCargo?.permissions || [],
                 version: update.versions().new,
                 entry: update.newCargo?.entry === NULL_FIELD
@@ -314,24 +331,81 @@ export class Shabah {
             return io.ok(STATUS_CODES.noDownloadbleResources)
         }
 
-        /*
-        await this.putDownloadIndex(downloadIndex)
-        await this.downloadManager.queueDownload(
-            downloadQueueId,
+        const downloadResponse = await this.startDownload({
+            params: {
+                backgroundDownload
+            },
             filesToRequest,
-            {
-                title,
-                downloadTotal: downloadIndex.bytes 
-            }
-        )
-        */
+            downloadIndex,
+            downloadQueueId,
+            title
+        })
 
-        return io.ok(STATUS_CODES.updateQueued)
+        return io.ok(downloadResponse)
+    }
+
+    private async startDownload(config: DownloadConfig): Promise<StatusCode> {
+        const {
+            filesToRequest, downloadQueueId,
+            title, params,
+            downloadIndex
+        } = config
+        
+        const {backgroundDownload} = params
+
+        if (backgroundDownload) {
+            await this.putDownloadIndex(downloadIndex)
+            await this.downloadManager.queueDownload(
+                downloadQueueId,
+                filesToRequest,
+                {
+                    title,
+                    downloadTotal: downloadIndex.bytes 
+                }
+            )
+            return STATUS_CODES.updateQueued
+        }
+
+        const {networkRequest} = this
+        const responses = await Promise.all(filesToRequest.map(async (url) => {
+            const request = new Request(url)
+            const response = await io.retry(
+                () => networkRequest(request, {method: "GET"}),
+                2
+            )
+            const record: BackgroundFetchRecord = {
+                request,
+                responseReady: response.ok
+                    ? Promise.resolve(response.data)
+                    : Promise.resolve(Response.error())
+            }
+            return {record, success: response.ok && response.data.ok}
+        }))
+
+        const requestFailed = responses.some((response) => !response.success)
+
+        const eventType: InstallEventName = requestFailed ? "fail" : "success"
+        const eventName = `[🐶 live-fetch ${eventType}]`
+
+        await installCore({
+            downloadIndex,
+            log: () => {},
+            fetchedResources: responses.map(({record}) => record),
+            fileCache: this.fileCache,
+            virtualFileCache: this.virtualFileCache,
+            eventName,
+            downloadQueueId: provisionDownloadId(),
+            eventType,
+            origin: this.origin
+        })
+
+        return requestFailed ? STATUS_CODES.liveFetchFailed : STATUS_CODES.ok
     }
 
     async retryFailedDownloads(
         canonicalUrls: string[],
-        title: string
+        title: string,
+        {backgroundDownload = true}: Partial<DownloadParams> = {}
     ): Promise<Ok<StatusCode>> {
         if (canonicalUrls.length < 1) {
             return io.ok(STATUS_CODES.zeroUpdatesProvided)
@@ -396,21 +470,26 @@ export class Shabah {
             retryDownloadIndex.bytes += index.bytes
             this.putCargoIndex({
                 ...cargoMeta, 
-                state: UPDATING, 
+                state: !backgroundDownload ? CACHED : UPDATING, 
                 downloadId: downloadQueueId
             })
         }
         const self = this
-        await Promise.all([
-            this.putDownloadIndex(retryDownloadIndex),
-            ...removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url))
-        ])
-        await this.downloadManager.queueDownload(
+        await Promise.all(removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url)))
+        
+        const downloadResponse = await this.startDownload({
+            downloadIndex: retryDownloadIndex,
             downloadQueueId,
-            requestFileUrls,
-            {title, downloadTotal: retryDownloadIndex.bytes}
-        )
-        return io.ok(STATUS_CODES.updateRetryQueued)
+            filesToRequest: requestFileUrls,
+            title,
+            params: {
+                backgroundDownload
+            }
+        })
+        if (downloadResponse === STATUS_CODES.updateQueued) {
+            return io.ok(STATUS_CODES.updateRetryQueued)
+        }
+        return io.ok(downloadResponse)
     }
 
     async cacheRootDocumentFallback() {
