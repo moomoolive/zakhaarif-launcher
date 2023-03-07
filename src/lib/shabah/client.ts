@@ -285,19 +285,19 @@ const verifyAllRequestableFiles = async (
                 latestFailMessage = "bad http code"
                 continue
             }
-            const contentLength = response.data.headers.get("content-length")
             
             const mime = response.data.headers.get("content-type")
             if (mime === null) {
                 return {url, reason: "missing 'content-type' header"}
             }
 
-            if (contentLength === null) {
-                return {url, reason: "server did not provide 'content-length' header, and fallback length was not provided"}
-            }
+            //if (contentLength === null) {
+            //    return {url, reason: "server did not provide 'content-length' header, and fallback length was not provided"}
+            //}
+            const contentLength = response.data.headers.get("content-length")
             
             const bytes = contentLength === null
-                ? fallbackBytes
+                ? 0
                 : parseInt(contentLength, 10)
             
             if (isNaN(bytes)) {

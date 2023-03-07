@@ -2,11 +2,8 @@
     "schema": 2,
     "name": "Game",
     "version": "0.1.0",
-    "entry": "index.js.gz",
-    "files": [
-        "index.js.gz",
-        "worker.js.gz"
-    ],
+    "entry": "index.js",
+    "files": ["index.js", "worker.js"],
     "invalidation": "url-diff",
     "authors": [
         {"name": "Mostafa Elbannan"}
