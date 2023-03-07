@@ -71,7 +71,7 @@ table {
 
 /* scroll bar for firefox */
 body {
-  scrollbar-width: thin;          
+  /*scrollbar-width: thin;*/          
   scrollbar-color: #404040 transparent;
 }
 
@@ -88,7 +88,7 @@ body {
   -webkit-text-size-adjust: 100%;
 
   min-width: 320px;
-  min-height: 100vh;
+  /*min-height: 100vh;*/
   position: relative;
   z-index: 0;
   background-color: rgb(38 38 38); /* equal to tailwinds bg-neutral-800 */

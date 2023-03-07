@@ -1,5 +1,5 @@
 import {HuzmaManifest} from "huzma"
-import type {ManifestIndex} from "../../lib/shabah/downloadClient"
+import {ManifestIndex, Shabah} from "../../lib/shabah/downloadClient"
 import {Permissions} from "../../lib/types/permissions"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {Tooltip, Button} from "@mui/material"
@@ -361,11 +361,18 @@ export const CargoFileSystem = ({
                         ? path.slice(1)
                         : cleanedPathEnd
                     const fullPath = `${cleanedBase}/${directoryPath.length > 1 ? cleanedPath + "/" : cleanedPath}${file.name}`
-                    const fileResponse = await downloadClient.getCachedFile(fullPath)
-                    if (!fileResponse) {
-                        logger.warn(`file ${fullPath} was not found although it should be cached!`)
-                        await confirm({title: "Could not find file!"})
-                        return
+                    let fileResponse = await downloadClient.getCachedFile(fullPath)
+                    if (!fileResponse || !fileResponse.ok) {
+                        const networkResponse = await fetch(fullPath, {
+                            method: "GET",
+                            headers: Shabah.POLICIES.networkFirst
+                        })
+                        if (!networkResponse || !networkResponse.ok) {
+                            logger.warn(`file ${fullPath} was not found although it should be cached!`)
+                            await confirm({title: "Could not find file!"})
+                            return
+                        }
+                        fileResponse = networkResponse
                     }
                     onOpenFileModal({
                         name: file.name,

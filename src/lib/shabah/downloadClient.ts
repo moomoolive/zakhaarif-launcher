@@ -272,7 +272,7 @@ export class Shabah {
             promises.push(this.putCargoIndex({
                 name: update.newCargo?.name || "none",
                 tag: update.tag,
-                state: !resourcesToRequest ? CACHED : UPDATING,
+                state: /*!resourcesToRequest*/ true ? CACHED : UPDATING,
                 permissions: update.newCargo?.permissions || [],
                 version: update.versions().new,
                 entry: update.newCargo?.entry === NULL_FIELD
@@ -314,6 +314,7 @@ export class Shabah {
             return io.ok(STATUS_CODES.noDownloadbleResources)
         }
 
+        /*
         await this.putDownloadIndex(downloadIndex)
         await this.downloadManager.queueDownload(
             downloadQueueId,
@@ -323,6 +324,7 @@ export class Shabah {
                 downloadTotal: downloadIndex.bytes 
             }
         )
+        */
 
         return io.ok(STATUS_CODES.updateQueued)
     }
