@@ -51,7 +51,7 @@ import {debugStatusCode} from "../lib/shabah/debug"
 const fullScreenLoadingOverlay = <div
     className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center"
 >
-    <div className="w-5/6 max-w-md py-3 rounded bg-neutral-800 animate-fade-in-left animate-pulse"/>
+    <div className="w-5/6 max-w-md py-3 h-60 rounded bg-neutral-800 animate-fade-in-left animate-pulse"/>
 </div>
 
 const FileOverlay = lazyComponent(
