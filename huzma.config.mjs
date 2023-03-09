@@ -5,6 +5,7 @@ import {EXTENSION_METADATA} from "./common/zakhaarif-dev-tools/build/index.js"
 export default {
     buildDir: "dist",
     huzmaName: "stable.huzma.json",
+    name: "Launcher",
     license: "AGPL-3",
     permissions: ["allowAll"],
     ignore: [
