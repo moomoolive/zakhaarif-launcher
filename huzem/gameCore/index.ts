@@ -1,4 +1,4 @@
-import type {MainScriptArguments} from "../../src/lib/types/extensions"
+import type {MainScriptArguments} from "../../common/zakhaarif-dev-tools"
 import type {ZakhaarifModEsModule} from "../../common/zakhaarif-dev-tools"
 
 export const main = async (args: MainScriptArguments) => {

@@ -1,6 +1,7 @@
 import { GameSave } from "../../../database/GameSaves"
-import type {RpcState} from "../state"
+import type {RpcState, DaemonRpcTransform} from "../state"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
+import type {GameSaveDaemonRpcs} from "../../../../../common/zakhaarif-dev-tools"
 
 export async function getSaveFile(
     id: number, 
@@ -16,14 +17,11 @@ export async function getSaveFile(
     return await state.database.gameSaves.getById(id) || null
 }
 
-export function createSave(): number {
+export function createSave(_: null): number {
     return 1
 }
 
-export type GameSaveRpcs = Omit<
-    typeof import("./index"),
-    "gameSaveRpcs"
->
+export type GameSaveRpcs = DaemonRpcTransform<GameSaveDaemonRpcs>
 
 export function gameSaveRpcs(state: RpcState): GameSaveRpcs {
     const {gameSaves: savePermissions} = state.permissionsSummary
@@ -39,7 +37,7 @@ export function gameSaveRpcs(state: RpcState): GameSaveRpcs {
     
     // write only permissions
     if (!savePermissions.read && savePermissions.write) {
-        return {createSave} as GameSaveRpcs
+        return {createSave} as unknown as GameSaveRpcs
     }
 
     return {

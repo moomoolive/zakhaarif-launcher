@@ -1,9 +1,9 @@
-import {RpcState} from "../state"
+import type {RpcState, DaemonRpcTransform} from "../state"
 import {ALLOW_ALL_PERMISSIONS} from "../../../types/permissions"
-
-type ReconfigurationConfig = {
-    canonicalUrls: string[],
-}
+import {
+    ReconfigurationConfig,
+    EmbedAnyExtensionDaemonRpcs
+} from "../../../../../common/zakhaarif-dev-tools"
 
 export function reconfigurePermissions(
     parameters: ReconfigurationConfig,
@@ -28,10 +28,7 @@ export function reconfigurePermissions(
     return true
 }
 
-export type EmbedAnyExtensionRpcs = Omit<
-    typeof import("./embedAny"), 
-    "embedAnyExtensionRpcs"
->
+export type EmbedAnyExtensionRpcs = DaemonRpcTransform<EmbedAnyExtensionDaemonRpcs>
 
 export function embedAnyExtensionRpcs(state: RpcState): EmbedAnyExtensionRpcs {
     if (

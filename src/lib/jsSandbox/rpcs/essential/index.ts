@@ -1,12 +1,12 @@
-import {RpcState} from "../state"
+import type {RpcState, DaemonRpcTransform} from "../state"
 import {TransferValue, wRpc} from "w-worker-rpc"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
-
-type FileTransfer = {
-    readonly type: string;
-    readonly length: string;
-    readonly body: ReadableStream<Uint8Array>;
-}
+import type {
+    FileTransfer,
+    InitialExtensionState,
+    FatalErrorConfig,
+    EssentialDaemonRpcs
+} from "../../../../../common/zakhaarif-dev-tools"
 
 export async function getFile(url: string, state: RpcState): Promise<TransferValue<FileTransfer> | null> {
     if (typeof url !== "string") {
@@ -22,13 +22,6 @@ export async function getFile(url: string, state: RpcState): Promise<TransferVal
     const transfer = {type, length, body: file.body} as const
     return wRpc.transfer(transfer, [file.body])
 }
-
-export type InitialExtensionState = {
-    configuredPermissions: boolean
-    queryState: string
-    rootUrl: string
-    recommendedStyleSheetUrl: string
-} 
 
 export function getInitialState(_: null, state: RpcState): InitialExtensionState {
     const {queryState, cargoIndex} = state
@@ -49,10 +42,6 @@ export function getInitialState(_: null, state: RpcState): InitialExtensionState
 export function secureContextEstablished(_: null, state: RpcState): boolean {
     state.secureContextEstablished = true
     return true
-}
-
-type FatalErrorConfig = {
-    details: string
 }
 
 export function signalFatalError(params: FatalErrorConfig, state: RpcState): boolean {
@@ -101,12 +90,9 @@ export async function exit(_: null, state: RpcState): Promise<boolean> {
     return true
 }
 
-export type EssentialRpcs = Omit<
-    typeof import("./index"),
-    "essentialRpcs"
->
+export type EssentialRpcs = DaemonRpcTransform<EssentialDaemonRpcs>
 
-export const essentialRpcs = (): EssentialRpcs => {
+export function essentialRpcs(): EssentialRpcs {
     return {
         getFile,
         getInitialState,

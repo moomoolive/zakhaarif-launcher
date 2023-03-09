@@ -40,3 +40,13 @@ export type RpcState = (
     & SandboxMutableState
     & {persistentState: RpcPersistentState}
 )
+
+export type DaemonRpc = {
+    [key: string]: (param: any) => any
+}
+
+export type DaemonRpcTransform<Rpcs extends DaemonRpc> = {
+    [key in keyof Rpcs]: (
+        ...args: [param: Parameters<Rpcs[key]>[0], state: RpcState] 
+    ) => ReturnType<Rpcs[key]>
+}

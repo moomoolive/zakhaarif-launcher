@@ -1,24 +1,20 @@
 import type {Database} from "./innerDatabase"
 import {createMetadataModifiers, DatabaseEntry} from "./utilities"
+import type {
+    SaveType,
+    ManualSave,
+    QuickSave,
+    AutoSave,
+    SaveData
+} from "../../../common/zakhaarif-dev-tools"
 
-export const MANUAL_SAVE = 1
-export const AUTO_SAVE = 2
-export const QUICK_SAVE = 3
+export const MANUAL_SAVE: ManualSave = 1
+export const AUTO_SAVE: AutoSave = 2
+export const QUICK_SAVE: QuickSave = 3
 
-export type GameSaveType = (
-    typeof MANUAL_SAVE 
-    | typeof AUTO_SAVE
-    | typeof QUICK_SAVE
-)
-
-export type GameSaveV1 = {
-    name: string
-    type: GameSaveType
-    mods: {
-        canonicalUrls: string[]
-        resolvedUrls: string[]
-        entryUrls: string[]
-    }
+export type GameSaveType = SaveType
+// id will be added via "DatabaseEntry" Generic
+export type GameSaveV1 = Omit<SaveData, "id"> & {
     content: {}
 }
 
@@ -39,7 +35,7 @@ export class GameSaves {
     async create(data: GameSaveV1): Promise<GameSave> {
         const dataWithTimestamps = createTimestamps(data)
         const id = await this.db.gameSaves.put(dataWithTimestamps)
-        return {id, ...dataWithTimestamps}
+        return {...dataWithTimestamps, id}
     }
 
     async getById(id: number): Promise<GameSave | undefined> {
