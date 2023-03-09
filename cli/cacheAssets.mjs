@@ -33,6 +33,7 @@ const ASSET_LIST = [
     "misc/bfdi-nine/source/model.gltf",
     "misc/bfdi-nine/textures/gltf_embedded_0.png",
     "misc/terrain-16bit.json",
+    "header.js"
 ]
 
 /**
