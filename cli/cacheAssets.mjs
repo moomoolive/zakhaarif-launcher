@@ -32,8 +32,7 @@ const ASSET_LIST = [
     "hm-painter-1025.png",
     "misc/bfdi-nine/source/model.gltf",
     "misc/bfdi-nine/textures/gltf_embedded_0.png",
-    "misc/terrain-16bit.json",
-    "header.js"
+    "misc/terrain-16bit.json"
 ]
 
 /**
