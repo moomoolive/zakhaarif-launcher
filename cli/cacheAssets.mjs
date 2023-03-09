@@ -39,7 +39,7 @@ const ASSET_LIST = [
  * @returns {Promise<void>}
  */
 async function main() {
-    console.info(`fetching large assets from "${ASSET_SERVER_ORIGIN}" and outputting to "${TARGET_FOLDER}"`)
+    console.info(`fetching assets from "${ASSET_SERVER_ORIGIN}" and outputting to "${TARGET_FOLDER}"`)
     console.info(`${ASSET_LIST.length} assets to cache...`)
     
     if (!fsSync.existsSync(TARGET_FOLDER)) {
@@ -68,7 +68,7 @@ async function main() {
             assetsToRequest.push(ASSET_SERVER_ORIGIN + remoteUrl)
         }
     }
-    console.info(`${assetsToRequest.length} assets will be requested`)
+    console.info(`🛫 ${assetsToRequest.length} assets will be requested`)
     
     /** @type {string[]} */
     const assetsToDelete = []
@@ -78,13 +78,14 @@ async function main() {
             assetsToDelete.push(target)
         }
     }
-    console.info(`${assetsToDelete.length} assets will be deleted`)
+    console.info(`🚮 ${assetsToDelete.length} assets will be deleted`)
 
     if (assetsToRequest.length < 1 && assetsToDelete.length < 1) {
-        console.info(`No changes to make. Ending...`)
+        console.info(`✅ No changes to make. Ending...`)
         return
     }
 
+    
     const assets = await Promise.all(
         assetsToRequest.map(url => requestAsset(url))
     )
@@ -98,41 +99,52 @@ async function main() {
     const failedAssetRequestCount = assets.length - filteredAssets.length
     
 
-    if (failedAssetRequestCount === 0) {
-        console.info(`Successfully requested all assets`)
+    if (assetsToRequest.length > 0 && failedAssetRequestCount === 0) {
+        console.info(`🛬 Successfully requested all assets`)
     }
 
     const createResponse = await Promise.all(filteredAssets.map(async (response) => {
         const {url} = response
         const relativeUrl = url.split(ASSET_SERVER_ORIGIN)[1]
         const filepath = path.join(TARGET_FOLDER, relativeUrl)
+        const folderpath = filepath.split("/").slice(0, -1).join("/")
+        if (folderpath.length > 0) {
+            await fs.mkdir(folderpath, {recursive: true})
+        }
         try {
             await fs.writeFile(
                 filepath,
-                new Uint8Array(await response.arrayBuffer()), 
+                new Uint8Array(await response.arrayBuffer())
             )
+            console.info("📝 created file", filepath)
             return true
         } catch (error) {
-            console.error(error)
+            console.error("❌", error)
             return false
         }
     }))
 
     const createFailCount = createResponse.filter((ok) => !ok)
 
-    if (createFailCount.length === 0) {
-        console.info("Wrote all new assets to disk")
-    } else {
-        console.error(`failed to write ${createResponse.length - createFailCount.length} files to disk`)
+    if (assetsToRequest.length > 0  && createFailCount.length === 0) {
+        console.info("✅ Wrote all new assets to disk")
     }
 
     if (failedAssetRequestCount > 0) {
-        throw new Error(`failed to fetch ${failedAssetRequestCount} after multiple retries. Ending script...`)
+        throw new Error(`❌ failed to fetch ${failedAssetRequestCount} after multiple retries. Ending script...`)
+    } else if (createFailCount.length > 0) {
+        throw new Error(`❌ failed to write ${createFailCount.length} files to disk`)
     }
 
-    await Promise.all(assetsToDelete.map((path) => fs.rm(path, {maxRetries: 1})))
+    if (assetsToDelete.length > 0) {
+        await Promise.all(assetsToDelete.map(async (filepath) => {
+            await fs.rm(filepath, {maxRetries: 1})
+            console.info("🚮 removed file", filepath)
+        }))
+        console.info(`✅ Deleted ${assetsToDelete.length} files successfully`)
+    }
 
-    console.info(`Deleted ${assetsToDelete.length} files successfully`)
+    console.info("✅ All changes made successfully!")
 }
 
 main()
@@ -178,10 +190,10 @@ async function requestAsset(url) {
         response = attempt
     }
     if (!response.ok || !response.payload) {
-        console.error(`request to "${url}" encountered network error (exception)`)
+        console.error(`❌ request to "${url}" encountered network error (exception)`)
         return null
     }
-    console.error(`request to "${url}" failed with status ${response.payload.status} (${response.payload.statusText})`)
+    console.error(`❌ request to "${url}" failed with status ${response.payload.status} (${response.payload.statusText})`)
     return null
 }
 
