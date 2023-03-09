@@ -1,9 +1,10 @@
 // docs: https://github.com/moomoolive/huzma
-/** @type {import("huzma").HuzmaCliConfig} */
+/** @type {import("./common/zakhaarif-dev-tools").HuzmaConfig} */
 export default {
     buildDir: "dist",
     huzmaName: "stable.huzma.json",
     license: "AGPL-3",
+    permissions: ["allowAll"],
     ignore: [
         "example-pkgs/",
         "bg-fetch-test/",

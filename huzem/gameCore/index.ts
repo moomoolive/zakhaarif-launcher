@@ -1,5 +1,5 @@
 import type {MainScriptArguments} from "../../src/lib/types/extensions"
-import { ZakhaarifModule} from "../common/types"
+import type {ZakhaarifModEsModule} from "../../common/zakhaarif-dev-tools"
 
 export const main = async (args: MainScriptArguments) => {
     console.info("[GAME LOADED] 😭 game loaded... with args =", args)
@@ -42,7 +42,7 @@ export const main = async (args: MainScriptArguments) => {
         const entry = gameSave.mods.entryUrls[i]
         importUrls.push(resolved + entry)
     }
-    const imports: {mod: ZakhaarifModule, url: string}[] = await Promise.all(
+    const imports: {mod: ZakhaarifModEsModule, url: string}[] = await Promise.all(
         importUrls.map(async (url) => ({mod: await import(url), url}))
     )
     console.info(`Found ${imports.length} imports`)
@@ -52,10 +52,10 @@ export const main = async (args: MainScriptArguments) => {
     rootElement.appendChild(rootCanvas)
 
     for (const {mod, url} of imports) {
-        if (!("pkg" in mod)) {
+        if (!("default" in mod)) {
             console.error(`import ${url} does not export a member called 'pkg'. ignoring...`)
             continue
         }
-        mod.pkg.init(rootCanvas)
+        mod.default.init(rootCanvas)
     }
 }

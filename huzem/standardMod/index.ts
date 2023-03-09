@@ -1,6 +1,6 @@
 import {main} from "./main"
-import {ZakhaarifPackage} from "../common/types"
+import {ZakhaarifMod} from "../../common/zakhaarif-dev-tools"
 
-export const pkg: ZakhaarifPackage = {
+export const pkg: ZakhaarifMod = {
     init: main
 }

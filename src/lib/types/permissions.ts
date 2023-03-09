@@ -1,38 +1,15 @@
 import type {PermissionsList} from "huzma"
+import {
+    ALLOW_ALL_PERMISSIONS as allowAll,
+    AllPermissions
+} from "../../../common/zakhaarif-dev-tools"
 
-export const ALLOW_ALL_PERMISSIONS = "allowAll"
+export const ALLOW_ALL_PERMISSIONS = allowAll
 export const ALLOW_ALL_EMBEDS = ALLOW_ALL_PERMISSIONS
 export const ALLOW_ALL_HTTP = ALLOW_ALL_PERMISSIONS
 
-export type AllowAllPermissionsDirective = typeof ALLOW_ALL_PERMISSIONS
-
-type ExtendableValue = typeof ALLOW_ALL_PERMISSIONS | string & {}
-
-const permissions = [
-    ALLOW_ALL_PERMISSIONS,
-    // "web-share" permission may be added later?
-    // allowing for this: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy/web-share
-    "geoLocation",
-    "microphone",
-    "camera",
-    "displayCapture",
-    "fullScreen",
-    
-    "pointerLock",
-    "allowInlineContent",
-    "allowUnsafeEval",
-    "allowDataUrls",
-    "allowBlobs",
-    
-    "unlimitedStorage",
-
-    {key: "files", value: ["read"]},
-    {key: "gameSaves", value: ["read", "write"]},
-    {key: "embedExtensions", value: [] as ExtendableValue[]},
-    {key: "webRequest", value: [] as ExtendableValue[]}
-] as const
-
-export type PermissionKeys = PermissionsList<typeof permissions>[number]["key"]
+export type Permissions = AllPermissions
+export type PermissionKeys = PermissionsList<AllPermissions>[number]["key"]
 
 const createMeta = ({
     name = "",
@@ -76,4 +53,4 @@ export const permissionsMeta = {
     webRequest: createMeta({extendable: true, dangerous: true}),
 } as const satisfies Record<PermissionKeys, PermissionMeta>
 
-export type Permissions = typeof permissions
+
