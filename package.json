@@ -40,7 +40,7 @@
     "babylonjs-loaders": "^5.38.0",
     "babylonjs-materials": "^5.38.0",
     "dexie": "^3.2.2",
-    "huzma": "^0.5.0",
+    "huzma": "^0.5.1",
     "material-ui-confirm": "^3.0.7",
     "nanoid": "^4.0.0",
     "react": "^18.2.0",
@@ -75,6 +75,7 @@
     "tailwindcss": "^3.2.4",
     "typescript": "^4.9.4",
     "vite": "^3.2.3",
-    "vitest": "^0.25.5"
+    "vitest": "^0.25.5",
+    "zakhaarif-dev-tools": "^0.1.0"
   }
 }
