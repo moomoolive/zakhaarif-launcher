@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import fs from "fs/promises"
 
 const CREDITS_OUTPUT = "public/credits.compiled.json"

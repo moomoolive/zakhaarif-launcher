@@ -1,7 +1,7 @@
 import type {PermissionsList} from "huzma"
 import {
     ALLOW_ALL_PERMISSIONS as allowAll,
-    AllPermissions
+    AllPermissions,
 } from "../../../common/zakhaarif-dev-tools"
 
 export const ALLOW_ALL_PERMISSIONS = allowAll

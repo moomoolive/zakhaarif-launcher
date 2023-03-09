@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import fs from "fs-extra"
 import commandLineArgs from "command-line-args"
 

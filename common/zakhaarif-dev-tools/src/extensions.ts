@@ -1,5 +1,9 @@
 import type {TerminalActions, wRpc, TransferValue} from "w-worker-rpc"
 
+export const EXTENSION_METADATA = {
+    "is-extension": "true"
+} as const
+
 export type FileTransfer = {
     readonly type: string;
     readonly length: string;

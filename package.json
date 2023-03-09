@@ -9,7 +9,8 @@
     "type-check-main": "tsc --project tsconfig.json --noEmit",
     "type-check": "npm run type-check-main && npm run type-check-sw",
     "build-main-huzma": "npx huzma-create",
-    "build": "npm run build-main && npm run build-sandbox && npm run build-huzem && npm run build-main-huzma",
+    "post-build": "npm run build-main-huzma && npm run cache-assets",
+    "build": "npm run build-main && npm run build-sandbox && npm run build-huzem && npm run post-build",
     "build-main": "npm run compile-credits && npm run sw && vite build && node ./src/build/headers.mjs",
     "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox && node ./sandbox/build/headers.mjs",
     "build-huzem": "node ./huzem/build.mjs",
@@ -24,7 +25,8 @@
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --outfile=./public/dev-sw.compiled.js",
     "check-types": "tsc",
     "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst",
-    "compile-credits": "node ./cli/compileCredits.mjs"
+    "compile-credits": "node ./cli/compileCredits.mjs",
+    "cache-assets": "node ./cli/cacheAssets.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
@@ -69,6 +71,7 @@
     "fast-png": "^6.1.0",
     "filehound": "^1.17.6",
     "fs-extra": "^11.1.0",
+    "node-fetch": "^3.3.0",
     "postcss": "^8.4.19",
     "semver": "^7.3.8",
     "sirv": "^2.0.2",

@@ -16,6 +16,7 @@ dist-sandbox
 dist
 dist-ssr
 *.local
+**/*.local.*
 bundle-anaylsis/
 dist-preview
 **/*.js.map

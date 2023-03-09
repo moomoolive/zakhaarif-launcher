@@ -11,12 +11,15 @@ const fullDirpath = __dirname
 export default defineConfig({
     plugins: [],
     base: fullDirpath + "/",
-    publicDir: false,
+    // only used during development
+    // public folder at root of repo will not be copied
+    // into repo
+    publicDir: path.join(__dirname, "../../public"),
     build: {
         lib: {
             entry: path.join(fullDirpath, "index.ts"),
             formats: ["es"],
-            fileName: "index.js"
+            fileName: "index"
         },
         manifest: "build-manifest.json",
         target: "es2020",
