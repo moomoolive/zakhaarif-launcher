@@ -22,7 +22,7 @@ export function Acknowledgments(): JSX.Element {
     const creditScrollerIntervalRef = useRef(-1)
 
     useEffectAsync(async () => {
-        const creditsResponse = await io.wrap(fetch("/credits.json"))
+        const creditsResponse = await io.wrap(fetch("/credits.compiled.json"))
         if (!creditsResponse.ok) {
             setError(true)
             return

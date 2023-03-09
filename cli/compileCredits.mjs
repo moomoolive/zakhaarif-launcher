@@ -1,6 +1,6 @@
 import fs from "fs/promises"
 
-const CREDITS_OUTPUT = "public/credits.json"
+const CREDITS_OUTPUT = "public/credits.compiled.json"
 
 console.log("building credits file...")
 
