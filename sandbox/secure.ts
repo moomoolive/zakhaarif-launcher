@@ -1,7 +1,7 @@
 import {wRpc} from "w-worker-rpc"
 import type {ServiceWorkerFunctions} from "./serviceWorkerFunctions"
 import {serviceWorkerToSandboxRpc, controllerRpc} from "./sandboxFunctions"
-import type {ExtensionModule, MainScriptArguments} from "../common/zakhaarif-dev-tools"
+import type {ExtensionModule, MainScriptArguments} from "zakhaarif-dev-tools"
 import {SERVICE_WORKER_FILE} from "./config"
 
 if (window.top !== window.parent) {

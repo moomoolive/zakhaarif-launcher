@@ -1,7 +1,7 @@
 import { GameSave } from "../../../database/GameSaves"
 import type {RpcState, DaemonRpcTransform} from "../state"
 import {type as betterTypeof} from "../../../utils/betterTypeof"
-import type {GameSaveDaemonRpcs} from "../../../../../common/zakhaarif-dev-tools"
+import type {GameSaveDaemonRpcs} from "zakhaarif-dev-tools"
 
 export async function getSaveFile(
     id: number, 

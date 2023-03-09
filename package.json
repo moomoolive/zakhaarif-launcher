@@ -12,7 +12,7 @@
     "build-main-huzma": "npx huzma-create",
     "build": "npm run build-huzem && npm run build-main && npm run build-sandbox",
     "build-main": "npm run compile-credits && npm run sw && vite build && node ./src/build/headers.mjs && npm run build-main-huzma",
-    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist-sandbox && node ./sandbox/build/headers.mjs",
+    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist/sandbox && node ./sandbox/build/headers.mjs",
     "build-huzem": "node ./huzem/build.mjs && npm run cache-assets",
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --sourcemap --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --sourcemap --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
@@ -79,6 +79,6 @@
     "typescript": "^4.9.4",
     "vite": "^3.2.3",
     "vitest": "^0.25.5",
-    "zakhaarif-dev-tools": "^0.1.0"
+    "zakhaarif-dev-tools": "^0.1.1"
   }
 }

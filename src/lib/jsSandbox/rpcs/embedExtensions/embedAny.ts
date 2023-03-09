@@ -3,7 +3,7 @@ import {ALLOW_ALL_PERMISSIONS} from "../../../types/permissions"
 import {
     ReconfigurationConfig,
     EmbedAnyExtensionDaemonRpcs
-} from "../../../../../common/zakhaarif-dev-tools"
+} from "zakhaarif-dev-tools"
 
 export function reconfigurePermissions(
     parameters: ReconfigurationConfig,

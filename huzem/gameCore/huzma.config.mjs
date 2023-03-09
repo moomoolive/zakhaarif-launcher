@@ -1,4 +1,4 @@
-import {EXTENSION_METADATA} from "../../common/zakhaarif-dev-tools/build/index.js"
+import {EXTENSION_METADATA} from "zakhaarif-dev-tools"
 
 // docs: https://github.com/moomoolive/huzma
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */

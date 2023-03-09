@@ -1,5 +1,4 @@
-import type {MainScriptArguments} from "../../common/zakhaarif-dev-tools"
-import type {ZakhaarifModEsModule} from "../../common/zakhaarif-dev-tools"
+import type {ZakhaarifModEsModule, MainScriptArguments} from "zakhaarif-dev-tools"
 
 export const main = async (args: MainScriptArguments) => {
     console.info("[GAME LOADED] 😭 game loaded... with args =", args)

@@ -1,5 +1,5 @@
 import {main} from "./main"
-import {ZakhaarifMod} from "../../common/zakhaarif-dev-tools"
+import {ZakhaarifMod} from "zakhaarif-dev-tools"
 
 export default {
     init: main

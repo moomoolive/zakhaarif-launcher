@@ -6,7 +6,7 @@ import type {
     InitialExtensionState,
     FatalErrorConfig,
     EssentialDaemonRpcs
-} from "../../../../../common/zakhaarif-dev-tools"
+} from "zakhaarif-dev-tools"
 
 export async function getFile(url: string, state: RpcState): Promise<TransferValue<FileTransfer> | null> {
     if (typeof url !== "string") {

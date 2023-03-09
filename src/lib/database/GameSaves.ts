@@ -6,7 +6,7 @@ import type {
     QuickSave,
     AutoSave,
     SaveData
-} from "../../../common/zakhaarif-dev-tools"
+} from "zakhaarif-dev-tools"
 
 export const MANUAL_SAVE: ManualSave = 1
 export const AUTO_SAVE: AutoSave = 2
