@@ -27,6 +27,7 @@ type JsSandboxOptions = {
 }
 
 const SANDBOX_PING_INTERVAL = 20 * MILLISECONDS_PER_SECOND
+const PING_MARGIN_OF_ERROR = (5 * MILLISECONDS_PER_SECOND) + SANDBOX_PING_INTERVAL
 
 export class JsSandbox {
     private frameListener: (message: MessageEvent<unknown>) => void
@@ -207,7 +208,7 @@ export class JsSandbox {
             const {latestPingResponse} = self
             const difference = now - latestPingResponse
             if (
-                difference >= SANDBOX_PING_INTERVAL
+                difference >= PING_MARGIN_OF_ERROR
                 || !this.state.readyForDisplay
             ) {
                 self.state.createFatalErrorMessage(

@@ -53,9 +53,10 @@ export const main = async (args: MainScriptArguments) => {
 
     for (const {mod, url} of imports) {
         if (!("default" in mod)) {
-            console.error(`import ${url} does not export a member called 'pkg'. ignoring...`)
+            console.error(`import ${url} does not contain a default export. ignoring...`)
             continue
         }
         mod.default.init(rootCanvas)
     }
+    messageAppShell("readyForDisplay")
 }

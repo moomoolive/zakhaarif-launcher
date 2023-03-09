@@ -85,53 +85,57 @@ async function main() {
         return
     }
 
-    
-    const assets = await Promise.all(
-        assetsToRequest.map(url => requestAsset(url))
-    )
-    /** @type {Response[]} */
-    const filteredAssets = []
-    for (const asset of assets) {
-        if (asset) {
-            filteredAssets.push(asset)
-        }
-    }
-    const failedAssetRequestCount = assets.length - filteredAssets.length
-    
 
-    if (assetsToRequest.length > 0 && failedAssetRequestCount === 0) {
-        console.info(`🛬 Successfully requested all assets`)
+    if (assetsToRequest.length > 0) {
+        console.info("preparing folders for incoming assets...")
     }
-
-    const createResponse = await Promise.all(filteredAssets.map(async (response) => {
-        const {url} = response
+    
+    // create any needed folders for assets
+    await Promise.all(assetsToRequest.map(async (url) => {
         const relativeUrl = url.split(ASSET_SERVER_ORIGIN)[1]
         const filepath = path.join(TARGET_FOLDER, relativeUrl)
         const folderpath = filepath.split("/").slice(0, -1).join("/")
         if (folderpath.length > 0) {
             await fs.mkdir(folderpath, {recursive: true})
         }
+    }))
+
+    if (assetsToRequest.length > 0) {
+        console.info("folders ready!")
+    }
+
+    const createResponse = await Promise.all(assetsToRequest.map(async (remoteUrl) => {
+        const response = await requestAsset(remoteUrl)
+        if (!response) {
+            return "request-error"
+        }
+        console.info(`🛬 Successfully requested`, remoteUrl)
+        const {url} = response
+        const relativeUrl = url.split(ASSET_SERVER_ORIGIN)[1]
+        const filepath = path.join(TARGET_FOLDER, relativeUrl)
+
         try {
             await fs.writeFile(
                 filepath,
                 new Uint8Array(await response.arrayBuffer())
             )
             console.info("📝 created file", filepath)
-            return true
+            return "ok"
         } catch (error) {
             console.error("❌", error)
-            return false
+            return "file-write-error"
         }
     }))
 
-    const createFailCount = createResponse.filter((ok) => !ok)
+    const createFailCount = createResponse.filter((state) => state === "file-write-error")
+    const failedAssetRequests = createResponse.filter((state) => state === "request-error")
 
     if (assetsToRequest.length > 0  && createFailCount.length === 0) {
         console.info("✅ Wrote all new assets to disk")
     }
 
-    if (failedAssetRequestCount > 0) {
-        throw new Error(`❌ failed to fetch ${failedAssetRequestCount} after multiple retries. Ending script...`)
+    if (failedAssetRequests.length > 0) {
+        throw new Error(`❌ failed to fetch ${failedAssetRequests.length} after multiple retries. Ending script...`)
     } else if (createFailCount.length > 0) {
         throw new Error(`❌ failed to write ${createFailCount.length} files to disk`)
     }

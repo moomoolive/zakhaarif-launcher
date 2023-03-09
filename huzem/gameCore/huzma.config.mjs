@@ -5,12 +5,27 @@ import {EXTENSION_METADATA} from "../../common/zakhaarif-dev-tools/build/index.j
 export default {
     buildDir: "public/huzem/gameCore",
     huzmaName: "stable.huzma.json",
-    name: "game-core",
-    entry: "index.mjs",
     ignore: [
         "build-manifest",
-
         "**/*.map"
     ],
-    metadata: {...EXTENSION_METADATA}
+    
+    name: "Game-core",
+    entry: "index.mjs",
+    version: "0.1.0",
+    description: "Starts game loop and injects any linked mods",
+    license: "AGPL-3",
+    authors: [{name: "Mostafa Elbannan"}],
+    homepageUrl: "https://github.com/moomoolive/zakhaarif-launcher",
+    repo: {type: "git", url: "https://github.com/moomoolive/zakhaarif-launcher"},
+    permissions: [
+        "fullScreen",
+        "pointerLock",
+        "allowInlineContent",
+        "allowUnsafeEval",
+        "allowDataUrls",
+        {key: "gameSaves", value: ["read", "write"]},
+        {key: "embedExtensions", value: ["allowAll"]}
+    ],
+    metadata: {...EXTENSION_METADATA},
 }

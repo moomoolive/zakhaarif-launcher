@@ -3,14 +3,14 @@
     "name": "Launcher",
     "version": "0.1.0",
     "files": [
-        "entry.js",
-        "asset.svg",
-        "yeah.html",
-        "random-style.css",
-        "cool.png",
-        "bird-svgrepo.svg",
-        "random.jpg",
-        "cool.json"
+        "bg-fetch-test/entry.js",
+        "bg-fetch-test/asset.svg",
+        "bg-fetch-test/yeah.html",
+        "bg-fetch-test/random-style.css",
+        "bg-fetch-test/cool.png",
+        "bg-fetch-test/bird-svgrepo.svg",
+        "bg-fetch-test/random.jpg",
+        "bg-fetch-test/cool.json"
     ],
     "authors": [
         {"name": "Mostafa Elbannan"}

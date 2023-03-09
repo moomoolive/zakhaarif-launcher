@@ -103,7 +103,7 @@ export const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                             className="animate-fade-in-left mb-2"
                         >
                             <div className="mt-1 text-xs text-neutral-400 ml-2">
-                                {"Send and recieve data from:"}
+                                {"Exchange data with:"}
                             </div>
 
                             {permission.value.map((value, index) => {
@@ -124,7 +124,7 @@ export const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                             <span className="text-red-500 mr-2.5">
                                 <FontAwesomeIcon icon={faCode}/>
                             </span>
-                            {`Embed Any Extension`}
+                            {`Embed Any Add-on`}
                         </>
                     }
                     return <>
@@ -132,7 +132,7 @@ export const PermissionsDisplay = ({permission} : PermissionsIconProps) => {
                             <span className="text-red-500 mr-2.5">
                                 <FontAwesomeIcon icon={faCode}/>
                             </span>
-                            {`Embed Extensions`}
+                            {`Embed Add-ons`}
                             <button 
                                 className="text-xs ml-2 text-blue-500 hover:text-green-500"
                                 onClick={() => setShowDetails(!showDetails)}

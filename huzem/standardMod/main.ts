@@ -40,6 +40,9 @@ import {
 import {VoxelColliders} from "./lib/physics/voxelColliders"
 
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
+const ROOT_URL = window.origin.includes("http://localhost") 
+    ? "http://localhost:5173"
+    : "https://preview.zakhaarif.com"
 
 export const main = async (canvas: HTMLCanvasElement) => {
     canvas.style.width = "100vw"
@@ -212,7 +215,7 @@ export const main = async (canvas: HTMLCanvasElement) => {
         position: {x: 2_048.0, y: 100.0, z: 2_048.0},
         rendering: {id: 0},
     }
-    const rawHeightMapJson = await fetch("/large-assets/terrain-16bit.json")
+    const rawHeightMapJson = await fetch(`${ROOT_URL}/large-assets/misc/terrain-16bit.json`)
 
     const rawHeightMap = await rawHeightMapJson.json() as {
         height: number
@@ -279,7 +282,7 @@ export const main = async (canvas: HTMLCanvasElement) => {
 
     const p = await SceneLoader.ImportMeshAsync(
         null, 
-        "./large-assets/bfdi-nine/source/",
+        `${ROOT_URL}/large-assets/misc/bfdi-nine/source/`,
         "model.gltf", 
         scene,
     )

@@ -42,7 +42,7 @@
     "babylonjs-loaders": "^5.38.0",
     "babylonjs-materials": "^5.38.0",
     "dexie": "^3.2.2",
-    "huzma": "^0.5.1",
+    "huzma": "^0.5.3",
     "material-ui-confirm": "^3.0.7",
     "nanoid": "^4.0.0",
     "react": "^18.2.0",

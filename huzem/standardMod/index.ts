@@ -1,6 +1,6 @@
 import {main} from "./main"
 import {ZakhaarifMod} from "../../common/zakhaarif-dev-tools"
 
-export const pkg: ZakhaarifMod = {
+export default {
     init: main
-}
+} satisfies ZakhaarifMod
