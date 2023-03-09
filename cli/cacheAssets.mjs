@@ -21,6 +21,7 @@ import fetch from "node-fetch"
 import Filehound from "filehound"
 import path from "path"
 import fs from "fs/promises"
+import fsSync from "fs"
 
 const ASSET_SERVER_ORIGIN = "https://asset-archive.zakhaarif.com"
 const TARGET_FOLDER = "public/large-assets"
@@ -41,6 +42,10 @@ async function main() {
     console.info(`fetching large assets from "${ASSET_SERVER_ORIGIN}" and outputting to "${TARGET_FOLDER}"`)
     console.info(`${ASSET_LIST.length} assets to cache...`)
     
+    if (!fsSync.existsSync(TARGET_FOLDER)) {
+        fsSync.mkdirSync(TARGET_FOLDER)
+    }
+
     /** @type {string[]} */
     const currentAssets = await Filehound.create()
         .paths(TARGET_FOLDER)
