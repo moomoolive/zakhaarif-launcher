@@ -1,5 +1,9 @@
 # بسم الله الرحمن الرحيم
 
+![CI Workflow](https://github.com/moomoolive/zakhaarif-launcher/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/github/license/moomoolive/zakhaarif-launcher)
+![Lines of Code](https://sloc.xyz/github/moomoolive/zakhaarif-launcher)
+
 ## Welcome to Zakhaarif!
 >  A fantasy action RPG inspired by Islamic Sources, Middle-Eastern culture, and folklore
 
