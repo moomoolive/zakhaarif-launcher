@@ -6,7 +6,7 @@
 Zakhaarif 
 (Arabic word for "ornaments", 
 pronounced [```/zakaarif/```](https://www.howtopronounce.com/arabic/%D8%B2%D8%AE%D8%A7%D8%B1%D9%81)
-, written in Arabic زخارف) is an fantasy action RPG inspired by Islamic Sources Middle-Eastern 
+, written in Arabic زخارف) is an fantasy action RPG inspired by Islamic Sources, Middle-Eastern 
 (Arab, Turkish, Persian, etc.) culture, and folklore. The game is currently experimental and under 
 heavy development.
 
@@ -21,7 +21,7 @@ This repo houses the official launcher for Zakhaarif and associated core extensi
 
 - 📱 Cross-platform - if you have a browser, you can play
 - 📥 Instant Play - no download required to start playing, jump straight in 
-- 📦 First-Class Mods - everything is implemented as mod (even the core game code!), meaning it's
+- 📦 First-Class Mods - everything is implemented as a mod (even the core game code!), meaning it's
 easy-peasy to make mods
 - 🌐 Web Technologies - made with HTML, CSS, JS, and WASM
 
