@@ -12,16 +12,18 @@ heavy development.
 
 This repo houses the official launcher for Zakhaarif and associated core extensions/mods.
 
-## Overview
+#### Browser Support:
+![Chrome](https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png) | ![Firefox](https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png) | ![IE](https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png) | ![Opera](https://raw.githubusercontent.com/alrra/browser-logos/master/src/opera/opera_48x48.png) | ![Safari](https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png)
+--- | --- | --- | --- | --- |
+✅ 91+ | ✅ 89+ | ✅ Latest | ✅ Latest | ✅ 16.4+ |
+
+## Highlights
 
 - 📱 Cross-platform - if you have a browser, you can play
+- 📥 Instant Play - no download required to start playing, jump straight in 
 - 📦 First-Class Mods - everything is implemented as mod (even the core game code!), meaning it's
 easy-peasy to make mods
 - 🌐 Web Technologies - made with HTML, CSS, JS, and WASM
-
-![Chrome](https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png) | ![Firefox](https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png) | ![IE](https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png) | ![Opera](https://raw.githubusercontent.com/alrra/browser-logos/master/src/opera/opera_48x48.png) | ![Safari](https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png)
---- | --- | --- | --- | --- |
-Latest ✔ | Latest ✔ | 10+ ✔ | Latest ✔ | 6.1+ ✔ |
 
 ## License
 
