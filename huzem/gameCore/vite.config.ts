@@ -10,7 +10,6 @@ const fullDirpath = __dirname
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [],
-    base: fullDirpath + "/",
     // only used during development
     // public folder at root of repo will not be copied
     // into repo
@@ -23,7 +22,8 @@ export default defineConfig({
         },
         manifest: "build-manifest.json",
         target: "es2020",
-        outDir: `public/huzem/${dirPath}`,
+        outDir: `dist/huzem/${dirPath}`,
         sourcemap: true,
-    }
+    },
+    server: {port: 5_555}
 })

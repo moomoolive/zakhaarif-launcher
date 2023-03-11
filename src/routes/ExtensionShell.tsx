@@ -23,6 +23,7 @@ import {
 import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 import { CACHED, ManifestIndex } from "../lib/shabah/backend"
+import { GAME_EXTENSION_CARGO } from "../standardCargos"
 
 export type ExtensionShellFunctions = SandboxFunctions
 
@@ -169,7 +170,7 @@ const ExtensionShellPage = () => {
         const isUnsafe = (
             unsafeCargosDisallowed
             && hasUnsafePermissions(permissionsSummary)
-            && extensionCargoIndex.current.canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
+            && extensionCargoIndex.current.canonicalUrl !== GAME_EXTENSION_CARGO.canonicalUrl
         )
 
         if (isUnsafe) {

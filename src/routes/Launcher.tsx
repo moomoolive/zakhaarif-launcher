@@ -190,7 +190,11 @@ const LauncherRoot = (): JSX.Element => {
     updatingCorePackages.current = urls
     const retryResponse = await downloadClient.retryFailedDownloads(
       urls,
-      "game core retry"
+      "game core retry",
+      {
+        backgroundDownload: false,
+        allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+      }
     )
     setProgressMsg("Retrying...")
     if (retryResponse.data !== Shabah.STATUS.updateRetryQueued) {
@@ -287,7 +291,10 @@ const LauncherRoot = (): JSX.Element => {
     const queueResponse = await downloadClient.executeUpdates(
       updatesAvailable,
       "game core",
-      {backgroundDownload: false}
+      {
+        backgroundDownload: false,
+        allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+      }
     )
 
     logger.info("queue response", queueResponse)
@@ -601,7 +608,7 @@ const LauncherRoot = (): JSX.Element => {
             }
            >
               <div className="fixed z-10 text-xs bottom-0 left-0 text-neutral-500 rounded">
-                <button className={`hover:bg-neutral-900 p-2 ${launcherState === "loading" ? "animate-pulse" : ""}`}>
+                <div className={`hover:bg-neutral-900 p-2 ${launcherState === "loading" ? "animate-pulse" : ""}`}>
                   <span className={`mr-1.5 ${launcherState === "error" ? "text-yellow-400" : "text-blue-400"}`}>
                       <FontAwesomeIcon 
                         icon={faCodeBranch}
@@ -611,7 +618,7 @@ const LauncherRoot = (): JSX.Element => {
                     ? "not installed" 
                     : "v" + currentAppVersion
                   }
-                </button>
+                </div>
               </div>
             </Tooltip>
         </div>

@@ -24,6 +24,7 @@ import { Permissions } from "../../lib/types/permissions"
 import { readableByteCount } from "../../lib/utils/storage/friendlyBytes"
 import { PermissionsDisplay } from "./PermissionsDisplay"
 import { useGlobalConfirm } from "../../hooks/globalConfirm"
+import { GAME_EXTENSION_CARGO, LAUNCHER_CARGO } from "../../standardCargos"
 
 type UpdateState = "error" | "up-to-date"
 
@@ -110,8 +111,8 @@ export const CargoUpdater = ({
         const isUnsafe = hasUnsafePermissions(permissionsSummary)
         if (
             isUnsafe
-            && canonicalUrl !== import.meta.env.VITE_APP_LAUNCHER_CARGO_URL
-            && canonicalUrl !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
+            && canonicalUrl !== LAUNCHER_CARGO.canonicalUrl
+            && canonicalUrl !== GAME_EXTENSION_CARGO.canonicalUrl
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
             logger.warn(`prevented unsafe cargo from being updated. Url=${canonicalUrl}`)

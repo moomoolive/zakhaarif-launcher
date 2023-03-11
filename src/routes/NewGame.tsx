@@ -22,7 +22,7 @@ import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import { isMod } from "../lib/utils/cargos"
 import { sleep } from "../lib/utils/sleep"
 import LoadingIcon from "../components/LoadingIcon"
-import { STANDARD_CARGOS } from "../standardCargos"
+import { GAME_EXTENSION_CARGO, STANDARD_CARGOS } from "../standardCargos"
 
 const NewGamePage = () => {
     const navigate = useNavigate()
@@ -78,7 +78,7 @@ const NewGamePage = () => {
         logger.info("successfully created save!")
         setLoading(false)
         window.localStorage.setItem(SAVE_EXISTS, "1")
-        navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${gameId}`)
+        navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(GAME_EXTENSION_CARGO.canonicalUrl)}&state=${gameId}`)
     }
 
     return <div 

@@ -1,0 +1,19 @@
+{
+    "schema": 2,
+    "name": "Standard-mod",
+    "version": "0.1.0", 
+    "entry": "https://localhost:6555/gameCore/index.ts", 
+    "description": "The one mod to rule them all. No seriously, the game needs this mod to function as it provides all the game's core code.",
+    "authors":[{"name":"Mostafa Elbannan"}],
+    "license":"AGPL-3",
+    "repo":{
+        "type":"git",
+        "url":"https://github.com/moomoolive/zakhaarif-launcher"
+    },
+    "homepageUrl":"https://github.com/moomoolive/zakhaarif-launcher",
+    "permissions": [
+        "unlimitedStorage",
+        {"key":"files","value":["read"]},
+        {"key":"webRequest","value":["https://unpkg.com/babylonjs-inspector@5.38.0/"]}
+    ]
+}

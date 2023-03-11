@@ -40,6 +40,7 @@ export const STATUS_CODES = {
     noMessagesFound: 7,
     createNewIndex: 8,
     updatedPreviousIndex: 9,
+    assetCacheDisallowed: 10,
 
     networkError: ERROR_CODES_START,
     badHttpCode: 101,

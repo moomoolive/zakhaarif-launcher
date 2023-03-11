@@ -5,6 +5,7 @@ interface ImportMetaEnv {
     readonly VITE_APP_CODE_REPO_URL: string
     readonly VITE_APP_RELEASE_NOTES_URL: string
     readonly VITE_APP_SANDBOX_ORIGIN: string
+    readonly VITE_APP_ALLOW_ASSET_CACHE: "true" | "false"
 
     // standard cargos
     readonly VITE_APP_LAUNCHER_CARGO_URL: string

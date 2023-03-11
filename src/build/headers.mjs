@@ -1,22 +1,17 @@
 import fs from "fs/promises"
 
-const MAIN_ORIGIN = process.env.MAIN_ORIGIN || "none"
-
 const HEADERS_FOR_ALL_URLS = "/*"
 const HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS = "https://:project.pages.dev/*"
 
 const file = `
 ${HEADERS_FOR_ALL_URLS}
     Access-Control-Allow-Origin: *
-    ! X-Content-Type-Options
-
-${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
-    X-Robots-Tag: noindex
-    
-${MAIN_ORIGIN}/
     Cross-Origin-Embedder-Policy: require-corp
     Cross-Origin-Opener-Policy: same-origin
     X-Frame-Options: deny
+
+${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}
+    X-Robots-Tag: noindex
 `.trim()
 
 

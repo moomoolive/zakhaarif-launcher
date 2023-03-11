@@ -1,4 +1,5 @@
 /public/large-assets/**
+prototype
 
 # Logs
 logs
@@ -17,9 +18,7 @@ dist-ssr
 *.local
 **/*.local.*
 bundle-anaylsis/
-dist-preview
 **/*.js.map
-public/huzem/**
 
 # Editor directories and files
 .vscode/*
@@ -31,5 +30,3 @@ public/huzem/**
 *.njsproj
 *.sln
 *.sw?
-
-prototype

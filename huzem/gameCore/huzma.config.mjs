@@ -3,7 +3,7 @@ import {EXTENSION_METADATA} from "zakhaarif-dev-tools"
 // docs: https://github.com/moomoolive/huzma
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */
 export default {
-    buildDir: "public/huzem/gameCore",
+    buildDir: "dist/huzem/gameCore",
     huzmaName: "stable.huzma.json",
     ignore: [
         "build-manifest",

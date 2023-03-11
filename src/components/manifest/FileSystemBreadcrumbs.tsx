@@ -312,7 +312,7 @@ export const FileSystemBreadcrumbs = ({
                                     if (!confirmed) {
                                         return
                                     }
-                                    if (targetCargo.canonicalUrl === import.meta.env.VITE_APP_LAUNCHER_CARGO_URL) {
+                                    if (targetCargo.canonicalUrl === LAUNCHER_CARGO.canonicalUrl) {
                                         navigate("/")
                                         return
                                     }

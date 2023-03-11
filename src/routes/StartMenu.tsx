@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faAngleDown, faAngleUp } from "@fortawesome/free-solid-svg-icons"
 import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAsyncState} from "../hooks/promise"
-import {STANDARD_CARGOS} from "../standardCargos"
+import {GAME_EXTENSION_CARGO, STANDARD_CARGOS} from "../standardCargos"
 import { useAppContext } from "./store"
 import { CACHED } from "../lib/shabah/backend"
 
@@ -40,7 +40,7 @@ const StartMenuPage = () => {
                         {gameSaveExists.current ? <>
                             <div>
                                 <Link 
-                                    to={`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=-1`}
+                                    to={`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(GAME_EXTENSION_CARGO.canonicalUrl)}&state=-1`}
                                     style={gameIsCached && gameSaveExists.current 
                                         ? {}
                                         : {pointerEvents: "none"}

@@ -57,6 +57,7 @@ const provisionDownloadId = () => nanoid(9)
 
 type DownloadParams = {
     backgroundDownload: boolean
+    allowAssetCache: boolean
 }
 
 type DownloadConfig = {
@@ -185,7 +186,10 @@ export class Shabah {
     async executeUpdates(
         updates: UpdateCheckResponse[],
         title: string,
-        {backgroundDownload = true}: Partial<DownloadParams> = {}
+        {
+            backgroundDownload = true,
+            allowAssetCache = true
+        }: Partial<DownloadParams> = {}
     ): Promise<Ok<StatusCode>> {
         if (updates.length < 1) {
             return io.ok(STATUS_CODES.zeroUpdatesProvided)
@@ -333,7 +337,8 @@ export class Shabah {
 
         const downloadResponse = await this.startDownload({
             params: {
-                backgroundDownload
+                backgroundDownload,
+                allowAssetCache
             },
             filesToRequest,
             downloadIndex,
@@ -351,7 +356,11 @@ export class Shabah {
             downloadIndex
         } = config
         
-        const {backgroundDownload} = params
+        const {backgroundDownload, allowAssetCache} = params
+
+        if (!allowAssetCache) {
+            return STATUS_CODES.assetCacheDisallowed
+        }
 
         if (backgroundDownload) {
             await this.putDownloadIndex(downloadIndex)
@@ -405,7 +414,10 @@ export class Shabah {
     async retryFailedDownloads(
         canonicalUrls: string[],
         title: string,
-        {backgroundDownload = true}: Partial<DownloadParams> = {}
+        {
+            backgroundDownload = true,
+            allowAssetCache = true
+        }: Partial<DownloadParams> = {}
     ): Promise<Ok<StatusCode>> {
         if (canonicalUrls.length < 1) {
             return io.ok(STATUS_CODES.zeroUpdatesProvided)
@@ -483,7 +495,8 @@ export class Shabah {
             filesToRequest: requestFileUrls,
             title,
             params: {
-                backgroundDownload
+                backgroundDownload,
+                allowAssetCache
             }
         })
         if (downloadResponse === STATUS_CODES.updateQueued) {

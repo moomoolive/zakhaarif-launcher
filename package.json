@@ -17,7 +17,8 @@
     "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --sourcemap --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --sourcemap --outfile=./sandbox/src/mirror-sw.compiled.js",
     "sandbox-server": "node ./sandbox/dev-server.mjs",
     "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
-    "preview": "vite build --outDir dist-preview && vite preview --outDir dist-preview",
+    "dev-huzem": "node ./huzem/devServer.mjs",
+    "preview": "npm run build && vite preview --outDir dist --host",
     "sw": "npm run sw-prod && npm run sw-dev",
     "test-watch": "vitest watch",
     "test": "vitest run",
@@ -56,6 +57,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^7.6.0",
+    "@types/command-line-args": "^5.2.0",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.15",
     "@types/node": "^18.11.10",

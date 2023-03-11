@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom"
 import { isMod } from "../lib/utils/cargos"
 import {ManifestIndex} from "../lib/shabah/downloadClient"
 import { sleep } from "../lib/utils/sleep"
+import { GAME_EXTENSION_CARGO } from "../standardCargos"
 
 const FILTERS = [
     {text: "Modified", key: "updatedAt"},
@@ -240,7 +241,7 @@ const LoadGamePage = (): JSX.Element => {
                     <div className="w-full h-5/6 overflow-y-scroll overflow-x-clip px-2">
                         {filteredSaves.map((save, index) => {
                             const {name, type, updated, id} = save
-                            const openGame = () => navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL)}&state=${id.toString()}`)
+                            const openGame = () => navigate(`/extension?${EXTENSION_SHELL_TARGET}=${encodeURIComponent(GAME_EXTENSION_CARGO.canonicalUrl)}&state=${id.toString()}`)
                             return <div
                                 key={`save-${index}`}
                                 className="w-full text-left bg-neutral-900 cursor-pointer hover:bg-neutral-900/60 mb-2 rounded shadow-2xl border-l-4 border-solid border-blue-500"

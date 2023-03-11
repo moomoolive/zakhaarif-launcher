@@ -42,7 +42,10 @@ export const main = async (args: MainScriptArguments) => {
         importUrls.push(resolved + entry)
     }
     const imports: {mod: ZakhaarifModEsModule, url: string}[] = await Promise.all(
-        importUrls.map(async (url) => ({mod: await import(url), url}))
+        importUrls.map(async (url) => ({
+            mod: await import(/* @vite-ignore */url), 
+            url
+        }))
     )
     console.info(`Found ${imports.length} imports`)
     

@@ -32,6 +32,7 @@ import {CargoRequestError, cargoErrorToText} from "../../lib/utils/errors/cargoE
 import { CACHED } from "../../lib/shabah/backend"
 import { useNavigate } from "react-router-dom"
 import { ADDONS_MODAL, ADDONS_VIEWING_CARGO } from "../../lib/utils/searchParameterKeys"
+import { GAME_EXTENSION_CARGO, LAUNCHER_CARGO } from "../../standardCargos"
 
 const toCargoIndex = (
     canonicalUrl: string,
@@ -165,8 +166,8 @@ export const Installer = ({
         const isUnsafe = hasUnsafePermissions(permissionsSummary)
         if (
             isUnsafe
-            && url !== import.meta.env.VITE_APP_LAUNCHER_CARGO_URL
-            && url !== import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL
+            && url !== LAUNCHER_CARGO.canonicalUrl
+            && url !== GAME_EXTENSION_CARGO.canonicalUrl
             && !localStorage.getItem(ALLOW_UNSAFE_PACKAGES)
         ) {
             logger.warn(`prevented unsafe add-on from being added. Url=${url}`)

@@ -22,6 +22,7 @@ import { MILLISECONDS_PER_SECOND } from "../lib/utils/consts/time"
 import { Paginator } from "../components/Paginator"
 import { useDebounce } from "../hooks/debounce"
 import { EXTENSION_CARGO_TAG } from "../config"
+import { GAME_EXTENSION_CARGO, LAUNCHER_CARGO } from "../standardCargos"
 
 const SEARCH_BAR_ID = "extensions-search-bar"
 
@@ -264,9 +265,9 @@ const ExtensionsListPage = (): JSX.Element => {
                                     to={((cargoIndex: ManifestIndex) => {
                                         const entry = cargoIndex.canonicalUrl
                                         switch (cargoIndex.canonicalUrl) {
-                                            case import.meta.env.VITE_APP_LAUNCHER_CARGO_URL:
+                                            case LAUNCHER_CARGO.canonicalUrl:
                                                 return "/"
-                                            case import.meta.env.VITE_APP_GAME_EXTENSION_CARGO_URL:
+                                            case GAME_EXTENSION_CARGO.canonicalUrl:
                                                 if (!gameSaveExists.current) {
                                                     return "/new-game"
                                                 }

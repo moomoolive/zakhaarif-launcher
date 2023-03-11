@@ -198,8 +198,7 @@ export class JsSandbox {
         if (reconfigured) {
             iframe.setAttribute("reconfigured-timestamp", Date.now().toString())
         }
-        const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
-        iframe.src = `${sandboxOrigin}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
+        iframe.src = `${import.meta.env.VITE_APP_SANDBOX_ORIGIN}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         
         window.clearInterval(this.extensionPingTimerId)
         const self = this

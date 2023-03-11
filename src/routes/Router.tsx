@@ -91,8 +91,7 @@ function PageDisplay(): JSX.Element {
             window.addEventListener("message", handler)
             sandbox.setAttribute("sandbox", "allow-scripts allow-same-origin")
             sandbox.allow = ""
-            const sandboxOrigin = import.meta.env.VITE_APP_SANDBOX_ORIGIN
-            sandbox.src = sandboxOrigin + "/"
+            sandbox.src = import.meta.env.VITE_APP_SANDBOX_ORIGIN + "/"
             sandbox.width = "0px"
             sandbox.height = "0px"
             document.body.appendChild(sandbox)

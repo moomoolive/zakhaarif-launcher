@@ -421,7 +421,10 @@ const AddOns = (): JSX.Element => {
                     const status = await downloadClient.executeUpdates(
                         [update],
                         title,
-                        {backgroundDownload: false}
+                        {
+                            backgroundDownload: false,
+                            allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+                        }
                     )
                     app.logger.info("new install status", status)                    
                     setCargoCount((previous) => previous + 1)
@@ -462,7 +465,10 @@ const AddOns = (): JSX.Element => {
                 const status = await downloadClient.executeUpdates(
                     [update],
                     title,
-                    {backgroundDownload: false}
+                    {
+                        backgroundDownload: false,
+                        allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+                    }
                 )
                 logger.info("update queue status", status)
                 const ok = !(status.data >= Shabah.ERROR_CODES_START)
@@ -484,6 +490,10 @@ const AddOns = (): JSX.Element => {
                     const retryResponse = await downloadClient.retryFailedDownloads(
                         [canonicalUrl],
                         title,
+                        {
+                            backgroundDownload: false,
+                            allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+                        }
                     )
                     const ok = retryResponse.data === Shabah.STATUS.updateRetryQueued
                     if (!ok) {

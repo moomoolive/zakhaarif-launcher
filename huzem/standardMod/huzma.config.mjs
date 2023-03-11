@@ -1,7 +1,7 @@
 // docs: https://github.com/moomoolive/huzma
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */
 export default {
-    buildDir: "public/huzem/standardMod",
+    buildDir: "dist/huzem/standardMod",
     huzmaName: "stable.huzma.json",
     ignore: [
         "build-manifest",
