@@ -1,0 +1,18 @@
+{
+  "name": "zakhaarif-huzem",
+  "private": true,
+  "scripts": {
+    "dev": "node ./devServer.mjs"
+  },
+  "dependencies": {
+    "alea": "^1.0.1",
+    "babylonjs": "^5.50.1",
+    "babylonjs-loaders": "^5.50.1",
+    "babylonjs-materials": "^5.50.1",
+    "simplex-noise": "^4.0.1"
+  },
+  "devDependencies": {
+    "huzma": "^0.5.5",
+    "vite": "^4.1.4"
+  }
+}

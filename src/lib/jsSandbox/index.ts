@@ -6,7 +6,6 @@ import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
 import type {ManifestIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
 import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
-//import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
 import { MILLISECONDS_PER_SECOND } from "../utils/consts/time"
 import { io } from "../monads/result"
 import { removeZipExtension } from "../utils/urls/removeZipExtension"
@@ -204,7 +203,7 @@ export class JsSandbox {
         }
         this.dependencies.logger.info(
             "opening extension", this.entry,
-            "with content-security policy of", contentSecurityPolicy
+            "\nwith content-security policy of", contentSecurityPolicy
         )
         iframe.src = `${import.meta.env.VITE_APP_SANDBOX_ORIGIN}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         

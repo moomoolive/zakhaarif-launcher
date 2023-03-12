@@ -19,5 +19,6 @@ export default defineConfig({
         target: "es2020"
     },
     server: {port: 7_888},
-    logLevel: "info"
+    logLevel: "info",
+    mode: "development"
 })

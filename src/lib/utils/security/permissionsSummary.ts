@@ -31,17 +31,17 @@ const permissionsSummary = (allowAll: boolean) => {
     return cleanedPermissions
 }
 
+const HTTP_WILDCARD = "*"
+
 export const isDangerousCspOrigin = (cspValue: string) => {
     if (
         !cspValue.startsWith("http://") 
         && !cspValue.startsWith("https://")
+        && !cspValue.startsWith("ws://")
     ) {
         return true
     }
-    if (cspValue.includes("*") || !cspValue.includes(".")) {
-        return true
-    }
-    return false
+    return cspValue.includes(HTTP_WILDCARD)
 }
 
 export type GeneralPermissions = {key: string, value: string[]}[]
@@ -104,10 +104,7 @@ export const hasUnsafePermissions = (summary: PermissionsSummary) => {
 
 const permissionCleaners = {
     webRequest: (value: string) => {
-        if (isDangerousCspOrigin(value)) {
-            return false
-        }
-        return isUrl(value)
+        return !isDangerousCspOrigin(value) && isUrl(value)
     },
     gameSaves: (value: string) => {
         switch (value) {

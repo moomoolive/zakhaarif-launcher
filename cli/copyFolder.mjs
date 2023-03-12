@@ -2,18 +2,17 @@
 import fs from "fs-extra"
 import commandLineArgs from "command-line-args"
 
-(async () => {
-    const {source = "", dest = ""} = commandLineArgs([
-        {name: "source", type: String},
-        {name: "dest", type: String}
-    ])
+const {source = "", dest = ""} = commandLineArgs([
+    {name: "source", type: String},
+    {name: "dest", type: String}
+])
 
-    if (!source || !dest) {
-        console.error(`source and dest option must be specified`)
-        return
-    }
-    
-    console.log("copying", source, "to", dest)
-    
-    await fs.copy(source, dest)
-})()
+if (!source || !dest) {
+    throw new Error(`source and dest option must be specified`)
+}
+
+console.info("📁 copying", source, "to", dest)
+
+await fs.copy(source, dest)
+
+console.info("✅ copied successfully!")

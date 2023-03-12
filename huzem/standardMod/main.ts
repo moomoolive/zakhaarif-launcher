@@ -40,8 +40,9 @@ import {
 import {VoxelColliders} from "./lib/physics/voxelColliders"
 
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
-const ROOT_URL = window.origin.includes("http://localhost") 
-    ? "http://localhost:5173"
+console.log("env", import.meta.env)
+const ROOT_URL = import.meta.env.DEV
+    ? "http://localhost:7888"
     : "https://preview.zakhaarif.com"
 
 export const main = async (canvas: HTMLCanvasElement) => {

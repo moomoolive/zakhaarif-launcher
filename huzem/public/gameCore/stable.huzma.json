@@ -1,9 +1,9 @@
 {
     "schema": 2,
-    "name": "Standard-mod",
+    "name": "Game-core",
     "version": "0.1.0", 
     "entry": "index.ts", 
-    "description": "The one mod to rule them all. No seriously, the game needs this mod to function as it provides all the game's core code.",
+    "description": "Starts game loop and injects any linked mods",
     "authors": [{"name":"Mostafa Elbannan"}],
     "license":"AGPL-3",
     "repo": {
@@ -12,11 +12,19 @@
     },
     "homepageUrl": "https://github.com/moomoolive/zakhaarif-launcher",
     "permissions": [
-        "unlimitedStorage",
-        {"key":"files","value":["read"]},
+        "fullScreen",
+        "pointerLock",
+        "allowInlineContent",
+        "allowUnsafeEval",
+        "allowDataUrls",
+        {"key": "gameSaves", "value": ["read", "write"]},
+        {"key": "embedExtensions", "value": ["allowAll"]},
         {
             "key":"webRequest",
-            "value":["http://localhost:7888/@vite/"]
+            "value":[
+                "http://localhost:7888/",
+                "ws://localhost:7888/"
+            ]
         }
     ]
 }

@@ -68,17 +68,6 @@ describe("filtering malicous csp values", () => {
             expect(isDangerousCspOrigin(c)).toBe(true)
         }
     })
-
-    it("values that do not have a dot in string will be rejected", () => {
-        const cases = [
-            "https://example",
-            "http://a-virus-site",
-            'https://let-gooooo'
-        ] as const
-        for (const c of cases) {
-            expect(isDangerousCspOrigin(c)).toBe(true)
-        }
-    })
 })
 
 describe("permissions summary generator", () => {

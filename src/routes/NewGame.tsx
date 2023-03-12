@@ -47,7 +47,7 @@ const NewGamePage = () => {
     }, [])
 
     const onSave = async () => {
-        if (!await confirm({title: "Are you sure you want to create a new game?"})) {
+        if (!await confirm({title: "Are you sure you want to create a new game?", confirmButtonColor: "success"})) {
             return
         }
         setLoading(true)

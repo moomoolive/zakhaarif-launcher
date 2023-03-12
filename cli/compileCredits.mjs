@@ -3,11 +3,15 @@ import fs from "fs/promises"
 
 const CREDITS_OUTPUT = "public/credits.compiled.json"
 
-console.log("building credits file...")
+console.info("building credits file...")
 
-const getNpm = async () => {
-    const packagejsonText = await fs.readFile(
-        "package.json",
+/**
+ * 
+ * @param {string} packageJsonPath 
+ * @returns {Promise<Array<{name: string, type: string, url: string}>>}
+ */
+const getNpm = async (packageJsonPath) => {
+    const packagejsonText = await fs.readFile(packageJsonPath,
         {encoding: "utf-8"}
     )
     
@@ -30,7 +34,7 @@ const getNpm = async () => {
         }
     })
     
-    console.log("found", npmDependencies.length, "npm dependencies")
+    console.info("found", npmDependencies.length, `npm dependencies @ ${packageJsonPath}`)
     return npmDependenciesWithLinks
 }
 
@@ -45,7 +49,8 @@ const getRuntimesUsed = () => {
 /** @type {Array<{name: string, type: string, url: string}>} */
 const allCredits = [
     ...getRuntimesUsed(),
-    ...(await getNpm())
+    ...(await getNpm("package.json")),
+    ...(await getNpm("huzem/package.json")),
 ]
 
 await fs.writeFile(CREDITS_OUTPUT, JSON.stringify(allCredits), {
