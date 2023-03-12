@@ -1,4 +1,4 @@
-name: "Tests & Linting"
+name: "CI"
 
 on:
   push:
@@ -18,6 +18,8 @@ jobs:
           cache: "npm"
       - name: build step
         run: npm i
+      - name: linting
+        run: npm run lint
       - name: type checking
         run: npm run type-check
       - name: testing

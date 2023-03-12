@@ -11,31 +11,31 @@ type AsyncState<T> = LoadedState<T> | LoadingState
 type SetAsyncStateAction<T> = [AsyncState<T>, (promise: Promise<T>) => void]
 
 export const useAsyncState = <T>(promise: Promise<T>): SetAsyncStateAction<T> => {    
-    const [loading, setLoading] = useState(true)
+	const [loading, setLoading] = useState(true)
 
-    const promiseRef = useRef(promise)
-    const {current: imperativeState} = useRef({
-        value: null as T | null,
-        setter(value: Promise<T>) {
-            setLoading(true)
-            promiseRef.current = value
-        }
-    })
+	const promiseRef = useRef(promise)
+	const {current: imperativeState} = useRef({
+		value: null as T | null,
+		setter(value: Promise<T>) {
+			setLoading(true)
+			promiseRef.current = value
+		}
+	})
 
-    useEffectAsync(async () => {
-        if (!loading) {
-            return
-        }
-        imperativeState.value = await promiseRef.current
-        setLoading(false)
-    }, [loading])
+	useEffectAsync(async () => {
+		if (!loading) {
+			return
+		}
+		imperativeState.value = await promiseRef.current
+		setLoading(false)
+	}, [loading])
 
-    if (loading) {
-        return [{loading, data: null}, imperativeState.setter]
-    }
+	if (loading) {
+		return [{loading, data: null}, imperativeState.setter]
+	}
 
-    return [
+	return [
         {loading, data: imperativeState.value} as LoadedState<T>, 
         imperativeState.setter
-    ]
+	]
 }

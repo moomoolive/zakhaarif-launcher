@@ -1,4 +1,3 @@
-// @ts-check
 import jimp from "jimp"
 import {writeFile} from "fs/promises"
 

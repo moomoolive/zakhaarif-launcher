@@ -59,9 +59,9 @@ export type BackgroundFetchRegistration = {
    matchAll: () => Promise<BackgroundFetchRecord[]>
    addEventListener: (
     eventName: "progress",
-    callback: (event: Event) => any
+    callback: (event: Event) => unknown
    ) => void
-   onprogress: (event: Event) => any
+   onprogress: (event: Event) => unknown
 }
 
 export type BackgroundFetchManager = {
@@ -75,7 +75,7 @@ export type BackgroundFetchManager = {
 }
 
 export type BackgroundFetchEvent = {
-    waitUntil: (promise: Promise<any>) => any
+    waitUntil: (promise: Promise<unknown>) => unknown
     readonly registration: BackgroundFetchRegistration
 }
 
@@ -100,9 +100,9 @@ export type BackgroundFetchEventMap = {
 }
 
 export type BackgroundFetchEventHandlerSetters = {
-    onbackgroundfetchsuccess: (event: BackgroundFetchUIEvent & Event) => any
-    onbackgroundfetchfail: (event: BackgroundFetchUIEvent & Event) => any
-    onbackgroundfetchabort: (event: BackgroundFetchEvent & Event) => any
-    onbackgroundfetchclick: (event: BackgroundFetchEvent & Event) => any
+    onbackgroundfetchsuccess: (event: BackgroundFetchUIEvent & Event) => unknown
+    onbackgroundfetchfail: (event: BackgroundFetchUIEvent & Event) => unknown
+    onbackgroundfetchabort: (event: BackgroundFetchEvent & Event) => unknown
+    onbackgroundfetchclick: (event: BackgroundFetchEvent & Event) => unknown
 }
 // background fetch types end

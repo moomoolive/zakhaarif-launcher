@@ -3,25 +3,25 @@ import {CargoIndexes} from "./CargoIndexes"
 import {GameSaves} from "./GameSaves"
 
 export class AppDatabase {
-    private db: Database
-    readonly gameSaves: GameSaves
-    readonly cargoIndexes: CargoIndexes
+	private db: Database
+	readonly gameSaves: GameSaves
+	readonly cargoIndexes: CargoIndexes
 
-    constructor() {
-        this.db = new Database()
-        this.gameSaves = new GameSaves(this.db)
-        this.cargoIndexes = new CargoIndexes(this.db)
-    }
+	constructor() {
+		this.db = new Database()
+		this.gameSaves = new GameSaves(this.db)
+		this.cargoIndexes = new CargoIndexes(this.db)
+	}
 
-    name(): string {
-        return DATABASE_NAME
-    }
+	name(): string {
+		return DATABASE_NAME
+	}
 
-    version(): number {
-        return CURRENT_VERSION
-    }
+	version(): number {
+		return CURRENT_VERSION
+	}
 
-    async clear() {
-        return this.db.delete()
-    }
+	async clear() {
+		return this.db.delete()
+	}
 }

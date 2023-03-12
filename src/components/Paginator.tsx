@@ -1,5 +1,5 @@
-import { ReactNode, useRef, useEffect } from "react"
-import { useAppContext } from "../routes/store"
+import {ReactNode, useRef, useEffect} from "react"
+import {useAppContext} from "../routes/store"
 
 export type PaginatorProps = {
     id: string
@@ -10,45 +10,45 @@ export type PaginatorProps = {
 }
 
 export const Paginator = ({
-    id,
-    children,
-    onPaginate,
-    threshold = [0.8],
-    className = ""
+	id,
+	children,
+	onPaginate,
+	threshold = [0.8],
+	className = ""
 }: PaginatorProps): JSX.Element => {
-    const {logger} = useAppContext()
+	const {logger} = useAppContext()
 
-    const paginatorObserver = useRef<IntersectionObserver | null>(null)
+	const paginatorObserver = useRef<IntersectionObserver | null>(null)
 
-    useEffect(() => {
-        if (paginatorObserver.current) {
-            return
-        }
-        const root = document.getElementById(id)
-        if (!root) {
-            logger.warn("observer couldn't find root element for id =", id)
-            return
-        }
-        const observer = new IntersectionObserver((entries) => {
-            for (const entry of entries) {
-                if (!entry.isIntersecting) {
-                    return
-                }
-                onPaginate()
-            }
-        }, {threshold})
-        observer.observe(root)
-        paginatorObserver.current = observer
-        return () => {
-            if (!paginatorObserver.current) {
-                return
-            }
-            paginatorObserver.current.disconnect()
-            paginatorObserver.current = null
-        }
-    }, [])
+	useEffect(() => {
+		if (paginatorObserver.current) {
+			return
+		}
+		const root = document.getElementById(id)
+		if (!root) {
+			logger.warn("observer couldn't find root element for id =", id)
+			return
+		}
+		const observer = new IntersectionObserver((entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) {
+					return
+				}
+				onPaginate()
+			}
+		}, {threshold})
+		observer.observe(root)
+		paginatorObserver.current = observer
+		return () => {
+			if (!paginatorObserver.current) {
+				return
+			}
+			paginatorObserver.current.disconnect()
+			paginatorObserver.current = null
+		}
+	}, [])
     
-    return <div id={id} className={className}>
-        {children}
-    </div>
+	return <div id={id} className={className}>
+		{children}
+	</div>
 }

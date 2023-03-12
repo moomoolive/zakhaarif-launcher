@@ -18,42 +18,42 @@ export const TERRAIN_MAX_Y = 1_024
 export const OCEAN_LEVEL = 61
 
 export class HeightMap {
-    height: number
-    width: number
-    data: number[]
-    high: number
+	height: number
+	width: number
+	data: number[]
+	high: number
     
-    constructor({
-        height, width, high, data
-    }: {
+	constructor({
+		height, width, high, data
+	}: {
         height: number,
         width: number,
         high: number,
         data: number[],
     }) {
-        this.height = height
-        this.width = width
-        this.data = data
-        this.high = high
-    }
+		this.height = height
+		this.width = width
+		this.data = data
+		this.high = high
+	}
 
-    getHeight(x: number, y: number) {
-        return this.data[this.height * y + x]
-    }
+	getHeight(x: number, y: number) {
+		return this.data[this.height * y + x]
+	}
 
-    getHeightPercent(x: number, y: number) {
-        return this.getHeight(x, y) / this.high
-    }
+	getHeightPercent(x: number, y: number) {
+		return this.getHeight(x, y) / this.high
+	}
 
-    uniqueDataPoints() {
-        return this.height * this.width
-    }
+	uniqueDataPoints() {
+		return this.height * this.width
+	}
 
-    toJSON() {
-        const {height, high, width} = this
-        const uniqueDataPoints = this.uniqueDataPoints()
-        return JSON.stringify({height, high, width, uniqueDataPoints})
-    }
+	toJSON() {
+		const {height, high, width} = this
+		const uniqueDataPoints = this.uniqueDataPoints()
+		return JSON.stringify({height, high, width, uniqueDataPoints})
+	}
 }
 
 const beachLevel = OCEAN_LEVEL + 4
@@ -61,22 +61,22 @@ const snowLevel = ~~(TERRAIN_MAX_Y * 0.5)
 const mountainLevel = ~~(TERRAIN_MAX_Y * 0.25)
 
 export const biome = (x: number, z: number, elevation: number) => {
-    const moisture = moistureNoise(x, z)
-    if (elevation < beachLevel) {
-        return voxel_consts.sand
-    } else if (elevation > snowLevel) {
-        if ((moisture * elevation) ** 2.5 > 40) {
-            return voxel_consts.snow
-        } else {
-            return voxel_consts.stone
-        }
-    } else if (elevation > mountainLevel) {
-        if (moisture < 0.1) {
-            return voxel_consts.stone
-        } else {
-            return voxel_consts.stone
-        }
-    } else {
-        return voxel_consts.sand
-    }
+	const moisture = moistureNoise(x, z)
+	if (elevation < beachLevel) {
+		return voxel_consts.sand
+	} else if (elevation > snowLevel) {
+		if ((moisture * elevation) ** 2.5 > 40) {
+			return voxel_consts.snow
+		} else {
+			return voxel_consts.stone
+		}
+	} else if (elevation > mountainLevel) {
+		if (moisture < 0.1) {
+			return voxel_consts.stone
+		} else {
+			return voxel_consts.stone
+		}
+	} else {
+		return voxel_consts.sand
+	}
 }

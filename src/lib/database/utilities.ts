@@ -1,4 +1,4 @@
-import { FilterOrder } from "../../components/FilterChevron"
+import {FilterOrder} from "../../components/FilterChevron"
 
 export type Timestamps = {
     created: number
@@ -24,10 +24,10 @@ export type QueryParams<T extends string = string> = {
 }
 
 export function createMetadataModifiers<
-    Document extends Object
+    Document extends object
 >(): DatabaseMetadataModifiers<Document> {
-    return {
-        createTimestamps: (value) =>  ({...value, created: Date.now(), updated: Date.now()}),
-        updateTimeStamps: (value) => ({...value, updated: Date.now()})
-    }
+	return {
+		createTimestamps: (value) =>  ({...value, created: Date.now(), updated: Date.now()}),
+		updateTimeStamps: (value) => ({...value, updated: Date.now()})
+	}
 }

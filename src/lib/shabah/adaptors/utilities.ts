@@ -1,4 +1,4 @@
-import type { DownloadManager, FetchFunction, FileCache } from "../backend"
+import type {DownloadManager, FetchFunction, FileCache} from "../backend"
 
 export type DownloadClientAdaptors = {
     fileCache: FileCache,

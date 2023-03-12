@@ -13,28 +13,28 @@ export type CargoRequestError = (
 )
 
 export const cargoErrorToText = (error: CargoRequestError) => {
-    switch (error) {
-        case "manifest-already-exists":
-            return "Add-on already exists"
-        case "invalid-manifest-url":
-            return "Invalid Add-on url"
-        case "insufficent-storage":
-            return "Insufficent disk space"
-        case "invalid-encoding":
-            return "Add-on is encoded incorrectly"
-        case "invalid-resource-detected":
-            return "Add-on has unreachable files"
-        case "network-error":
-            return "Server could not provide Add-on"
-        case "not-found":
-            return "Add-on does not exist"
-        case "malformed-url":
-            return "Invalid url"
-        case "analyzing":
-            return "Loading..."
-        case "catch-all-error":
-            return "Couldn't get Add-on"
-        default:
-            return ""
-    }
+	switch (error) {
+	case "manifest-already-exists":
+		return "Add-on already exists"
+	case "invalid-manifest-url":
+		return "Invalid Add-on url"
+	case "insufficent-storage":
+		return "Insufficent disk space"
+	case "invalid-encoding":
+		return "Add-on is encoded incorrectly"
+	case "invalid-resource-detected":
+		return "Add-on has unreachable files"
+	case "network-error":
+		return "Server could not provide Add-on"
+	case "not-found":
+		return "Add-on does not exist"
+	case "malformed-url":
+		return "Invalid url"
+	case "analyzing":
+		return "Loading..."
+	case "catch-all-error":
+		return "Couldn't get Add-on"
+	default:
+		return ""
+	}
 }

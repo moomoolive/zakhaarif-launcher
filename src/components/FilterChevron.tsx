@@ -16,24 +16,24 @@ export type FilterChevronProps = {
 }
 
 export const FilterChevron = ({
-    currentFilter, 
-    targetFilter,
-    order,
-    className = ""
+	currentFilter, 
+	targetFilter,
+	order,
+	className = ""
 }: FilterChevronProps) => {
-    if (currentFilter !== targetFilter) {
-        return <></>
-    } else if (order === DESCENDING_ORDER) {
-        return <span className={className}>
-            <FontAwesomeIcon 
-                icon={faChevronUp}
-            />
-        </span>
-    } else {
-        return <span className={className}>
-            <FontAwesomeIcon 
-                icon={faChevronDown}
-            />
-        </span>
-    }
+	if (currentFilter !== targetFilter) {
+		return <></>
+	} else if (order === DESCENDING_ORDER) {
+		return <span className={className}>
+			<FontAwesomeIcon 
+				icon={faChevronUp}
+			/>
+		</span>
+	} else {
+		return <span className={className}>
+			<FontAwesomeIcon 
+				icon={faChevronDown}
+			/>
+		</span>
+	}
 }

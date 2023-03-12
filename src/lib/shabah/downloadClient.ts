@@ -1,32 +1,32 @@
 import {
-    checkForUpdates,
-    createResourceMap,
-    ERROR_CODES_START,
-    StatusCode,
-    STATUS_CODES,
+	checkForUpdates,
+	createResourceMap,
+	ERROR_CODES_START,
+	StatusCode,
+	STATUS_CODES,
 } from "./client"
 import {io, Ok} from "../monads/result"
 import {
-    ManifestIndexWithoutMeta,
-    headers,
-    FetchFunction,
-    FileCache,
-    DownloadManager,
-    DownloadState,
-    getErrorDownloadIndex,
-    rootDocumentFallBackUrl,
-    DownloadIndex,
-    NO_UPDATE_QUEUED,
-    DownloadSegment,
-    removeSlashAtEnd,
-    CACHED,
-    UPDATING,
-    ABORTED,
-    FAILED,
-    ClientMessageChannel,
-    DownloadClientManifestIndexStorage,
-    ManifestIndex,
-    BackendMessageChannel
+	ManifestIndexWithoutMeta,
+	headers,
+	FetchFunction,
+	FileCache,
+	DownloadManager,
+	DownloadState,
+	getErrorDownloadIndex,
+	rootDocumentFallBackUrl,
+	DownloadIndex,
+	NO_UPDATE_QUEUED,
+	DownloadSegment,
+	removeSlashAtEnd,
+	CACHED,
+	UPDATING,
+	ABORTED,
+	FAILED,
+	ClientMessageChannel,
+	DownloadClientManifestIndexStorage,
+	ManifestIndex,
+	BackendMessageChannel
 } from "./backend"
 import {serviceWorkerPolicies} from "./serviceWorkerMeta"
 import {BYTES_PER_MB} from "../utils/consts/storage"
@@ -34,13 +34,13 @@ import {NULL_FIELD, HuzmaManifest} from "huzma"
 import {resultJsonParse} from "../monads/utils/jsonParse"
 import {GeneralPermissions} from "../utils/security/permissionsSummary"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
-import { NO_INSTALLATION } from "./utility"
+import {NO_INSTALLATION} from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
-import { nanoid } from "nanoid"
-import { getFileNameFromUrl } from "../utils/urls/getFilenameFromUrl"
+import {nanoid} from "nanoid"
+import {getFileNameFromUrl} from "../utils/urls/getFilenameFromUrl"
 import {stringBytes} from "../utils/stringBytes"
-import { BackgroundFetchRecord } from "../types/serviceWorkers"
-import { installCore, InstallEventName } from "./serviceWorker/installCore"
+import {BackgroundFetchRecord} from "../types/serviceWorkers"
+import {installCore, InstallEventName} from "./serviceWorker/installCore"
 
 export type {ManifestIndex, ManifestState} from "./backend"
 
@@ -83,735 +83,735 @@ export type ShabahConfig = {
 }
 
 export class Shabah {
-    static readonly NO_PREVIOUS_INSTALLATION = NO_INSTALLATION
-    static readonly POLICIES = serviceWorkerPolicies
-    static readonly STATUS = STATUS_CODES
-    static readonly ERROR_CODES_START = ERROR_CODES_START
+	static readonly NO_PREVIOUS_INSTALLATION = NO_INSTALLATION
+	static readonly POLICIES = serviceWorkerPolicies
+	static readonly STATUS = STATUS_CODES
+	static readonly ERROR_CODES_START = ERROR_CODES_START
 
-    readonly origin: string
+	readonly origin: string
 
-    private networkRequest: FetchFunction
-    private fileCache: FileCache
-    private virtualFileCache: FileCache
-    private downloadManager: DownloadManager
-    private clientMessageChannel: ClientMessageChannel
-    private backendMessageChannel: BackendMessageChannel
-    private indexStorage: DownloadClientManifestIndexStorage
-    private permissionsCleaner: null | (
+	private networkRequest: FetchFunction
+	private fileCache: FileCache
+	private virtualFileCache: FileCache
+	private downloadManager: DownloadManager
+	private clientMessageChannel: ClientMessageChannel
+	private backendMessageChannel: BackendMessageChannel
+	private indexStorage: DownloadClientManifestIndexStorage
+	private permissionsCleaner: null | (
         (permissions: GeneralPermissions) => GeneralPermissions
     )
 
-    constructor({
-        adaptors, 
-        origin, 
-        permissionsCleaner,
-        clientMessageChannel,
-        indexStorage,
-        backendMessageChannel
-    }: ShabahConfig) {
-        if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
-            throw new Error("origin of download client must be full url, starting with https:// or http://")
-        }
-        const {
-            networkRequest, fileCache, 
-            downloadManager, virtualFileCache
-        } = adaptors
-        this.permissionsCleaner = permissionsCleaner || null
-        this.clientMessageChannel = clientMessageChannel
-        this.indexStorage = indexStorage
-        this.networkRequest = networkRequest
-        this.fileCache = fileCache
-        this.virtualFileCache = virtualFileCache
-        this.downloadManager = downloadManager
-        this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
-        this.backendMessageChannel = backendMessageChannel
-    }
+	constructor({
+		adaptors, 
+		origin, 
+		permissionsCleaner,
+		clientMessageChannel,
+		indexStorage,
+		backendMessageChannel
+	}: ShabahConfig) {
+		if (!origin.startsWith("https://") && !origin.startsWith("http://")) {
+			throw new Error("origin of download client must be full url, starting with https:// or http://")
+		}
+		const {
+			networkRequest, fileCache, 
+			downloadManager, virtualFileCache
+		} = adaptors
+		this.permissionsCleaner = permissionsCleaner || null
+		this.clientMessageChannel = clientMessageChannel
+		this.indexStorage = indexStorage
+		this.networkRequest = networkRequest
+		this.fileCache = fileCache
+		this.virtualFileCache = virtualFileCache
+		this.downloadManager = downloadManager
+		this.origin = origin.endsWith("/") ? origin.slice(0, -1) : origin
+		this.backendMessageChannel = backendMessageChannel
+	}
 
-    async diskInfo() {
-        const [diskusage, downloadIndices] = await Promise.all([
-            this.fileCache.queryUsage(),
-            this.backendMessageChannel.getAllMessages()
-        ] as const)
-        const currentDownloadBytes = downloadIndices.reduce(
-            (total, next) => total + next.bytes,
-            0
-        )
-        const used = diskusage.usage + currentDownloadBytes
-        const total = Math.max(
-            diskusage.quota - SYSTEM_RESERVED_BYTES,
-            0
-        )
-        const left = total - used
-        return {used, total, left}
-    }
+	async diskInfo() {
+		const [diskusage, downloadIndices] = await Promise.all([
+			this.fileCache.queryUsage(),
+			this.backendMessageChannel.getAllMessages()
+		] as const)
+		const currentDownloadBytes = downloadIndices.reduce(
+			(total, next) => total + next.bytes,
+			0
+		)
+		const used = diskusage.usage + currentDownloadBytes
+		const total = Math.max(
+			diskusage.quota - SYSTEM_RESERVED_BYTES,
+			0
+		)
+		const left = total - used
+		return {used, total, left}
+	}
 
-    async checkForUpdates(cargo: {
+	async checkForUpdates(cargo: {
         canonicalUrl: string
         tag: number
     }): Promise<UpdateCheckResponse> {
-        const cargoIndex = await this.getCargoIndexByCanonicalUrl(
-            cargo.canonicalUrl
-        )
-        const oldResolvedUrl = cargoIndex?.resolvedUrl || ""
-        const oldManifestName = cargoIndex?.manifestName || ""
-        const response = await checkForUpdates({
-            canonicalUrl: cargo.canonicalUrl,
-            oldResolvedUrl,
-            oldManifestName
-        }, this.networkRequest, this.fileCache)
+		const cargoIndex = await this.getCargoIndexByCanonicalUrl(
+			cargo.canonicalUrl
+		)
+		const oldResolvedUrl = cargoIndex?.resolvedUrl || ""
+		const oldManifestName = cargoIndex?.manifestName || ""
+		const response = await checkForUpdates({
+			canonicalUrl: cargo.canonicalUrl,
+			oldResolvedUrl,
+			oldManifestName
+		}, this.networkRequest, this.fileCache)
         
-        if (response.newCargo && this.permissionsCleaner) {
-            const permissions = response.newCargo.parsed.permissions
-            response.newCargo.parsed.permissions = this.permissionsCleaner(permissions)
-        }
+		if (response.newCargo && this.permissionsCleaner) {
+			const permissions = response.newCargo.parsed.permissions
+			response.newCargo.parsed.permissions = this.permissionsCleaner(permissions)
+		}
 
-        return new UpdateCheckResponse({
-            status: response.code,
-            tag: cargo.tag,
-            originalResolvedUrl: oldResolvedUrl,
-            resolvedUrl: response.newCargo?.resolvedUrl || "",
-            canonicalUrl: cargo.canonicalUrl,
-            errors: response.errors,
-            newCargo: response.newCargo?.parsed || null,
-            originalNewCargoResponse: response.newCargo?.response || new Response(),
-            previousCargo: response.previousCargo || null,
-            downloadableResources: response.downloadableResources,
-            resourcesToDelete: response.resoucesToDelete,
-            diskInfo: await this.diskInfo(),
-            manifestName: response.manifestName,
-            oldManifestName
-        })
-    }
+		return new UpdateCheckResponse({
+			status: response.code,
+			tag: cargo.tag,
+			originalResolvedUrl: oldResolvedUrl,
+			resolvedUrl: response.newCargo?.resolvedUrl || "",
+			canonicalUrl: cargo.canonicalUrl,
+			errors: response.errors,
+			newCargo: response.newCargo?.parsed || null,
+			originalNewCargoResponse: response.newCargo?.response || new Response(),
+			previousCargo: response.previousCargo || null,
+			downloadableResources: response.downloadableResources,
+			resourcesToDelete: response.resoucesToDelete,
+			diskInfo: await this.diskInfo(),
+			manifestName: response.manifestName,
+			oldManifestName
+		})
+	}
 
-    async executeUpdates(
-        updates: UpdateCheckResponse[],
-        title: string,
-        {
-            backgroundDownload = true,
-            allowAssetCache = true
-        }: Partial<DownloadParams> = {}
-    ): Promise<Ok<StatusCode>> {
-        if (updates.length < 1) {
-            return io.ok(STATUS_CODES.zeroUpdatesProvided)
-        }
+	async executeUpdates(
+		updates: UpdateCheckResponse[],
+		title: string,
+		{
+			backgroundDownload = true,
+			allowAssetCache = true
+		}: Partial<DownloadParams> = {}
+	): Promise<Ok<StatusCode>> {
+		if (updates.length < 1) {
+			return io.ok(STATUS_CODES.zeroUpdatesProvided)
+		}
 
-        for (const update of updates) {
-            if (update.errorOccurred()) {
-                return io.ok(STATUS_CODES.updateImpossible)
-            }
-            if (!update.updateAvailable()) {
-                return io.ok(STATUS_CODES.updateNotAvailable)
-            } 
-            if (!update.enoughStorageForCargo()) {
-                return io.ok(STATUS_CODES.insufficentDiskSpace)
-            }
+		for (const update of updates) {
+			if (update.errorOccurred()) {
+				return io.ok(STATUS_CODES.updateImpossible)
+			}
+			if (!update.updateAvailable()) {
+				return io.ok(STATUS_CODES.updateNotAvailable)
+			} 
+			if (!update.enoughStorageForCargo()) {
+				return io.ok(STATUS_CODES.insufficentDiskSpace)
+			}
     
-            const downloadIndex = await this.getDownloadIndexByCanonicalUrl(
-                update.canonicalUrl
-            )
-            const updateInProgress = !!downloadIndex
-            if (updateInProgress) {
-                return io.ok(STATUS_CODES.updateAlreadyQueued)
-            }
+			const downloadIndex = await this.getDownloadIndexByCanonicalUrl(
+				update.canonicalUrl
+			)
+			const updateInProgress = !!downloadIndex
+			if (updateInProgress) {
+				return io.ok(STATUS_CODES.updateAlreadyQueued)
+			}
     
-            // in case there is a mismatch between the underlying
-            // download manager and the download client
-            // check that the download manager also doesn't
-            // have the same update queued
-            const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
-                update.canonicalUrl
-            )
-            const updateQueued = updateCargoIndex?.downloadId !== NO_UPDATE_QUEUED
-            if (!updateCargoIndex || !updateQueued) {
-                continue
-            }
+			// in case there is a mismatch between the underlying
+			// download manager and the download client
+			// check that the download manager also doesn't
+			// have the same update queued
+			const updateCargoIndex = await this.getCargoIndexByCanonicalUrl(
+				update.canonicalUrl
+			)
+			const updateQueued = updateCargoIndex?.downloadId !== NO_UPDATE_QUEUED
+			if (!updateCargoIndex || !updateQueued) {
+				continue
+			}
 
-            const downloadManagerResponse = await io.wrap(
-                this.downloadManager.getDownloadState(updateCargoIndex.downloadId)
-            )
-            if (
-                downloadManagerResponse.ok 
+			const downloadManagerResponse = await io.wrap(
+				this.downloadManager.getDownloadState(updateCargoIndex.downloadId)
+			)
+			if (
+				downloadManagerResponse.ok 
                 && !!downloadManagerResponse.data
-            ) {
-                return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
-            }
-        }        
+			) {
+				return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+			}
+		}        
         
-        let byteCount = 0
-        const filesToRequest: string[] = []
-        const filesToDelete: string[] = []
-        for (const update of updates) {
-            byteCount += update.downloadMetadata().bytesToDownload
+		let byteCount = 0
+		const filesToRequest: string[] = []
+		const filesToDelete: string[] = []
+		for (const update of updates) {
+			byteCount += update.downloadMetadata().bytesToDownload
             
-            const metadata = update.downloadMetadata()
-            const removeFiles = metadata.resourcesToDelete.map(
-                (file) => file.storageUrl
-            )
-            filesToDelete.push(...removeFiles)
-            const addFiles = metadata.downloadableResources.map(
-                (file) => file.requestUrl
-            )
-            filesToRequest.push(...addFiles)
-        }
+			const metadata = update.downloadMetadata()
+			const removeFiles = metadata.resourcesToDelete.map(
+				(file) => file.storageUrl
+			)
+			filesToDelete.push(...removeFiles)
+			const addFiles = metadata.downloadableResources.map(
+				(file) => file.requestUrl
+			)
+			filesToRequest.push(...addFiles)
+		}
 
-        const resourcesToRequest = filesToRequest.length > 0
-        const downloadQueueId = resourcesToRequest 
-            ? provisionDownloadId() 
-            : NO_UPDATE_QUEUED
-        const downloadIndex: DownloadIndex = {
-            id: downloadQueueId,
-            previousId: "",
-            bytes: byteCount,
-            segments: [] as DownloadSegment[],
-            title,
-            startedAt: Date.now()
-        }
-        const promises: Promise<unknown>[] = []
-        for (const update of updates) {
-            const manifestName = update.resolvedUrl + update.manifestName
-            promises.push(this.fileCache.putFile(
-                manifestName,
-                new Response(JSON.stringify(update.newCargo), {
-                    status: 200,
-                    statusText: "OK",
-                    headers: headers(
-                        "application/json",
-                        stringBytes(await update.originalNewCargoResponse.text())
-                    )
-                })
-            ))
+		const resourcesToRequest = filesToRequest.length > 0
+		const downloadQueueId = resourcesToRequest 
+			? provisionDownloadId() 
+			: NO_UPDATE_QUEUED
+		const downloadIndex: DownloadIndex = {
+			id: downloadQueueId,
+			previousId: "",
+			bytes: byteCount,
+			segments: [] as DownloadSegment[],
+			title,
+			startedAt: Date.now()
+		}
+		const promises: Promise<unknown>[] = []
+		for (const update of updates) {
+			const manifestName = update.resolvedUrl + update.manifestName
+			promises.push(this.fileCache.putFile(
+				manifestName,
+				new Response(JSON.stringify(update.newCargo), {
+					status: 200,
+					statusText: "OK",
+					headers: headers(
+						"application/json",
+						stringBytes(await update.originalNewCargoResponse.text())
+					)
+				})
+			))
 
-            if (
-                update.oldManifestName.length > 0 
+			if (
+				update.oldManifestName.length > 0 
                 && update.oldManifestName !== update.manifestName
-            ) {
-                filesToDelete.push(`${update.originalResolvedUrl}/${update.oldManifestName}`)
-            }
+			) {
+				filesToDelete.push(`${update.originalResolvedUrl}/${update.oldManifestName}`)
+			}
             
-            promises.push(this.putCargoIndex({
-                name: update.newCargo?.name || "none",
-                tag: update.tag,
-                state: !resourcesToRequest || !backgroundDownload 
-                    ? CACHED 
-                    : UPDATING,
-                permissions: update.newCargo?.permissions || [],
-                version: update.versions().new,
-                entry: update.newCargo?.entry === NULL_FIELD
-                    ? NULL_FIELD
-                    : update.newCargo?.entry || NULL_FIELD,
-                bytes: update.downloadMetadata().cargoTotalBytes,
-                resolvedUrl: update.resolvedUrl,
-                canonicalUrl: update.canonicalUrl,
-                logo: update.newCargo?.crateLogoUrl || "",
-                downloadId: downloadQueueId,
-                manifestName: update.manifestName
-            }))
+			promises.push(this.putCargoIndex({
+				name: update.newCargo?.name || "none",
+				tag: update.tag,
+				state: !resourcesToRequest || !backgroundDownload 
+					? CACHED 
+					: UPDATING,
+				permissions: update.newCargo?.permissions || [],
+				version: update.versions().new,
+				entry: update.newCargo?.entry === NULL_FIELD
+					? NULL_FIELD
+					: update.newCargo?.entry || NULL_FIELD,
+				bytes: update.downloadMetadata().cargoTotalBytes,
+				resolvedUrl: update.resolvedUrl,
+				canonicalUrl: update.canonicalUrl,
+				logo: update.newCargo?.crateLogoUrl || "",
+				downloadId: downloadQueueId,
+				manifestName: update.manifestName
+			}))
 
-            if (downloadQueueId === NO_UPDATE_QUEUED) {
-                continue
-            }
+			if (downloadQueueId === NO_UPDATE_QUEUED) {
+				continue
+			}
 
-            downloadIndex.segments.push({
-                name: update.newCargo?.name || "",
-                map: createResourceMap(update.downloadableResources),
-                version: update.versions().new,
-                previousVersion: update.versions().old,
-                resolvedUrl: update.resolvedUrl,
-                canonicalUrl: update.canonicalUrl,
-                bytes: update.downloadMetadata().bytesToDownload,
-                resourcesToDelete: filesToDelete,
-                downloadedResources: [],
-                canRevertToPreviousVersion: false,
-            })
-        }
+			downloadIndex.segments.push({
+				name: update.newCargo?.name || "",
+				map: createResourceMap(update.downloadableResources),
+				version: update.versions().new,
+				previousVersion: update.versions().old,
+				resolvedUrl: update.resolvedUrl,
+				canonicalUrl: update.canonicalUrl,
+				bytes: update.downloadMetadata().bytesToDownload,
+				resourcesToDelete: filesToDelete,
+				downloadedResources: [],
+				canRevertToPreviousVersion: false,
+			})
+		}
 
-        for (const url of filesToDelete) {
-            promises.push(this.fileCache.deleteFile(url))
-        }
+		for (const url of filesToDelete) {
+			promises.push(this.fileCache.deleteFile(url))
+		}
 
-        await Promise.all(promises)
+		await Promise.all(promises)
 
-        if (!resourcesToRequest) {
-            return io.ok(STATUS_CODES.noDownloadbleResources)
-        }
+		if (!resourcesToRequest) {
+			return io.ok(STATUS_CODES.noDownloadbleResources)
+		}
 
-        const downloadResponse = await this.startDownload({
-            params: {
-                backgroundDownload,
-                allowAssetCache
-            },
-            filesToRequest,
-            downloadIndex,
-            downloadQueueId,
-            title
-        })
+		const downloadResponse = await this.startDownload({
+			params: {
+				backgroundDownload,
+				allowAssetCache
+			},
+			filesToRequest,
+			downloadIndex,
+			downloadQueueId,
+			title
+		})
 
-        return io.ok(downloadResponse)
-    }
+		return io.ok(downloadResponse)
+	}
 
-    private async startDownload(config: DownloadConfig): Promise<StatusCode> {
-        const {
-            filesToRequest, downloadQueueId,
-            title, params,
-            downloadIndex
-        } = config
+	private async startDownload(config: DownloadConfig): Promise<StatusCode> {
+		const {
+			filesToRequest, downloadQueueId,
+			title, params,
+			downloadIndex
+		} = config
         
-        const {backgroundDownload, allowAssetCache} = params
+		const {backgroundDownload, allowAssetCache} = params
 
-        if (!allowAssetCache) {
-            return STATUS_CODES.assetCacheDisallowed
-        }
+		if (!allowAssetCache) {
+			return STATUS_CODES.assetCacheDisallowed
+		}
 
-        if (backgroundDownload) {
-            await this.putDownloadIndex(downloadIndex)
-            await this.downloadManager.queueDownload(
-                downloadQueueId,
-                filesToRequest,
-                {
-                    title,
-                    downloadTotal: downloadIndex.bytes 
-                }
-            )
-            return STATUS_CODES.updateQueued
-        }
+		if (backgroundDownload) {
+			await this.putDownloadIndex(downloadIndex)
+			await this.downloadManager.queueDownload(
+				downloadQueueId,
+				filesToRequest,
+				{
+					title,
+					downloadTotal: downloadIndex.bytes 
+				}
+			)
+			return STATUS_CODES.updateQueued
+		}
 
-        const {networkRequest} = this
-        const responses = await Promise.all(filesToRequest.map(async (url) => {
-            const request = new Request(url)
-            const response = await io.retry(
-                () => networkRequest(request, {method: "GET"}),
-                2
-            )
-            const record: BackgroundFetchRecord = {
-                request,
-                responseReady: response.ok
-                    ? Promise.resolve(response.data)
-                    : Promise.resolve(Response.error())
-            }
-            return {record, success: response.ok && response.data.ok}
-        }))
+		const {networkRequest} = this
+		const responses = await Promise.all(filesToRequest.map(async (url) => {
+			const request = new Request(url)
+			const response = await io.retry(
+				() => networkRequest(request, {method: "GET"}),
+				2
+			)
+			const record: BackgroundFetchRecord = {
+				request,
+				responseReady: response.ok
+					? Promise.resolve(response.data)
+					: Promise.resolve(Response.error())
+			}
+			return {record, success: response.ok && response.data.ok}
+		}))
 
-        const requestFailed = responses.some((response) => !response.success)
+		const requestFailed = responses.some((response) => !response.success)
 
-        const eventType: InstallEventName = requestFailed ? "fail" : "success"
-        const eventName = `[🐶 live-fetch ${eventType}]`
+		const eventType: InstallEventName = requestFailed ? "fail" : "success"
+		const eventName = `[🐶 live-fetch ${eventType}]`
 
-        await installCore({
-            downloadIndex,
-            log: () => {},
-            fetchedResources: responses.map(({record}) => record),
-            fileCache: this.fileCache,
-            virtualFileCache: this.virtualFileCache,
-            eventName,
-            downloadQueueId: provisionDownloadId(),
-            eventType,
-            origin: this.origin
-        })
+		await installCore({
+			downloadIndex,
+			log: () => {},
+			fetchedResources: responses.map(({record}) => record),
+			fileCache: this.fileCache,
+			virtualFileCache: this.virtualFileCache,
+			eventName,
+			downloadQueueId: provisionDownloadId(),
+			eventType,
+			origin: this.origin
+		})
 
-        return requestFailed ? STATUS_CODES.liveFetchFailed : STATUS_CODES.ok
-    }
+		return requestFailed ? STATUS_CODES.liveFetchFailed : STATUS_CODES.ok
+	}
 
-    async retryFailedDownloads(
-        canonicalUrls: string[],
-        title: string,
-        {
-            backgroundDownload = true,
-            allowAssetCache = true
-        }: Partial<DownloadParams> = {}
-    ): Promise<Ok<StatusCode>> {
-        if (canonicalUrls.length < 1) {
-            return io.ok(STATUS_CODES.zeroUpdatesProvided)
-        }
+	async retryFailedDownloads(
+		canonicalUrls: string[],
+		title: string,
+		{
+			backgroundDownload = true,
+			allowAssetCache = true
+		}: Partial<DownloadParams> = {}
+	): Promise<Ok<StatusCode>> {
+		if (canonicalUrls.length < 1) {
+			return io.ok(STATUS_CODES.zeroUpdatesProvided)
+		}
 
-        const errorReports = []
-        for (const canonicalUrl of canonicalUrls) {
-            const cargoMeta = await this.getCargoIndexByCanonicalUrl(
-                canonicalUrl
-            )
-            if (!cargoMeta) {
-                return io.ok(STATUS_CODES.remoteResourceNotFound)
-            }
-            const {state} = cargoMeta
-            if (state !== ABORTED && state !== FAILED) {
-                return io.ok(STATUS_CODES.updateRetryImpossible)
-            }
-            const {resolvedUrl} = cargoMeta
-            const errDownloadIndexRes = await getErrorDownloadIndex(
-                resolvedUrl, this.virtualFileCache
-            )
-            if (!errDownloadIndexRes) {
-                return io.ok(STATUS_CODES.errorIndexNotFound)
-            }
-            const prevUpdateIndex = await this.getDownloadIndexByCanonicalUrl(
-                cargoMeta.canonicalUrl
-            )
-            const updateInProgress = !!prevUpdateIndex
-            if (updateInProgress) {
-                return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
-            }
+		const errorReports = []
+		for (const canonicalUrl of canonicalUrls) {
+			const cargoMeta = await this.getCargoIndexByCanonicalUrl(
+				canonicalUrl
+			)
+			if (!cargoMeta) {
+				return io.ok(STATUS_CODES.remoteResourceNotFound)
+			}
+			const {state} = cargoMeta
+			if (state !== ABORTED && state !== FAILED) {
+				return io.ok(STATUS_CODES.updateRetryImpossible)
+			}
+			const {resolvedUrl} = cargoMeta
+			const errDownloadIndexRes = await getErrorDownloadIndex(
+				resolvedUrl, this.virtualFileCache
+			)
+			if (!errDownloadIndexRes) {
+				return io.ok(STATUS_CODES.errorIndexNotFound)
+			}
+			const prevUpdateIndex = await this.getDownloadIndexByCanonicalUrl(
+				cargoMeta.canonicalUrl
+			)
+			const updateInProgress = !!prevUpdateIndex
+			if (updateInProgress) {
+				return io.ok(STATUS_CODES.downloadManagerUnsyncedState)
+			}
     
-            const errorReport = errDownloadIndexRes
-            const {index: errDownloadIndex} = errorReport
-            if (errDownloadIndex.segments.length < 1) {
-                return io.ok(STATUS_CODES.noSegmentsFound)
-            }
-            if (errDownloadIndex.segments.length > 1) {
-                return io.ok(STATUS_CODES.invalidErrorDownloadIndex)
-            }
-            errorReports.push({errorReport, cargoMeta})
-        }
+			const errorReport = errDownloadIndexRes
+			const {index: errDownloadIndex} = errorReport
+			if (errDownloadIndex.segments.length < 1) {
+				return io.ok(STATUS_CODES.noSegmentsFound)
+			}
+			if (errDownloadIndex.segments.length > 1) {
+				return io.ok(STATUS_CODES.invalidErrorDownloadIndex)
+			}
+			errorReports.push({errorReport, cargoMeta})
+		}
 
-        //const downloadsIndex = await this.getDownloadIndices()
-        const removeFileUrls = []
-        const requestFileUrls = []
-        const downloadQueueId = provisionDownloadId()
-        const retryDownloadIndex: DownloadIndex = {
-            id: downloadQueueId,
-            previousId: "",
-            bytes: 0,
-            segments: [] as DownloadSegment[],
-            title,
-            startedAt: Date.now()
-        }
-        for (const {errorReport, cargoMeta} of errorReports) {
-            const {index, url} = errorReport
-            removeFileUrls.push(url)
-            const [targetSegment] = index.segments
-            requestFileUrls.push(...Object.keys(targetSegment.map))
-            retryDownloadIndex.segments.push(targetSegment)
-            retryDownloadIndex.bytes += index.bytes
-            this.putCargoIndex({
-                ...cargoMeta, 
-                state: !backgroundDownload ? CACHED : UPDATING, 
-                downloadId: downloadQueueId
-            })
-        }
-        const self = this
-        await Promise.all(removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url)))
+		//const downloadsIndex = await this.getDownloadIndices()
+		const removeFileUrls = []
+		const requestFileUrls = []
+		const downloadQueueId = provisionDownloadId()
+		const retryDownloadIndex: DownloadIndex = {
+			id: downloadQueueId,
+			previousId: "",
+			bytes: 0,
+			segments: [] as DownloadSegment[],
+			title,
+			startedAt: Date.now()
+		}
+		for (const {errorReport, cargoMeta} of errorReports) {
+			const {index, url} = errorReport
+			removeFileUrls.push(url)
+			const [targetSegment] = index.segments
+			requestFileUrls.push(...Object.keys(targetSegment.map))
+			retryDownloadIndex.segments.push(targetSegment)
+			retryDownloadIndex.bytes += index.bytes
+			this.putCargoIndex({
+				...cargoMeta, 
+				state: !backgroundDownload ? CACHED : UPDATING, 
+				downloadId: downloadQueueId
+			})
+		}
+		const self = this
+		await Promise.all(removeFileUrls.map((url) => self.virtualFileCache.deleteFile(url)))
         
-        const downloadResponse = await this.startDownload({
-            downloadIndex: retryDownloadIndex,
-            downloadQueueId,
-            filesToRequest: requestFileUrls,
-            title,
-            params: {
-                backgroundDownload,
-                allowAssetCache
-            }
-        })
-        if (downloadResponse === STATUS_CODES.updateQueued) {
-            return io.ok(STATUS_CODES.updateRetryQueued)
-        }
-        return io.ok(downloadResponse)
-    }
+		const downloadResponse = await this.startDownload({
+			downloadIndex: retryDownloadIndex,
+			downloadQueueId,
+			filesToRequest: requestFileUrls,
+			title,
+			params: {
+				backgroundDownload,
+				allowAssetCache
+			}
+		})
+		if (downloadResponse === STATUS_CODES.updateQueued) {
+			return io.ok(STATUS_CODES.updateRetryQueued)
+		}
+		return io.ok(downloadResponse)
+	}
 
-    async cacheRootDocumentFallback() {
-        const {networkRequest, origin, fileCache} = this
-        const rootUrl = origin + "/"
-        const fallbackUrl = rootDocumentFallBackUrl(origin)
-        const rootDocRequest = await io.retry(
-            () => networkRequest(rootUrl, {
-                method: "GET",
-                headers: Shabah.POLICIES.networkFirst
-            }),
-            3
-        )
-        if (!rootDocRequest.ok || !rootDocRequest.data.ok) {
-            return io.err("root document request failed")
-        }
-        const mimeType = rootDocRequest.data.headers.get("content-type")
-        if (mimeType !== "text/html") {
-            return io.err(
-                `root document caching failed, expected mime "text/html", ${mimeType ? `got ${mimeType}` : "couldn't find header 'Content-Type'"}`
-            )
-        }
-        await fileCache.putFile(fallbackUrl, rootDocRequest.data)
-        return io.ok(STATUS_CODES.cached)
-    }
+	async cacheRootDocumentFallback() {
+		const {networkRequest, origin, fileCache} = this
+		const rootUrl = origin + "/"
+		const fallbackUrl = rootDocumentFallBackUrl(origin)
+		const rootDocRequest = await io.retry(
+			() => networkRequest(rootUrl, {
+				method: "GET",
+				headers: Shabah.POLICIES.networkFirst
+			}),
+			3
+		)
+		if (!rootDocRequest.ok || !rootDocRequest.data.ok) {
+			return io.err("root document request failed")
+		}
+		const mimeType = rootDocRequest.data.headers.get("content-type")
+		if (mimeType !== "text/html") {
+			return io.err(
+				`root document caching failed, expected mime "text/html", ${mimeType ? `got ${mimeType}` : "couldn't find header 'Content-Type'"}`
+			)
+		}
+		await fileCache.putFile(fallbackUrl, rootDocRequest.data)
+		return io.ok(STATUS_CODES.cached)
+	}
 
-    uninstallAllAssets(): Promise<unknown> {
-        return Promise.all([
-            this.fileCache.deleteAllFiles(),
-            this.virtualFileCache.deleteAllFiles(),
-            this.clientMessageChannel.deleteAllMessages(),
-            this.backendMessageChannel.deleteAllMessages()
-        ] as const)
-    }
+	uninstallAllAssets(): Promise<unknown> {
+		return Promise.all([
+			this.fileCache.deleteAllFiles(),
+			this.virtualFileCache.deleteAllFiles(),
+			this.clientMessageChannel.deleteAllMessages(),
+			this.backendMessageChannel.deleteAllMessages()
+		] as const)
+	}
 
-    async getCargoAtUrl(canonicalUrl: string) {
-        const cargoIndex = await this.getCargoIndexByCanonicalUrl(canonicalUrl)
-        if (!cargoIndex) {
-            return io.err("not found")
-        }
-        const {resolvedUrl} = cargoIndex
-        const cleanedRootUrl = addSlashToEnd(resolvedUrl)
-        const manifestName = getFileNameFromUrl(canonicalUrl)
-        const cargoUrl = `${cleanedRootUrl}${manifestName}`
-        const cargoFile = await this.fileCache.getFile(cargoUrl)
-        if (!cargoFile) {
-            return io.err("not found")
-        }
-        const cargoFileText = await io.wrap(cargoFile.text())
-        if (!cargoFileText.ok) {
-            return io.err("no text found in cargo response")
-        }
-        const cargoFileJson = resultJsonParse(cargoFileText.data)
-        if (!cargoFileJson.ok) {
-            return io.err("cargo not json encoded")
-        }
-        return io.ok({
-            name: manifestName,
-            pkg: new HuzmaManifest(cargoFileJson.data as HuzmaManifest),
-            bytes: stringBytes(cargoFileText.data)
-        })
-    }
+	async getCargoAtUrl(canonicalUrl: string) {
+		const cargoIndex = await this.getCargoIndexByCanonicalUrl(canonicalUrl)
+		if (!cargoIndex) {
+			return io.err("not found")
+		}
+		const {resolvedUrl} = cargoIndex
+		const cleanedRootUrl = addSlashToEnd(resolvedUrl)
+		const manifestName = getFileNameFromUrl(canonicalUrl)
+		const cargoUrl = `${cleanedRootUrl}${manifestName}`
+		const cargoFile = await this.fileCache.getFile(cargoUrl)
+		if (!cargoFile) {
+			return io.err("not found")
+		}
+		const cargoFileText = await io.wrap(cargoFile.text())
+		if (!cargoFileText.ok) {
+			return io.err("no text found in cargo response")
+		}
+		const cargoFileJson = resultJsonParse(cargoFileText.data)
+		if (!cargoFileJson.ok) {
+			return io.err("cargo not json encoded")
+		}
+		return io.ok({
+			name: manifestName,
+			pkg: new HuzmaManifest(cargoFileJson.data as HuzmaManifest),
+			bytes: stringBytes(cargoFileText.data)
+		})
+	}
 
-    getCachedFile(url: string) {
-        return this.fileCache.getFile(url)
-    }
+	getCachedFile(url: string) {
+		return this.fileCache.getFile(url)
+	}
 
-    private async deleteAllCargoFiles(
-        canonicalUrl: string, 
-        resolvedUrl: string
-    ): Promise<boolean> {
-        const fullCargo = await this.getCargoAtUrl(canonicalUrl)
-        if (!fullCargo.ok) {
-            return false
-        }
-        const {pkg} = fullCargo.data
-        // add to cargo.json to files so that it 
-        // can be deleted along side it's files
-        pkg.files.push({
-            name: getFileNameFromUrl(canonicalUrl), 
-            bytes: 0, 
-            invalidation: "default"
-        })
-        const fileCache = this.fileCache
-        const deleteResponses = await Promise.all(pkg.files.map(
-            (file) => fileCache.deleteFile(`${resolvedUrl}${file.name}`)
-        ))
-        return deleteResponses.reduce(
-            (total, next) => total && next, true
-        )
-    }
+	private async deleteAllCargoFiles(
+		canonicalUrl: string, 
+		resolvedUrl: string
+	): Promise<boolean> {
+		const fullCargo = await this.getCargoAtUrl(canonicalUrl)
+		if (!fullCargo.ok) {
+			return false
+		}
+		const {pkg} = fullCargo.data
+		// add to cargo.json to files so that it 
+		// can be deleted along side it's files
+		pkg.files.push({
+			name: getFileNameFromUrl(canonicalUrl), 
+			bytes: 0, 
+			invalidation: "default"
+		})
+		const fileCache = this.fileCache
+		const deleteResponses = await Promise.all(pkg.files.map(
+			(file) => fileCache.deleteFile(`${resolvedUrl}${file.name}`)
+		))
+		return deleteResponses.reduce(
+			(total, next) => total && next, true
+		)
+	}
 
-    private async removeCargoFromDownloadQueue(canonicalUrl: string): Promise<StatusCode> {
-        const targetIndex = await this.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        if (!targetIndex) {
-            return STATUS_CODES.remoteResourceNotFound
-        }
-        const promises: Promise<unknown>[] = []
-        if (targetIndex.segments.length < 2) {
-            promises.push(
-                this.deleteDownloadIndex(canonicalUrl),
-                this.downloadManager.cancelDownload(targetIndex.id)
-            )
-        } else {
-            promises.push(this.removeDownloadSegment(canonicalUrl))
-        }
-        await Promise.all(promises)
-        return STATUS_CODES.ok
-    }
+	private async removeCargoFromDownloadQueue(canonicalUrl: string): Promise<StatusCode> {
+		const targetIndex = await this.getDownloadIndexByCanonicalUrl(
+			canonicalUrl
+		)
+		if (!targetIndex) {
+			return STATUS_CODES.remoteResourceNotFound
+		}
+		const promises: Promise<unknown>[] = []
+		if (targetIndex.segments.length < 2) {
+			promises.push(
+				this.deleteDownloadIndex(canonicalUrl),
+				this.downloadManager.cancelDownload(targetIndex.id)
+			)
+		} else {
+			promises.push(this.removeDownloadSegment(canonicalUrl))
+		}
+		await Promise.all(promises)
+		return STATUS_CODES.ok
+	}
 
-    async deleteCargo(canonicalUrl: string): Promise<Ok<StatusCode>> {
-        const cargoIndex = await this.getCargoIndexByCanonicalUrl(canonicalUrl)
-        if (!cargoIndex) {
-            return io.ok(STATUS_CODES.remoteResourceNotFound)
-        }
-        const promises = []
-        promises.push(
-            this.deleteAllCargoFiles(
-                cargoIndex.canonicalUrl,
-                cargoIndex.resolvedUrl
-            )
-        )
-        if (
-            cargoIndex.state === UPDATING
+	async deleteCargo(canonicalUrl: string): Promise<Ok<StatusCode>> {
+		const cargoIndex = await this.getCargoIndexByCanonicalUrl(canonicalUrl)
+		if (!cargoIndex) {
+			return io.ok(STATUS_CODES.remoteResourceNotFound)
+		}
+		const promises = []
+		promises.push(
+			this.deleteAllCargoFiles(
+				cargoIndex.canonicalUrl,
+				cargoIndex.resolvedUrl
+			)
+		)
+		if (
+			cargoIndex.state === UPDATING
             && cargoIndex.downloadId !== NO_UPDATE_QUEUED
-        ) {
-            promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
-        }
+		) {
+			promises.push(this.removeCargoFromDownloadQueue(canonicalUrl))
+		}
 
-        const errorDownloadIndex = await getErrorDownloadIndex(cargoIndex.resolvedUrl, this.virtualFileCache)
-        if (errorDownloadIndex) {
-            promises.push(
-                this.virtualFileCache.deleteFile(errorDownloadIndex.url)
-            )
-        }
-        await Promise.all(promises)
+		const errorDownloadIndex = await getErrorDownloadIndex(cargoIndex.resolvedUrl, this.virtualFileCache)
+		if (errorDownloadIndex) {
+			promises.push(
+				this.virtualFileCache.deleteFile(errorDownloadIndex.url)
+			)
+		}
+		await Promise.all(promises)
         
-        return io.ok(await this.deleteCargoIndex(cargoIndex.canonicalUrl))
-    }
+		return io.ok(await this.deleteCargoIndex(cargoIndex.canonicalUrl))
+	}
 
-    async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<ManifestIndex | null> {
-        return await this.indexStorage.getIndex(canonicalUrl)
-    }
+	async getCargoIndexByCanonicalUrl(canonicalUrl: string): Promise<ManifestIndex | null> {
+		return await this.indexStorage.getIndex(canonicalUrl)
+	}
 
-    async putCargoIndex(newIndex: ManifestIndexWithoutMeta): Promise<StatusCode> {
-        const previousIndex = await this.indexStorage.getIndex(newIndex.canonicalUrl)
-        if (!previousIndex) {
-            await this.indexStorage.putIndex({
-                ...newIndex,
-                created: Date.now(),
-                updated: Date.now()
-            })
-            return STATUS_CODES.createNewIndex
-        }
-        await this.indexStorage.putIndex({
-            ...previousIndex,
-            ...newIndex,
-            updated: Date.now()
-        })
-        return STATUS_CODES.updatedPreviousIndex
-    }
+	async putCargoIndex(newIndex: ManifestIndexWithoutMeta): Promise<StatusCode> {
+		const previousIndex = await this.indexStorage.getIndex(newIndex.canonicalUrl)
+		if (!previousIndex) {
+			await this.indexStorage.putIndex({
+				...newIndex,
+				created: Date.now(),
+				updated: Date.now()
+			})
+			return STATUS_CODES.createNewIndex
+		}
+		await this.indexStorage.putIndex({
+			...previousIndex,
+			...newIndex,
+			updated: Date.now()
+		})
+		return STATUS_CODES.updatedPreviousIndex
+	}
 
-    async deleteCargoIndex(canonicalUrl: string): Promise<StatusCode> {
-        const targetIndex = await this.indexStorage.getIndex(canonicalUrl)
-        if (!targetIndex) {
-            return STATUS_CODES.remoteResourceNotFound
-        }
-        await this.indexStorage.deleteIndex(canonicalUrl)
-        return STATUS_CODES.ok
-    }
+	async deleteCargoIndex(canonicalUrl: string): Promise<StatusCode> {
+		const targetIndex = await this.indexStorage.getIndex(canonicalUrl)
+		if (!targetIndex) {
+			return STATUS_CODES.remoteResourceNotFound
+		}
+		await this.indexStorage.deleteIndex(canonicalUrl)
+		return STATUS_CODES.ok
+	}
 
-    // download index interfaces
-    async getDownloadIndexByCanonicalUrl(
-        canonicalUrl: string
-    ): Promise<DownloadIndex | null> {
-        const indexes = await this.backendMessageChannel.getAllMessages()
-        const targetIndex = indexes.findIndex((index) => {
-            const {segments} = index
-            const targetIndex = segments.findIndex(
-                (segment) => segment.canonicalUrl === canonicalUrl
-            )
-            return targetIndex > -1
-        })
-        if (targetIndex < 0) {
-            return null
-        }
-        return indexes[targetIndex]
-    }
+	// download index interfaces
+	async getDownloadIndexByCanonicalUrl(
+		canonicalUrl: string
+	): Promise<DownloadIndex | null> {
+		const indexes = await this.backendMessageChannel.getAllMessages()
+		const targetIndex = indexes.findIndex((index) => {
+			const {segments} = index
+			const segmentIndex = segments.findIndex(
+				(segment) => segment.canonicalUrl === canonicalUrl
+			)
+			return segmentIndex > -1
+		})
+		if (targetIndex < 0) {
+			return null
+		}
+		return indexes[targetIndex]
+	}
 
-    async putDownloadIndex(updatedIndex: DownloadIndex): Promise<boolean> {
-        return this.backendMessageChannel.createMessage(updatedIndex)
-    }
+	async putDownloadIndex(updatedIndex: DownloadIndex): Promise<boolean> {
+		return this.backendMessageChannel.createMessage(updatedIndex)
+	}
 
-    private async removeDownloadSegment(canonicalUrl: string): Promise<Ok<StatusCode>> {
-        const target = await this.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        if (!target) {
-            return io.ok(STATUS_CODES.remoteResourceNotFound)
-        }
-        const segmentIndex = target.segments.findIndex(
-            (segment) => segment.canonicalUrl === canonicalUrl 
-        )
-        if (segmentIndex < 0) {
-            return io.ok(STATUS_CODES.downloadSegmentNotFound)
-        }
-        target.segments.splice(segmentIndex, 1)
-        await this.putDownloadIndex(target)
-        return io.ok(STATUS_CODES.ok)
-    }
+	private async removeDownloadSegment(canonicalUrl: string): Promise<Ok<StatusCode>> {
+		const target = await this.getDownloadIndexByCanonicalUrl(
+			canonicalUrl
+		)
+		if (!target) {
+			return io.ok(STATUS_CODES.remoteResourceNotFound)
+		}
+		const segmentIndex = target.segments.findIndex(
+			(segment) => segment.canonicalUrl === canonicalUrl 
+		)
+		if (segmentIndex < 0) {
+			return io.ok(STATUS_CODES.downloadSegmentNotFound)
+		}
+		target.segments.splice(segmentIndex, 1)
+		await this.putDownloadIndex(target)
+		return io.ok(STATUS_CODES.ok)
+	}
 
-    async deleteDownloadIndex(canonicalUrl: string) {
-        const target = await this.getDownloadIndexByCanonicalUrl(
-            canonicalUrl
-        )
-        if (!target) {
-            return io.ok(STATUS_CODES.remoteResourceNotFound)
-        }
-        await this.backendMessageChannel.deleteMessage(target.id)
-        return io.ok(STATUS_CODES.ok)
-    }
+	async deleteDownloadIndex(canonicalUrl: string) {
+		const target = await this.getDownloadIndexByCanonicalUrl(
+			canonicalUrl
+		)
+		if (!target) {
+			return io.ok(STATUS_CODES.remoteResourceNotFound)
+		}
+		await this.backendMessageChannel.deleteMessage(target.id)
+		return io.ok(STATUS_CODES.ok)
+	}
 
-    // progress listening interfaces
-    async getDownloadState(canonicalUrl: string): Promise<DownloadStateSummary | null> {
-        const [cargoIndex, downloadIndex] = await Promise.all([
-            this.getCargoIndexByCanonicalUrl(canonicalUrl),
-            this.getDownloadIndexByCanonicalUrl(canonicalUrl)
-        ] as const)
-        if (!cargoIndex || !downloadIndex) {
-            return null
-        }
-        if (cargoIndex.downloadId === NO_UPDATE_QUEUED) {
-            return null
-        }
-        const managerResponse = await io.wrap(
-            this.downloadManager.getDownloadState(cargoIndex.downloadId)
-        )
-        if (!managerResponse.ok || !managerResponse.data) {
-            return null
-        }
-        const response = managerResponse.data
-        const segmentIndex = downloadIndex.segments.findIndex(
-            (segment) => segment.canonicalUrl === canonicalUrl 
-        ) 
-        const {previousVersion, version} = downloadIndex.segments[segmentIndex]
-        return {...response, previousVersion, version}
-    }
+	// progress listening interfaces
+	async getDownloadState(canonicalUrl: string): Promise<DownloadStateSummary | null> {
+		const [cargoIndex, downloadIndex] = await Promise.all([
+			this.getCargoIndexByCanonicalUrl(canonicalUrl),
+			this.getDownloadIndexByCanonicalUrl(canonicalUrl)
+		] as const)
+		if (!cargoIndex || !downloadIndex) {
+			return null
+		}
+		if (cargoIndex.downloadId === NO_UPDATE_QUEUED) {
+			return null
+		}
+		const managerResponse = await io.wrap(
+			this.downloadManager.getDownloadState(cargoIndex.downloadId)
+		)
+		if (!managerResponse.ok || !managerResponse.data) {
+			return null
+		}
+		const response = managerResponse.data
+		const segmentIndex = downloadIndex.segments.findIndex(
+			(segment) => segment.canonicalUrl === canonicalUrl 
+		) 
+		const {previousVersion, version} = downloadIndex.segments[segmentIndex]
+		return {...response, previousVersion, version}
+	}
 
-    async getDownloadStateById(downloadId: string): Promise<DownloadState | null> {
-        const managerResponse = await io.wrap(
-            this.downloadManager.getDownloadState(downloadId)
-        )
-        if (!managerResponse.ok || !managerResponse.data) {
-            return null
-        }
-        return managerResponse.data
-    }
+	async getDownloadStateById(downloadId: string): Promise<DownloadState | null> {
+		const managerResponse = await io.wrap(
+			this.downloadManager.getDownloadState(downloadId)
+		)
+		if (!managerResponse.ok || !managerResponse.data) {
+			return null
+		}
+		return managerResponse.data
+	}
 
-    async consumeQueuedMessages(): Promise<StatusCode> {
-        const {clientMessageChannel} = this
-        const messages = await clientMessageChannel.getAllMessages()
-        if (messages.length < 1) {
-            return STATUS_CODES.noMessagesFound
-        }
+	async consumeQueuedMessages(): Promise<StatusCode> {
+		const {clientMessageChannel} = this
+		const messages = await clientMessageChannel.getAllMessages()
+		if (messages.length < 1) {
+			return STATUS_CODES.noMessagesFound
+		}
 
-        const stateUpdateCount = messages.reduce(
-            (total, next) => total + next.stateUpdates.length,
-            0
-        )
-        let notFoundCount = 0
+		const stateUpdateCount = messages.reduce(
+			(total, next) => total + next.stateUpdates.length,
+			0
+		)
+		let notFoundCount = 0
 
-        for (const message of messages) {
-            for (const update of message.stateUpdates) {
-                const {canonicalUrl, state} = update
-                const targetIndex = await this.getCargoIndexByCanonicalUrl(
-                    canonicalUrl
-                )
-                if (!targetIndex) {
-                    notFoundCount++
-                    continue
-                }
-                await this.putCargoIndex({
-                    ...targetIndex, 
-                    state,
-                    downloadId: NO_UPDATE_QUEUED
-                })
-            }
-        }
+		for (const message of messages) {
+			for (const update of message.stateUpdates) {
+				const {canonicalUrl, state} = update
+				const targetIndex = await this.getCargoIndexByCanonicalUrl(
+					canonicalUrl
+				)
+				if (!targetIndex) {
+					notFoundCount++
+					continue
+				}
+				await this.putCargoIndex({
+					...targetIndex, 
+					state,
+					downloadId: NO_UPDATE_QUEUED
+				})
+			}
+		}
         
-        await Promise.all(
-            messages.map((message) => clientMessageChannel.deleteMessage(message.downloadId))
-        )
+		await Promise.all(
+			messages.map((message) => clientMessageChannel.deleteMessage(message.downloadId))
+		)
 
-        if (notFoundCount === stateUpdateCount) {
-            return STATUS_CODES.allMessagesAreOrphaned
-        }
+		if (notFoundCount === stateUpdateCount) {
+			return STATUS_CODES.allMessagesAreOrphaned
+		}
 
-        if (notFoundCount > 0) {
-            return STATUS_CODES.someMessagesAreOrphaned
-        }
-        return STATUS_CODES.messagesConsumed
-    }
+		if (notFoundCount > 0) {
+			return STATUS_CODES.someMessagesAreOrphaned
+		}
+		return STATUS_CODES.messagesConsumed
+	}
 
-    async askToPersist(): Promise<boolean> {
-        if (await this.fileCache.isPersisted()) {
-            return false
-        }
-        return this.fileCache.requestPersistence()
-    }
+	async askToPersist(): Promise<boolean> {
+		if (await this.fileCache.isPersisted()) {
+			return false
+		}
+		return this.fileCache.requestPersistence()
+	}
 }

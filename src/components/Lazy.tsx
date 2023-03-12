@@ -1,4 +1,4 @@
-import {lazy, Suspense, PropsWithRef, FC} from "react"
+import {lazy, Suspense, PropsWithRef} from "react"
 
 type ComponentProps<T> = (
     PropsWithRef<T> 
@@ -14,15 +14,15 @@ export type LazyComponentOptions = {
 }
 
 export function lazyComponent<T>(
-    loader: ComponentLoader<T>,
-    { 
-        loadingElement = null
-    }: LazyComponentOptions = {}
+	loader: ComponentLoader<T>,
+	{ 
+		loadingElement = null
+	}: LazyComponentOptions = {}
 ) {
-    const Route = lazy(async () => ({default: await loader()})) as (props: ComponentProps<T>) => JSX.Element
-    return (props: ComponentProps<T> = {} as ComponentProps<T>) => {
-        return <Suspense fallback={loadingElement}>
-            <Route {...props}/>
-        </Suspense>
-    }
+	const Route = lazy(async () => ({default: await loader()})) as (props: ComponentProps<T>) => JSX.Element
+	return (props: ComponentProps<T> = {} as ComponentProps<T>) => {
+		return <Suspense fallback={loadingElement}>
+			<Route {...props}/>
+		</Suspense>
+	}
 }

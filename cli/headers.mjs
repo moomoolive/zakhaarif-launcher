@@ -8,6 +8,7 @@ ${HEADERS_FOR_ALL_URLS}
     Access-Control-Allow-Origin: *
     Cross-Origin-Embedder-Policy: require-corp
     Cross-Origin-Opener-Policy: same-origin
+    X-Content-Type-Options: nosniff
     X-Frame-Options: deny
 
 ${HEADERS_FOR_CLOUDFLARE_DEV_DEPLOYMENTS}

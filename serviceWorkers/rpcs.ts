@@ -15,14 +15,14 @@ export type ServiceWorkerRpcs = {
 }
 
 export function createServiceWorkerRpcs(
-    params: ServiceWorkerRpcDependencies
+	params: ServiceWorkerRpcDependencies
 ): ServiceWorkerRpcs {
-    return {
-        config: (_: null, state: GlobalConfig) => state,
-        logger: (verbose: boolean, state: GlobalConfig) => {
-            state.log = verbose
-            params.persistConfig(state)
-            return true
-        }
-    }
+	return {
+		config: (_: null, state: GlobalConfig) => state,
+		logger: (verbose: boolean, state: GlobalConfig) => {
+			state.log = verbose
+			params.persistConfig(state)
+			return true
+		}
+	}
 }

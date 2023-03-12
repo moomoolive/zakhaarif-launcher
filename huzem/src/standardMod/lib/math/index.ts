@@ -18,12 +18,12 @@ export const toDegrees = (radians: number) => radians * (180.0 / Math.PI)
 export const fpEqual = (fp1: number, fp2: number, range: number) => fp1 < fp2 + range && fp1 > fp2 - range
 
 export const createAxisRotation = (
-    x: number, y: number, z: number, radians: number 
+	x: number, y: number, z: number, radians: number 
 ) => {
-    const factor = Math.sin(radians / 2.0)
-    const xNew = x * factor
-    const yNew = y * factor
-    const zNew = z * factor
-    const w = Math.cos(radians / 2.0)
-    return new Quaternion(xNew, yNew, zNew, w).normalize()
+	const factor = Math.sin(radians / 2.0)
+	const xNew = x * factor
+	const yNew = y * factor
+	const zNew = z * factor
+	const w = Math.cos(radians / 2.0)
+	return new Quaternion(xNew, yNew, zNew, w).normalize()
 }

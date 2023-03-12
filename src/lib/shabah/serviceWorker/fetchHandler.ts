@@ -1,23 +1,20 @@
 import {
-    FileCache,
-    rootDocumentFallBackUrl,
+	FileCache,
+	rootDocumentFallBackUrl,
 } from "../backend"
 import {
-    serviceWorkerPolicies,
-    cacheHit, 
-    errorResponse,
-    LogFn,
-    logRequest
+	cacheHit, 
+	errorResponse,
+	LogFn,
+	logRequest
 } from "../serviceWorkerMeta"
 import {fetchCore} from "./fetchCore"
 
 export type FetchHandlerEvent = {
     respondWith: (r: Response | PromiseLike<Response>) => void
     request: Request
-    waitUntil: (promise: Promise<any>) => void
+    waitUntil: (promise: Promise<unknown>) => void
 }
-
-const CACHE_FIRST = serviceWorkerPolicies.cacheFirst["Sw-Policy"]
 
 type ConfigReference = {
     log: boolean
@@ -34,48 +31,48 @@ export type FetchOptions = {
 const networkfirstTag = "network-first"
 
 export const makeFetchHandler = (options: FetchOptions) => {
-    const {origin, fileCache, fetchFile, log, config} = options
-    const rootDoc = origin.endsWith("/") ? origin : origin + "/"
-    const rootDocFallback = rootDocumentFallBackUrl(origin)
-    return async (event: FetchHandlerEvent) => {
-        const {request} = event
-        const strippedQuery = request.url.split("?")[0]
-        const isRootDocument = strippedQuery === rootDoc
+	const {origin, fileCache, fetchFile, log, config} = options
+	const rootDoc = origin.endsWith("/") ? origin : origin + "/"
+	const rootDocFallback = rootDocumentFallBackUrl(origin)
+	return async (event: FetchHandlerEvent) => {
+		const {request} = event
+		const strippedQuery = request.url.split("?")[0]
+		const isRootDocument = strippedQuery === rootDoc
 
-        if (isRootDocument) {
-            try {
-                const res = await fetchFile(request)
-                logRequest(
-                    networkfirstTag, 
-                    request,
-                    log, 
-                    config.log,
-                    null
-                )
-                return res
-            } catch (err) {
-                const cached = await fileCache.getFile(rootDocFallback)
-                logRequest(
-                    networkfirstTag, 
-                    request,
-                    log, 
-                    config.log,
-                    cached
-                )
-                if (cached && cached.ok) {
-                    return cacheHit(cached)
-                }
-                return errorResponse(err)
-            }
-        }
+		if (isRootDocument) {
+			try {
+				const res = await fetchFile(request)
+				logRequest(
+					networkfirstTag, 
+					request,
+					log, 
+					config.log,
+					null
+				)
+				return res
+			} catch (err) {
+				const cached = await fileCache.getFile(rootDocFallback)
+				logRequest(
+					networkfirstTag, 
+					request,
+					log, 
+					config.log,
+					cached
+				)
+				if (cached && cached.ok) {
+					return cacheHit(cached)
+				}
+				return errorResponse(err)
+			}
+		}
 
-        return fetchCore(
-            request,
-            fetchFile,
-            fileCache,
-            "",
-            log,
-            config.log
-        )
-    }
+		return fetchCore(
+			request,
+			fetchFile,
+			fileCache,
+			"",
+			log,
+			config.log
+		)
+	}
 }

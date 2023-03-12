@@ -4,7 +4,7 @@ import {ManifestIndex, Shabah} from "../../shabah/downloadClient"
 import {Permissions} from "../../types/permissions"
 import type {AppDatabase} from "../../database/AppDatabase"
 import {PermissionsSummary} from "../../utils/security/permissionsSummary"
-import type { Logger } from "../../types/app" 
+import type {Logger} from "../../types/app" 
 
 export type SandboxDependencies = DeepReadonly<{
     displayExtensionFrame: () => void
@@ -42,7 +42,7 @@ export type RpcState = (
 )
 
 export type DaemonRpc = {
-    [key: string]: (param: any) => any
+    [key: string]: (param: unknown) => unknown
 }
 
 export type DaemonRpcTransform<Rpcs extends DaemonRpc> = {

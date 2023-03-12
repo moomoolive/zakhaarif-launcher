@@ -18,10 +18,10 @@ export type FileCache = {
 export const rootDocumentFallBackUrl = (origin: string) => `${removeSlashAtEnd(origin)}/offline.html`
 
 export const headers = (mimeType: Mime, contentLength: number) => ({
-    "Last-Modified": new Date().toUTCString(),
-    "Sw-Source": "shabah",
-    "Content-Length": contentLength.toString(),
-    "Content-Type": mimeType
+	"Last-Modified": new Date().toUTCString(),
+	"Sw-Source": "shabah",
+	"Content-Length": contentLength.toString(),
+	"Content-Type": mimeType
 } as const)
 
 export type DownloadState = {
@@ -79,13 +79,13 @@ export type DownloadIndex = {
 }
 
 export const operationCodes = {
-    updatedExisting: 0,
-    createdNew: 1,
-    notFound: 2,
-    removed: 3,
-    saved: 4,
-    tooManySegments: 5,
-    noSegmentsFound: 6
+	updatedExisting: 0,
+	createdNew: 1,
+	notFound: 2,
+	removed: 3,
+	saved: 4,
+	tooManySegments: 5,
+	noSegmentsFound: 6
 } as const
 
 export type BackendOpertionCode = typeof operationCodes[keyof typeof operationCodes]
@@ -95,37 +95,37 @@ const errDownloadIndexUrl = (resolvedUrl: string) => `${removeSlashAtEnd(resolve
 const isRelativeUrl = (url: string) => !url.startsWith("http://") && !url.startsWith("https://")
 
 export const getErrorDownloadIndex = async (
-    resolvedUrl: string,
-    virtualFileCache: FileCache
+	resolvedUrl: string,
+	virtualFileCache: FileCache
 ) => {
-    const url = errDownloadIndexUrl(resolvedUrl)
-    const file = await virtualFileCache.getFile(url)
-    if (!file) {
-        return null
-    }
-    const index = await file.json() as DownloadIndex
-    return {index, url}
+	const url = errDownloadIndexUrl(resolvedUrl)
+	const file = await virtualFileCache.getFile(url)
+	if (!file) {
+		return null
+	}
+	const index = await file.json() as DownloadIndex
+	return {index, url}
 }
 
 export const saveErrorDownloadIndex = async (
-    resolvedUrl: string,
-    index: DownloadIndex,
-    virtualFileCache: FileCache
+	resolvedUrl: string,
+	index: DownloadIndex,
+	virtualFileCache: FileCache
 ) => {
-    if (isRelativeUrl(resolvedUrl)) {
-        throw new Error("error download indices storage url must be a full url and not a relative one. Got " + resolvedUrl)
-    }
-    if (index.segments.length > 1) {
-        return operationCodes.tooManySegments
-    }
-    if (index.segments.length < 1) {
-        return operationCodes.noSegmentsFound
-    }
-    const url = errDownloadIndexUrl(resolvedUrl)
-    const text = JSON.stringify(index)
-    const response = new Response(text, {status: 200, statusText: "OK"})
-    await virtualFileCache.putFile(url, response)
-    return operationCodes.saved
+	if (isRelativeUrl(resolvedUrl)) {
+		throw new Error("error download indices storage url must be a full url and not a relative one. Got " + resolvedUrl)
+	}
+	if (index.segments.length > 1) {
+		return operationCodes.tooManySegments
+	}
+	if (index.segments.length < 1) {
+		return operationCodes.noSegmentsFound
+	}
+	const url = errDownloadIndexUrl(resolvedUrl)
+	const text = JSON.stringify(index)
+	const response = new Response(text, {status: 200, statusText: "OK"})
+	await virtualFileCache.putFile(url, response)
+	return operationCodes.saved
 }
 
 export type FetchFunction = typeof fetch

@@ -1,4 +1,4 @@
-import {useConfirm, ConfirmOptions} from "material-ui-confirm"
+import {useConfirm} from "material-ui-confirm"
 
 export type ButtonColor = (
     "error" | "primary" | "secondary"
@@ -15,24 +15,24 @@ export type GlobalConfirmProps = {
 }
 
 export const useGlobalConfirm = () => {
-    const innerConfirm = useConfirm()
+	const innerConfirm = useConfirm()
     
-    return async (props: GlobalConfirmProps) => {
-        try {
-            const confirmationButtonProps = props.confirmButtonColor 
-                ? {color: props.confirmButtonColor}
-                : {}
-            const cancellationButtonProps = props.cancelButtonColor 
-                ? {color: props.cancelButtonColor}
-                : {}
-            await innerConfirm({
-                ...props, 
-                cancellationButtonProps,
-                confirmationButtonProps
-            })
-            return true
-        } catch {
-            return false
-        }
-    }
+	return async (props: GlobalConfirmProps) => {
+		try {
+			const confirmationButtonProps = props.confirmButtonColor 
+				? {color: props.confirmButtonColor}
+				: {}
+			const cancellationButtonProps = props.cancelButtonColor 
+				? {color: props.cancelButtonColor}
+				: {}
+			await innerConfirm({
+				...props, 
+				cancellationButtonProps,
+				confirmationButtonProps
+			})
+			return true
+		} catch {
+			return false
+		}
+	}
 }
