@@ -1,5 +1,5 @@
 {
-  "name": "zakhaarif-huzem",
+  "name": "zakhaarif-huzem-internal-pkg",
   "private": true,
   "scripts": {
     "dev": "node ./devServer.mjs"

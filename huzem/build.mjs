@@ -7,13 +7,13 @@ import {libraryDirs, ENTRY_FILE_NAME} from "./config.mjs"
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 for (const dirPath of libraryDirs) {
-    const fullDirpath = path.join(__dirname, dirPath)
+    const fullDirpath = path.join(__dirname, "src", dirPath)
    
     // https://vitejs.dev/config/
     await build({
         configFile: false,
         publicDir: false,
-        base: fullDirpath + "/",
+        base: path.join(__dirname, "/src/"),
         build: {
             lib: {
                 entry: path.join(fullDirpath, ENTRY_FILE_NAME),

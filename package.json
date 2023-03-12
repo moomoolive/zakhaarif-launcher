@@ -13,10 +13,6 @@
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --outfile=./public/dev-sw.compiled.js",
     "compile-credits": "node ./cli/compileCredits.mjs",
     "cache-assets": "node ./cli/cacheAssets.mjs",
-    "sw-sandbox": "node ./sandbox/generateHtml.mjs && esbuild ./sandbox/secure.ts --bundle --sourcemap --minify --format=esm --outfile=./sandbox/src/secure.compiled.js && node ./sandbox/inlineCoreFiles.mjs && esbuild ./sandbox/serviceWorker/index.ts --bundle --minify --sourcemap --outfile=./sandbox/src/mirror-sw.compiled.js",
-    "build-sandbox": "npm run sw-sandbox && node ./cli/copyFolder.mjs --source=sandbox/src --dest=dist/sandbox && node ./sandbox/build/headers.mjs",
-    "sandbox-server": "node ./sandbox/dev-server.mjs",
-    "dev-sandbox": "npm run sw-sandbox && npm run sandbox-server",
     "type-check": "tsc --project tsconfig.json --noEmit && tsc --project serviceWorkers/tsconfig.json --noEmit",
     "test-watch": "vitest watch",
     "test": "vitest run",
@@ -41,6 +37,7 @@
     "small-semver": "^0.1.1",
     "w-worker-rpc": "^0.1.3",
     "wasm-check": "^2.1.2",
+    "zakhaarif-huzem-internal-pkg": "file:huzem",
     "zod": "^3.20.2"
   },
   "devDependencies": {
