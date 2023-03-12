@@ -6,10 +6,14 @@ import {createRpcState, AllRpcs, createRpcFunctions} from "./rpcs/index"
 import type {ManifestIndex, Shabah} from "../shabah/downloadClient"
 import { DeepReadonly } from "../types/utility"
 import {SandboxDependencies, RpcPersistentState, RpcState} from "./rpcs/state"
-import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
+//import {SandboxResponses} from "../../../sandbox/sandboxFunctions"
 import { MILLISECONDS_PER_SECOND } from "../utils/consts/time"
 import { io } from "../monads/result"
 import { removeZipExtension } from "../utils/urls/removeZipExtension"
+
+type SandboxResponses = {
+    ping: () => number
+}
 
 export type SandboxFunctions = AllRpcs
 
@@ -198,6 +202,10 @@ export class JsSandbox {
         if (reconfigured) {
             iframe.setAttribute("reconfigured-timestamp", Date.now().toString())
         }
+        this.dependencies.logger.info(
+            "opening extension", this.entry,
+            "with content-security policy of", contentSecurityPolicy
+        )
         iframe.src = `${import.meta.env.VITE_APP_SANDBOX_ORIGIN}/runProgram.html?entry=${encodeURIComponent(this.entry)}&csp=${encodeURIComponent(contentSecurityPolicy)}`
         
         window.clearInterval(this.extensionPingTimerId)
@@ -206,10 +214,11 @@ export class JsSandbox {
             const now = Date.now()
             const {latestPingResponse} = self
             const difference = now - latestPingResponse
-            if (
+            const pingDidNotReturn = (
                 difference >= PING_MARGIN_OF_ERROR
                 || !this.state.readyForDisplay
-            ) {
+            )
+            if (pingDidNotReturn && !this.state.fatalErrorOccurred) {
                 self.state.createFatalErrorMessage(
                     "A fatal error has occurred",
                     "Extension is irresponsive"

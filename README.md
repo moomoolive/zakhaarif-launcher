@@ -34,7 +34,7 @@ easy-peasy to make mods
 All files in this repo are generally licensed under AGPL-3.0, 
 meaning they are **free to use, modify, and distribute. Forever.**
 
-All files found under the ```public/large-assets```, files requested via the 
+All files found under the ```huzem/public/large-assets```, files requested via the 
 ```npm run cache-assets``` command, or files that have ```.asset``` in extension
 are proprietary (**NOT open-source**). Please do not distribute, sell, 
 the aforementioned files without explict

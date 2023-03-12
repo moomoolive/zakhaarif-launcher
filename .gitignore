@@ -1,4 +1,5 @@
 /public/large-assets/**
+/huzem/public/large-assets/**
 prototype
 
 # Logs
@@ -19,6 +20,7 @@ dist-ssr
 **/*.local.*
 bundle-anaylsis/
 **/*.js.map
+_sandbox
 
 # Editor directories and files
 .vscode/*

@@ -309,6 +309,7 @@ const LauncherRoot = (): JSX.Element => {
     const updateQueued = (
       queueResponse.data === Shabah.STATUS.updateQueued
       || queueResponse.data === Shabah.STATUS.ok
+      || queueResponse.data === Shabah.STATUS.assetCacheDisallowed
     )
     if (!updateQueued && !previousVersionsExist) {
       setLauncherState("error")

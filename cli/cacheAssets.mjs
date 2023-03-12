@@ -24,7 +24,7 @@ import fs from "fs/promises"
 import fsSync from "fs"
 
 const ASSET_SERVER_ORIGIN = "https://asset-archive.zakhaarif.com"
-const TARGET_FOLDER = "public/large-assets"
+const TARGET_FOLDER = "huzem/public/large-assets"
 
 const ASSET_LIST = [
     "hadramout-terrain.png",
