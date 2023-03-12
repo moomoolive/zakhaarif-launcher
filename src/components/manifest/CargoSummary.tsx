@@ -95,17 +95,17 @@ export const CargoSummary = ({
 
 	const standardKeywords = useMemo(() => {
 		const tag = cargoIndex.tag
-		const keywords = []
+		const standardKeywordsList = []
 		if (isStandardCargo(cargoIndex)) {
-			keywords.push({text: "core", type: "std"})
+			standardKeywordsList.push({text: "core", type: "std"})
 		}
 		if (tag === MOD_CARGO_TAG) {
-			keywords.push({text: "mod", type: "mod"})
+			standardKeywordsList.push({text: "mod", type: "mod"})
 		}
 		if (tag === EXTENSION_CARGO_TAG) {
-			keywords.push({text: "extension", type: "ext"})
+			standardKeywordsList.push({text: "extension", type: "ext"})
 		}
-		return keywords
+		return standardKeywordsList
 	}, [cargo])
 
 	const permissionsFiltered = useMemo(() => {
@@ -237,7 +237,7 @@ export const CargoSummary = ({
 								{`Author${authors.length > 1 ? "s" : ""}:`}
 							</div>
 							{authors.map((author, index) => {
-								const {name, email, url} = author
+								const {name: authorName, email, url} = author
 								return <div
 									key={`cargo-author-${index}`}
 									className="text-sm"
@@ -264,7 +264,7 @@ export const CargoSummary = ({
 										</span>
 									</a> : <></>}
 									<span>
-										{name}
+										{authorName}
 									</span>
 								</div>
 							})}

@@ -397,7 +397,7 @@ export const checkForUpdates = async (
 		if (filePreflightResponses.errorUrls.length > 0) {
 			const preflightErrors = filePreflightResponses
 				.errorUrls
-				.map((response) => `${response.url} [${response.reason}]`)
+				.map((preflightResponse) => `${preflightResponse.url} [${preflightResponse.reason}]`)
 				.join(", ")
 			return downloadError(
 				`the following urls are invalid: ${preflightErrors}`,
@@ -510,7 +510,7 @@ export const checkForUpdates = async (
 		if (filePreflightResponses.errorUrls.length > 0) {
 			const preflightErrors = filePreflightResponses
 				.errorUrls
-				.map((response) => `${response.url} [${response.reason}]`)
+				.map((preflightResponse) => `${preflightResponse.url} [${preflightResponse.reason}]`)
 				.join(", ")
 			return downloadError(
 				`the following urls are invalid: ${preflightErrors}`,
@@ -576,7 +576,7 @@ export const checkForUpdates = async (
 	if (filePreflightResponses.errorUrls.length > 0) {
 		const preflightErrors = filePreflightResponses
 			.errorUrls
-			.map((response) => `${response.url} [${response.reason}]`)
+			.map((preflightResponse) => `${preflightResponse.url} [${preflightResponse.reason}]`)
 			.join(", ")
 		return downloadError(
 			`the following urls are invalid: ${preflightErrors}`,

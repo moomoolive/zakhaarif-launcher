@@ -1,4 +1,4 @@
-const enum ri_encoding {
+const enum ri_encoding { // eslint-disable-line no-shadow
     start_offset = 0,
     length_offset = 1,
     sizeof = 2
@@ -46,7 +46,7 @@ export class RunIndexVec {
 	}
 }
 
-const enum rv_encoding {
+const enum rv_encoding { // eslint-disable-line no-shadow
     type_offset = 0,
     length_offset = 1,
     sizeof = 2

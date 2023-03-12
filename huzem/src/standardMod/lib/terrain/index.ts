@@ -1,6 +1,6 @@
 import {moistureNoise} from "./noise"
 
-export const enum voxel_consts {
+export const enum voxel_consts { // eslint-disable-line no-shadow
     null = -1,
     air = 0,
     stone = 1,

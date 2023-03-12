@@ -762,7 +762,7 @@ class VoxelColumnIterator {
 	}
 }
 
-const enum axis_flags {
+const enum axis_flags { // eslint-disable-line no-shadow
     positive_z = 1 << 0,
     negative_z = 1 << 1,
     positive_x = 1 << 2,
@@ -781,7 +781,7 @@ const enum axis_flags {
 
 let wireframeShader: StandardMaterial
 
-const enum meshing {
+const enum meshing { // eslint-disable-line no-shadow
     greedy = 0
 }
 
@@ -1075,7 +1075,7 @@ class Chunk {
     */
 
 	greedyMesh({meshColorer}: ChunkRenderingOptions) {
-		const start = Date.now()
+		const startTime = Date.now()
 		const colorFn = meshColorer
 		const {levelOfDetail, bounds} = this
 		const originx = bounds.min.x
@@ -1342,7 +1342,7 @@ class Chunk {
 		this.faces = new Uint32Array(indices)
 		this.vertices = new Float32Array(vertices)
 		this.colors = new Float32Array(colors)
-		this.meshingDelta = Date.now() - start
+		this.meshingDelta = Date.now() - startTime
 	}
 
 	private createSkirt(
@@ -1735,8 +1735,8 @@ export class TerrainManager {
 		}
 
 		for (let i = 0; i < this.recycledChunks.length; i++) {
-			const chunkref = this.recycledChunks[i]
-			const chunk = this.chunks[chunkref]
+			const targetChunkref = this.recycledChunks[i]
+			const chunk = this.chunks[targetChunkref]
 			if (chunk.isRendered) {
 				chunk.hideMesh()
 			}

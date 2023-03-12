@@ -555,10 +555,10 @@ export const main = async (canvas: HTMLCanvasElement) => {
 
 		// apply visual changes
 		{
-			const player = activeMeshes[playerEntity.rendering.id]
-			player.position.x = playerEntity.position.x
-			player.position.z = playerEntity.position.z
-			player.position.y = playerEntity.position.y
+			const playerMesh = activeMeshes[playerEntity.rendering.id]
+			playerMesh.position.x = playerEntity.position.x
+			playerMesh.position.z = playerEntity.position.z
+			playerMesh.position.y = playerEntity.position.y
 
 			// debug
 			//boxCollider.position.x = playerEntity.position.x

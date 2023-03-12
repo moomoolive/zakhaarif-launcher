@@ -47,12 +47,12 @@ caches.open(APP_CACHE).then(async (cache) => {
 	config = {...config, ...parsed}
 })
 
-const persistConfig = async (config: GlobalConfig) => {
+const persistConfig = async (globalConfig: GlobalConfig) => {
 	const cache = await caches.open(APP_CACHE)
-	config.updatedAt = Date.now()
+	globalConfig.updatedAt = Date.now()
 	await cache.put(
 		CONFIG_URL, 
-		new Response(JSON.stringify(config), {status: 200})
+		new Response(JSON.stringify(globalConfig), {status: 200})
 	)
 	return true
 }

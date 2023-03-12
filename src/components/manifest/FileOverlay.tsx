@@ -119,7 +119,7 @@ export const FileOverlay = ({
 		</div>
 
 		<div className="w-5/6 max-w-xl">
-			{((content: typeof contentType, url: string) => {
+			{((content: typeof contentType) => {
 				if (content === "headers") {
 					return <div
 						className="px-4 pb-4 pt-2 w-full bg-neutral-800 rounded"
@@ -229,7 +229,7 @@ export const FileOverlay = ({
                         File is too large. Download to view.
 					</div>
 				}
-			})(contentType, url)}
+			})(contentType)}
 		</div>
 	</div>
 }

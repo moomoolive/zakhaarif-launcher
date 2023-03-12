@@ -87,7 +87,7 @@ const addFileToDirectory = (
 	}
 	const [nextPath] = splitPath
 	const directoryIndex = directory.directories.findIndex(
-		(directory) => directory.path === nextPath
+		(subDirectory) => subDirectory.path === nextPath
 	)
 	const name = splitPath.slice(1).join("/")
 	if (directoryIndex > -1) {
@@ -215,7 +215,7 @@ export const CargoFileSystem = ({
 				(file) => file.name.includes(searchText)
 			)
 			directory.directories = directory.directories.filter(
-				(directory) => directory.path.includes(searchText)
+				(subDirectory) => subDirectory.path.includes(searchText)
 			)
 		}
 
@@ -224,22 +224,22 @@ export const CargoFileSystem = ({
 		switch (type) {
 		case "bytes":
 			directory.directories.sort((a, b) => {
-				const order = a.contentBytes > b.contentBytes ? 1 : -1
-				return order * orderFactor
+				const factor = a.contentBytes > b.contentBytes ? 1 : -1
+				return factor * orderFactor
 			})
 			directory.files.sort((a, b) => {
-				const order = a.bytes > b.bytes ? 1 : -1
-				return order * orderFactor
+				const factor = a.bytes > b.bytes ? 1 : -1
+				return factor * orderFactor
 			})
 			break 
 		case "name":
 			directory.directories.sort((a, b) => {
-				const order = a.path.localeCompare(b.path)
-				return order * -1 * orderFactor
+				const factor = a.path.localeCompare(b.path)
+				return factor * -1 * orderFactor
 			})
 			directory.files.sort((a, b) => {
-				const order = a.name.localeCompare(b.name)
-				return order * -1 * orderFactor
+				const factor = a.name.localeCompare(b.name)
+				return factor * -1 * orderFactor
 			})
 			break
 		default:

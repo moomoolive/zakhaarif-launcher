@@ -20,7 +20,7 @@ export class CollisionInfo {
 	}
 }
 
-export const enum axis {
+export const enum axis { // eslint-disable-line no-shadow
     positive_x = 1,
     negative_x = -1,
     x_bit_check = 1 << positive_x,

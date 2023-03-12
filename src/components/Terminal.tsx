@@ -466,14 +466,14 @@ const TerminalCore = ({
 			) {
 				const command = terminalCommands[commandIndex]
 				const {inputs} = command
-				const prediction = {
+				const helpPrediction = {
 					name: helpCommand,
 					dataType: "bool",
 					category: "option",
 					source: "std",
 					commandIndex
 				} as const
-				const predictions = [prediction] as IntellisensePrediction[]
+				const predictions = [helpPrediction] as IntellisensePrediction[]
 				const existingInputs = inputToKeyValuePairs(prompt).map(({key}) => key)
 				let endOfRequiredArguments = 0
 				for (let i = 0; i < inputs.length; i++) {
