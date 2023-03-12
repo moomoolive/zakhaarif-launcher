@@ -42,7 +42,7 @@ export type RpcState = (
 )
 
 export type DaemonRpc = {
-    [key: string]: (param: unknown) => unknown
+    [key: string]: (param: any) => any // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export type DaemonRpcTransform<Rpcs extends DaemonRpc> = {
