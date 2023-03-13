@@ -22,9 +22,8 @@ module.exports = {
         "indent": ["error", "tab"],
         "object-curly-spacing": ["error", "never"],
         "quotes": ["error", "double"],
-        "no-shadow": ["error", {
-            builtinGlobals: true,
-        }]
+        "no-shadow": ["error", {builtinGlobals: true}],
+        "@typescript-eslint/no-empty-interface": ["warn"]
     },
     ignorePatterns: [
         "**/*.test.ts", 
