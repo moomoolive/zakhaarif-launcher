@@ -48,3 +48,5 @@ Full conditions can be found at
 
 - [Huzma: mod/extension format](https://github.com/moomoolive/huzma)
 - [Zakhaarif Dev Tools: tools for developing mods/extensions](https://github.com/moomoolive/zakhaarif-dev-tools)
+- [Zakhaarif Sandbox: a sandboxed execution context for extensions/mods](https://github.com/moomoolive/zakhaarif-sandbox)
+- [W-Worker-RPC: a message channel for communicating with sandbox](https://github.com/moomoolive/w-worker-rpc)
