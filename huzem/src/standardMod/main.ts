@@ -31,13 +31,15 @@ import {
 	TERRAIN_MAX_Z
 } from "./lib/terrain/index"
 import {VoxelColliders} from "./lib/physics/voxelColliders"
+import {ShaheenEngine} from "zakhaarif-dev-tools"
 
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
 const ROOT_URL = import.meta.env.DEV
 	? "http://localhost:7888"
 	: "https://preview.zakhaarif.com"
 
-export const main = async (canvas: HTMLCanvasElement) => {
+export const main = async (mainEngine: ShaheenEngine) => {
+	const canvas = mainEngine.getRootCanvas()
 	console.log("📦 mod imported")
 	canvas.style.width = "100vw"
 	canvas.style.height = "100vh"

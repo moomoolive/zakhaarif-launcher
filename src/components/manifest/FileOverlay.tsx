@@ -54,7 +54,7 @@ export const FileOverlay = ({
 			return
 		}
 		setFileText(textResponse.data)
-	}, [])
+	}, [fileResponse])
 
 	useCloseOnEscape(onClose)
     

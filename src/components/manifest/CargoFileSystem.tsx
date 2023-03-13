@@ -134,7 +134,7 @@ export type FileDetails = {
     bytes: number;
 }
 
-const ROOT_DIRECTORY_PATH = "#"
+const ROOT_DIRECTORY_PATH = "~"
 
 export type RootDirectoryPath = typeof ROOT_DIRECTORY_PATH
 
@@ -185,7 +185,7 @@ export const CargoFileSystem = ({
 
 	useEffect(() => {
 		createFileSystemDelay(() => setCreatingFileSystem(false))
-		if (!cargoIndex || cargo.files.length < 1) {
+		if (!cargoIndex) {
 			return
 		}
 		const rootDirectory = cleanDirectory()

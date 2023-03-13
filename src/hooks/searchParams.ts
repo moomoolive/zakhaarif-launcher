@@ -7,7 +7,7 @@ type SearchParams = [
 
 export const useSearchParams = (): SearchParams => {
 	const [searchParams, setSearch] = useState(new URLSearchParams(location.search))
-    
+
 	const searchRef = useRef(location.search)
 	const {current: setSearchParams} = useRef((newSearchParams: URLSearchParams) => {
 		const newSearchString = newSearchParams.toString()
@@ -23,8 +23,7 @@ export const useSearchParams = (): SearchParams => {
 			if (searchRef.current === location.search) {
 				return
 			}
-			searchRef.current = location.search
-			setSearch(new URLSearchParams(location.search))
+			setSearchParams(new URLSearchParams(location.search))
 		}
 		window.addEventListener("popstate", handler)
 		return () => window.removeEventListener("popstate", handler)

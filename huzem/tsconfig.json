@@ -17,6 +17,11 @@
     "jsx": "react-jsx",
     "checkJs": true
   },
-  "include": ["src", "config.mjs", "build.mjs", "devServer.mjs"],
+  "include": [
+    "src", 
+    "config.mjs", 
+    "build.mjs", 
+    "devServer.mjs"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

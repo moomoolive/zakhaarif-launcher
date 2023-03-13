@@ -36,7 +36,16 @@ import {FileSystemBreadcrumbs} from "../components/manifest/FileSystemBreadcrumb
 import type {CargoDirectory} from "../components/manifest/CargoFileSystem"
 import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
-import {ADDONS_INFO_MODAL, ADDONS_INSTALL_MODAL, ADDONS_MODAL, ADDONS_UPDATE_MODAL, ADDONS_VIEWING_CARGO, ADDONS_VIEWING_FILE} from "../lib/utils/searchParameterKeys"
+import {
+	ADDONS_INFO_MODAL, 
+	ADDONS_INSTALL_MODAL, 
+	ADDONS_MODAL, 
+	ADDONS_RECOVERY_MODAL, 
+	ADDONS_UPDATE_MODAL, 
+	ADDONS_VIEWING_CARGO, 
+	ADDONS_VIEWING_DIRECTORY, 
+	ADDONS_VIEWING_FILE_MODAL
+} from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
 import {roundDecimal} from "../lib/math/rounding"
 import {MILLISECONDS_PER_SECOND} from "../lib/utils/consts/time"
@@ -108,14 +117,6 @@ const RecoveryModal = lazyComponent(
 	{loadingElement: fullScreenLoadingOverlay}
 )
 
-type ShownModal = (
-    ""
-    | "Updater"
-    | "Installer"
-    | "CargoInfo"
-    | "Recovery"
-)
-
 type FilterType = "updated" | "bytes" | "state" | "tag" | "name"
 
 type FilterConfig = {
@@ -157,7 +158,6 @@ const AddOns = (): JSX.Element => {
 	const [directoryPath, setDirectoryPath] = useState<CargoDirectory[]>([])
 	const [fileDetails, setFileDetails] = useState<FileDetails | null>(null)
 	const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null)
-	const [modalShown, setModalShown] = useState<ShownModal>("")
 	const [offset, setOffset] = useState(0)
 	const [targetIndex, setTargetIndex] = useState<ManifestIndex | null>(null)
 	const [cacheBusterId, setCacheBusterId] = useState(0)
@@ -187,23 +187,25 @@ const AddOns = (): JSX.Element => {
 	})
 	const {current: onBackToCargos} = useRef(() => {
 		removeSearchKey(ADDONS_VIEWING_CARGO)
+		removeSearchKey(ADDONS_MODAL)
 		setFilterConfig({type: "updated", order: DESCENDING_ORDER})
 	})
-	const {current: onShowInstaller} = useRef(() => {
-		searchParams.set(ADDONS_MODAL, ADDONS_INSTALL_MODAL)
-		setSearchParams(new URLSearchParams(searchParams))
+	const {current: showModal} = useRef((type: string) => {
+		setSearchKey(ADDONS_MODAL, type)
 	})
-	const {current: onShowRecovery} = useRef(() => setModalShown("Recovery"))
-	const {current: onShowCargoInfo} = useRef(() => setSearchKey(ADDONS_MODAL, ADDONS_INFO_MODAL))
-	const {current: onShowCargoUpdater} = useRef(() => setSearchKey(ADDONS_MODAL, ADDONS_UPDATE_MODAL))
-	const {current: clearModal} = useRef(() => {
-		removeSearchKey(ADDONS_MODAL)
-		setModalShown("")
+	const {current: mutateDirectoryPath} = useRef((newValue: CargoDirectory[]) => {
+		setDirectoryPath(newValue)
 	})
+	const {current: clearModal} = useRef(() => removeSearchKey(ADDONS_MODAL))
+	const {current: onShowInstaller} = useRef(() => showModal(ADDONS_INSTALL_MODAL))
+	const {current: onShowRecovery} = useRef(() => showModal(ADDONS_RECOVERY_MODAL))
+	const {current: onShowCargoInfo} = useRef(() => showModal(ADDONS_INFO_MODAL))
+	const {current: onShowCargoUpdater} = useRef(() => showModal(ADDONS_UPDATE_MODAL))	
 	const {current: onShowSettings} = useRef(() => navigate("/settings"))
 	const {current: clearAlert} = useRef(() => setAlertConfig(null))
 	const {current: setViewingCargo} = useRef((canonicalUrl: string) => {
 		const url = encodeURIComponent(canonicalUrl)
+		removeSearchKey(ADDONS_MODAL)
 		setSearchKey(ADDONS_VIEWING_CARGO, url)
 		setFilterConfig({type: "name", order: DESCENDING_ORDER})
 	})
@@ -225,46 +227,31 @@ const AddOns = (): JSX.Element => {
 		return true
 	}
 
-	useEffectAsync(async () => {
-		if (searchParams.has(ADDONS_MODAL)) {
-			const value = searchParams.get(ADDONS_MODAL) || ""
-			if (value === ADDONS_UPDATE_MODAL) {
-				setModalShown("Updater")
-			} else if (value === ADDONS_INFO_MODAL) {
-				setModalShown("CargoInfo")
-			} else if (value === ADDONS_INSTALL_MODAL) {
-				setModalShown("Installer")
-			}
+	useEffect(() => {
+		if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
 			return
 		}
+		if (!searchParams.has(ADDONS_VIEWING_DIRECTORY)) {
+			return
+		}
+	}, [searchParams])
 
-		if (searchParams.has(ADDONS_VIEWING_FILE)) {
-			const fullPath = decodeURIComponent(searchParams.get(ADDONS_VIEWING_FILE) || "")
-			if (fullPath.length < 1) {
-				return
-			}
-			let fileResponse = await downloadClient.getCachedFile(fullPath)        
-			if (!fileResponse || !fileResponse.ok) {
-				setAlertConfig({type: "info", content: "fetching file..."})
-				const networkResponse = await fetch(fullPath, {
-					method: "GET",
-					headers: Shabah.POLICIES.networkFirst
-				})
-				if (!networkResponse || !networkResponse.ok) {
-					logger.warn(`file ${fileDetails?.url} was not found although it should be cached!`)
-					clearAlert()
-					await confirm({title: "Could not find file!"})
-					return
-				}
-				fileResponse = networkResponse
-				setTimeout(clearAlert,  600)
-			}
-			const filename = fullPath.split("/").at(-1) || "unnamed-file"
-			const mime = urlToMime(filename) || "text/plain"
+	useEffectAsync(async () => {
+		if (!searchParams.has(ADDONS_VIEWING_FILE_MODAL)) {
+			return
+		}
+		const fullPath = decodeURIComponent(searchParams.get(ADDONS_VIEWING_FILE_MODAL) || "")
+		if (fullPath.length < 1) {
+			return
+		}
+		
+		const fileResponse = await downloadClient.getCachedFile(fullPath)        
+		const filename = fullPath.split("/").at(-1) || "unnamed-file"
+		const mime = urlToMime(filename) || "text/plain"
+		const fileMeta = {name: filename, mime, url: fullPath} as const
+		if (fileResponse && fileResponse.ok) {
 			setFileDetails({
-				name: filename,
-				mime,
-				url: fullPath,
+				...fileMeta,
 				fileResponse,
 				bytes: fileResponse.headers.has("content-length")
 					? parseInt(fileResponse.headers.get("content-length") || "0", 10)
@@ -272,6 +259,29 @@ const AddOns = (): JSX.Element => {
 			})
 			return
 		}
+
+		setAlertConfig({type: "info", content: "fetching file..."})
+		const networkResponse = await fetch(fullPath, {
+			method: "GET",
+			headers: Shabah.POLICIES.networkFirst
+		})
+		
+		if (!networkResponse || !networkResponse.ok) {
+			logger.warn(`file ${fileDetails?.url} was not found although it should be cached!`)
+			clearAlert()
+			await confirm({title: "Could not find file!"})
+			return
+		}
+
+		const milliseconds = 600
+		setTimeout(clearAlert,  milliseconds)
+		setFileDetails({
+			...fileMeta,
+			fileResponse: networkResponse,
+			bytes: networkResponse.headers.has("content-length")
+				? parseInt(networkResponse.headers.get("content-length") || "0", 10)
+				: 0
+		})
 	}, [searchParams])
 
 	const [cargoQuery, setCargoQuery] = useState({
@@ -384,10 +394,10 @@ const AddOns = (): JSX.Element => {
 		if (!cargo.ok) {
 			return
 		}
+		targetCargoRef.current = new HuzmaManifest(cargo.data.pkg as HuzmaManifest<Permissions>)
 		setTargetIndex(index)
 		setFilterConfig({type: "name", order: DESCENDING_ORDER})
 		viewingCargoBytes.current = cargo.data.bytes
-		targetCargoRef.current = new HuzmaManifest(cargo.data.pkg as HuzmaManifest<Permissions>)
 	}, [searchParams])
 
 	useEffect(() => {
@@ -433,22 +443,27 @@ const AddOns = (): JSX.Element => {
 	const isViewingCargo = searchParams.has(ADDONS_VIEWING_CARGO)
 	const cargoFound = isViewingCargo && !!targetIndex
 	const showingValidCargo = isViewingCargo && cargoFound
+	const showingModal = searchParams.get(ADDONS_MODAL) || ""
 
 	return <div 
 		className="fixed z-0 w-screen h-screen overflow-clip"
 	>
-		{searchParams.has(ADDONS_VIEWING_FILE) && fileDetails ? <>
-			<FileOverlay 
-				onClose={() => {
-					searchParams.delete(ADDONS_VIEWING_FILE)
-					setSearchParams(new URLSearchParams(searchParams))
-					setFileDetails(null)
-				}}
-				{...fileDetails}
-			/>
-		</> : <></>}
+		{(
+			searchParams.has(ADDONS_VIEWING_FILE_MODAL) 
+			&& !searchParams.has(ADDONS_MODAL) 
+			&& fileDetails
+		) ? <>
+				<FileOverlay 
+					onClose={() => {
+						searchParams.delete(ADDONS_VIEWING_FILE_MODAL)
+						setSearchParams(new URLSearchParams(searchParams))
+						setFileDetails(null)
+					}}
+					{...fileDetails}
+				/>
+			</> : <></>}
 
-		{showingValidCargo && modalShown === "CargoInfo" ? <>
+		{showingValidCargo && showingModal === ADDONS_INFO_MODAL ? <>
 			<CargoInfo
 				onClose={clearModal}
 				cargo={targetCargoRef.current}
@@ -456,7 +471,7 @@ const AddOns = (): JSX.Element => {
 			/>
 		</> : <></>}
 
-		{modalShown === "Installer" ? <>
+		{showingModal === ADDONS_INSTALL_MODAL ? <>
 			<Installer
 				onClose={clearModal}
 				onInstallCargo={async (update, title) => {
@@ -496,34 +511,36 @@ const AddOns = (): JSX.Element => {
 			style={{top: "91vh"}}
 		/> : <></>}
 
-		{showingValidCargo && modalShown === "Updater" ? <CargoUpdater
-			onClose={clearModal}
-			cargoIndex={targetIndex}
-			cargo={targetCargoRef.current}
-			createAlert={(content) => {
-				setAlertConfig({type: "success", content})
-			}}
-			onUpdateCargo={async (update, title) => {
-				const status = await downloadClient.executeUpdates(
-					[update],
-					title,
-					{
-						backgroundDownload: false,
-						allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+		{showingValidCargo && showingModal === ADDONS_UPDATE_MODAL ? <>
+			<CargoUpdater
+				onClose={clearModal}
+				cargoIndex={targetIndex}
+				cargo={targetCargoRef.current}
+				createAlert={(content) => {
+					setAlertConfig({type: "success", content})
+				}}
+				onUpdateCargo={async (update, title) => {
+					const status = await downloadClient.executeUpdates(
+						[update],
+						title,
+						{
+							backgroundDownload: false,
+							allowAssetCache: import.meta.env.VITE_APP_ALLOW_ASSET_CACHE === "true"
+						}
+					)
+					logger.info("update queue status", status)
+					const ok = !(status.data >= Shabah.ERROR_CODES_START)
+					if (!ok) {
+						return false
 					}
-				)
-				logger.info("update queue status", status)
-				const ok = !(status.data >= Shabah.ERROR_CODES_START)
-				if (!ok) {
-					return false
-				}
-				setCacheBusterId((previous) => previous + 1)
-				setOffset(0)
-				return true
-			}}
-		/> : <></>}
+					setCacheBusterId((previous) => previous + 1)
+					setOffset(0)
+					return true
+				}}
+			/> 
+		</>: <></>}
 
-		{showingValidCargo && modalShown === "Recovery" ? <>
+		{showingValidCargo && showingModal === ADDONS_RECOVERY_MODAL ? <>
 			<RecoveryModal
 				cargoIndex={targetIndex}
 				onClose={clearModal}
@@ -649,7 +666,7 @@ const AddOns = (): JSX.Element => {
 					directoryPath={directoryPath}
 					targetCargo={targetIndex}
 					onBackToCargos={onBackToCargos}
-					mutateDirectoryPath={setDirectoryPath}
+					mutateDirectoryPath={mutateDirectoryPath}
 					onShowCargoInfo={onShowCargoInfo}
 					onShowCargoUpdater={onShowCargoUpdater}
 					onRecoverCargo={onShowRecovery}
@@ -731,11 +748,11 @@ const AddOns = (): JSX.Element => {
 							filter={filterConfig}
 							directoryPath={directoryPath}
 							onOpenFileModal={(url) => {
-								searchParams.set(ADDONS_VIEWING_FILE, encodeURIComponent(url))
+								searchParams.set(ADDONS_VIEWING_FILE_MODAL, encodeURIComponent(url))
 								setSearchParams(new URLSearchParams(searchParams))
 							}}
 							onBackToCargos={onBackToCargos}
-							mutateDirectoryPath={setDirectoryPath}
+							mutateDirectoryPath={mutateDirectoryPath}
 							onCreateAlert={(type, content) => {
 								setAlertConfig({type, content})
 							}}

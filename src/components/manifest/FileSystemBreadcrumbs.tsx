@@ -25,7 +25,7 @@ import {UPDATING} from "../../lib/shabah/backend"
 import {nanoid} from "nanoid"
 import {LAUNCHER_CARGO} from "../../standardCargos"
 
-const ROOT_DIRECTORY_PATH: RootDirectoryPath = "#"
+const ROOT_DIRECTORY_PATH: RootDirectoryPath = "~"
 
 type FileSystemBreadcrumbsProps = {
     isViewingCargo: boolean

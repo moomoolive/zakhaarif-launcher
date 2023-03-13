@@ -1,4 +1,8 @@
-import type {ZakhaarifModEsModule, MainScriptArguments} from "zakhaarif-dev-tools"
+import type {
+	MainScriptArguments,
+	ZakhaarifModEsModule, 
+	ShaheenEngine
+} from "zakhaarif-dev-tools"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -53,12 +57,16 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 
+	const engine: ShaheenEngine = {
+		getRootCanvas: () => rootCanvas
+	}
+
 	for (const {mod, url} of imports) {
 		if (!("default" in mod)) {
 			console.error(`import ${url} does not contain a default export. ignoring...`)
 			continue
 		}
-		mod.default.init(rootCanvas)
+		mod.default.init(engine)
 	}
 	messageAppShell("readyForDisplay")
 }
