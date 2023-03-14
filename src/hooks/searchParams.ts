@@ -6,21 +6,27 @@ type SearchParams = [
 ]
 
 export const useSearchParams = (): SearchParams => {
-	const [searchParams, setSearch] = useState(new URLSearchParams(location.search))
+	const state = useState(new URLSearchParams(location.search))
+	const [searchParams, setSearch] = state
 
 	const searchRef = useRef(location.search)
-	const {current: setSearchParams} = useRef((newSearchParams: URLSearchParams) => {
+	
+	const setSearchParams = (newSearchParams: URLSearchParams) => {
+		console.log("new params", newSearchParams)
 		const newSearchString = newSearchParams.toString()
 		searchRef.current = newSearchString
 		const search = newSearchString.length > 0 ? `?${newSearchString}` : ""
 		const hash = location.hash.length > 0 ? `#${location.hash}` : ""
 		history.pushState("", "", `${location.pathname}${search}${hash}`)
 		setSearch(newSearchParams)
-	})
-
+	}
+	
 	useEffect(() => {
 		const handler = () => {
-			if (searchRef.current === location.search) {
+			const targetLocation = location.search.startsWith("?")
+				? location.search.slice(1)
+				: location
+			if (searchRef.current === targetLocation) {
 				return
 			}
 			setSearchParams(new URLSearchParams(location.search))

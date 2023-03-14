@@ -1,4 +1,4 @@
-import {useSearchParams, Link, useNavigate} from "react-router-dom"
+import {Link, useNavigate} from "react-router-dom"
 import {useEffect, useRef, useState} from "react"
 import {useEffectAsync} from "../hooks/effectAsync"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
@@ -23,6 +23,7 @@ import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
 import {CACHED, ManifestIndex} from "../lib/shabah/backend"
 import {GAME_EXTENSION_CARGO} from "../standardCargos"
+import {useSearchParams} from "../hooks/searchParams"
 
 export type ExtensionShellFunctions = SandboxFunctions
 

@@ -177,19 +177,24 @@ const AddOns = (): JSX.Element => {
 		setOffset(0)
 	})
 	const targetCargoRef = useRef(new HuzmaManifest<Permissions>())
-	const {current: setSearchKey} = useRef((key: string, value: string) => {
+	
+	const setSearchKey = (key: string, value: string) => {
 		searchParams.set(key, value)
 		setSearchParams(new URLSearchParams(searchParams))
-	})
-	const {current: removeSearchKey} = useRef((key: string) => {
+	}
+	
+	const removeSearchKey = (key: string) => {
 		searchParams.delete(key)
 		setSearchParams(new URLSearchParams(searchParams))
-	})
-	const {current: onBackToCargos} = useRef(() => {
+	}
+	
+	const onBackToCargos = () => {
 		removeSearchKey(ADDONS_VIEWING_CARGO)
-		removeSearchKey(ADDONS_MODAL)
+		if (searchParams.has(ADDONS_MODAL)) {
+			removeSearchKey(ADDONS_MODAL)
+		}
 		setFilterConfig({type: "updated", order: DESCENDING_ORDER})
-	})
+	}
 	const {current: showModal} = useRef((type: string) => {
 		setSearchKey(ADDONS_MODAL, type)
 	})
@@ -205,7 +210,9 @@ const AddOns = (): JSX.Element => {
 	const {current: clearAlert} = useRef(() => setAlertConfig(null))
 	const {current: setViewingCargo} = useRef((canonicalUrl: string) => {
 		const url = encodeURIComponent(canonicalUrl)
-		removeSearchKey(ADDONS_MODAL)
+		if (searchParams.has(ADDONS_MODAL)) {
+			removeSearchKey(ADDONS_MODAL)
+		}
 		setSearchKey(ADDONS_VIEWING_CARGO, url)
 		setFilterConfig({type: "name", order: DESCENDING_ORDER})
 	})
@@ -226,15 +233,6 @@ const AddOns = (): JSX.Element => {
 		setCargoCount((previous) => previous - 1)
 		return true
 	}
-
-	useEffect(() => {
-		if (!searchParams.has(ADDONS_VIEWING_CARGO)) {
-			return
-		}
-		if (!searchParams.has(ADDONS_VIEWING_DIRECTORY)) {
-			return
-		}
-	}, [searchParams])
 
 	useEffectAsync(async () => {
 		if (!searchParams.has(ADDONS_VIEWING_FILE_MODAL)) {
@@ -396,7 +394,6 @@ const AddOns = (): JSX.Element => {
 		}
 		targetCargoRef.current = new HuzmaManifest(cargo.data.pkg as HuzmaManifest<Permissions>)
 		setTargetIndex(index)
-		setFilterConfig({type: "name", order: DESCENDING_ORDER})
 		viewingCargoBytes.current = cargo.data.bytes
 	}, [searchParams])
 
