@@ -2,7 +2,6 @@ import {build} from "vite"
 import path from 'path'
 import {fileURLToPath} from 'url'
 import fs from "fs/promises"
-import {DEV_TOOL_ENTRIES, DEV_TOOLS_CJS_FOLDER} from "./config.mjs"
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const devToolBase = "src/zakhaarif-dev-tools"
@@ -45,16 +44,12 @@ const devDependencies = await (async () => {
 /** @type {import("type-fest").PackageJson} */
 const generatedPackageJson = {
     name: "zakhaarif-dev-tools",
-    version: "0.1.7",
+    version: "0.1.8",
     description: "developer tools to help create extension & mods for zakhaarif",
     type: "module",
     author: "mostafa elbannan",
     license: "MIT",
-    //main: "index.js",
-    exports: {
-        import: "./index.js",
-        require: "./cjs/index.cjs"
-    },
+    main: "index.js",
     types: "index.d.ts",
     devDependencies,
     keywords: ["zakhaarif", "dev", "mods", "extensions"],
@@ -85,24 +80,6 @@ await Promise.all(copyFiles.map(async (filename) => {
     const fullPath = path.join(__dirname, devToolBase, filename)
     const fileContents = await fs.readFile(fullPath, {encoding: "utf-8"})
     const writePath = path.join(__dirname, outDir, filename)
-    await fs.writeFile(writePath, fileContents, {encoding: "utf-8"})
-}))
-
-console.info(`${DEV_TOOL_NAME} copying declaration files for cjs package`)
-// copy declaration files
-await Promise.all(DEV_TOOL_ENTRIES.map(async (filename) => {
-    const fullPath = path.join(
-        __dirname,
-        outDir, 
-        filename.replace(".ts", ".d.ts")
-    )
-    const fileContents = await fs.readFile(fullPath, {encoding: "utf-8"})
-    const writePath = path.join(
-        __dirname, 
-        outDir,
-        DEV_TOOLS_CJS_FOLDER, 
-        filename.replace(".ts", ".d.ts")
-    )
     await fs.writeFile(writePath, fileContents, {encoding: "utf-8"})
 }))
 

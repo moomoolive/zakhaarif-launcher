@@ -8,4 +8,3 @@ export const DEV_TOOL_ENTRIES = [
     "extensions.ts",
     "engine.ts"
 ]
-export const DEV_TOOLS_CJS_FOLDER = "cjs"
