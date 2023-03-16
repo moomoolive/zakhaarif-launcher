@@ -14,7 +14,7 @@ pronounced [```/zakaarif/```](https://www.howtopronounce.com/arabic/%D8%B2%D8%AE
 (Arab, Turkish, Persian, etc.) culture, and folklore. The game is currently experimental and under 
 heavy development.
 
-This repo houses the official launcher for Zakhaarif and associated core extensions/mods.
+This repo houses Zakhaarif's official launcher, core extensions/mods, and dev tool library.
 
 #### Browser Support:
 ![Chrome](https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png) | ![Firefox](https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png) | ![IE](https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png) | ![Opera](https://raw.githubusercontent.com/alrra/browser-logos/master/src/opera/opera_48x48.png) | ![Safari](https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png)
@@ -47,6 +47,5 @@ Full conditions can be found at
 ## Related Projects
 
 - [Huzma: mod/extension format](https://github.com/moomoolive/huzma)
-- [Zakhaarif Dev Tools: tools for developing mods/extensions](https://github.com/moomoolive/zakhaarif-dev-tools)
 - [Zakhaarif Sandbox: a sandboxed execution context for extensions/mods](https://github.com/moomoolive/zakhaarif-sandbox)
 - [W-Worker-RPC: a message channel for communicating with sandbox](https://github.com/moomoolive/w-worker-rpc)
