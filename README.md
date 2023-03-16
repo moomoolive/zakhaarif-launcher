@@ -3,6 +3,8 @@
 ![CI Workflow](https://github.com/moomoolive/zakhaarif-launcher/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/github/license/moomoolive/zakhaarif-launcher)
 ![Lines of Code](https://sloc.xyz/github/moomoolive/zakhaarif-launcher)
+![Compiler](https://badges.aleen42.com/src/vitejs.svg)
+![Node Version](https://img.shields.io/badge/node-%3E%2017.8-blue)
 
 ## Welcome to Zakhaarif!
 >  A fantasy action RPG inspired by Islamic Sources, Middle-Eastern culture, and folklore
@@ -14,7 +16,7 @@ pronounced [```/zakaarif/```](https://www.howtopronounce.com/arabic/%D8%B2%D8%AE
 (Arab, Turkish, Persian, etc.) culture, and folklore. The game is currently experimental and under 
 heavy development.
 
-This repo houses Zakhaarif's official launcher, core extensions/mods, and dev tool library.
+This repo houses Zakhaarif's official launcher, core extensions/mods, and [dev tool library](https://www.npmjs.com/package/zakhaarif-dev-tools).
 
 #### Browser Support:
 ![Chrome](https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png) | ![Firefox](https://raw.githubusercontent.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png) | ![IE](https://raw.githubusercontent.com/alrra/browser-logos/master/src/edge/edge_48x48.png) | ![Opera](https://raw.githubusercontent.com/alrra/browser-logos/master/src/opera/opera_48x48.png) | ![Safari](https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png)
@@ -47,5 +49,6 @@ Full conditions can be found at
 ## Related Projects
 
 - [Huzma: mod/extension format](https://github.com/moomoolive/huzma)
+- [Zakhaarif Dev Tools: tools for developing mods/extensions](https://www.npmjs.com/package/zakhaarif-dev-tools)
 - [Zakhaarif Sandbox: a sandboxed execution context for extensions/mods](https://github.com/moomoolive/zakhaarif-sandbox)
 - [W-Worker-RPC: a message channel for communicating with sandbox](https://github.com/moomoolive/w-worker-rpc)
