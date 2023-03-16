@@ -23,7 +23,10 @@ module.exports = {
         "object-curly-spacing": ["error", "never"],
         "quotes": ["error", "double"],
         "no-shadow": ["error", {builtinGlobals: true}],
-        "@typescript-eslint/no-empty-interface": ["warn"]
+        "@typescript-eslint/no-empty-interface": ["warn"],
+        "no-console": ["error", {
+            allow: ["warn", "info", "error"]
+        }]
     },
     ignorePatterns: [
         "**/*.test.ts", 
@@ -38,5 +41,7 @@ module.exports = {
         ".husky",
         "huzem/src/zakhaarif-dev-tools/build",
         "huzem/src/zakhaarif-dev-tools",
+        "**/*.local.*",
+        "**/*.compiled.*"
     ]
 }

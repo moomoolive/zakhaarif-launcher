@@ -15,7 +15,11 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "checkJs": true
+    "checkJs": true,
+    "paths": {
+      "zakhaarif-dev-tools": ["./src/zakhaarif-dev-tools/src/index"],
+      "zakhaarif-dev-tools/*": ["./src/zakhaarif-dev-tools/src/*"]
+    }
   },
   "include": [
     "src", 

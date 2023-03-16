@@ -12,7 +12,6 @@ export const useSearchParams = (): SearchParams => {
 	const searchRef = useRef(location.search)
 	
 	const setSearchParams = (newSearchParams: URLSearchParams) => {
-		console.log("new params", newSearchParams)
 		const newSearchString = newSearchParams.toString()
 		searchRef.current = newSearchString
 		const search = newSearchString.length > 0 ? `?${newSearchString}` : ""

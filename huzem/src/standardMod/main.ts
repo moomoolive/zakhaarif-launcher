@@ -43,7 +43,7 @@ const ROOT_URL = import.meta.env.DEV
 
 export const main: GameSystem = async (mainEngine) => {
 	const canvas = mainEngine.getRootCanvas()
-	console.log("📦 mod imported")
+	console.info("📦 mod imported")
 	canvas.style.width = "100vw"
 	canvas.style.height = "100vh"
     
@@ -224,7 +224,7 @@ export const main: GameSystem = async (mainEngine) => {
     }
 	const heightMap = new HeightMap(rawHeightMap)
 	console.info(`imported height map (${heightMap.height},${heightMap.width}), with ${heightMap.uniqueDataPoints()} data points`)
-	console.log("chunking starting...")
+	console.info("chunking starting...")
 	const chunkStart = Date.now()
 	const colliders = VoxelColliders.fromHeightMap(
 		heightMap, 
@@ -708,7 +708,7 @@ export const main: GameSystem = async (mainEngine) => {
 
 		// some logging stuff
 		{
-			console.log("terrain chunks", chunkManager.chunkCount())
+			console.info("terrain chunks", chunkManager.chunkCount())
 		}
 
 		// adjust horizon

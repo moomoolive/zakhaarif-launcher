@@ -3,7 +3,7 @@ import {mod} from "zakhaarif-dev-tools"
 
 const linkedMod = mod().create({
 	alias: "zakhaarif.com/huzem/standardMod",
-	state: (_meta) => {
+	state: () => {
 		return {
 			transform: {x: 0.0, y: 0.0, z: 0.0},
 			impulse: {x: 0.0, y: 0.0, z: 0.0},
@@ -15,7 +15,17 @@ const linkedMod = mod().create({
 			rendering: {id: 0},
 		}
 	},
-	onBeforeGameLoop: (_engine) => {
+	onInit: (meta) => {
+		console.info("init called with meta", meta)
+	},
+	onBeforeGameLoop: (engine) => {
+		console.info("before game loop called", engine)
+		const {mods} = engine
+		engine.ecs.addSystem(() => {
+			console.info("system called")
+			console.info("mods", mods)
+			console.info("my mod", mods["zakhaarif.com/huzem/standardMod"])
+		})
 	},
 })
 

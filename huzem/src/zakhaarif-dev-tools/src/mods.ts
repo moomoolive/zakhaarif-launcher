@@ -18,7 +18,7 @@ export type ModMetadata = {
 export type StateEvent<State extends object> = (
     metadata: ModMetadata,
     engineCore: InitializedEngineCore, 
-) => State
+) => State | Promise<State>
 
 export type ModData<
     Alias extends string,
@@ -53,7 +53,9 @@ export type ModWrapper<
 
 export type GenericModWrapper = ModWrapper<string, object | undefined, object>
 
-export type ModView = GenericModWrapper
+export interface ModView extends GenericModWrapper {
+
+}
 
 export type LinkedMods<
     EngineModules extends ModModules,
@@ -69,7 +71,7 @@ export type LinkedMods<
                     },
                 mod["state"] extends undefined
                     ? {}
-                    : ReturnType<NonNullable<mod["state"]>>
+                    : Awaited<ReturnType<NonNullable<mod["state"]>>>
             >
         )
     }
@@ -85,7 +87,9 @@ export interface ModExtensions {}
 
 export type DependenciesDeclaration<
     Dependencies extends ModModules
-> = Dependencies extends [] ? {} : {
+> = Dependencies extends [] ? {
+    readonly dependencies?: never[]
+} : {
     // generics here made with the help of these answers:
     // https://stackoverflow.com/questions/71918556/typescript-creating-object-type-from-readonly-array
     // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
@@ -107,11 +111,17 @@ export type ModDeclaration<
     & ModData<Alias, ImmutableResources, State>
 )
 
-export type ShaheenEngine<
-    LinkedMods extends ModModules,
-> = (
+export interface Ecs<LinkedMods extends ModModules> {
+    addSystem: (handler: (engine: ShaheenEngine<LinkedMods>) => void) => number,
+    step: () => number
+}
+
+export type ShaheenEngine<LinkedMods extends ModModules> = (
     EngineLinkedMods<LinkedMods>
     & InitializedEngineCore
+    & {
+        ecs: Ecs<LinkedMods>
+    }
 )
 
 export type EnginePrimitives = Partial<PostInitializationCore>

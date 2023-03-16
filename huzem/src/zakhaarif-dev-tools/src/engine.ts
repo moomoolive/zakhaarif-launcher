@@ -1,10 +1,5 @@
-export interface Ecs {
-    addSystem: (system: () => void) => number
-}
-
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement
-    ecs: Ecs
     getDeltaTime: () => number
 }
 
