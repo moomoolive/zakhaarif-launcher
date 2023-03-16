@@ -3,7 +3,7 @@ import {mod} from "zakhaarif-dev-tools"
 
 const linkedMod = mod().create({
 	alias: "zakhaarif.com/huzem/standardMod",
-	state: ({canonicalUrl, resolvedUrl}) => {
+	state: (_meta) => {
 		return {
 			transform: {x: 0.0, y: 0.0, z: 0.0},
 			impulse: {x: 0.0, y: 0.0, z: 0.0},
@@ -15,8 +15,7 @@ const linkedMod = mod().create({
 			rendering: {id: 0},
 		}
 	},
-	onBeforeGameLoop: (engine) => {
-		const {mods} = engine
+	onBeforeGameLoop: (_engine) => {
 	},
 })
 

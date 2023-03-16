@@ -43,7 +43,6 @@ import {
 	ADDONS_RECOVERY_MODAL, 
 	ADDONS_UPDATE_MODAL, 
 	ADDONS_VIEWING_CARGO, 
-	ADDONS_VIEWING_DIRECTORY, 
 	ADDONS_VIEWING_FILE_MODAL
 } from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"

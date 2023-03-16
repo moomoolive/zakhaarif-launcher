@@ -1,10 +1,12 @@
-export type EngineCore = {
-    getRootCanvas: () => HTMLCanvasElement
+export interface Ecs {
+    addSystem: (system: () => void) => number
 }
 
-export interface EngineExtensions {}
-
-export type ExtendedEngineCore = (EngineCore & EngineExtensions)
+export type EngineCore = {
+    getRootCanvas: () => HTMLCanvasElement
+    ecs: Ecs
+    getDeltaTime: () => number
+}
 
 export type Ptr = number
 
@@ -20,6 +22,6 @@ export type PostInitializationCore = {
 }
 
 export type InitializedEngineCore = (
-    ExtendedEngineCore 
+    EngineCore 
     & PostInitializationCore
 )

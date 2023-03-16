@@ -20,7 +20,7 @@ dist-ssr
 **/*.local.*
 bundle-anaylsis/
 **/*.js.map
-huzem/src/zakhaarif-dev-tools/build/cjs/**
+huzem/src/zakhaarif-dev-tools/build/**
 
 # Editor directories and files
 .vscode/*

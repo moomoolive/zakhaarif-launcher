@@ -5,12 +5,12 @@
   "license": "AGPL-3",
   "scripts": {
     "dev": "npm run compile-credits && npm run sw-dev && vite",
-    "dev-huzem": "node ./huzem/devServer.mjs",
+    "dev-huzem": "npm run build-dev-tools && node ./huzem/devServer.mjs",
     "preview": "npm run build && vite preview --outDir dist --host",
     "build": "npm run build-main && npm run build-huzem",
     "build-main": "npm run compile-credits && npm run sw-prod && vite build && node ./cli/headers.mjs && npx huzma-create",
     "build-huzem": "npm run cache-assets && node ./cli/copyFolder.mjs --source=huzem/public/large-assets --dest=dist/large-assets && node ./huzem/build.mjs",
-    "build-dev-tools": "node ./huzem/buildDevTools.mjs", 
+    "build-dev-tools": "node ./huzem/buildDevTools.mjs",
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --minify --outfile=./public/sw.compiled.js",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --outfile=./public/dev-sw.compiled.js",
     "compile-credits": "node ./cli/compileCredits.mjs",
@@ -20,7 +20,9 @@
     "lint-fix": "npx eslint . --fix",
     "test-watch": "vitest watch",
     "test": "vitest run",
-    "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst"
+    "analyze-bundle": "npx vite-bundle-visualizer --output=bundle-anaylsis/index.html --open --template sunburst",
+    "install-githooks": "npx husky install && npx husky add .husky/pre-commit \"npm run pre-commit\"",
+    "pre-commit": "npm run lint-fix"
   },
   "dependencies": {
     "@emotion/react": "^11.10.5",
@@ -66,6 +68,7 @@
     "fast-png": "^6.1.0",
     "filehound": "^1.17.6",
     "fs-extra": "^11.1.0",
+    "husky": "^8.0.3",
     "node-fetch": "^3.3.0",
     "postcss": "^8.4.19",
     "semver": "^7.3.8",

@@ -1,7 +1,7 @@
 import type {
 	MainScriptArguments,
 	ZakhaarifModEsModule, 
-	ShaheenEngine
+	//ShaheenEngine
 } from "zakhaarif-dev-tools"
 
 export const main = async (args: MainScriptArguments) => {
@@ -62,7 +62,7 @@ export const main = async (args: MainScriptArguments) => {
 		getDeltaTime: () => 0.0,
 		ecs: {
 			systems: [],
-			addSystem: (system) => {
+			addSystem: () => {
 				return 1
 			}
 		}

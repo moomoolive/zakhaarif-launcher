@@ -34,6 +34,9 @@ module.exports = {
         "public",
         "**/vite-env.d.ts",
         "prototype",
-        "dist"
+        "dist",
+        ".husky",
+        "huzem/src/zakhaarif-dev-tools/build",
+        "huzem/src/zakhaarif-dev-tools",
     ]
 }

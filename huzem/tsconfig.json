@@ -21,7 +21,9 @@
     "src", 
     "config.mjs", 
     "build.mjs", 
-    "devServer.mjs"
+    "devServer.mjs",
+    "buildDevTools.mjs"
   ],
+  "exclude": ["src/zakhaarif-dev-tools/build"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

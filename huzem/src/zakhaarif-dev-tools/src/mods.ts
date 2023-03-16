@@ -1,7 +1,7 @@
 import type {
-    ExtendedEngineCore, 
-    InitializedEngineCore,
-    PostInitializationCore
+	EngineCore, 
+	InitializedEngineCore,
+	PostInitializationCore
 } from "./engine"
 
 export type ModDataResources<
@@ -53,7 +53,7 @@ export type ModWrapper<
 
 export type GenericModWrapper = ModWrapper<string, object | undefined, object>
 
-export interface ModView extends GenericModWrapper {}
+export type ModView = GenericModWrapper
 
 export type LinkedMods<
     EngineModules extends ModModules,
@@ -122,7 +122,7 @@ export type BeforeGameLoopEvent<
 
 export type InitEvent = (
     metadata: ModMetadata,
-    engineCore: ExtendedEngineCore, 
+    engineCore: EngineCore, 
 ) => Promise<EnginePrimitives | void> | EnginePrimitives | void
 
 export type ExitEvent<LinkedMods extends ModModules> = BeforeGameLoopEvent<LinkedMods>
@@ -161,7 +161,7 @@ export type Mod<
 export const mod = <
     Dependencies extends ModModules = []
 >() => ({
-    create: <
+		create: <
         Alias extends string,
         ImmutableResources extends object | undefined,
         State extends object
@@ -171,7 +171,7 @@ export const mod = <
         ImmutableResources,
         State
     >) => zMod
-})
+	})
 
 export type GenericMod = Mod<
     [], 
