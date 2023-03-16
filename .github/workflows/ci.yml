@@ -16,8 +16,10 @@ jobs:
         with:
           node-version: 18
           cache: "npm"
-      - name: build step
+      - name: install step
         run: npm i
+      - name: build step
+        run: npm run build-lib
       - name: linting
         run: npm run lint
       - name: type checking
