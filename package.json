@@ -10,6 +10,7 @@
     "build": "npm run build-main && npm run build-huzem",
     "build-main": "npm run compile-credits && npm run sw-prod && vite build && node ./cli/headers.mjs && npx huzma-create",
     "build-huzem": "npm run cache-assets && node ./cli/copyFolder.mjs --source=huzem/public/large-assets --dest=dist/large-assets && node ./huzem/build.mjs",
+    "build-dev-tools": "node ./huzem/buildDevTools.mjs", 
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --minify --outfile=./public/sw.compiled.js",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --outfile=./public/dev-sw.compiled.js",
     "compile-credits": "node ./cli/compileCredits.mjs",
@@ -73,6 +74,6 @@
     "typescript": "^4.9.4",
     "vite": "^3.2.3",
     "vitest": "^0.25.5",
-    "zakhaarif-dev-tools": "^0.1.3"
+    "zakhaarif-dev-tools": "file:huzem/src/zakhaarif-dev-tools/build"
   }
 }

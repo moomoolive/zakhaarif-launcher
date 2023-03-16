@@ -1,7 +1,22 @@
-import "zakhaarif-dev-tools"
+import * as Types from "zakhaarif-dev-tools"
 
 declare module "zakhaarif-dev-tools" {
-    export interface ShaheenEngineExtensions {}
+    type EcsSystem = (engine: Types.ShaheenEngine) => void
+
+    interface Ecs {
+        addSystem: (system: EcsSystem) => number
+    }
+
+    export interface ShaheenEngineExtensions {
+        getDeltaTime: () => number
+        ecs: Ecs
+    }
+
+    type Vec3 = {
+        x: number
+        y: number
+        z: number
+    }
 
     export interface ZakhaarifModExtensions {}
 

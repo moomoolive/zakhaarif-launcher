@@ -4,12 +4,16 @@ import {faHeartBroken} from "@fortawesome/free-solid-svg-icons"
 import LoadingIcon from "../../components/LoadingIcon"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {io} from "../../lib/monads/result"
-import {faNodeJs, faNpm} from "@fortawesome/free-brands-svg-icons"
+import {faNodeJs, faNpm, faFirefoxBrowser} from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../../lib/utils/consts/arabic"
 
 type CreditElement = {
     name: string
-    type: "npm" | "node"
+    type: (
+		"npm" 
+		| "node" 
+		| "mdn"
+	)
     url: string
 }
 
@@ -111,6 +115,10 @@ export function Acknowledgments(): JSX.Element {
 										case "node":
 											return <span className="text-green-600 mx-0.5">
 												<FontAwesomeIcon icon={faNodeJs}/>
+											</span>
+										case "mdn":
+											return <span className="text-orange-500">
+												<FontAwesomeIcon icon={faFirefoxBrowser}/>
 											</span>
 										case "npm":
 										default:

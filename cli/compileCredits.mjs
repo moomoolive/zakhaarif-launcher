@@ -42,13 +42,22 @@ const getRuntimesUsed = () => {
     const runtimes = [
         {name: "Node.js", type: "node", url: "https://nodejs.org/en/"}
     ]
-    console.log("found", runtimes.length, "runtimes")
+    console.info("found", runtimes.length, "runtimes")
     return runtimes
+}
+
+const getDocsUsed = () => {
+    const docs = [
+        {name: "Mozilla Developer Network", type: "mdn", url: "https://developer.mozilla.org/en-US/docs/Web"}
+    ]
+    console.info("found", docs.length, "doc sources")
+    return docs
 }
 
 /** @type {Array<{name: string, type: string, url: string}>} */
 const allCredits = [
     ...getRuntimesUsed(),
+    ...getDocsUsed(),
     ...(await getNpm("package.json")),
     ...(await getNpm("huzem/package.json")),
 ]

@@ -58,7 +58,14 @@ export const main = async (args: MainScriptArguments) => {
 	rootElement.appendChild(rootCanvas)
 
 	const engine: ShaheenEngine = {
-		getRootCanvas: () => rootCanvas
+		getRootCanvas: () => rootCanvas,
+		getDeltaTime: () => 0.0,
+		ecs: {
+			systems: [],
+			addSystem: (system) => {
+				return 1
+			}
+		}
 	}
 
 	for (const {mod, url} of imports) {
