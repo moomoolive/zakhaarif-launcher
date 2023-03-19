@@ -64,7 +64,7 @@ export const CargoSummary = ({
 		homepageUrl,
 		repo,
 		authors,
-		crateLogoUrl,
+		logoUrl,
 		permissions,
 	} = cargo
 
@@ -147,7 +147,7 @@ export const CargoSummary = ({
 			<div className="flex justify-start pb-3">
 				<CargoIcon 
 					importUrl={resolvedUrl}
-					crateLogoUrl={crateLogoUrl}
+					crateLogoUrl={logoUrl}
 					pixels={80}
 					className="mr-4 animate-fade-in-left"
 				/>

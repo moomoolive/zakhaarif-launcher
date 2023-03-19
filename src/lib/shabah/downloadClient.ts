@@ -302,7 +302,7 @@ export class Shabah {
 				bytes: update.downloadMetadata().cargoTotalBytes,
 				resolvedUrl: update.resolvedUrl,
 				canonicalUrl: update.canonicalUrl,
-				logo: update.newCargo?.crateLogoUrl || "",
+				logo: update.newCargo?.logoUrl || "",
 				downloadId: downloadQueueId,
 				manifestName: update.manifestName
 			}))

@@ -393,7 +393,7 @@ export const cargoToCargoIndex = (
 	const index: ManifestIndex = {
 		tag,
 		name: cargo.name,
-		logo: cargo.crateLogoUrl,
+		logo: cargo.logoUrl,
 		resolvedUrl: _resolvedUrl,
 		canonicalUrl,
 		bytes,

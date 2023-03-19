@@ -1,6 +1,13 @@
+export type TimeUtils = {
+    originTime: () => number
+    previousFrameTime: () => number
+    totalElapsedTime: () => number
+}
+
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement
     getDeltaTime: () => number
+    time: TimeUtils
 }
 
 export type Ptr = number

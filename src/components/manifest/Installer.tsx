@@ -43,7 +43,7 @@ const toCargoIndex = (
 	return {
 		tag: isExtension ? EXTENSION_CARGO_TAG : MOD_CARGO_TAG,
 		name: cargo.name,
-		logo: cargo.crateLogoUrl,
+		logo: cargo.logoUrl,
 		resolvedUrl,
 		canonicalUrl,
 		bytes,

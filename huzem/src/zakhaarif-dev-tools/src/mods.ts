@@ -10,10 +10,12 @@ export type ModDataResources<
     readonly resources: ImmutableResources 
 }
 
-export type ModMetadata = {
+export type ModMetadata = Readonly<{
     canonicalUrl: string
     resolvedUrl: string
-}
+    alias: string,
+    dependencies: string[]
+}>
 
 export type StateEvent<State extends object> = (
     metadata: ModMetadata,
@@ -34,53 +36,32 @@ export type GenericModData = ModData<string, object | undefined, object>
 
 export type ModModules = ReadonlyArray<GenericModData>
 
-export type ModWrapper<
-    Alias extends string,
-    ImmutableResources extends object | undefined,
-    State extends object
-> = (
-    ModMetadata
-    & {
-        readonly alias: Alias
-        readonly resources: ImmutableResources extends undefined
+type ModStateIndex<EngineModules extends ModModules> = {
+    [mod in EngineModules[number] as mod["alias"]]: (
+        mod["state"] extends undefined 
             ? {}
-            : ImmutableResources
-        state: State,
-        dependencies: string[]
-        originalModule: ModModule
-    }
-)
-
-export type GenericModWrapper = ModWrapper<string, object | undefined, object>
-
-export interface ModView extends GenericModWrapper {
-
+            : Awaited<ReturnType<NonNullable<mod["state"]>>>
+    )
 }
 
-export type LinkedMods<
-    EngineModules extends ModModules,
-> = (
-    {
-        [mod in EngineModules[number] as mod["alias"]]: (
-            ModWrapper<
-                mod["alias"], 
-                mod["resources"] extends undefined
-                    ? {}
-                    : { 
-                        readonly [key in keyof NonNullable<mod["resources"]>]: string 
-                    },
-                mod["state"] extends undefined
-                    ? {}
-                    : Awaited<ReturnType<NonNullable<mod["state"]>>>
-            >
-        )
-    }
-)
+type ModResourceIndex<EngineModules extends ModModules> = {
+    [mod in EngineModules[number] as mod["alias"]]: (
+        mod["resources"] extends undefined ? {} : { 
+            readonly [key in keyof NonNullable<mod["resources"]>]: string 
+        }
+    )
+}
+
+type ModMetadataIndex<EngineModules extends ModModules> = {
+    [mod in EngineModules[number] as mod["alias"]]: ModMetadata
+}
 
 export type EngineLinkedMods<
     EngineModules extends ModModules
 > = {
-    mods: LinkedMods<EngineModules>
+    state: () => ModStateIndex<EngineModules>
+    resouces: () => ModResourceIndex<EngineModules>
+    metadata: () => ModMetadataIndex<EngineModules>
 }
 
 export interface ModExtensions {}

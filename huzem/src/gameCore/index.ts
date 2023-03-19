@@ -1,9 +1,9 @@
 import type {
 	MainScriptArguments,
+	ModMetadata,
 	ModModule, 
 	ShaheenEngine
 } from "zakhaarif-dev-tools"
-import {ModWrapper} from "./modWrapper"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -77,6 +77,13 @@ export const main = async (args: MainScriptArguments) => {
 	rootElement.appendChild(rootCanvas)
 
 	const systems: ((e: typeof engine) => void)[] = []
+	let originTime = 0.0
+	let previousFrame = 0.0
+	let elapsedTime = 0.0
+	const stopLoop = false
+	const state = {}
+	const metadata = {}
+	const resources = {}
 
 	const engine: ShaheenEngine<[]> = {
 		allocator: {
@@ -87,9 +94,16 @@ export const main = async (args: MainScriptArguments) => {
 			realloc: () => 0,
 			free: () => 0
 		},
-		mods: {},
+		state: () => state,
+		metadata: () => metadata,
+		resouces: () => resources,
 		getRootCanvas: () => rootCanvas,
-		getDeltaTime: () => 0.0,
+		getDeltaTime: () => elapsedTime,
+		time: {
+			originTime: () => originTime,
+			previousFrameTime: () => previousFrame,
+			totalElapsedTime: () => (previousFrame - originTime) + elapsedTime
+		},
 		ecs: {
 			addSystem: (system) => {
 				systems.push(system)
@@ -104,35 +118,49 @@ export const main = async (args: MainScriptArguments) => {
 		}
 	}
 
-	for (const metadata of imports) {
-		const {importedModule, url} = metadata
+	for (const importMetadata of imports) {
+		const {importedModule, url} = importMetadata
 		if (!("default" in importedModule)) {
 			console.error(`import ${url} does not contain a default export. ignoring...`)
 			continue
 		}
 
 		const mod = importedModule.default
-		if (mod.onInit) {
-			await mod.onInit(metadata, engine)
+		
+		const modMetadata: ModMetadata = {
+			alias: mod.alias,
+			canonicalUrl: importMetadata.canonicalUrl,
+			resolvedUrl: importMetadata.resolvedUrl,
+			dependencies: mod.dependencies || [],
 		}
 		
-		const modWrapper = new ModWrapper({
-			alias: mod.alias,
-			canonicalUrl: metadata.canonicalUrl,
-			resolvedUrl: metadata.resolvedUrl,
-			dependencies: mod.dependencies || [],
-			originalModule: importedModule,
-			resources: mod.resources || {},
-			state: mod.state 
-				? await mod.state(metadata, engine)
-				: {}
-		})
+		if (mod.onInit) {
+			await mod.onInit(modMetadata, engine)
+		}
 
-		Object.defineProperty(engine.mods, mod.alias, {
+		const modState = mod.state 
+			? await mod.state(modMetadata, engine)
+			: {}
+		
+		Object.defineProperty(state, mod.alias, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
-			value: modWrapper
+			value: modState
+		})
+
+		Object.defineProperty(resources, mod.alias, {
+			configurable: true,
+			enumerable: true,
+			writable: true,
+			value: mod.resources || {}
+		})
+
+		Object.defineProperty(metadata, mod.alias, {
+			configurable: true,
+			enumerable: true,
+			writable: true,
+			value: modMetadata
 		})
 
 		if (mod.onBeforeGameLoop) {
@@ -141,8 +169,24 @@ export const main = async (args: MainScriptArguments) => {
 		
 	}
 
-	const stepResponse = engine.ecs.step()
-	console.info("ecs step returned", stepResponse)
+	const runGameLoop = (time: number) => {
+		elapsedTime = time - previousFrame
+		previousFrame = time
+
+		const _stepResponse = engine.ecs.step()
+
+		if (stopLoop) {
+			return
+		}
+		window.requestAnimationFrame(runGameLoop)
+	}
+
+	window.requestAnimationFrame((time) => {
+		originTime = time
+		previousFrame = time
+		console.info("starting game loop...")
+		window.requestAnimationFrame(runGameLoop)
+	})
 
 	messageAppShell("readyForDisplay")
 }
