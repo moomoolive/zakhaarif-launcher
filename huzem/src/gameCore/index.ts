@@ -1,9 +1,9 @@
 import type {
 	MainScriptArguments,
 	ModMetadata,
-	ModModule, 
-	ShaheenEngine
+	ModModule,
 } from "zakhaarif-dev-tools"
+import {Engine} from "./engine"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -76,47 +76,7 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 
-	const systems: ((e: typeof engine) => void)[] = []
-	let originTime = 0.0
-	let previousFrame = 0.0
-	let elapsedTime = 0.0
-	const stopLoop = false
-	const state = {}
-	const metadata = {}
-	const resources = {}
-
-	const engine: ShaheenEngine<[]> = {
-		allocator: {
-			getRawMemory: () => new WebAssembly.Memory({
-				initial: 1,
-			}),
-			malloc: () => 0,
-			realloc: () => 0,
-			free: () => 0
-		},
-		state: () => state,
-		metadata: () => metadata,
-		resouces: () => resources,
-		getRootCanvas: () => rootCanvas,
-		getDeltaTime: () => elapsedTime,
-		time: {
-			originTime: () => originTime,
-			previousFrameTime: () => previousFrame,
-			totalElapsedTime: () => (previousFrame - originTime) + elapsedTime
-		},
-		ecs: {
-			addSystem: (system) => {
-				systems.push(system)
-				return 1
-			},
-			step: () => {
-				for (const system of systems) {
-					system(engine)
-				}
-				return 0
-			}
-		}
-	}
+	const engine = new Engine({rootCanvas})
 
 	for (const importMetadata of imports) {
 		const {importedModule, url} = importMetadata
@@ -142,21 +102,21 @@ export const main = async (args: MainScriptArguments) => {
 			? await mod.state(modMetadata, engine)
 			: {}
 		
-		Object.defineProperty(state, mod.alias, {
+		Object.defineProperty(engine.modState, mod.alias, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
 			value: modState
 		})
 
-		Object.defineProperty(resources, mod.alias, {
+		Object.defineProperty(engine.modResources, mod.alias, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
 			value: mod.resources || {}
 		})
 
-		Object.defineProperty(metadata, mod.alias, {
+		Object.defineProperty(engine.modMetaData, mod.alias, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
@@ -170,20 +130,19 @@ export const main = async (args: MainScriptArguments) => {
 	}
 
 	const runGameLoop = (time: number) => {
-		elapsedTime = time - previousFrame
-		previousFrame = time
-
-		const _stepResponse = engine.ecs.step()
-
-		if (stopLoop) {
+		engine.elapsedTime = time - engine.previousFrame
+		engine.previousFrame = time
+		engine.ecs.step()
+		if (!engine.isRunning) {
 			return
 		}
 		window.requestAnimationFrame(runGameLoop)
 	}
 
 	window.requestAnimationFrame((time) => {
-		originTime = time
-		previousFrame = time
+		engine.originTime = time
+		engine.previousFrame = time
+		engine.isRunning = true
 		console.info("starting game loop...")
 		window.requestAnimationFrame(runGameLoop)
 	})

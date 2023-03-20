@@ -7,7 +7,7 @@ export type TimeUtils = {
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement
     getDeltaTime: () => number
-    time: TimeUtils
+    readonly time: TimeUtils
 }
 
 export type Ptr = number
@@ -20,7 +20,7 @@ export interface Allocator {
 }
 
 export type PostInitializationCore = {
-    allocator: Allocator
+    heap: Allocator
 }
 
 export type InitializedEngineCore = (

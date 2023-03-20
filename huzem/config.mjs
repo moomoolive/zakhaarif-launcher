@@ -6,5 +6,6 @@ export const DEV_TOOL_ENTRIES = [
     "permissions.ts",
     "huzem.ts",
     "extensions.ts",
-    "engine.ts"
+    "engine.ts",
+    "implement.ts"
 ]

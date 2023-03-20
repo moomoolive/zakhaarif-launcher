@@ -26,29 +26,25 @@ This repo houses Zakhaarif's official launcher, core extensions/mods, and [dev t
 ## Highlights
 
 - 📱 Cross-platform - if you have a browser, you can play
-- 📥 Instant Play - no download required to start playing, jump straight in 
-- 📦 First-Class Mods - everything is implemented as a mod (even the core game code!), meaning it's
-easy-peasy to make mods
+- 📥 Instant Play - start playing right away, no download required
+- 📦 First-Class Mods - mods are trivial to create and distribute
 - 🌐 Web Technologies - made with HTML, CSS, JS, and WASM
+
+## Quick Links
+
+- [Dev tools for developing mods & extensions](https://www.npmjs.com/package/zakhaarif-dev-tools)
+- [Mod & extension package reference](https://github.com/moomoolive/huzma)
+- [Sandbox for Extensions & Mods](https://github.com/moomoolive/zakhaarif-sandbox)
+- [Message channel for communicating with sandbox](https://github.com/moomoolive/w-worker-rpc)
 
 ## License
 
-All files in this repo are generally licensed under AGPL-3.0, 
+All files are generally licensed under AGPL-3.0, 
 meaning they are **free to use, modify, and distribute. Forever.**
 
-All files found under the ```huzem/public/large-assets```, files requested via the 
-```npm run cache-assets``` command, or files that have ```.asset``` in extension
-are proprietary (**NOT open-source**). Please do not distribute, sell, 
+All files requested via the 
+```npm run cache-assets``` command, files that originate from the [zakhaarif asset servers](https://github.com/moomoolive/zakhaarif-launcher/blob/master/cli/cacheAssets.mjs), or files that have ```.asset``` in file extension
+[are proprietary (**NOT open-source**)](https://github.com/moomoolive/zakhaarif-launcher/blob/master/cli/cacheAssets.mjs). Please do not distribute and/or sell
 the aforementioned files without explict
-permission. Feel free to use them in debugging, testing, developing extensions/mods, or 
+permission. Feel free to use assets in debugging, testing, developing extensions/mods, or 
 anything related to playing/developing for the Zakhaarif game. 
-
-Full conditions can be found at
-[```cli/cacheAssets.mjs```](https://github.com/moomoolive/zakhaarif-launcher/blob/master/cli/cacheAssets.mjs).
-
-## Related Projects
-
-- [Huzma: mod/extension format](https://github.com/moomoolive/huzma)
-- [Zakhaarif Dev Tools: tools for developing mods/extensions](https://www.npmjs.com/package/zakhaarif-dev-tools)
-- [Zakhaarif Sandbox: a sandboxed execution context for extensions/mods](https://github.com/moomoolive/zakhaarif-sandbox)
-- [W-Worker-RPC: a message channel for communicating with sandbox](https://github.com/moomoolive/w-worker-rpc)

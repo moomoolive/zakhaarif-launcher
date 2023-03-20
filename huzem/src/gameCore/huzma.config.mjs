@@ -1,5 +1,3 @@
-import {EXTENSION_METADATA} from "zakhaarif-dev-tools/extensions.js"
-
 // docs: https://github.com/moomoolive/huzma
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */
 export default {
@@ -27,5 +25,7 @@ export default {
         {key: "gameSaves", value: ["read", "write"]},
         {key: "embedExtensions", value: ["allowAll"]}
     ],
-    metadata: {...EXTENSION_METADATA},
+    metadata: {
+        "is-extension": "true"
+    },
 }

@@ -4,12 +4,6 @@ import type {
 	PostInitializationCore
 } from "./engine"
 
-export type ModDataResources<
-    ImmutableResources extends object | undefined
-> = ImmutableResources extends undefined ? {} : { 
-    readonly resources: ImmutableResources 
-}
-
 export type ModMetadata = Readonly<{
     canonicalUrl: string
     resolvedUrl: string
@@ -22,9 +16,11 @@ export type StateEvent<State extends object> = (
     engineCore: InitializedEngineCore, 
 ) => State | Promise<State>
 
+type ImmutableResourceMap = object | undefined
+
 export type ModData<
     Alias extends string,
-    ImmutableResources extends object | undefined,
+    ImmutableResources extends ImmutableResourceMap,
     State extends object
 > = {
     readonly alias: Alias,
@@ -32,7 +28,7 @@ export type ModData<
     state?: StateEvent<State>
 }
 
-export type GenericModData = ModData<string, object | undefined, object>
+export type GenericModData = ModData<string, ImmutableResourceMap, object>
 
 export type ModModules = ReadonlyArray<GenericModData>
 
@@ -69,7 +65,7 @@ export interface ModExtensions {}
 export type DependenciesDeclaration<
     Dependencies extends ModModules
 > = Dependencies extends [] ? {
-    readonly dependencies?: never[]
+    readonly dependencies?: string[]
 } : {
     // generics here made with the help of these answers:
     // https://stackoverflow.com/questions/71918556/typescript-creating-object-type-from-readonly-array
@@ -85,14 +81,18 @@ export type DependenciesDeclaration<
 export type ModDeclaration<
     Dependencies extends ModModules,
     Alias extends string,
-    ImmutableResources extends object | undefined,
+    ImmutableResources extends ImmutableResourceMap,
     State extends object
 > = (
     DependenciesDeclaration<Dependencies> 
     & ModData<Alias, ImmutableResources, State>
 )
 
-export interface Ecs<LinkedMods extends ModModules> {
+export type EcsSystem<
+    LinkedMods extends ModModules
+> = (engine: ShaheenEngine<LinkedMods>) => void 
+
+export type Ecs<LinkedMods extends ModModules> = {
     addSystem: (handler: (engine: ShaheenEngine<LinkedMods>) => void) => number,
     step: () => number
 }
@@ -121,7 +121,7 @@ export type ExitEvent<LinkedMods extends ModModules> = BeforeGameLoopEvent<Linke
 export type ModLifeCycleEvents<
     Dependencies extends ModModules,
     Alias extends string,
-    ImmutableResources extends object | undefined,
+    ImmutableResources extends ImmutableResourceMap,
     State extends object
 > = {
     onInit?: InitEvent
@@ -141,7 +141,7 @@ export type ModLifeCycleEvents<
 export type Mod<
     Dependencies extends ModModules,
     Alias extends string,
-    ImmutableResources extends object | undefined,
+    ImmutableResources extends ImmutableResourceMap,
     State extends object
 > = (
     ModDeclaration<Dependencies, Alias, ImmutableResources, State>
@@ -154,20 +154,23 @@ export const mod = <
 >() => ({
 		create: <
         Alias extends string,
-        ImmutableResources extends object | undefined,
+        ImmutableResources extends ImmutableResourceMap,
         State extends object
-    >(zMod: Mod<
-        Dependencies, 
-        Alias, 
-        ImmutableResources,
-        State
-    >) => zMod
+    >(zMod: ImmutableResources extends Record<string, string> | undefined 
+        ? Mod<
+            Dependencies, 
+            Alias, 
+            ImmutableResources,
+            State
+        >
+        : never
+    ) => zMod
 	})
 
 export type GenericMod = Mod<
     [], 
     string, 
-    object,
+    ImmutableResourceMap,
     object
 >
 
