@@ -6,20 +6,20 @@ import {ReactNode} from "react"
 export type CargoIconProps = {
     importUrl: string
     pixels: number
-    crateLogoUrl: string
+    logoUrl: string
     className?: string
     customIcon?: ReactNode
 }
 
 export const CargoIcon = ({
-	crateLogoUrl, 
+	logoUrl, 
 	importUrl, 
 	pixels, 
 	className = "",
 	customIcon = null
 }: CargoIconProps) => {
 	const cssPixels = `${pixels}px`
-	return crateLogoUrl === "" || crateLogoUrl === CARGO_NULL_FIELD
+	return logoUrl === "" || logoUrl === CARGO_NULL_FIELD
 		?   <div 
 			className={"flex items-center justify-center rounded-2xl bg-neutral-900 shadow-lg " + className}
 			style={{minWidth: cssPixels, height: cssPixels}}
@@ -34,7 +34,7 @@ export const CargoIcon = ({
 		</div>
 		:   <div className={className}>
 			<img 
-				src={`${importUrl}${crateLogoUrl}`}
+				src={`${importUrl}${logoUrl}`}
 				crossOrigin=""
 				className="rounded-2xl bg-neutral-900 shadow-lg"
 				style={{minWidth: cssPixels, height: cssPixels}}

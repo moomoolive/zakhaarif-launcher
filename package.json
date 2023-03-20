@@ -35,7 +35,7 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@mui/material": "^5.10.16",
     "dexie": "^3.2.2",
-    "huzma": "^0.6.0",
+    "huzma": "^0.6.2",
     "material-ui-confirm": "^3.0.7",
     "nanoid": "^4.0.0",
     "react": "^18.2.0",

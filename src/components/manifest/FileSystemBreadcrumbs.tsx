@@ -234,7 +234,7 @@ export const FileSystemBreadcrumbs = ({
 								>
 									<CargoIcon 
 										importUrl={targetCargo.resolvedUrl}
-										crateLogoUrl={targetCargo.logo}
+										logoUrl={targetCargo.logo}
 										pixels={17}
 										className="animate-fade-in-left"
 									/>

@@ -282,7 +282,7 @@ const ExtensionsListPage = (): JSX.Element => {
 											<CargoIcon 
 												pixels={80}
 												importUrl={resolvedUrl}
-												crateLogoUrl={logo}
+												logoUrl={logo}
 												className="hover:shadow-2xl"
 											/>
 										</div>

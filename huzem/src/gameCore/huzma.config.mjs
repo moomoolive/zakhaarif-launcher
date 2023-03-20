@@ -4,7 +4,7 @@ import {EXTENSION_METADATA} from "zakhaarif-dev-tools/extensions.js"
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */
 export default {
     buildDir: "dist/huzem/gameCore",
-    huzmaName: "stable.huzma.json",
+    outFile: "dist/huzem/gameCore/stable.huzma.json",
     ignore: [
         "build-manifest",
         "**/*.map"

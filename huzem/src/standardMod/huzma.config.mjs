@@ -2,7 +2,7 @@
 /** @type {import("zakhaarif-dev-tools").HuzmaConfig} */
 export default {
     buildDir: "dist/huzem/standardMod",
-    huzmaName: "stable.huzma.json",
+    outFile: "dist/huzem/standardMod/stable.huzma.json",
     ignore: [
         "build-manifest",
         "**/*.map"
