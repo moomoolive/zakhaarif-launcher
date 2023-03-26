@@ -28,6 +28,9 @@
     "devServer.mjs",
     "buildDevTools.mjs"
   ],
-  "exclude": ["src/zakhaarif-dev-tools/build/"],
+  "exclude": [
+    "src/zakhaarif-dev-tools/build/",
+    "src/gameCore/engine_allocator/pkg/engine_allocator.js"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

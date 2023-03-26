@@ -42,6 +42,7 @@ module.exports = {
         "huzem/src/zakhaarif-dev-tools/build",
         "huzem/src/zakhaarif-dev-tools",
         "**/*.local.*",
-        "**/*.compiled.*"
+        "**/*.compiled.*",
+        "huzem/src/gameCore/engine_allocator"
     ]
 }

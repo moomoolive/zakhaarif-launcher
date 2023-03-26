@@ -10,7 +10,7 @@
     "preview": "npm run build && vite preview --outDir dist --host",
     "build": "npm run build-lib && npm run build-main && npm run build-huzem",
     "build-main": "npm run compile-credits && npm run sw-prod && vite build && node ./cli/headers.mjs && npx huzma-create",
-    "build-huzem": "npm run cache-assets && node ./cli/copyFolder.mjs --source=huzem/public/large-assets --dest=dist/large-assets && node ./huzem/build.mjs",
+    "build-huzem": "npm run cache-assets && node ./cli/copyFolder.mjs --source=huzem/public/large-assets --dest=dist/large-assets && node ./cli/copyFolder.mjs --source=huzem/public/wasm-lib --dest=dist/wasm-lib && node ./huzem/build.mjs",
     "build-lib": "node ./huzem/buildDevTools.mjs",
     "sw-prod": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --minify --outfile=./public/sw.compiled.js",
     "sw-dev": "esbuild ./serviceWorkers/index.ts --bundle --sourcemap --outfile=./public/dev-sw.compiled.js",

@@ -8,24 +8,28 @@ import type {
 	EcsImpl,
 	EcsSystemImpl
 } from "zakhaarif-dev-tools/implement"
+import {
+	calloc, 
+	realloc,
+	malloc,
+	free,
+} from "./engine_allocator/pkg/engine_allocator"
 
 class Heap implements Allocator {
-    
+	malloc = malloc
+	calloc = calloc
+	free = free
+	realloc = realloc
+
+	private wasmMemory: WebAssembly.Memory
+
+	constructor(wasmMemory: WebAssembly.Memory) {
+		this.wasmMemory = wasmMemory
+	}
+	
 	getRawMemory(): WebAssembly.Memory {
-		return new WebAssembly.Memory({initial: 1})
+		return this.wasmMemory
 	}
-
-	malloc(_byteSize: number): number {
-		return 0
-	}
-
-	realloc(_ptr: number, _byteSize: number): number {
-		return 0
-	}
-
-	free(_ptr: number): number {
-		return 0
-	} 
 }
 
 type EcsConfig = {
@@ -60,6 +64,7 @@ export class EngineEcs implements EcsImpl {
 
 export type EngineConfig = {
     rootCanvas: HTMLCanvasElement
+	heapMemory: WebAssembly.Memory
 }
 
 export type CompiledState = Record<string, object>
@@ -82,7 +87,7 @@ export class Engine implements ShaheenEngineImpl {
 	private canvas: HTMLCanvasElement
 
 	constructor(config: EngineConfig) {
-		this.heap = new Heap()
+		this.heap = new Heap(config.heapMemory)
 		this.isRunning = true
 		const self = this
 		this.ecs = new EngineEcs({engine: self})

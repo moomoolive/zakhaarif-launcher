@@ -10,13 +10,17 @@ export type EngineCore = {
     readonly time: TimeUtils
 }
 
-export type Ptr = number
-
 export interface Allocator {
     getRawMemory: () => WebAssembly.Memory
-    malloc: (byteSize: number) => Ptr
-    realloc: (ptr: Ptr, byteSize: number) => Ptr
-    free: (ptr: Ptr) => number
+    malloc: (byteSize: number, alignment: number) => number
+    calloc: (byteSize: number, alignment: number) => number
+    realloc: (
+        ptr: number, 
+        oldByteSize: number, 
+        oldAlignment: number, 
+        newByteSize: number
+    ) => number
+    free: (ptr: number, byteSize: number, alignment: number) => void
 }
 
 export type PostInitializationCore = {

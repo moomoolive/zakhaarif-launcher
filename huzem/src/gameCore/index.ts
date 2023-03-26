@@ -4,6 +4,10 @@ import type {
 	ModModule,
 } from "zakhaarif-dev-tools"
 import {Engine} from "./engine"
+import initHeap from "./engine_allocator/pkg/engine_allocator"
+import {wasmMap} from "../wasmBinaryPaths.mjs"
+
+const HEAP_RELATIVE_URL = wasmMap.engine_allocator
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -76,7 +80,16 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 
-	const engine = new Engine({rootCanvas})
+	const heapUrl = new URL(
+		HEAP_RELATIVE_URL, import.meta.url
+	).href
+	console.info("Loading heap...", heapUrl)
+	const heapModule = await initHeap(heapUrl)
+
+	const engine = new Engine({
+		rootCanvas,
+		heapMemory: heapModule.memory
+	})
 
 	for (const importMetadata of imports) {
 		const {importedModule, url} = importMetadata

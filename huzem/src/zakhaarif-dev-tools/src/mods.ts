@@ -60,8 +60,6 @@ export type EngineLinkedMods<
     metadata: () => ModMetadataIndex<EngineModules>
 }
 
-export interface ModExtensions {}
-
 export type DependenciesDeclaration<
     Dependencies extends ModModules
 > = Dependencies extends [] ? {
@@ -137,7 +135,6 @@ export type ModLifeCycleEvents<
     ]>,
 }
 
-
 export type Mod<
     Dependencies extends ModModules,
     Alias extends string,
@@ -146,7 +143,6 @@ export type Mod<
 > = (
     ModDeclaration<Dependencies, Alias, ImmutableResources, State>
     & ModLifeCycleEvents<Dependencies, Alias, ImmutableResources, State>
-    & ModExtensions
 )
 
 export const mod = <
