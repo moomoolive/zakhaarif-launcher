@@ -1,21 +1,19 @@
 import {useEffect, useState, useRef} from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
-import {faHeartBroken} from "@fortawesome/free-solid-svg-icons"
+import {faCubes, faHeartBroken} from "@fortawesome/free-solid-svg-icons"
 import LoadingIcon from "../../components/LoadingIcon"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {io} from "../../lib/monads/result"
-import {faNodeJs, faNpm, faFirefoxBrowser} from "@fortawesome/free-brands-svg-icons"
+import {
+	faNodeJs, 
+	faNpm, 
+	faFirefoxBrowser, 
+	faRust
+} from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../../lib/utils/consts/arabic"
+import type {Acknowledgment} from "../../lib/types/app"
 
-type CreditElement = {
-    name: string
-    type: (
-		"npm" 
-		| "node" 
-		| "mdn"
-	)
-    url: string
-}
+type CreditElement = Acknowledgment
 
 const CREDITS_DIV_ID = "credits-compiled"
 
@@ -119,6 +117,14 @@ export function Acknowledgments(): JSX.Element {
 										case "mdn":
 											return <span className="text-orange-500">
 												<FontAwesomeIcon icon={faFirefoxBrowser}/>
+											</span>
+										case "rust":
+											return <span className="text-red-400">
+												<FontAwesomeIcon icon={faRust}/>
+											</span>
+										case "crates.io":
+											return <span className="text-amber-300">
+												<FontAwesomeIcon icon={faCubes}/>
 											</span>
 										case "npm":
 										default:

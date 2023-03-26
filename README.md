@@ -3,8 +3,9 @@
 ![CI Workflow](https://github.com/moomoolive/zakhaarif-launcher/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/github/license/moomoolive/zakhaarif-launcher)
 ![Lines of Code](https://sloc.xyz/github/moomoolive/zakhaarif-launcher)
-![Compiler](https://badges.aleen42.com/src/vitejs.svg)
-![Node Version](https://img.shields.io/badge/node-%3E%2017.8-blue)
+[![Compiler](https://badges.aleen42.com/src/vitejs.svg)](https://vitejs.dev/)
+[![Node Version](https://img.shields.io/badge/node-17.9%2B-blue)](https://nodejs.org/en)
+[![Rust Version](https://img.shields.io/badge/rustc-1.68%2B-red)](https://www.rust-lang.org/)
 
 ## Welcome to Zakhaarif!
 >  A fantasy action RPG inspired by Islamic Sources, Middle-Eastern culture, and folklore

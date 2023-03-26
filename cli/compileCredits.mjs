@@ -1,14 +1,59 @@
 #!/usr/bin/env node
 import fs from "fs/promises"
+import toml from "toml"
 
 const CREDITS_OUTPUT = "public/credits.compiled.json"
 
 console.info("building credits file...")
 
 /**
- * 
- * @param {string} packageJsonPath 
- * @returns {Promise<Array<{name: string, type: string, url: string}>>}
+ * @typedef {import("../src/lib/types/app").Acknowledgment} AcknowledgementElement
+ */
+
+/**
+ * @param {string} cargoTomlPath
+ */
+const getCargo = async (cargoTomlPath) => {
+    const cargoTomlText = await fs.readFile(cargoTomlPath, {
+        encoding: "utf-8"
+    })
+    /** @type {{dependencies?: Record<string, unknown>}} */
+    const parsedCargoToml = toml.parse(cargoTomlText)
+    const allNames = Object.keys(parsedCargoToml.dependencies || {})
+    /** @type {AcknowledgementElement[]} */
+    const dependencies = allNames.map((name) => ({
+        name,
+        type: "crates.io",
+        url: `https://crates.io/crates/${name}`
+    }))
+    return dependencies
+}
+
+const getAllCargoDependencies = async () => {
+    const cargoPaths = [
+        "huzem/src/gameCore/engine_allocator/Cargo.toml"
+    ]
+    const allDependencies = await Promise.all(
+        cargoPaths.map((path) => getCargo(path))
+    )
+    const allCratesioDeps = allDependencies.flat()
+    /** @type {AcknowledgementElement[]} */
+    const compiled = []
+    /** @type {Map<string, boolean>} */
+    const packageMap = new Map()
+    for (const pkg of allCratesioDeps) {
+        if (packageMap.has(pkg.name)) {
+            continue
+        }
+        packageMap.set(pkg.name, true)
+        compiled.push(pkg)
+    }
+    console.info("found", compiled.length, `crates.io dependencies @ ${cargoPaths.join(", ")}`)
+    return compiled
+}
+
+/**
+ * @param {string} packageJsonPath
  */
 const getNpm = async (packageJsonPath) => {
     const packagejsonText = await fs.readFile(packageJsonPath,
@@ -26,6 +71,7 @@ const getNpm = async (packageJsonPath) => {
         "npm"
     ].sort()
     
+    /** @type {AcknowledgementElement[]} */
     const npmDependenciesWithLinks = npmDependencies.map((dependency) => {
         return {
             name: dependency,
@@ -33,20 +79,47 @@ const getNpm = async (packageJsonPath) => {
             url: `https://npmjs.com/package/${dependency}`
         }
     })
-    
-    console.info("found", npmDependencies.length, `npm dependencies @ ${packageJsonPath}`)
     return npmDependenciesWithLinks
 }
 
+const allNpmPackages = async () => {
+    const pkgPaths = [
+        "package.json", "huzem/package.json"
+    ]
+    const pkgPromises = await Promise.all(
+        pkgPaths.map((pkgPath) => getNpm(pkgPath))
+    )
+    const allPackages = pkgPromises.flat()
+    /** @type {AcknowledgementElement[]} */
+    const filteredPackages = []
+    /** @type {Map<string, boolean>} */
+    const packageMap = new Map()
+    for (const pkg of allPackages) {
+        if (
+            packageMap.has(pkg.name) 
+            || pkg.name === "zakhaarif-huzem-internal-pkg"
+        ) {
+            continue
+        }
+        packageMap.set(pkg.name, true)
+        filteredPackages.push(pkg)
+    }
+    console.info("found", filteredPackages.length, `npm dependencies @ ${pkgPaths.join(", ")}`)
+    return filteredPackages
+}
+
 const getRuntimesUsed = () => {
+    /** @type {AcknowledgementElement[]} */
     const runtimes = [
-        {name: "Node.js", type: "node", url: "https://nodejs.org/en/"}
+        {name: "Node.js", type: "node", url: "https://nodejs.org/en/"},
+        {name: "Rust", type: "rust", url: "https://www.rust-lang.org/"},
     ]
     console.info("found", runtimes.length, "runtimes")
     return runtimes
 }
 
 const getDocsUsed = () => {
+    /** @type {AcknowledgementElement[]} */
     const docs = [
         {name: "Mozilla Developer Network", type: "mdn", url: "https://developer.mozilla.org/en-US/docs/Web"}
     ]
@@ -54,12 +127,12 @@ const getDocsUsed = () => {
     return docs
 }
 
-/** @type {Array<{name: string, type: string, url: string}>} */
+/** @type {AcknowledgementElement[]} */
 const allCredits = [
     ...getRuntimesUsed(),
     ...getDocsUsed(),
-    ...(await getNpm("package.json")),
-    ...(await getNpm("huzem/package.json")),
+    ...(await allNpmPackages()),
+    ...(await getAllCargoDependencies())
 ]
 
 await fs.writeFile(CREDITS_OUTPUT, JSON.stringify(allCredits), {
