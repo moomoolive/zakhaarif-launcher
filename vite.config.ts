@@ -3,12 +3,13 @@ import react from "@vitejs/plugin-react"
 import sirv from "sirv"
 
 // taken from https://github.com/chaosprint/vite-plugin-cross-origin-isolation
-const serverAllowSharedArrayBuffer = () => ({
+export const serverAllowSharedArrayBuffer = () => ({
 	name: "allow-shared-array-buffers",
 	configureServer: (server) => {
 		server.middlewares.use(function allowSharedArrayBuffers(_, res, next) {
 			res.setHeader("Cross-Origin-Embedder-Policy", "require-corp")
 			res.setHeader("Cross-Origin-Opener-Policy", "same-origin")
+			res.setHeader("Cross-Origin-Resource-Policy", "cross-origin")
 			res.setHeader("X-Frame-Options", "deny")
 			res.setHeader("Access-Control-Allow-Origin", "*")
 			next()

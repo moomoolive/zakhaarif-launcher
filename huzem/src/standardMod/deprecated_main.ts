@@ -44,8 +44,9 @@ const ROOT_URL = import.meta.env.DEV
 export const main: GameSystem = async (mainEngine) => {
 	const canvas = mainEngine.getRootCanvas()
 	console.info("📦 mod imported")
-	canvas.style.width = "100vw"
-	canvas.style.height = "100vh"
+	canvas.style.width = "100px"
+	canvas.style.height = "100px"
+	canvas.style.zIndex = "0"
     
 	const engine = new Engine(canvas, true, {
 		adaptToDeviceRatio: true,
@@ -62,7 +63,7 @@ export const main: GameSystem = async (mainEngine) => {
 	Database.IDBStorageEnabled = false
 
 	const scene = new Scene(engine, {})
-	//scene.debugLayer.show({embedMode: true})
+	scene.debugLayer.show()
     
 	const camera = new ArcRotateCamera(
 		"camera", 

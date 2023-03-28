@@ -10,6 +10,7 @@ import {
 	processMouseInput,
 	playerController
 } from "./systems"
+import {DebugLayer} from "babylonjs"
 
 const linkedMod = mod().create({
 	alias: "zakhaarifStd",
@@ -27,8 +28,17 @@ const linkedMod = mod().create({
 
 		const {zakhaarifStd} = engine.state()
 
-		const {skybox, controller} = zakhaarifStd
+		const {skybox, controller, scene} = zakhaarifStd
 		skybox.setEnabled(true)
+		console.info("IMPORT META", import.meta.url)
+		DebugLayer.InspectorURL = new URL(
+			"/debug/babylonjs-inspector.js", 
+			engine.metadata().zakhaarifStd.resolvedUrl
+		).href
+		scene.debugLayer.show({
+			embedMode: true,
+			overlay: true,
+		})
 
 		window.addEventListener("keydown", (e) => {
 			if (e.repeat) {
