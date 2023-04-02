@@ -4,10 +4,21 @@ export type TimeUtils = {
     totalElapsedTime: () => number
 }
 
+export type ThreadUtils = {
+    isMainThread: () => boolean
+    threadId: () => number
+}
+
+export type ConsoleCommand = (input: object) => unknown
+
+export type ConsoleCommandIndex = Record<string, ConsoleCommand>
+
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement
     getDeltaTime: () => number
     readonly time: TimeUtils
+    readonly threads: ThreadUtils
+    zconsole: Record<string, ConsoleCommand>
 }
 
 export interface Allocator {
@@ -24,7 +35,7 @@ export interface Allocator {
 }
 
 export type PostInitializationCore = {
-    heap: Allocator
+    wasmHeap: Allocator
 }
 
 export type InitializedEngineCore = (

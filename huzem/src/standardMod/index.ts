@@ -1,4 +1,7 @@
-import {InferGameSystem, mod} from "zakhaarif-dev-tools"
+import {
+	InferUtils,
+	zmod
+} from "zakhaarif-dev-tools"
 import {stateHandler} from "./events"
 import {
 	render,
@@ -12,7 +15,8 @@ import {
 } from "./systems"
 import {DebugLayer} from "babylonjs"
 
-const linkedMod = mod().create({
+export const mod = zmod().create({
+	systems: {},
 	alias: "zakhaarifStd",
 	state: stateHandler,
 	onInit: (meta) => {
@@ -20,7 +24,7 @@ const linkedMod = mod().create({
 	},
 	onBeforeGameLoop: (engine) => {
 		console.info("before game loop called", engine)
-		
+
 		const canvas = engine.getRootCanvas()
 		canvas.style.width = "100vw"
 		canvas.style.height = "100vh"
@@ -28,17 +32,13 @@ const linkedMod = mod().create({
 
 		const {zakhaarifStd} = engine.state()
 
-		const {skybox, controller, scene} = zakhaarifStd
+		const {skybox, controller} = zakhaarifStd
 		skybox.setEnabled(true)
 		console.info("IMPORT META", import.meta.url)
 		DebugLayer.InspectorURL = new URL(
 			"/debug/babylonjs-inspector.js", 
 			engine.metadata().zakhaarifStd.resolvedUrl
 		).href
-		scene.debugLayer.show({
-			embedMode: true,
-			overlay: true,
-		})
 
 		window.addEventListener("keydown", (e) => {
 			if (e.repeat) {
@@ -169,11 +169,29 @@ const linkedMod = mod().create({
 		engine.ecs.addSystem(applyTransforms)
 		engine.ecs.addSystem(visualChanges)
 		engine.ecs.addSystem(render)
+
+		engine.addConsoleCommand({
+			name: "gldebugger",
+			args: {show: "boolean?"},
+			fn: (gameEngine, input) => {
+				if (input.show === undefined) {
+					return "no valid options detected"
+				}
+				const {scene} = gameEngine.state().zakhaarifStd
+				if (!input.show) {
+					scene.debugLayer.hide()
+					return "closed"
+				}
+				scene.debugLayer.show({
+					embedMode: true,
+					overlay: true,
+				})
+				return "opened"
+			}
+		})
 	},
 })
 
-export type ModType = typeof linkedMod
+export type ModUtils = InferUtils<typeof mod>
 
-export type GameSystem = InferGameSystem<ModType>
-
-export default linkedMod
+export type GameSystem = ModUtils["system"]

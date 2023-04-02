@@ -17,7 +17,8 @@
         {
             "key":"webRequest",
             "value":[
-                "http://localhost:7888/debug/babylonjs-inspector.js"
+                "http://localhost:7888/debug/babylonjs-inspector.js",
+                "https://unpkg.com/babylonjs-inspector@5.51.0/babylon.inspector.bundle.js.map"
             ]
         }
     ] 

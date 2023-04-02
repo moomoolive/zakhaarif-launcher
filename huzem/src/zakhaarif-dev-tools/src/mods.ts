@@ -100,6 +100,9 @@ export type ShaheenEngine<LinkedMods extends ModModules> = (
     & InitializedEngineCore
     & {
         ecs: Ecs<LinkedMods>
+        addConsoleCommand: <
+            T extends ConsoleCommandInputDeclaration
+        >(command: ModConsoleCommand<ShaheenEngine<LinkedMods>, T>) => void
     }
 )
 
@@ -114,56 +117,110 @@ export type InitEvent = (
     engineCore: EngineCore, 
 ) => Promise<EnginePrimitives | void> | EnginePrimitives | void
 
-export type ExitEvent<LinkedMods extends ModModules> = BeforeGameLoopEvent<LinkedMods>
+export type ExitEvent<
+    LinkedMods extends ModModules
+> = BeforeGameLoopEvent<LinkedMods>
 
-export type ModLifeCycleEvents<
-    Dependencies extends ModModules,
-    Alias extends string,
-    ImmutableResources extends ImmutableResourceMap,
-    State extends object
-> = {
+export type ModLifeCycleEvents<LinkedMods extends ModModules> = {
     onInit?: InitEvent
     
-    onBeforeGameLoop?: BeforeGameLoopEvent<[
-        ...Dependencies, 
-        ModData<Alias, ImmutableResources, State>
-    ]>
+    onBeforeGameLoop?: BeforeGameLoopEvent<LinkedMods>
     
-    onExit?: ExitEvent<[
-        ...Dependencies, 
-        ModData<Alias, ImmutableResources, State>
-    ]>,
+    onExit?: ExitEvent<LinkedMods>,
 }
+
+export type ConsoleArgNumber = "number"
+export type ConsoleArgOptionalNumber = "number?"
+export type ConsoleArgBool = "boolean"
+export type ConsoleArgOptionalBool = "boolean?"
+export type ConsoleArgString = "string"
+export type ConsoleArgOptionalString = "string?"
+
+export type ConsoleArgType = (
+    ConsoleArgBool
+    | ConsoleArgOptionalBool
+    | ConsoleArgNumber
+    | ConsoleArgOptionalNumber
+    | ConsoleArgOptionalString
+    | ConsoleArgString
+)
+
+export type ConsoleParsedArg<T extends ConsoleArgType> = (
+    T extends "number"
+    ? number
+    : T extends "number?"
+    ? number | undefined
+    : T extends "boolean" 
+    ? boolean
+    : T extends "boolean?"
+    ? boolean | undefined
+    : T extends "string"
+    ? string
+    : T extends "string?"
+    ? string | undefined
+    : never 
+)
+
+export type ConsoleCommandInputDeclaration = {
+    readonly [key: string]: ConsoleArgType
+}
+
+export type ParsedConsoleCommandInput<
+    Input extends ConsoleCommandInputDeclaration
+> = {
+    [key in keyof Input]: ConsoleParsedArg<Input[key]>
+}
+
+export type ModConsoleCommand<
+    Engine extends ShaheenEngine<[]>,
+    CommandArgs extends ConsoleCommandInputDeclaration
+>  = {
+    name: string
+    args?: CommandArgs
+    fn: (
+        engine: Engine,
+        parsedInput: ParsedConsoleCommandInput<CommandArgs>,
+    ) => unknown
+}
+
+export type CompleteMod<LinkedMods extends ModModules> = (
+    ModLifeCycleEvents<LinkedMods> & {
+        readonly systems?: {
+            readonly [key: string]: (engine: ShaheenEngine<LinkedMods>) => void
+        }
+    }
+)
 
 export type Mod<
     Dependencies extends ModModules,
     Alias extends string,
     ImmutableResources extends ImmutableResourceMap,
-    State extends object
+    State extends object,
 > = (
     ModDeclaration<Dependencies, Alias, ImmutableResources, State>
-    & ModLifeCycleEvents<Dependencies, Alias, ImmutableResources, State>
+    & CompleteMod<[
+        ...Dependencies, 
+        ModData<Alias, ImmutableResources, State>
+    ]>
 )
 
-export const mod = <
-    Dependencies extends ModModules = []
->() => ({
-		create: <
+export const zmod = <LinkedMods extends ModModules = []>() => ({
+    create: <
         Alias extends string,
         ImmutableResources extends ImmutableResourceMap,
-        State extends object
+        State extends object,
     >(zMod: ImmutableResources extends Record<string, string> | undefined 
         ? Mod<
-            Dependencies, 
+            LinkedMods, 
             Alias, 
             ImmutableResources,
             State
         >
         : never
     ) => zMod
-	})
+})
 
-export type GenericMod = Mod<
+type GenericMod = Mod<
     [], 
     string, 
     ImmutableResourceMap,
@@ -171,52 +228,28 @@ export type GenericMod = Mod<
 >
 
 export type ModModule<ExportedMod extends GenericMod = GenericMod> = {
-    default: ExportedMod
+    mod: ExportedMod
 }
 
-// utility types
-export type InferEngine<CurrentMod> = ( 
+type AllUtils<Dependencies extends ModModules> = {
+    engine: ShaheenEngine<Dependencies>,
+    system: (engine: ShaheenEngine<Dependencies>) => void
+
+    // events
+    beforeGameLoopEvent: BeforeGameLoopEvent<Dependencies> 
+    exitEvent: ExitEvent<Dependencies> 
+}
+
+export type InferUtils<CurrentMod> = (
     CurrentMod extends Mod<
         infer Dep,
         infer Alias,
         infer ImmutableResources,
         infer State
     > 
-        ? ShaheenEngine<[
+        ? AllUtils<[
             ...Dep, 
             ModData<Alias, ImmutableResources, State>
-        ]> 
+        ]>
         : never
-)
-
-export type InferGameSystem<CurrentMod> = ( 
-    CurrentMod extends Mod<
-        infer Dep,
-        infer Alias,
-        infer ImmutableResources,
-        infer State
-    > 
-        ? (engine: ShaheenEngine<[
-            ...Dep, 
-            ModData<Alias, ImmutableResources, State>
-        ]>) => void
-        : never
-)
-
-export type InferBeforeGameLoopEvent<CurrentMod> = ( 
-    CurrentMod extends Mod<
-        infer Dep,
-        infer Alias,
-        infer ImmutableResources,
-        infer State
-    > 
-        ? BeforeGameLoopEvent<[
-            ...Dep, 
-            ModData<Alias, ImmutableResources, State>
-        ]> 
-        : never
-)
-
-export type InferExitEvent<CurrentMod> = (
-    InferBeforeGameLoopEvent<CurrentMod>
 )

@@ -247,5 +247,4 @@ export const visualChanges: GameSystem = (engine) => {
 export const render: GameSystem = (engine) => {
 	const {scene} = engine.state().zakhaarifStd
 	scene.render()
-	console.info("render called")
 }

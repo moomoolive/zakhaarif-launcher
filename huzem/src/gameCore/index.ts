@@ -3,7 +3,11 @@ import type {
 	ModMetadata,
 	ModModule,
 } from "zakhaarif-dev-tools"
-import {Engine} from "./engine"
+import {
+	Engine, 
+	Heap, 
+	MAIN_THREAD_ID,
+} from "./engine"
 import initHeap from "./engine_allocator/pkg/engine_allocator"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 
@@ -86,19 +90,36 @@ export const main = async (args: MainScriptArguments) => {
 	console.info("Loading heap...", heapUrl)
 	const heapModule = await initHeap(heapUrl)
 
+	const wasmHeap = new Heap(heapModule.memory)
+
 	const engine = new Engine({
 		rootCanvas,
-		heapMemory: heapModule.memory
+		wasmHeap,
+		threadId: MAIN_THREAD_ID
+	})
+
+	Object.defineProperty(globalThis, "zengine", {
+		value: engine,
+		enumerable: true,
+		writable: false,
+		configurable: true
+	})
+
+	Object.defineProperty(globalThis, "zconsole", {
+		value: engine.zconsole,
+		enumerable: true,
+		writable: false,
+		configurable: true
 	})
 
 	for (const importMetadata of imports) {
 		const {importedModule, url} = importMetadata
-		if (!("default" in importedModule)) {
+		if (!("mod" in importedModule)) {
 			console.error(`import ${url} does not contain a default export. ignoring...`)
 			continue
 		}
 
-		const mod = importedModule.default
+		const mod = importedModule.mod
 		
 		const modMetadata: ModMetadata = {
 			alias: mod.alias,

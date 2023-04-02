@@ -6,6 +6,7 @@
     "babylonjs": "^5.50.1",
     "babylonjs-loaders": "^5.50.1",
     "babylonjs-materials": "^5.50.1",
+    "command-line-parser": "^0.2.10",
     "simplex-noise": "^4.0.1"
   },
   "devDependencies": {

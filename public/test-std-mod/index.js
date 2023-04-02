@@ -1,3 +1,3 @@
 console.log("[LOADED] std-mod is now loaded")
 
-export default {}
+export const mod = {}
