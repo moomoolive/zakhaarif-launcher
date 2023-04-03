@@ -4,12 +4,12 @@ import type {
 	ModModule,
 } from "zakhaarif-dev-tools"
 import {
-	Engine, 
-	Heap, 
+	Engine,
 	MAIN_THREAD_ID,
 } from "./engine"
 import initHeap from "./engine_allocator/pkg/engine_allocator"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
+import {WasmHeap} from "./lib/heap/wasmHeap"
 
 const HEAP_RELATIVE_URL = wasmMap.engine_allocator
 
@@ -88,13 +88,10 @@ export const main = async (args: MainScriptArguments) => {
 		HEAP_RELATIVE_URL, import.meta.url
 	).href
 	console.info("Loading heap...", heapUrl)
-	const heapModule = await initHeap(heapUrl)
-
-	const wasmHeap = new Heap(heapModule.memory)
 
 	const engine = new Engine({
 		rootCanvas,
-		wasmHeap,
+		wasmHeap: new WasmHeap(await initHeap(heapUrl)),
 		threadId: MAIN_THREAD_ID
 	})
 
@@ -122,35 +119,35 @@ export const main = async (args: MainScriptArguments) => {
 		const mod = importedModule.mod
 		
 		const modMetadata: ModMetadata = {
-			alias: mod.alias,
+			name: mod.data.name,
 			canonicalUrl: importMetadata.canonicalUrl,
 			resolvedUrl: importMetadata.resolvedUrl,
-			dependencies: mod.dependencies || [],
+			dependencies: mod.data.dependencies || [],
 		}
 		
 		if (mod.onInit) {
 			await mod.onInit(modMetadata, engine)
 		}
 
-		const modState = mod.state 
-			? await mod.state(modMetadata, engine)
+		const modState = mod.data.state 
+			? await mod.data.state(modMetadata, engine)
 			: {}
 		
-		Object.defineProperty(engine.modState, mod.alias, {
+		Object.defineProperty(engine.modState, mod.data.name, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
 			value: modState
 		})
 
-		Object.defineProperty(engine.modResources, mod.alias, {
+		Object.defineProperty(engine.modResources, mod.data.name, {
 			configurable: true,
 			enumerable: true,
 			writable: true,
-			value: mod.resources || {}
+			value: mod.data.resources || {}
 		})
 
-		Object.defineProperty(engine.modMetaData, mod.alias, {
+		Object.defineProperty(engine.modMetaData, mod.data.name, {
 			configurable: true,
 			enumerable: true,
 			writable: true,

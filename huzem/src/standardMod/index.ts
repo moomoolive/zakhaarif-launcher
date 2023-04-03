@@ -1,6 +1,7 @@
 import {
-	InferUtils,
-	zmod
+	Zutils,
+	modData,
+	initMod,
 } from "zakhaarif-dev-tools"
 import {stateHandler} from "./events"
 import {
@@ -15,10 +16,26 @@ import {
 } from "./systems"
 import {DebugLayer} from "babylonjs"
 
-export const mod = zmod().create({
-	systems: {},
-	alias: "zakhaarifStd",
+const data = modData().define({
+	name: "zakhaarifStd",
 	state: stateHandler,
+	components: {
+		transform: {x: "f32", y: "f32", z: "f32"},
+		velocity: {x: "f32", y: "f32", z: "f32"},
+		acceleration: {x: "f32", y: "f32", z: "f32"},
+		position: {x: "f32", y: "f32", z: "f32"},
+		impulse: {x: "f32", y: "f32", z: "f32"},
+		kinematics: {x: "f32", y: "f32", z: "f32"},
+		collider: {x: "f32", y: "f32", z: "f32"},
+		rendering: {id: "i32"}
+	}
+})
+
+export type Utils = Zutils<typeof data>
+export type System = Utils["System"]
+
+export const mod = initMod({
+	data,
 	onInit: (meta) => {
 		console.info("init called with meta", meta)
 	},
@@ -192,6 +209,3 @@ export const mod = zmod().create({
 	},
 })
 
-export type ModUtils = InferUtils<typeof mod>
-
-export type GameSystem = ModUtils["system"]

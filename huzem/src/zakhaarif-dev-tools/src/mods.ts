@@ -1,13 +1,16 @@
 import type {
 	EngineCore, 
 	InitializedEngineCore,
-	PostInitializationCore
+	PostInitializationCore,
 } from "./engine"
+import type {
+    ComponentDefinition
+} from "./components"
 
 export type ModMetadata = Readonly<{
     canonicalUrl: string
     resolvedUrl: string
-    alias: string,
+    name: string,
     dependencies: string[]
 }>
 
@@ -18,22 +21,33 @@ export type StateEvent<State extends object> = (
 
 type ImmutableResourceMap = object | undefined
 
+export type ComponentDeclaration = {
+    readonly [key: string]: ComponentDefinition
+}
+
 export type ModData<
-    Alias extends string,
+    Name extends string,
     ImmutableResources extends ImmutableResourceMap,
-    State extends object
+    State extends object,
+    ComponentDefs extends ComponentDeclaration
 > = {
-    readonly alias: Alias,
+    readonly name: Name,
     readonly resources?: ImmutableResources
+    readonly components?: ComponentDefs
     state?: StateEvent<State>
 }
 
-export type GenericModData = ModData<string, ImmutableResourceMap, object>
+export type GenericModData = ModData<
+    string, 
+    ImmutableResourceMap, 
+    object,
+    {}
+>
 
 export type ModModules = ReadonlyArray<GenericModData>
 
 type ModStateIndex<EngineModules extends ModModules> = {
-    [mod in EngineModules[number] as mod["alias"]]: (
+    [mod in EngineModules[number] as mod["name"]]: (
         mod["state"] extends undefined 
             ? {}
             : Awaited<ReturnType<NonNullable<mod["state"]>>>
@@ -41,7 +55,7 @@ type ModStateIndex<EngineModules extends ModModules> = {
 }
 
 type ModResourceIndex<EngineModules extends ModModules> = {
-    [mod in EngineModules[number] as mod["alias"]]: (
+    [mod in EngineModules[number] as mod["name"]]: (
         mod["resources"] extends undefined ? {} : { 
             readonly [key in keyof NonNullable<mod["resources"]>]: string 
         }
@@ -49,7 +63,7 @@ type ModResourceIndex<EngineModules extends ModModules> = {
 }
 
 type ModMetadataIndex<EngineModules extends ModModules> = {
-    [mod in EngineModules[number] as mod["alias"]]: ModMetadata
+    [mod in EngineModules[number] as mod["name"]]: ModMetadata
 }
 
 export type EngineLinkedMods<
@@ -70,21 +84,11 @@ export type DependenciesDeclaration<
     // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
     
     readonly dependencies: {
-        [index in keyof Dependencies]: Dependencies[index] extends { alias: string }
-            ? Dependencies[index]["alias"]
+        [index in keyof Dependencies]: Dependencies[index] extends { name: string }
+            ? Dependencies[index]["name"]
             : never
     }
 }
-
-export type ModDeclaration<
-    Dependencies extends ModModules,
-    Alias extends string,
-    ImmutableResources extends ImmutableResourceMap,
-    State extends object
-> = (
-    DependenciesDeclaration<Dependencies> 
-    & ModData<Alias, ImmutableResources, State>
-)
 
 export type EcsSystem<
     LinkedMods extends ModModules
@@ -185,71 +189,99 @@ export type ModConsoleCommand<
 
 export type CompleteMod<LinkedMods extends ModModules> = (
     ModLifeCycleEvents<LinkedMods> & {
-        readonly systems?: {
-            readonly [key: string]: (engine: ShaheenEngine<LinkedMods>) => void
-        }
+        
     }
 )
 
-export type Mod<
+export type ModDataWithDependents<
     Dependencies extends ModModules,
-    Alias extends string,
+    Name extends string,
     ImmutableResources extends ImmutableResourceMap,
     State extends object,
+    ComponentDefs extends ComponentDeclaration,
 > = (
-    ModDeclaration<Dependencies, Alias, ImmutableResources, State>
-    & CompleteMod<[
-        ...Dependencies, 
-        ModData<Alias, ImmutableResources, State>
-    ]>
+    DependenciesDeclaration<Dependencies> 
+    & ModData<Name, ImmutableResources, State, ComponentDefs>
 )
 
-export const zmod = <LinkedMods extends ModModules = []>() => ({
-    create: <
-        Alias extends string,
+export const modData = <LinkedMods extends ModModules = []>() => ({
+    define: <
+        Name extends string,
         ImmutableResources extends ImmutableResourceMap,
         State extends object,
+        ComponentDefs extends ComponentDeclaration,
     >(zMod: ImmutableResources extends Record<string, string> | undefined 
-        ? Mod<
+        ? ModDataWithDependents<
             LinkedMods, 
-            Alias, 
+            Name, 
             ImmutableResources,
-            State
+            State,
+            ComponentDefs
         >
         : never
     ) => zMod
 })
 
-type GenericMod = Mod<
+type LinkableMod<Data> = (
+    Data extends ModDataWithDependents<
+        infer Dep,
+        infer Name,
+        infer ImmutableResources,
+        infer State,
+        infer ComponentDefs
+    >  
+        ? ({
+            data: Data
+        } & CompleteMod<[
+            ...Dep, 
+            ModData<Name, ImmutableResources, State, ComponentDefs>
+        ]>)
+        : never
+)
+
+type EmptyMod = ModDataWithDependents<
     [], 
     string, 
     ImmutableResourceMap,
-    object
+    object,
+    {}
 >
 
+export const initMod = <Data extends EmptyMod>(mod: LinkableMod<Data>) => mod
+
+type GenericMod = LinkableMod<
+    ModDataWithDependents<
+        [], 
+        string, 
+        ImmutableResourceMap,
+        object,
+        {}
+    >
+>
 export type ModModule<ExportedMod extends GenericMod = GenericMod> = {
     mod: ExportedMod
 }
 
 type AllUtils<Dependencies extends ModModules> = {
-    engine: ShaheenEngine<Dependencies>,
-    system: (engine: ShaheenEngine<Dependencies>) => void
+    Engine: ShaheenEngine<Dependencies>,
+    System: (engine: ShaheenEngine<Dependencies>) => void
 
     // events
-    beforeGameLoopEvent: BeforeGameLoopEvent<Dependencies> 
-    exitEvent: ExitEvent<Dependencies> 
+    BeforeGameLoopHandler: BeforeGameLoopEvent<Dependencies> 
+    ExitHandler: ExitEvent<Dependencies> 
 }
 
-export type InferUtils<CurrentMod> = (
-    CurrentMod extends Mod<
+export type Zutils<CurrentMod> = (
+    CurrentMod extends ModDataWithDependents<
         infer Dep,
-        infer Alias,
+        infer Name,
         infer ImmutableResources,
-        infer State
+        infer State,
+        infer ComponentDefs
     > 
         ? AllUtils<[
             ...Dep, 
-            ModData<Alias, ImmutableResources, State>
+            ModData<Name, ImmutableResources, State, ComponentDefs>
         ]>
         : never
 )

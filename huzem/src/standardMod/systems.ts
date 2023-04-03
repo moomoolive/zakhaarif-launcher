@@ -1,4 +1,4 @@
-import type {GameSystem} from "./index"
+import type {System} from "./index"
 import {sweepBoxCollisions} from "./lib/physics/index"
 import {Vector3, Quaternion} from "babylonjs"
 import {
@@ -8,7 +8,7 @@ import {
 	createAxisRotation
 } from "./lib/math/index"
 
-export const playerController: GameSystem = (engine) => {
+export const playerController: System = (engine) => {
 	const {
 		movementVec, 
 		controller, 
@@ -41,7 +41,7 @@ export const playerController: GameSystem = (engine) => {
 	movementVec.angle = toDegrees(moveAngleRadians)
 }
 
-export const processMouseInput: GameSystem = (engine) => {
+export const processMouseInput: System = (engine) => {
 	const deltaTime = engine.getDeltaTime()
 	const {
 		mouseMovement, 
@@ -115,7 +115,7 @@ export const processMouseInput: GameSystem = (engine) => {
 	}
 }
 
-export const cameraPosition: GameSystem = (engine) => {
+export const cameraPosition: System = (engine) => {
 	const {
 		controller, 
 		camera, 
@@ -139,7 +139,7 @@ export const cameraPosition: GameSystem = (engine) => {
 const GRAVITY = 1_080.0
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
 
-export const movement: GameSystem = (engine) => {
+export const movement: System = (engine) => {
 	const {
 		playerEntity, 
 		controller,
@@ -202,7 +202,7 @@ export const movement: GameSystem = (engine) => {
 	}
 }
 
-export const physics: GameSystem = (engine) => {
+export const physics: System = (engine) => {
 	const {playerEntity} = engine.state().zakhaarifStd
 
 	const {impulse, velocity, kinematics} = playerEntity
@@ -229,14 +229,14 @@ export const physics: GameSystem = (engine) => {
 	playerEntity.transform.z = transform.z
 }
 
-export const applyTransforms: GameSystem = (engine) => {
+export const applyTransforms: System = (engine) => {
 	const {playerEntity} = engine.state().zakhaarifStd
 	playerEntity.position.x += playerEntity.transform.x
 	playerEntity.position.y += playerEntity.transform.y
 	playerEntity.position.z += playerEntity.transform.z
 }
 
-export const visualChanges: GameSystem = (engine) => {
+export const visualChanges: System = (engine) => {
 	const {playerEntity, activeMeshes} = engine.state().zakhaarifStd
 	const playerMesh = activeMeshes[playerEntity.rendering.id]
 	playerMesh.position.x = playerEntity.position.x
@@ -244,7 +244,7 @@ export const visualChanges: GameSystem = (engine) => {
 	playerMesh.position.y = playerEntity.position.y
 }
 
-export const render: GameSystem = (engine) => {
+export const render: System = (engine) => {
 	const {scene} = engine.state().zakhaarifStd
 	scene.render()
 }
