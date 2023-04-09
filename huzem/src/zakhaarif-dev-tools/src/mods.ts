@@ -230,6 +230,7 @@ export interface ModAccessor<
     useComponent: () => ({
         readonly [key in keyof C]: ComponentClass<C[key]>
     })
+    useArchetype: () => object
 }
 
 export interface ShaheenEngine<Mods extends ModModules> extends InitializedEngineCore {    

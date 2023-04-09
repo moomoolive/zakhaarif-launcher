@@ -1,14 +1,3 @@
-export type TimeUtils = {
-    originTime: () => number
-    previousFrameTime: () => number
-    totalElapsedTime: () => number
-}
-
-export type ThreadUtils = {
-    isMainThread: () => boolean
-    threadId: () => number
-}
-
 export type ConsoleCommand = (input: object) => unknown
 
 export type ConsoleCommandIndex = Record<string, ConsoleCommand>
@@ -16,8 +5,11 @@ export type ConsoleCommandIndex = Record<string, ConsoleCommand>
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement
     getDeltaTime: () => number
-    readonly time: TimeUtils
-    readonly threads: ThreadUtils
+    getOriginTime: () => number
+    getPreviousFrameTime: () => number
+    getTotalElapsedTime: () => number
+    isMainThread: () => boolean
+    threadId: () => number
     zconsole: Record<string, ConsoleCommand>
 }
 

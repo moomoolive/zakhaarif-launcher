@@ -53,4 +53,8 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 	useComponent() {
 		return this.componentClasses
 	}
+
+	useArchetype() {
+		return {}
+	}
 }

@@ -1,8 +1,6 @@
 import type {
 	Allocator,
-	TimeUtils,
 	ConsoleCommandIndex,
-	ThreadUtils,
 	ConsoleCommandInputDeclaration,
 	ParsedConsoleCommandInput,
 	ModConsoleCommand,
@@ -14,6 +12,7 @@ import type {
 import {validateCommandInput} from "./lib/cli/parser"
 import {EcsCore} from "./lib/ecs/ecsCore"
 import {NullPrototype} from "./lib/utils/nullProto"
+import {Archetype} from "./lib/mods/archetype"
 
 export const MAIN_THREAD_ID = 0
 
@@ -40,16 +39,17 @@ export class Engine extends NullPrototype implements ShaheenEngineImpl {
 	isRunning: boolean
 	zconsole: ConsoleCommandIndex
 	compiledMods: CompiledMods
+	archetypes: Archetype[]
 
-	// engine libraries
-	readonly time: TimeUtils
-	readonly threads: ThreadUtils
+	readonly currentThreadId: number
 
 	private canvas: HTMLCanvasElement
 
 	constructor(config: EngineConfig) {
 		super()
 		const {wasmHeap, rootCanvas, threadId} = config
+		this.currentThreadId = threadId
+		this.archetypes = []
 		this.wasmHeap = wasmHeap
 		this.isRunning = false
 		this.zconsole = nullObject()
@@ -60,15 +60,26 @@ export class Engine extends NullPrototype implements ShaheenEngineImpl {
 		this.canvas = rootCanvas
 		const self = this
 		this.ecs = new EcsCore({engine: self})
-		this.time = {
-			originTime: () => self.originTime,
-			previousFrameTime: () => self.previousFrame,
-			totalElapsedTime: () => (self.previousFrame - self.originTime) + self.elapsedTime
-		}
-		this.threads = {
-			isMainThread: () => threadId === MAIN_THREAD_ID,
-			threadId: () => MAIN_THREAD_ID
-		}
+	}
+
+	isMainThread(): boolean {
+		return this.currentThreadId === MAIN_THREAD_ID
+	}
+
+	threadId(): number {
+		return this.currentThreadId
+	}
+
+	getOriginTime(): number {
+		return this.originTime
+	}
+
+	getPreviousFrameTime(): number {
+		return this.previousFrame
+	}
+
+	getTotalElapsedTime(): number {
+		return (this.previousFrame - this.originTime) + this.elapsedTime
 	}
 
 	addConsoleCommand<
