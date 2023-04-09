@@ -1,20 +1,29 @@
 import type {
 	Allocator,
 	TimeUtils,
-	ModMetadata,
 	ConsoleCommandIndex,
 	ThreadUtils,
 	ConsoleCommandInputDeclaration,
 	ParsedConsoleCommandInput,
-	ModConsoleCommand
+	ModConsoleCommand,
 } from "zakhaarif-dev-tools"
+import {CompiledMod} from "./lib/mods/compiledMod"
 import type {
 	ShaheenEngineImpl,
 } from "zakhaarif-dev-tools/implement"
 import {validateCommandInput} from "./lib/cli/parser"
 import {EcsCore} from "./lib/ecs/ecsCore"
+import {NullPrototype} from "./lib/utils/nullProto"
 
 export const MAIN_THREAD_ID = 0
+
+type CompiledMods = {
+	readonly [key: string]: CompiledMod
+}
+
+const EMPTY_OBJECT = {}
+
+const nullObject = <T extends object>(): T => Object.create(null)
 
 export type EngineConfig = {
     rootCanvas: HTMLCanvasElement
@@ -22,26 +31,15 @@ export type EngineConfig = {
 	threadId: number
 }
 
-export const NullPrototype = (function() {} as unknown as { new<T extends object = object>(): T})
-NullPrototype.prototype = null
-
-export type CompiledState = Record<string, object>
-export type CompiledResources = Record<string, Record<string, string>>
-export type CompiledModMetadata = Record<string, ModMetadata>
-
-const EMPTY_OBJECT = {}
-
 export class Engine extends NullPrototype implements ShaheenEngineImpl {
 	wasmHeap: Allocator
 	ecs: EcsCore
 	originTime: number
 	previousFrame: number
 	elapsedTime: number
-	modState: CompiledState
-	modResources: CompiledResources
-	modMetaData: CompiledModMetadata
 	isRunning: boolean
 	zconsole: ConsoleCommandIndex
+	compiledMods: CompiledMods
 
 	// engine libraries
 	readonly time: TimeUtils
@@ -53,16 +51,15 @@ export class Engine extends NullPrototype implements ShaheenEngineImpl {
 		super()
 		const {wasmHeap, rootCanvas, threadId} = config
 		this.wasmHeap = wasmHeap
-		this.isRunning = true
-		const self = this
-		this.modState = {}
-		this.modResources = {}
-		this.modMetaData = {}
+		this.isRunning = false
+		this.zconsole = nullObject()
+		this.compiledMods = nullObject()
 		this.originTime = 0.0
 		this.previousFrame = 0.0
 		this.elapsedTime = 0.0
 		this.canvas = rootCanvas
-		this.zconsole = Object.create(null)
+		const self = this
+		this.ecs = new EcsCore({engine: self})
 		this.time = {
 			originTime: () => self.originTime,
 			previousFrameTime: () => self.previousFrame,
@@ -72,7 +69,6 @@ export class Engine extends NullPrototype implements ShaheenEngineImpl {
 			isMainThread: () => threadId === MAIN_THREAD_ID,
 			threadId: () => MAIN_THREAD_ID
 		}
-		this.ecs = new EcsCore({engine: self})
 	}
 
 	addConsoleCommand<
@@ -122,15 +118,7 @@ export class Engine extends NullPrototype implements ShaheenEngineImpl {
 		return this.elapsedTime
 	}
 
-	state(): CompiledState {
-		return this.modState
-	}
-
-	resouces(): CompiledResources {
-		return this.modResources
-	}
-
-	metadata(): CompiledModMetadata {
-		return this.modMetaData
+	useMod(): CompiledMods {
+		return this.compiledMods
 	}
 }

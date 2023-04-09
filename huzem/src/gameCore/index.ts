@@ -1,15 +1,22 @@
 import type {
+	ModModule,
+} from "zakhaarif-dev-tools/implement"
+import {
+	ComponentClass,
 	MainScriptArguments,
 	ModMetadata,
-	ModModule,
 } from "zakhaarif-dev-tools"
 import {
 	Engine,
 	MAIN_THREAD_ID,
 } from "./engine"
+import {CompiledMod} from "./lib/mods/compiledMod"
 import initHeap from "./engine_allocator/pkg/engine_allocator"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 import {WasmHeap} from "./lib/heap/wasmHeap"
+import {
+	compileComponentClass
+} from "./lib/mods/componentView"
 
 const HEAP_RELATIVE_URL = wasmMap.engine_allocator
 
@@ -129,29 +136,62 @@ export const main = async (args: MainScriptArguments) => {
 			await mod.onInit(modMetadata, engine)
 		}
 
-		const modState = mod.data.state 
-			? await mod.data.state(modMetadata, engine)
-			: {}
+		let modState = {}
+		if (mod.data.state) {
+			modState = await mod.data.state(modMetadata, engine)
+		}
+
+		const queries = mod.data.queries || {}
+		const definedQueries = Object.keys(queries)
+		const queryAccessors = {}
+		for (let i = 0; i < definedQueries.length; i++) {
+			const queryname = definedQueries[i]
+			Object.defineProperty(queryAccessors, queryname, {
+				configurable: true,
+				enumerable: true,
+				writable: true,
+				value: () => ({})
+			})
+		}
+
+		const componentClasses: Record<string, ComponentClass> = Object.create(null)
+		const components = mod.data.components || {}
+		const componentNames = Object.keys(components)
+		for (let i = 0; i < componentNames.length; i++) {
+			const componentName = componentNames[i]
+			const definition = components[componentName]
+			const fullname = `${mod.data.name}.${componentName}`
+			const compilerResponse = compileComponentClass(
+				componentName,
+				definition,
+				fullname,
+				i
+			)
+			if (!compilerResponse.ok) {
+				console.warn(`couldn't compiled component "${fullname}": ${compilerResponse.msg}`)
+				continue
+			}
+			Object.defineProperty(componentClasses, componentName, {
+				value: compilerResponse.componentClass,
+				enumerable: true,
+				writable: true,
+				configurable: true
+			})
+		}
+
+		const compiledMod = new CompiledMod({
+			state: modState,
+			meta: modMetadata,
+			resources: (mod.data.resources || {}) as Record<string, string>,
+			queries: queries,
+			componentClasses
+		})
 		
-		Object.defineProperty(engine.modState, mod.data.name, {
+		Object.defineProperty(engine.compiledMods, mod.data.name, {
 			configurable: true,
 			enumerable: true,
-			writable: true,
-			value: modState
-		})
-
-		Object.defineProperty(engine.modResources, mod.data.name, {
-			configurable: true,
-			enumerable: true,
-			writable: true,
-			value: mod.data.resources || {}
-		})
-
-		Object.defineProperty(engine.modMetaData, mod.data.name, {
-			configurable: true,
-			enumerable: true,
-			writable: true,
-			value: modMetadata
+			writable: false,
+			value: compiledMod
 		})
 
 		if (mod.onBeforeGameLoop) {

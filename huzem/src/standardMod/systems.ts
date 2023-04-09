@@ -9,11 +9,10 @@ import {
 } from "./lib/math/index"
 
 export const playerController: System = (engine) => {
-	const {
-		movementVec, 
-		controller, 
-		camera
-	} = engine.state().zakhaarifStd
+	const {zakhaarifStd} = engine.useMod()
+	const {movementVec} = zakhaarifStd.useMutState()
+	const {camera, controller} = zakhaarifStd.useState()
+
 	movementVec.horizontal = 0
 	movementVec.vertical = 0
 
@@ -43,11 +42,12 @@ export const playerController: System = (engine) => {
 
 export const processMouseInput: System = (engine) => {
 	const deltaTime = engine.getDeltaTime()
+	const {zakhaarifStd} = engine.useMod()
 	const {
-		mouseMovement, 
 		camera,
-		controller
-	} = engine.state().zakhaarifStd
+		controller,
+		mouseMovement
+	} = zakhaarifStd.useMutState()
 
 	const {
 		deltaDegreesX, currentXDegrees, 
@@ -116,11 +116,11 @@ export const processMouseInput: System = (engine) => {
 }
 
 export const cameraPosition: System = (engine) => {
-	const {
-		controller, 
-		camera, 
-		playerEntity
-	} = engine.state().zakhaarifStd
+	const {zakhaarifStd} = engine.useMod()
+
+	const {camera} = zakhaarifStd.useMutState()
+	const {controller, playerEntity} = zakhaarifStd.useState()
+
 	if (controller.cameraLeft) {
 		camera.alpha += controller.frameCameraXRotation
 	} else if (controller.cameraRight) {
@@ -140,34 +140,41 @@ const GRAVITY = 1_080.0
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
 
 export const movement: System = (engine) => {
+	const {zakhaarifStd} = engine.useMod()
 	const {
-		playerEntity, 
-		controller,
+		playerEntity: {
+			velocity: playerVelocity,
+			impulse: playerImpluse
+		}, 
 		playerStats,
-		movementVec,
 		activeMeshes
-	} = engine.state().zakhaarifStd
+	} = zakhaarifStd.useMutState()
+	const {
+		controller, 
+		movementVec,
+		playerEntity
+	} = zakhaarifStd.useState()
 
 	const player = activeMeshes[playerEntity.rendering.id]
 	const deltaTime = engine.getDeltaTime()
 	const deltaSeconds = deltaTime * 0.0001
 
 	const frameDecleration = new Vector3(
-		playerEntity.velocity.x * deceleration.x,
-		playerEntity.velocity.y * deceleration.y,
-		playerEntity.velocity.z * deceleration.z,
+		playerVelocity.x * deceleration.x,
+		playerVelocity.y * deceleration.y,
+		playerVelocity.z * deceleration.z,
 	)
 	frameDecleration.x *= deltaSeconds
 	frameDecleration.y *= deltaSeconds
 	frameDecleration.z *= deltaSeconds
 	frameDecleration.z = (
 		Math.sign(frameDecleration.z) 
-        * Math.min(Math.abs(frameDecleration.z), Math.abs(playerEntity.velocity.z))
+        * Math.min(Math.abs(frameDecleration.z), Math.abs(playerVelocity.z))
 	)
 
-	playerEntity.velocity.x += frameDecleration.x
-	playerEntity.velocity.y += frameDecleration.y
-	playerEntity.velocity.z += frameDecleration.z
+	playerVelocity.x += frameDecleration.x
+	playerVelocity.y += frameDecleration.y
+	playerVelocity.z += frameDecleration.z
 
 	if (
 		controller.forward 
@@ -175,8 +182,8 @@ export const movement: System = (engine) => {
         || controller.left 
         || controller.right
 	) {
-		playerEntity.velocity.z += playerEntity.acceleration.z * deltaSeconds * - movementVec.vertical
-		playerEntity.velocity.x += playerEntity.acceleration.x * deltaSeconds * movementVec.horizontal
+		playerVelocity.z += playerEntity.acceleration.z * deltaSeconds * - movementVec.vertical
+		playerVelocity.x += playerEntity.acceleration.x * deltaSeconds * movementVec.horizontal
 
 		/* I cannot get the model to line up with camera for some reason
             fix this later
@@ -196,16 +203,25 @@ export const movement: System = (engine) => {
 
 	}
 
-	const {impulse, kinematics} = playerEntity
 	if (controller.up) {
-		impulse.y += kinematics.mass * (GRAVITY * deltaSeconds * 2.0)
+		playerImpluse.y += playerEntity.kinematics.mass * (GRAVITY * deltaSeconds * 2.0)
 	}
 }
 
 export const physics: System = (engine) => {
-	const {playerEntity} = engine.state().zakhaarifStd
+	const {zakhaarifStd} = engine.useMod()
 
-	const {impulse, velocity, kinematics} = playerEntity
+	const {
+		impulse, 
+		velocity, 
+		transform
+	} = zakhaarifStd.useMutState().playerEntity
+
+	const {
+		kinematics, 
+		position, 
+		collider,
+	} = zakhaarifStd.useState().playerEntity
 
 	velocity.x += impulse.x / kinematics.mass
 	velocity.y += impulse.y / kinematics.mass
@@ -214,37 +230,40 @@ export const physics: System = (engine) => {
 	impulse.x = impulse.y = impulse.z = 0.0
 	const deltaSeconds = engine.getDeltaTime() * 0.0001
 
-	const res = sweepBoxCollisions(
-		playerEntity.position,
-		playerEntity.collider, 
+	const {transform: diff} = sweepBoxCollisions(
+		position,
+		collider, 
 		{isVoxelSolid: (_x, _y, _z) => false},
-		playerEntity.velocity.x * deltaSeconds,
-		playerEntity.velocity.y * deltaSeconds,
-		playerEntity.velocity.z * deltaSeconds,
+		velocity.x * deltaSeconds,
+		velocity.y * deltaSeconds,
+		velocity.z * deltaSeconds,
 	)
-	const {transform} = res
 
-	playerEntity.transform.x = transform.x
-	playerEntity.transform.y = transform.y
-	playerEntity.transform.z = transform.z
+	transform.x = diff.x
+	transform.y = diff.y
+	transform.z = diff.z
 }
 
 export const applyTransforms: System = (engine) => {
-	const {playerEntity} = engine.state().zakhaarifStd
-	playerEntity.position.x += playerEntity.transform.x
-	playerEntity.position.y += playerEntity.transform.y
-	playerEntity.position.z += playerEntity.transform.z
+	const {zakhaarifStd} = engine.useMod()
+	const {position} = zakhaarifStd.useMutState().playerEntity
+	const {transform} = zakhaarifStd.useState().playerEntity
+	position.x += transform.x
+	position.y += transform.y
+	position.z += transform.z
 }
 
 export const visualChanges: System = (engine) => {
-	const {playerEntity, activeMeshes} = engine.state().zakhaarifStd
-	const playerMesh = activeMeshes[playerEntity.rendering.id]
-	playerMesh.position.x = playerEntity.position.x
-	playerMesh.position.z = playerEntity.position.z
-	playerMesh.position.y = playerEntity.position.y
+	const {zakhaarifStd} = engine.useMod()
+	const {activeMeshes} = zakhaarifStd.useMutState()
+	const {rendering, position} = zakhaarifStd.useState().playerEntity
+	const mesh = activeMeshes[rendering.id]
+	mesh.position.x = position.x
+	mesh.position.z = position.z
+	mesh.position.y = position.y
 }
 
 export const render: System = (engine) => {
-	const {scene} = engine.state().zakhaarifStd
+	const {scene} = engine.useMod().zakhaarifStd.useMutState()
 	scene.render()
 }

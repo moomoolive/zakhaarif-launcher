@@ -25,9 +25,27 @@ const data = modData().define({
 		acceleration: {x: "f32", y: "f32", z: "f32"},
 		position: {x: "f32", y: "f32", z: "f32"},
 		impulse: {x: "f32", y: "f32", z: "f32"},
-		kinematics: {x: "f32", y: "f32", z: "f32"},
+		kinematics: {mass: "f32", gravityModifier: "f32"},
 		collider: {x: "f32", y: "f32", z: "f32"},
 		rendering: {id: "i32"}
+	},
+	queries: {
+		visualChanges: {
+			"zakhaarifStd.position": "required",
+			"zakhaarifStd.rendering": "required",
+		}
+	},
+	archetypes: {
+		player: {
+			"zakhaarifStd.transform": {},
+			"zakhaarifStd.impulse": {},
+			"zakhaarifStd.collider": {x: 0.5, y: 1.0, z: 0.5},
+			"zakhaarifStd.kinematics": {mass: 10.0, gravityModifier: 1.0},
+			"zakhaarifStd.velocity": {},
+			"zakhaarifStd.acceleration":  {x: 2_000.0, y: 0.25, z: 2_000.0},
+			"zakhaarifStd.position": {x: 2_048.0, y: 100.0, z: 2_048.0},
+			"zakhaarifStd.rendering": {}
+		}
 	}
 })
 
@@ -47,14 +65,15 @@ export const mod = initMod({
 		canvas.style.height = "100vh"
 		canvas.onclick = () => canvas.requestPointerLock()
 
-		const {zakhaarifStd} = engine.state()
+		const {zakhaarifStd} = engine.useMod()
+		const state = zakhaarifStd.useMutState()
 
-		const {skybox, controller} = zakhaarifStd
+		const {skybox, controller} = state
 		skybox.setEnabled(true)
 		console.info("IMPORT META", import.meta.url)
 		DebugLayer.InspectorURL = new URL(
 			"/debug/babylonjs-inspector.js", 
-			engine.metadata().zakhaarifStd.resolvedUrl
+			zakhaarifStd.useMetadata().resolvedUrl
 		).href
 
 		window.addEventListener("keydown", (e) => {
@@ -115,7 +134,7 @@ export const mod = initMod({
 			}
 		})
 
-		const {mouseMovement} = zakhaarifStd
+		const {mouseMovement} = state
 
 		window.addEventListener("mousemove", (e) => {
 			const move = mouseMovement
@@ -135,7 +154,7 @@ export const mod = initMod({
 			}
 		})
 
-		const {babylonJsEngine} = zakhaarifStd
+		const {babylonJsEngine} = state
 	
 		window.addEventListener("resize", () => {
 			babylonJsEngine.resize()
@@ -145,7 +164,7 @@ export const mod = initMod({
 			playerEntity, 
 			lodSystemState, 
 			chunkManager
-		} = zakhaarifStd
+		} = state
 
 		{
 			const minChunkSize = 16
@@ -194,7 +213,7 @@ export const mod = initMod({
 				if (input.show === undefined) {
 					return "no valid options detected"
 				}
-				const {scene} = gameEngine.state().zakhaarifStd
+				const {scene} = gameEngine.useMod().zakhaarifStd.useMutState()
 				if (!input.show) {
 					scene.debugLayer.hide()
 					return "closed"
