@@ -2,7 +2,7 @@ import {
     compileComponentClass,
 } from "./componentView"
 import {expect, it, describe} from "vitest"
-import {JsHeapRef, ComponentToken} from "zakhaarif-dev-tools"
+import {JsHeapRef} from "zakhaarif-dev-tools"
 
 describe("component tokenizer", () => {
     it("compiler should return not okay if definition is not an object", () => {
@@ -44,19 +44,15 @@ describe("component tokenizer", () => {
         }
     })
 
-    it("compiler should return array of name-type pairs if definition is correct", () => {
+    it("should return not ok if field name ends with '$'", () => {
         const tests = [
-            {field: "i32"},
-            {field: "f32", field2: "f32"},
-            {field: "f32", field2: "f32", field3: "u32"},
+            {field$: "i32"},
+            {ptr$: "f32", field2: "f32"},
+            {field: "f32", field2: "f32", x$: "u32"},
         ] as const
         for (const def of tests) {
             const response = compileComponentClass("", def, "", 0)
-            expect(response.ok).toBe(true)
-            if (response.ok) {
-                expect(response.componentClass.def).toStrictEqual(def)
-            }
-           
+            expect(response.ok).toBe(false)
         }
     })
 })
@@ -67,7 +63,7 @@ describe("class compiler", () => {
         f32: new Float32Array(4),
         u32: new Uint32Array(4)
     }
-    it("accessors should be generated correctly", () => {
+    it("accessors should be generated correctly if correct definition is provided", () => {
         const tests = [
             {tokens: {f: "f32"}, name: "floaty"},
             {tokens: {i: "i32"}, name: "inty"},

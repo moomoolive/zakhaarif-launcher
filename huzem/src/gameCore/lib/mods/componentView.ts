@@ -21,11 +21,33 @@ const compileRes: CompileResponse<true> | CompileResponse<false> = {
 	msg: ""
 }
 
+/**
+ * Repersents a view for a component on top of
+ * a binary heap (anything that implments the JsHeapRef 
+ * interface). 
+ * Field names are intentionally small to increase
+ * chance of accessor methods being inlined 
+ * (V8 for instance takes into account the character
+ * size of a method/function when deciding whether to inline
+ * it. https://chromium.googlesource.com/v8/v8/+/refs/heads/lkgr/src/compiler/js-inlining-heuristic.cc)
+ */
 export type ComponentInternals = {
-    "@@ptr": number
-    "@@heap": JsHeapRef
-    "@@offset": number
+    /**
+	 * pointer to struct of array
+	 */
+	p$: number
+	/**
+	 * a heap that holds the struct in question
+	 */
+    h$: JsHeapRef
+	/**
+	 * offset from pointer of the element 
+	 * being inspected
+	 */
+    o$: number
 }
+
+const INTERNAL_FIELD_PREFIX = "$"
 
 export function compileComponentClass<
     D extends ComponentDefinition = ComponentDefinition
@@ -49,6 +71,11 @@ export function compileComponentClass<
 	const keys = Object.keys(def)
 	for (let i = 0; i < keys.length; i++) {
 		const name = keys[i]
+		if (name.endsWith(INTERNAL_FIELD_PREFIX)) {
+			compileRes.ok = false
+			compileRes.msg = `component field "${name}" is an invalid field name. Field names cannot start with "@@" or be named "ptr"`
+			return compileRes
+		}
 		const type = def[name]
 		if (typeof type !== "string") {
 			compileRes.ok = false
@@ -77,9 +104,9 @@ export function compileComponentClass<
 		ptr: number,
 		jsHeap: JsHeapRef
 	) {
-		this["@@ptr"] = ptr
-		this["@@heap"] = jsHeap
-		this["@@offset"] = 0
+		this.p$ = ptr
+		this.h$ = jsHeap
+		this.o$ = 0
 	}
 
 	Object.defineProperty(Component, "name", {
@@ -109,7 +136,7 @@ export function compileComponentClass<
 	const componentPrototype: object = Object.create(null)
 	Object.defineProperty(componentPrototype, "index", {
 		value(this: ComponentInternals, index: number) {
-			this["@@offset"] = index
+			this.o$ = index
 			return this
 		},
 		enumerable: true,
@@ -123,15 +150,22 @@ export function compileComponentClass<
 		case "i32": {
 			Object.defineProperty(componentPrototype, name, {
 				get(this: ComponentInternals): number {
-					return this["@@heap"].i32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]]
+					return this.h$.i32[
+						// get array pointer for field 
+						// from heap.
+						this.h$.u32[this.p$ + offset]
+						// add offset of element being
+						// inspected
+						+ this.o$
+					]
 				},
 				set(this: ComponentInternals, i32: number): void {
-					this["@@heap"].i32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]] = i32
+					this.h$.i32[this.h$.u32[this.p$ + offset] + this.o$] = i32
 				},
 			})
 			Object.defineProperty(componentPrototype, `${name}Ptr`, {
 				value(this: ComponentInternals): number {
-					return this["@@heap"].u32[this["@@ptr"] + offset]
+					return this.h$.u32[this.p$ + offset]
 				},
 				enumerable: true,
 				configurable: true,
@@ -142,15 +176,15 @@ export function compileComponentClass<
 		case "f32": {
 			Object.defineProperty(componentPrototype, name, {
 				get(this: ComponentInternals): number {
-					return this["@@heap"].f32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]]
+					return this.h$.f32[this.h$.u32[this.p$ + offset] + this.o$]
 				},
 				set(this: ComponentInternals, f32: number): void {
-					this["@@heap"].f32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]] = f32
+					this.h$.f32[this.h$.u32[this.p$ + offset] + this.o$] = f32
 				},
 			})
 			Object.defineProperty(componentPrototype, `${name}Ptr`, {
 				value(this: ComponentInternals): number {
-					return this["@@heap"].u32[this["@@ptr"] + offset]
+					return this.h$.u32[this.p$ + offset]
 				},
 				enumerable: true,
 				configurable: true,
@@ -161,15 +195,15 @@ export function compileComponentClass<
 		case "u32": {
 			Object.defineProperty(componentPrototype, name, {
 				get(this: ComponentInternals): number {
-					return this["@@heap"].u32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]]
+					return this.h$.u32[this.h$.u32[this.p$ + offset] + this.o$]
 				},
 				set(this: ComponentInternals, u32: number): void {
-					this["@@heap"].u32[this["@@heap"].u32[this["@@ptr"] + offset] + this["@@offset"]] = u32
+					this.h$.u32[this.h$.u32[this.p$ + offset] + this.o$] = u32
 				},
 			})
 			Object.defineProperty(componentPrototype, `${name}Ptr`, {
 				value(this: ComponentInternals): number {
-					return this["@@heap"].u32[this["@@ptr"] + offset]
+					return this.h$.u32[this.p$ + offset]
 				},
 				enumerable: true,
 				configurable: true,

@@ -1,13 +1,16 @@
-export type ComponentBuffer = {
+export type ComponentFieldBuffer = {
     ptr: number
     elementSize: number
 }
 
+export type ComponentBuffer = Array<ComponentFieldBuffer>
+
 export class Archetype {
+	readonly id: number
+
 	components: number[]
 	length: number
 	capacity: number
-	readonly id: number
 	componentBuffers: ComponentBuffer[]
 
 	constructor() {
