@@ -1,10 +1,8 @@
-import type {
-	ModModule,
-} from "zakhaarif-dev-tools/implement"
 import {
 	ComponentClass,
 	MainScriptArguments,
 	ModMetadata,
+	ModEsModule
 } from "zakhaarif-dev-tools"
 import {
 	Engine,
@@ -62,7 +60,7 @@ export const main = async (args: MainScriptArguments) => {
 		importUrls.push(resolved + entry)
 	}
 	type ImportType = {
-		importedModule: ModModule, 
+		importedModule: ModEsModule, 
 		url: string,
 		canonicalUrl: string,
 		resolvedUrl: string
@@ -183,7 +181,7 @@ export const main = async (args: MainScriptArguments) => {
 			state: modState,
 			meta: modMetadata,
 			resources: (mod.data.resources || {}) as Record<string, string>,
-			queries: queries,
+			queries: queryAccessors,
 			componentClasses
 		})
 		

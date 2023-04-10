@@ -4,11 +4,9 @@ import type {
 	ConsoleCommandInputDeclaration,
 	ParsedConsoleCommandInput,
 	ModConsoleCommand,
+	ShaheenEngine
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "./lib/mods/compiledMod"
-import type {
-	ShaheenEngineImpl,
-} from "zakhaarif-dev-tools/implement"
 import {validateCommandInput} from "./lib/cli/parser"
 import {EcsCore} from "./lib/ecs/ecsCore"
 import {NullPrototype} from "./lib/utils/nullProto"
@@ -30,7 +28,7 @@ export type EngineConfig = {
 	threadId: number
 }
 
-export class Engine extends NullPrototype implements ShaheenEngineImpl {
+export class Engine extends NullPrototype implements ShaheenEngine {
 	wasmHeap: Allocator
 	ecs: EcsCore
 	originTime: number

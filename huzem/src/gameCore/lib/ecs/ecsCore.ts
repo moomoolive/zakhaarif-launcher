@@ -1,23 +1,19 @@
-import type {
-	ShaheenEngineImpl,
-	EcsImpl,
-	EcsSystemImpl
-} from "zakhaarif-dev-tools/implement"
+import {ShaheenEngine, Ecs, EcsSystem} from "zakhaarif-dev-tools"
 
 type EcsConfig = {
-    engine: ShaheenEngineImpl
+    engine: ShaheenEngine
 }
 
-export class EcsCore implements EcsImpl {
-	engine: ShaheenEngineImpl
-	systems: Array<EcsSystemImpl>
+export class EcsCore implements Ecs {
+	engine: ShaheenEngine
+	systems: Array<EcsSystem>
 
 	constructor(config: EcsConfig) {
 		this.engine = config.engine
 		this.systems = []
 	}
     
-	addSystem(system: EcsSystemImpl): number {
+	addSystem(system: EcsSystem): number {
 		this.systems.push(system)
 		return this.systems.length - 1
 	}

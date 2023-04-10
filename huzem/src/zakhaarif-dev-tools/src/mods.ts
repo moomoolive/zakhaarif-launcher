@@ -12,11 +12,13 @@ import type {
     ParsedConsoleCommandInput,
 } from "./console"
 
-export type DependencyMetadata<N extends string = string> = { 
+export type DependencyMetadata<
+    N extends string = string
+> = Readonly<{ 
     name: N,
-    type?: "error" | "warn" | "ignore"
+    type?: "required" | "optional"
     version?: string
-}
+}>
 
 export type ModMetadata = Readonly<{
     canonicalUrl: string
@@ -64,16 +66,30 @@ export type ArchetypeDeclaration<
     }
 }
 
-export type GenericModData = ModData<
-    string, 
-    ImmutableResourceMap, 
-    object,
-    ComponentDeclaration,
-    {},
-    {}
->
+export type ComponentDefWithName<
+    D extends ComponentDeclaration,
+    N extends string
+> = {
+    readonly [key in keyof D as `${N}.${key & string}`]: D[key]
+}
 
-export type ModModules = ReadonlyArray<GenericModData>
+export type ModData<
+    Name extends string = string,
+    ImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
+    State extends object = object,
+    ComponentDefs extends ComponentDeclaration = ComponentDeclaration,
+    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>> = QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
+    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>> = ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>,
+> = {
+    readonly name: Name,
+    readonly resources?: ImmutableResources
+    readonly components?: ComponentDefs
+    readonly queries?: Queries
+    readonly archetypes?: Archetypes
+    state?: StateEvent<State>,
+}
+
+export type ModModules = ReadonlyArray<ModData>
 
 export type DependenciesDeclaration<
     Dependencies extends ModModules
@@ -85,43 +101,24 @@ export type DependenciesDeclaration<
     // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
     
     readonly dependencies: {
-        [index in keyof Dependencies]: Dependencies[index] extends { name: string }
-            ? DependencyMetadata<Dependencies[index]["name"]> 
-            : never
+        [index in keyof Dependencies]: (
+            Dependencies[index] extends { name: string, }
+                ? DependencyMetadata<
+                    Dependencies[index]["name"]
+                > 
+                : never
+        )
     }
 }
 
-export type ComponentDefWithName<
-    D extends ComponentDeclaration,
-    N extends string
-> = {
-    readonly [key in keyof D as `${N}.${key & string}`]: D[key]
-}
-
-export type ModData<
-    Name extends string,
-    ImmutableResources extends ImmutableResourceMap,
-    State extends object,
-    ComponentDefs extends ComponentDeclaration,
-    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
-    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>
-> = {
-    readonly name: Name,
-    readonly resources?: ImmutableResources
-    readonly components?: ComponentDefs
-    readonly queries?: Queries
-    readonly archetypes?: Archetypes
-    state?: StateEvent<State>,
-}
-
 export type ModDataWithDependents<
-    Dependencies extends ModModules,
-    Name extends string,
-    ImmutableResources extends ImmutableResourceMap,
-    State extends object,
-    ComponentDefs extends ComponentDeclaration,
-    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
-    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>
+    Dependencies extends ModModules = [],
+    Name extends string = string,
+    ImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
+    State extends object = object,
+    ComponentDefs extends ComponentDeclaration = ComponentDeclaration,
+    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>> = QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
+    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>> = ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>
 > = (
     DependenciesDeclaration<Dependencies> 
     & ModData<
@@ -157,10 +154,10 @@ export const modData = <LinkedMods extends ModModules = []>() => ({
 })
 
 export type EcsSystem<
-    LinkedMods extends ModModules
+    LinkedMods extends ModModules = []
 > = (engine: ShaheenEngine<LinkedMods>) => void 
 
-export type Ecs<LinkedMods extends ModModules> = {
+export type Ecs<LinkedMods extends ModModules = []> = {
     addSystem: (handler: (engine: ShaheenEngine<LinkedMods>) => void) => number,
     step: () => number
 }
@@ -189,11 +186,22 @@ export type DeepReadonly<T> = {
     )
 }
 
-export type ComponentViewer<
-    C extends ComponentDefinition = ComponentDefinition
+export type MutableComponentAccessor<
+    C extends ComponentDefinition = ComponentDefinition,
 > = (
     {
         index: (i: number) => ComponentType<C>
+    }
+    & {
+        [key in keyof C as `${key & string}Ptr`]: () => number
+    }
+)
+
+export type ComponentAccessor<
+    C extends ComponentDefinition = ComponentDefinition,
+> = (
+    {
+        index: (i: number) => Readonly<ComponentType<C>>
     }
     & {
         [key in keyof C as `${key & string}Ptr`]: () => number
@@ -209,7 +217,7 @@ export interface JsHeapRef {
 export type ComponentClass<
     C extends ComponentDefinition = ComponentDefinition
 > = {
-    new (ptr: number, heapRef: JsHeapRef): ComponentViewer<C>,
+    new (ptr: number, heapRef: JsHeapRef): MutableComponentAccessor<C>,
     readonly def: Readonly<C>
     readonly fullname: string
     readonly id: number
@@ -233,7 +241,9 @@ export interface ModAccessor<
     useArchetype: () => object
 }
 
-export interface ShaheenEngine<Mods extends ModModules> extends InitializedEngineCore {    
+export interface ShaheenEngine<
+    Mods extends ModModules = []
+> extends InitializedEngineCore {    
     ecs: Ecs<Mods>
     addConsoleCommand: <
         T extends ConsoleCommandInputDeclaration
@@ -292,7 +302,7 @@ export type CompleteMod<LinkedMods extends ModModules> = (
 
 export type ExtractMods<M> = (
     M extends ModDataWithDependents<
-        infer Dep,
+        infer Dependencies,
         infer Name,
         infer ImmutableResources,
         infer State,
@@ -301,7 +311,7 @@ export type ExtractMods<M> = (
         infer Archetypes
     >  
         ? [
-            ...Dep, 
+            ...Dependencies, 
             ModData<
                 Name, 
                 ImmutableResources, 
@@ -314,22 +324,14 @@ export type ExtractMods<M> = (
         : never
 )
 
-export type EmptyModData = ModDataWithDependents<
-    [], 
-    string, 
-    ImmutableResourceMap,
-    object,
-    {},
-    {},
-    {}
->
-
-export type LinkableMod<Mod extends EmptyModData> = (
+export type LinkableMod<
+    Mod extends ModDataWithDependents = ModDataWithDependents
+> = (
     { data: Mod } 
     & CompleteMod<ExtractMods<Mod>>
 )
 
-export const initMod = <M extends EmptyModData>(mod: LinkableMod<M>) => mod
+export const initMod = <M extends ModDataWithDependents>(mod: LinkableMod<M>) => mod
 
 type AllUtils<Mods extends ModModules> = (
     Required<ModLifeCycleEvents<Mods>>
@@ -339,4 +341,8 @@ type AllUtils<Mods extends ModModules> = (
     }
 )
 
-export type Zutils<Mod extends EmptyModData> = AllUtils<ExtractMods<Mod>>
+export type Zutils<Mod extends ModDataWithDependents> = AllUtils<ExtractMods<Mod>>
+
+export type ModEsModule = {
+    mod: LinkableMod
+}
