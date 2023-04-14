@@ -10,7 +10,9 @@ export type ComponentDefinition = {
     readonly [key: string]: ComponentToken
 }
 
-export type ComponentType<D extends ComponentDefinition> = {
+export type ComponentType<
+    D extends ComponentDefinition = ComponentDefinition
+> = {
     [key in keyof D]: D[key] extends ComponentToken ? number : never
 }
 

@@ -64,6 +64,7 @@ export const main = async (args: MainScriptArguments) => {
 		url: string,
 		canonicalUrl: string,
 		resolvedUrl: string
+		id: number
 	}
 	const importPromises: Promise<ImportType>[] = []
 	for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
@@ -71,12 +72,14 @@ export const main = async (args: MainScriptArguments) => {
 		const entry = gameSave.mods.entryUrls[i]
 		const canonicalUrl = gameSave.mods.canonicalUrls[i]
 		const url = resolved + entry
+		const id = i
 		importPromises.push((async () => {
 			return {
 				importedModule: await import(/* @vite-ignore */url), 
 				url,
 				resolvedUrl: resolved,
-				canonicalUrl
+				canonicalUrl,
+				id
 			}
 		})())
 	}
@@ -128,6 +131,7 @@ export const main = async (args: MainScriptArguments) => {
 			canonicalUrl: importMetadata.canonicalUrl,
 			resolvedUrl: importMetadata.resolvedUrl,
 			dependencies: mod.data.dependencies || [],
+			id: importMetadata.id
 		}
 		
 		if (mod.onInit) {

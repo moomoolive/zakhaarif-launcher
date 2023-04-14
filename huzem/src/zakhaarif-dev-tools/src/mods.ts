@@ -25,6 +25,7 @@ export type ModMetadata = Readonly<{
     resolvedUrl: string
     name: string,
     dependencies: DependencyMetadata[]
+    id: number
 }>
 
 export type StateEvent<State extends object> = (
@@ -56,14 +57,18 @@ export type ExtractComponentNames<
     & string
 )
 
+export type ArchetypeComponents<
+    ComponentsDef extends ComponentDeclaration = ComponentDeclaration
+> = {
+    readonly [key in keyof ComponentsDef]?: (
+        Partial<ComponentType<ComponentsDef[key]>>
+    )
+}
+
 export type ArchetypeDeclaration<
     ComponentsDef extends ComponentDeclaration = ComponentDeclaration
 > = {
-    readonly [key: string]: {
-        readonly [innerkey in keyof ComponentsDef]?: (
-            Partial<ComponentType<ComponentsDef[innerkey]>>
-        )
-    }
+    readonly [key: string]: ArchetypeComponents<ComponentsDef> 
 }
 
 export type ComponentDefWithName<
@@ -223,28 +228,111 @@ export type ComponentClass<
     readonly id: number
 }
 
-export type ModArchetypes<
-    A extends ArchetypeDeclaration = ArchetypeDeclaration
-> = {
-    readonly [key in keyof A]: object
+// This type is sooooo cancer.
+// Basically this takes any tuple and makes an intersection
+// (e.g index1 & index2 & index3 ...)
+// of all it's elements
+// taken from: https://stackoverflow.com/questions/74217585/how-to-merge-of-many-generic-in-typescript
+export type TupleToIntersection<T extends ReadonlyArray<any>> = (
+    { [I in keyof T]: (x: T[I]) => void }[number] extends 
+    (x: infer I) => void ? I : never
+)
+
+export type GlobalModIndex<Mods extends ModModules = []> = {
+    components: TupleToIntersection<{
+        [I in keyof Mods]: Mods[I] extends 
+            { name: infer N, components?: infer C}
+            ? (C extends undefined ? {} : {
+                [key in keyof C as `${N & string}_${key & string}`]: C[key]
+            })
+            : {}
+    }>
+} 
+
+export type LocalModIndex<M extends ModData = ModData> = {
+    state: M["state"] extends undefined ? {} : Awaited<
+        ReturnType<NonNullable<M["state"]>>
+    >,
+    resources: M["resources"] extends undefined ? {} : { 
+        readonly [key in keyof NonNullable<M["resources"]>]: string 
+    }
+    components: M["components"] extends undefined ? {} : NonNullable<
+        M["components"]
+    >
+    queries: M["queries"] extends undefined ? {} : {
+        readonly [key in keyof NonNullable<M["queries"]>]: QueryAccessor
+    }
+    archetypes: M["archetypes"] extends undefined ? {} : NonNullable<
+        M["archetypes"]
+    >
+}
+
+export type ComponentDefFromGlobalIndex<
+    TName extends PropertyKey = PropertyKey,
+    TGlobalIndex extends GlobalModIndex = GlobalModIndex
+> = (
+    TName extends keyof TGlobalIndex["components"]
+        ? TGlobalIndex["components"][TName] extends ComponentDefinition
+            ? TGlobalIndex["components"][TName]
+            : {}
+        : {}
+)
+
+export interface ArchetypeAccessor<
+    TArchetype extends ArchetypeComponents = ArchetypeComponents,
+    TGlobalIndex extends GlobalModIndex = GlobalModIndex
+> {
+    id: () => number
+        
+    /** returns the amount of memory (bytes) a single entity consumes */
+    sizeOfEntity: () => number
+    /** the number of entities currently being held in archetype */
+    entityCount: () => number
+    /** the number of entities that can be held before component buffers need to be resized */
+    entityCapacity: () => number
+
+    useComponents: () => {
+        [CKey in keyof TArchetype]: ComponentAccessor<
+            ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
+        >
+    }
+
+    useMutComponents: () => {
+        [CKey in keyof TArchetype]: MutableComponentAccessor<
+            ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
+        >
+    }
+
+    initEntity: () => ({
+        [CKey in keyof TArchetype]: ComponentType<
+            ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
+        >
+    } & {
+        create: () => number
+    }),
 }
 
 export interface ModAccessor<
-    TState extends object = object,
-    TResource extends Record<string, string> = Record<string, string>,
-    TComponents extends ComponentDeclaration = ComponentDeclaration,
-    TQueries extends Record<string, QueryAccessor> = Record<string, QueryAccessor>,
-    TArchetypes extends ArchetypeDeclaration = ArchetypeDeclaration
+    TGlobalIndex extends GlobalModIndex = GlobalModIndex,
+    TLocalIndex extends LocalModIndex = LocalModIndex
 > {
-    useMutState: () => TState
-    useState: () => DeepReadonly<TState>
-    useQuery: () => TQueries 
+    useMutState: () => TLocalIndex["state"]
+    useState: () => DeepReadonly<TLocalIndex["state"]>
+    useQuery: () => TLocalIndex["queries"] 
     useMetadata: () => ModMetadata,
-    useResource: () => TResource,
+    useResource: () => TLocalIndex["resources"],
     useComponent: () => ({
-        readonly [key in keyof TComponents]: ComponentClass<TComponents[key]>
+        readonly [key in keyof TLocalIndex["components"]]: (
+            ComponentClass<TLocalIndex["components"][key]>
+        )
     })
-    useArchetype: () => ModArchetypes<TArchetypes>
+    useArchetype: () => ({
+        readonly [key in keyof TLocalIndex["archetypes"]]: (
+            ArchetypeAccessor<
+                TLocalIndex["archetypes"][key], TGlobalIndex
+            > 
+        )
+    })
 }
 
 export interface ShaheenEngine<
@@ -255,28 +343,9 @@ export interface ShaheenEngine<
         T extends ConsoleCommandInputDeclaration
     >(command: ModConsoleCommand<ShaheenEngine<Mods>, T>) => void,
     useMod: () => ({
-        [mod in Mods[number] as mod["name"]]: ModAccessor<
-            (
-                mod["state"] extends undefined ? {} : Awaited<
-                    ReturnType<NonNullable<mod["state"]>>
-                >
-            ),
-            (
-                mod["resources"] extends undefined ? {} : { 
-                    readonly [key in keyof NonNullable<mod["resources"]>]: string 
-                }
-            ),
-            (
-                mod["components"] extends undefined ? {} : NonNullable<mod["components"]>
-            ),
-            (
-                mod["queries"] extends undefined ? {} : {
-                    readonly [key in keyof NonNullable<mod["queries"]>]: QueryAccessor
-                }
-            ),
-            (
-                mod["archetypes"] extends undefined ? {} : NonNullable<mod["archetypes"]>
-            )
+        [Mod in Mods[number] as Mod["name"]]: ModAccessor<
+            GlobalModIndex<Mods>,
+            LocalModIndex<Mod>
         >
     })
 }

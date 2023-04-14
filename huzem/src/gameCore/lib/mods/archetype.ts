@@ -1,6 +1,7 @@
 import type {
 	ComponentAccessor, 
-	MutableComponentAccessor
+	MutableComponentAccessor,
+	ArchetypeAccessor,
 } from "zakhaarif-dev-tools"
 
 export type MutableComponentRegistry = {
@@ -37,14 +38,15 @@ export type ComponentBuffer = {
 // Sander Mertens's amazing post helped inform
 // the layout for archetypes.
 // link: https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9
-export class Archetype {
-	readonly id: number
-	/** the amount of memory a single entity consumes */
-	readonly sizeOfEntity: number
-	/** the number of entities currently being held in archetype */
-	entityCount: number
-	/** the number of entities that can be held before component buffers need to be resized */
-	entityCapacity: number
+export class Archetype implements ArchetypeAccessor {
+	readonly hash: number
+	readonly entitySize: number
+	numberOfEntities: number
+	capacityForEntities: number
+
+	// accessors & heaps for js
+	readonly mutComponents: MutableComponentRegistry
+	readonly components: ComponentRegistry
 
 	// should be in ascending order
 	// so binary search can be used for lookup
@@ -58,20 +60,47 @@ export class Archetype {
 	// at position 2.
 	componentBuffers: ComponentBuffer[]
 	
-	// accessors & heaps for js
-	readonly mutComponents: MutableComponentRegistry
-	readonly components: ComponentRegistry
 
 	constructor() {
-		this.id = 0
-		this.sizeOfEntity = 0
-		this.entityCount = 0
-		this.entityCapacity = 0
+		this.hash = 0
+		this.entitySize = 0
+		this.numberOfEntities = 0
+		this.capacityForEntities = 0
 		this.componentIds = []
 		this.componentCount = 0
 		this.componentBuffers = []
 
 		this.mutComponents = {}
 		this.components = {}
+	}
+
+	id(): number {
+		return this.hash
+	}
+
+	sizeOfEntity(): number {
+		return this.entitySize
+	}
+
+	entityCount(): number {
+		return this.numberOfEntities
+	}
+
+	entityCapacity(): number {
+		return this.capacityForEntities
+	}
+
+	useComponents(): ReturnType<ArchetypeAccessor["useComponents"]> {
+		return this.components
+	}
+
+	useMutComponents(): ReturnType<ArchetypeAccessor["useMutComponents"]> {
+		return this.mutComponents
+	}
+
+	initEntity(): ReturnType<ArchetypeAccessor["initEntity"]> {
+		return {
+			create: () => 0
+		}
 	}
 }
