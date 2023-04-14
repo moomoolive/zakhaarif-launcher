@@ -2,7 +2,8 @@ import type {
 	ModMetadata,
 	QueryAccessor,
 	ModAccessor,
-	ComponentClass
+	ComponentClass,
+	ModArchetypes
 } from "zakhaarif-dev-tools"
 import {NullPrototype} from "../utils/nullProto"
 
@@ -12,6 +13,7 @@ export type CompiledModConfig = {
 	resources: Record<string, string>
 	queries: Record<string, QueryAccessor>
 	componentClasses: Record<string, ComponentClass>
+	archetypes: ModArchetypes
 }
 
 export class CompiledMod extends NullPrototype implements ModAccessor {
@@ -20,6 +22,7 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 	readonly resources: Record<string, string>
 	readonly queries: Record<string, QueryAccessor>
 	readonly componentClasses: Record<string, ComponentClass>
+	readonly archetypes: ModArchetypes
 
 	constructor(config: CompiledModConfig) {
 		super()
@@ -28,6 +31,7 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 		this.resources = config.resources
 		this.queries = config.queries
 		this.componentClasses = config.componentClasses
+		this.archetypes = config.archetypes
 	}
 
 	useMutState() {
@@ -55,6 +59,6 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 	}
 
 	useArchetype() {
-		return {}
+		return this.archetypes
 	}
 }

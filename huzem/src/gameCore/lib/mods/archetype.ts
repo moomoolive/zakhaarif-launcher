@@ -39,6 +39,8 @@ export type ComponentBuffer = {
 // link: https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9
 export class Archetype {
 	readonly id: number
+	/** the amount of memory a single entity consumes */
+	readonly sizeOfEntity: number
 	/** the number of entities currently being held in archetype */
 	entityCount: number
 	/** the number of entities that can be held before component buffers need to be resized */
@@ -57,11 +59,12 @@ export class Archetype {
 	componentBuffers: ComponentBuffer[]
 	
 	// accessors & heaps for js
-	mutComponents: MutableComponentRegistry
-	components: ComponentRegistry
+	readonly mutComponents: MutableComponentRegistry
+	readonly components: ComponentRegistry
 
 	constructor() {
 		this.id = 0
+		this.sizeOfEntity = 0
 		this.entityCount = 0
 		this.entityCapacity = 0
 		this.componentIds = []

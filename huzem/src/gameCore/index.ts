@@ -108,7 +108,7 @@ export const main = async (args: MainScriptArguments) => {
 	})
 
 	Object.defineProperty(globalThis, "zconsole", {
-		value: engine.zconsole,
+		value: engine.console,
 		enumerable: true,
 		writable: false,
 		configurable: true
@@ -177,12 +177,26 @@ export const main = async (args: MainScriptArguments) => {
 			})
 		}
 
+		const modArchetypes = mod.data.archetypes || {}
+		const archetypes = {}
+		const archetypeKeys = Object.keys(modArchetypes)
+		for (let i = 0; i < archetypeKeys.length; i++) {
+			const key = archetypeKeys[i]
+			Object.defineProperty(archetypes, key, {
+				value: {},
+				enumerable: true,
+				writable: true,
+				configurable: true
+			})
+		}
+
 		const compiledMod = new CompiledMod({
 			state: modState,
 			meta: modMetadata,
 			resources: (mod.data.resources || {}) as Record<string, string>,
 			queries: queryAccessors,
-			componentClasses
+			componentClasses,
+			archetypes
 		})
 		
 		Object.defineProperty(engine.compiledMods, mod.data.name, {

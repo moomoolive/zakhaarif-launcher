@@ -10,7 +10,7 @@ export type EngineCore = {
     getTotalElapsedTime: () => number
     isMainThread: () => boolean
     threadId: () => number
-    zconsole: Record<string, ConsoleCommand>
+    console: Record<string, ConsoleCommand>
 }
 
 export interface Allocator {

@@ -31,20 +31,20 @@ const data = modData().define({
 	},
 	queries: {
 		visualChanges: {
-			"zakhaarifStd.position": "required",
-			"zakhaarifStd.rendering": "required",
+			zakhaarifStd_position: "required",
+			zakhaarifStd_rendering: "required"
 		}
 	},
 	archetypes: {
 		player: {
-			"zakhaarifStd.transform": {},
-			"zakhaarifStd.impulse": {},
-			"zakhaarifStd.collider": {x: 0.5, y: 1.0, z: 0.5},
-			"zakhaarifStd.kinematics": {mass: 10.0, gravityModifier: 1.0},
-			"zakhaarifStd.velocity": {},
-			"zakhaarifStd.acceleration":  {x: 2_000.0, y: 0.25, z: 2_000.0},
-			"zakhaarifStd.position": {x: 2_048.0, y: 100.0, z: 2_048.0},
-			"zakhaarifStd.rendering": {}
+			zakhaarifStd_transform: {},
+			zakhaarifStd_impulse: {},
+			zakhaarifStd_collider: {x: 0.5, y: 1.0, z: 0.5},
+			zakhaarifStd_kinematics: {mass: 10.0, gravityModifier: 1.0},
+			zakhaarifStd_velocity: {},
+			zakhaarifStd_acceleration:  {x: 2_000.0, y: 0.25, z: 2_000.0},
+			zakhaarifStd_position: {x: 2_048.0, y: 100.0, z: 2_048.0},
+			zakhaarifStd_rendering: {}
 		}
 	}
 })

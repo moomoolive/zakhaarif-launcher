@@ -52,12 +52,12 @@ export type ExtractComponentNames<
     D extends ComponentDeclaration,
     N extends string
 > = (
-    keyof ({ readonly [key in keyof D as `${N}.${string & key}`]: string }) 
+    keyof ({ readonly [key in keyof D as `${N}_${string & key}`]: string }) 
     & string
 )
 
 export type ArchetypeDeclaration<
-    ComponentsDef extends ComponentDeclaration
+    ComponentsDef extends ComponentDeclaration = ComponentDeclaration
 > = {
     readonly [key: string]: {
         readonly [innerkey in keyof ComponentsDef]?: (
@@ -70,7 +70,7 @@ export type ComponentDefWithName<
     D extends ComponentDeclaration,
     N extends string
 > = {
-    readonly [key in keyof D as `${N}.${key & string}`]: D[key]
+    readonly [key in keyof D as `${N}_${key & string}`]: D[key]
 }
 
 export type ModData<
@@ -223,22 +223,28 @@ export type ComponentClass<
     readonly id: number
 }
 
+export type ModArchetypes<
+    A extends ArchetypeDeclaration = ArchetypeDeclaration
+> = {
+    readonly [key in keyof A]: object
+}
+
 export interface ModAccessor<
-    S extends object = object,
-    R extends Record<string, string> = Record<string, string>,
-    C extends ComponentDeclaration = ComponentDeclaration,
-    Q extends Record<string, QueryAccessor> = Record<string, QueryAccessor>,
-    A extends ArchetypeDeclaration<{}> = ArchetypeDeclaration<{}>
+    TState extends object = object,
+    TResource extends Record<string, string> = Record<string, string>,
+    TComponents extends ComponentDeclaration = ComponentDeclaration,
+    TQueries extends Record<string, QueryAccessor> = Record<string, QueryAccessor>,
+    TArchetypes extends ArchetypeDeclaration = ArchetypeDeclaration
 > {
-    useMutState: () => S
-    useState: () => DeepReadonly<S>
-    useQuery: () => Q 
+    useMutState: () => TState
+    useState: () => DeepReadonly<TState>
+    useQuery: () => TQueries 
     useMetadata: () => ModMetadata,
-    useResource: () => R,
+    useResource: () => TResource,
     useComponent: () => ({
-        readonly [key in keyof C]: ComponentClass<C[key]>
+        readonly [key in keyof TComponents]: ComponentClass<TComponents[key]>
     })
-    useArchetype: () => object
+    useArchetype: () => ModArchetypes<TArchetypes>
 }
 
 export interface ShaheenEngine<

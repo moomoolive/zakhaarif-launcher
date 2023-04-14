@@ -35,7 +35,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	previousFrame: number
 	elapsedTime: number
 	isRunning: boolean
-	zconsole: ConsoleCommandIndex
+	console: ConsoleCommandIndex
 	compiledMods: CompiledMods
 	archetypes: Archetype[]
 
@@ -50,7 +50,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.archetypes = []
 		this.wasmHeap = wasmHeap
 		this.isRunning = false
-		this.zconsole = nullObject()
+		this.console = nullObject()
 		this.compiledMods = nullObject()
 		this.originTime = 0.0
 		this.previousFrame = 0.0
@@ -92,7 +92,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		})
 		const self = this
 		const commandArgs = args || EMPTY_OBJECT
-		Object.defineProperty(this.zconsole, name, {
+		Object.defineProperty(this.console, name, {
 			value: (input: Record<string, string | boolean | number | undefined> = {}) => {
 				if (
 					typeof input === "object" 

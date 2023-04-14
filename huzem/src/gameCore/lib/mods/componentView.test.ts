@@ -16,7 +16,9 @@ describe("component tokenizer", () => {
             Symbol()
         ] as const
         for (const test of tests) {
-            expect(compileComponentClass("", test as any, "", 0).ok).toBe(false)
+            const response = compileComponentClass("", test as any, "", 0)
+            expect(response.ok).toBe(false)
+            expect(response.componentClass).toBe(null)
         }
     })
 
@@ -27,7 +29,9 @@ describe("component tokenizer", () => {
             [{field: "i32", field2: "f32"}],
         ] as const
         for (const test of tests) {
-            expect(compileComponentClass("", test as any, "", 0).ok).toBe(false)
+            const response = compileComponentClass("", test as any, "", 0)
+            expect(response.ok).toBe(false)
+            expect(response.componentClass).toBe(null)
         }
     })
 
@@ -40,11 +44,13 @@ describe("component tokenizer", () => {
             {field: "num7", field2: "yeah"},
         ] as const
         for (const test of tests) {
-            expect(compileComponentClass("", test as any, "", 0).ok).toBe(false)
+            const response = compileComponentClass("", test as any, "", 0)
+            expect(response.ok).toBe(false)
+            expect(response.componentClass).toBe(null)
         }
     })
 
-    it("should return not ok if field name ends with '$'", () => {
+    it("compiler should return not ok if field name ends with '$'", () => {
         const tests = [
             {field$: "i32"},
             {ptr$: "f32", field2: "f32"},
@@ -53,7 +59,14 @@ describe("component tokenizer", () => {
         for (const def of tests) {
             const response = compileComponentClass("", def, "", 0)
             expect(response.ok).toBe(false)
+            expect(response.componentClass).toBe(null)
         }
+    })
+
+    it("compiler should return not ok if component definition has no fields", () => {
+        const response = compileComponentClass("", {}, "", 0)
+        expect(response.ok).toBe(false)
+        expect(response.componentClass).toBe(null)
     })
 })
 

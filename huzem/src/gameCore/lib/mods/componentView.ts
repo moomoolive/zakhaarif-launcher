@@ -69,6 +69,11 @@ export function compileComponentClass<
 	}
 	const initialTokens = []
 	const keys = Object.keys(def)
+	if (keys.length < 1) {
+		compileRes.ok = false
+		compileRes.msg = "component definition must have more than one field defined. Did you mean to create a tag component?"
+		return compileRes
+	}
 	for (let i = 0; i < keys.length; i++) {
 		const name = keys[i]
 		if (name.endsWith(INTERNAL_FIELD_PREFIX)) {
