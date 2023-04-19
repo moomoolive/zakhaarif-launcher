@@ -31,6 +31,7 @@
   "exclude": [
     "src/zakhaarif-dev-tools/build/",
     "src/gameCore/engine_allocator/pkg/engine_allocator.js",
+    "src/gameCore/engine_allocator/pkg-node/engine_allocator.js",
     "public/"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
