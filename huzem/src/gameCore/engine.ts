@@ -13,8 +13,7 @@ import {NullPrototype} from "./lib/utils/nullProto"
 import {Archetype} from "./lib/mods/archetype"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 import {WasmHeap} from "./lib/heap/wasmHeap"
-import initHeap from "./engine_allocator/pkg/engine_allocator"
-import nodeHeap from "./engine_allocator/pkg-node/engine_allocator.js"
+import initWebHeap from "./engine_allocator/pkg/engine_allocator"
 
 export const MAIN_THREAD_ID = 0
 
@@ -35,8 +34,12 @@ export type EngineConfig = {
 
 export class Engine extends NullPrototype implements ShaheenEngine {
 	static async init(config: Omit<EngineConfig, "wasmHeap">): Promise<Engine> {
-		const isRunningInNode = typeof window === "undefined"
+		const isRunningInNode = (
+			typeof window === "undefined"
+			&& typeof require === "function"
+		)
 		if (isRunningInNode) {
+			const nodeHeap = require("./engine_allocator/pkg-node/engine_allocator.js") // eslint-disable-line @typescript-eslint/no-var-requires
 			const wasmHeap = new WasmHeap({
 				...nodeHeap, memory: nodeHeap.__wasm.memory
 			})
@@ -44,7 +47,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		}
 		const relativeUrl = wasmMap.engine_allocator
 		const heapUrl = new URL(relativeUrl, import.meta.url).href
-		const innerHeap = await initHeap(heapUrl)
+		const innerHeap = await initWebHeap(heapUrl)
 		const wasmHeap = new WasmHeap(innerHeap)
 		return new Engine({wasmHeap, ...config})
 	}
