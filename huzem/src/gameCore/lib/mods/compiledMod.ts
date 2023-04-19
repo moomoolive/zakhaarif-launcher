@@ -3,7 +3,6 @@ import type {
 	QueryAccessor,
 	ModAccessor,
 	ComponentClass,
-	ModArchetypes
 } from "zakhaarif-dev-tools"
 import {NullPrototype} from "../utils/nullProto"
 
@@ -13,7 +12,7 @@ export type CompiledModConfig = {
 	resources: Record<string, string>
 	queries: Record<string, QueryAccessor>
 	componentClasses: Record<string, ComponentClass>
-	archetypes: ModArchetypes
+	archetypes: ReturnType<ModAccessor["useArchetype"]>
 }
 
 export class CompiledMod extends NullPrototype implements ModAccessor {
@@ -22,7 +21,7 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 	readonly resources: Record<string, string>
 	readonly queries: Record<string, QueryAccessor>
 	readonly componentClasses: Record<string, ComponentClass>
-	readonly archetypes: ModArchetypes
+	readonly archetypes: ReturnType<ModAccessor["useArchetype"]>
 
 	constructor(config: CompiledModConfig) {
 		super()

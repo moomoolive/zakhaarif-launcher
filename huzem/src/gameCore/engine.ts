@@ -11,6 +11,10 @@ import {validateCommandInput} from "./lib/cli/parser"
 import {EcsCore} from "./lib/ecs/ecsCore"
 import {NullPrototype} from "./lib/utils/nullProto"
 import {Archetype} from "./lib/mods/archetype"
+import {wasmMap} from "../wasmBinaryPaths.mjs"
+import {WasmHeap} from "./lib/heap/wasmHeap"
+import initHeap from "./engine_allocator/pkg/engine_allocator"
+import nodeHeap from "./engine_allocator/pkg-node/engine_allocator.js"
 
 export const MAIN_THREAD_ID = 0
 
@@ -26,9 +30,25 @@ export type EngineConfig = {
     rootCanvas: HTMLCanvasElement
 	wasmHeap: Allocator
 	threadId: number
+	threadedMode: boolean
 }
 
 export class Engine extends NullPrototype implements ShaheenEngine {
+	static async init(config: Omit<EngineConfig, "wasmHeap">): Promise<Engine> {
+		const isRunningInNode = typeof window === "undefined"
+		if (isRunningInNode) {
+			const wasmHeap = new WasmHeap({
+				...nodeHeap, memory: nodeHeap.__wasm.memory
+			})
+			return new Engine({...config, wasmHeap})
+		}
+		const relativeUrl = wasmMap.engine_allocator
+		const heapUrl = new URL(relativeUrl, import.meta.url).href
+		const innerHeap = await initHeap(heapUrl)
+		const wasmHeap = new WasmHeap(innerHeap)
+		return new Engine({wasmHeap, ...config})
+	}
+	
 	wasmHeap: Allocator
 	ecs: EcsCore
 	originTime: number

@@ -9,14 +9,9 @@ import {
 	MAIN_THREAD_ID,
 } from "./engine"
 import {CompiledMod} from "./lib/mods/compiledMod"
-import initHeap from "./engine_allocator/pkg/engine_allocator"
-import {wasmMap} from "../wasmBinaryPaths.mjs"
-import {WasmHeap} from "./lib/heap/wasmHeap"
 import {
 	compileComponentClass
 } from "./lib/mods/componentView"
-
-const HEAP_RELATIVE_URL = wasmMap.engine_allocator
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -91,15 +86,10 @@ export const main = async (args: MainScriptArguments) => {
 	const rootCanvas = document.createElement("canvas")
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
-
-	const heapUrl = new URL(
-		HEAP_RELATIVE_URL, import.meta.url
-	).href
-	console.info("Loading heap...", heapUrl)
-
-	const engine = new Engine({
+	
+	const engine = await Engine.init({
 		rootCanvas,
-		wasmHeap: new WasmHeap(await initHeap(heapUrl)),
+		threadedMode: false,
 		threadId: MAIN_THREAD_ID
 	})
 
