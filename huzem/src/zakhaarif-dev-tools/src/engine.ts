@@ -3,7 +3,7 @@ export type ConsoleCommand = (input: object) => unknown
 export type ConsoleCommandIndex = Record<string, ConsoleCommand>
 
 export type EngineCore = {
-    getRootCanvas: () => HTMLCanvasElement
+    getRootCanvas: () => HTMLCanvasElement | null
     getDeltaTime: () => number
     getOriginTime: () => number
     getPreviousFrameTime: () => number

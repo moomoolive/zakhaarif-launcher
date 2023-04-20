@@ -4,10 +4,7 @@ import {
 	ModMetadata,
 	ModEsModule
 } from "zakhaarif-dev-tools"
-import {
-	Engine,
-	MAIN_THREAD_ID,
-} from "./engine"
+import {Engine} from "./lib/engine/core"
 import {CompiledMod} from "./lib/mods/compiledMod"
 import {
 	compileComponentClass
@@ -90,7 +87,7 @@ export const main = async (args: MainScriptArguments) => {
 	const engine = await Engine.init({
 		rootCanvas,
 		threadedMode: false,
-		threadId: MAIN_THREAD_ID
+		threadId: Engine.MAIN_THREAD_ID
 	})
 
 	Object.defineProperty(globalThis, "zengine", {

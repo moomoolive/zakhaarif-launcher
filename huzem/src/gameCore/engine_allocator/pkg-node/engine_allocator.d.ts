@@ -30,4 +30,4 @@ export function free(ptr: number, size: number, align: number): void;
 */
 export function realloc(ptr: number, old_size: number, old_align: number, new_size: number): number;
 
-export const __wasm: {memory: WebAssembly.Memory}
+export const __wasm: { memory: WebAssembly.Memory }

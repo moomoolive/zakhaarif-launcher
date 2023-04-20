@@ -61,9 +61,11 @@ export const mod = initMod({
 		console.info("before game loop called", engine)
 
 		const canvas = engine.getRootCanvas()
-		canvas.style.width = "100vw"
-		canvas.style.height = "100vh"
-		canvas.onclick = () => canvas.requestPointerLock()
+		if (canvas) {
+			canvas.style.width = "100vw"
+			canvas.style.height = "100vh"
+			canvas.onclick = () => canvas.requestPointerLock()
+		}
 
 		const {zakhaarifStd} = engine.useMod()
 		const state = zakhaarifStd.useMutState()
