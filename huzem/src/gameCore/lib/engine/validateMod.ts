@@ -17,20 +17,32 @@ const modValidator = s.object({
 		components: s.optional(
 			s.record(
 				s.string(), 
-				s.union([
-					s.literal("f32"), 
-					s.literal("i32"), 
-					s.literal("u32")
-				])
+				s.record(
+					s.string(),
+					s.union([
+						s.literal("f32"), 
+						s.literal("i32"), 
+						s.literal("u32")
+					]) 
+				)
 			)
 		),
 		archetypes: s.optional(
 			s.record(
 				s.string(), 
-				s.record(s.string(), s.number())
+				s.record(
+					s.string(),
+					s.record(s.string(), s.number())
+				)
 			)
 		),
-		state: s.optional(s.func())
+		state: s.optional(s.func()),
+		queries: s.optional(
+			s.record(
+				s.string(), 
+				s.record(s.string(), s.string())
+			)
+		)
 	}),
 	onInit: s.optional(s.func()),
 	onBeforeGameLoop: s.optional(s.func()),

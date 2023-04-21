@@ -6,6 +6,8 @@ import type {
 	ModConsoleCommand,
 	ShaheenEngine,
 	LinkableMod,
+	ModMetadata,
+	ComponentClass
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {validateCommandInput} from "../cli/parser"
@@ -17,6 +19,7 @@ import {WasmHeap} from "../heap/wasmHeap"
 import initWebHeap from "../../engine_allocator/pkg/engine_allocator"
 import {validateMod} from "./validateMod"
 import {defineEnum} from "../utils/enum"
+import {compileComponentClass} from "../mods/componentView"
 
 const MAIN_THREAD_ID = 0
 
@@ -35,6 +38,7 @@ export type ModLinkInfo = {
 	wrapper: LinkableMod,
 	resolvedUrl: string,
 	canonicalUrl: string
+    entryUrl: string
 }
 
 type CompiledMods = {
@@ -85,6 +89,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	// will be null if running in Node (or Deno...)
 	private canvas: HTMLCanvasElement | null
 	private linkedMods: ModLinkInfo[]
+	private modIdCounter: number
 
 	constructor(config: EngineConfig) {
 		super()
@@ -102,6 +107,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.linkedMods = []
 		const self = this
 		this.ecs = new EcsCore({engine: self})
+		this.modIdCounter = 0
 	}
 
 	isMainThread(): boolean {
@@ -205,28 +211,100 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 
 		// some kind of type check on
 		// mods, components, state, & archetypes
-
-		const modCount = this.linkedMods.length
 		
-		for (let i = 0; i < mods.length; i++) {
-			const mod = mods[i]
+		for (let m = 0; m < mods.length; m++) {
+			const mod = mods[m]
 			const {wrapper, resolvedUrl, canonicalUrl} = mod
 			const {data} = wrapper
-			const id = modCount + i
+			const id = this.modIdCounter++
+			const meta: ModMetadata = {
+				name: data.name,
+				canonicalUrl,
+				resolvedUrl,
+				dependencies: data.dependencies || [],
+				id 
+			}
+			const engine = this
+			if (wrapper.onInit) {
+				await wrapper.onInit(meta, engine)
+			}
+
+			let modState = {}
+			if (wrapper.data.state) {
+				modState = await wrapper.data.state(meta, this)
+			}
+
+			const componentClasses: Record<string, ComponentClass> = Object.create(null)
+			const components = wrapper.data.components || {}
+			const componentNames = Object.keys(components)
+			for (let i = 0; i < componentNames.length; i++) {
+				const componentName = componentNames[i]
+				const definition = components[componentName]
+				const fullname = `${wrapper.data.name}.${componentName}`
+				const compilerResponse = compileComponentClass(
+					componentName,
+					definition,
+					fullname,
+					i
+				)
+				if (!compilerResponse.ok) {
+					console.warn(`couldn't compiled component "${fullname}": ${compilerResponse.msg}`)
+					continue
+				}
+				Object.defineProperty(componentClasses, componentName, {
+					value: compilerResponse.componentClass,
+					enumerable: true,
+					writable: true,
+					configurable: true
+				})
+			}
+
+			const modArchetypes = wrapper.data.archetypes || {}
+			const archetypes = {}
+			const archetypeKeys = Object.keys(modArchetypes)
+			for (let i = 0; i < archetypeKeys.length; i++) {
+				const key = archetypeKeys[i]
+				Object.defineProperty(archetypes, key, {
+					value: {},
+					enumerable: true,
+					writable: true,
+					configurable: true
+				})
+			}
+
+			const queries = wrapper.data.queries || {}
+			const definedQueries = Object.keys(queries)
+			const queryAccessors = {}
+			for (let i = 0; i < definedQueries.length; i++) {
+				const queryname = definedQueries[i]
+				Object.defineProperty(queryAccessors, queryname, {
+					configurable: true,
+					enumerable: true,
+					writable: true,
+					value: () => ({})
+				})
+			}
+
 			const compiled = new CompiledMod({
-				state: {},
-				meta: {
-					name: data.name,
-					canonicalUrl,
-					resolvedUrl,
-					dependencies: data.dependencies || [],
-					id 
-				},
-				resources: {},
-				queries: {},
-				componentClasses: {},
-				archetypes: {}
+				state: modState,
+				meta,
+				resources: (wrapper.data.resources || {}) as Record<string, string>,
+				queries: queryAccessors,
+				componentClasses,
+				archetypes
 			})
+            
+			Object.defineProperty(this.compiledMods, wrapper.data.name, {
+				configurable: true,
+				enumerable: true,
+				writable: false,
+				value: compiled
+			})
+
+			if (wrapper.onBeforeGameLoop) {
+				await wrapper.onBeforeGameLoop(engine)
+			}
+
 			modBuffer.push(compiled)
 		}
 

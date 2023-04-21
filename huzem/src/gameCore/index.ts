@@ -1,14 +1,5 @@
-import {
-	ComponentClass,
-	MainScriptArguments,
-	ModMetadata,
-	ModEsModule
-} from "zakhaarif-dev-tools"
-import {Engine} from "./lib/engine/core"
-import {CompiledMod} from "./lib/mods/compiledMod"
-import {
-	compileComponentClass
-} from "./lib/mods/componentView"
+import {MainScriptArguments} from "zakhaarif-dev-tools"
+import {Engine, ModLinkInfo} from "./lib/engine/core"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -51,32 +42,36 @@ export const main = async (args: MainScriptArguments) => {
 		const entry = gameSave.mods.entryUrls[i]
 		importUrls.push(resolved + entry)
 	}
-	type ImportType = {
-		importedModule: ModEsModule, 
-		url: string,
-		canonicalUrl: string,
-		resolvedUrl: string
-		id: number
-	}
-	const importPromises: Promise<ImportType>[] = []
+	const importPromises: Promise<ModLinkInfo | null>[] = []
 	for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
 		const resolved = gameSave.mods.resolvedUrls[i]
 		const entry = gameSave.mods.entryUrls[i]
 		const canonicalUrl = gameSave.mods.canonicalUrls[i]
 		const url = resolved + entry
-		const id = i
 		importPromises.push((async () => {
+			const modModule = await import(/* @vite-ignore */url)
+			if (!("mod" in modModule)) {
+				return null
+			}
 			return {
-				importedModule: await import(/* @vite-ignore */url), 
-				url,
+				wrapper: modModule.mod, 
+				entryUrl: url,
 				resolvedUrl: resolved,
 				canonicalUrl,
-				id
 			}
 		})())
 	}
 
-	const imports = await Promise.all(importPromises)
+	const importAttempts = await Promise.all(importPromises)
+
+	const imports = []
+	for (const importAttempt of importAttempts) {
+		if (!importAttempt) {
+			console.warn("module import failed")
+			return
+		}
+		imports.push(importAttempt)
+	}
 	
 	console.info(`Found ${imports.length} imports`)
     
@@ -104,6 +99,19 @@ export const main = async (args: MainScriptArguments) => {
 		configurable: true
 	})
 
+	const linkStatus = await engine.linkMods(imports)
+
+	console.info("link status returned with", linkStatus)
+
+	if (!linkStatus.ok) {
+		console.error("failed to link mods, found", linkStatus.errors.length, "errors")
+		for (const {msg, status, statusText} of linkStatus.errors) {
+			console.error(`${status} (${statusText}) ${msg}`)
+		}
+		return
+	}
+
+	/*
 	for (const importMetadata of imports) {
 		const {importedModule, url} = importMetadata
 		if (!("mod" in importedModule)) {
@@ -202,6 +210,7 @@ export const main = async (args: MainScriptArguments) => {
 		}
 		
 	}
+	*/
 
 	const runGameLoop = (time: number) => {
 		engine.elapsedTime = time - engine.previousFrame
