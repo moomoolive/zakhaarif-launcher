@@ -2,7 +2,9 @@ import type {
 	ComponentDefinition, 
 	ComponentToken,
 	ComponentClass,
-	JsHeapRef
+	JsHeapRef,
+	ComponentFieldMeta,
+	MutableComponentAccessor
 } from "zakhaarif-dev-tools"
 
 export const VALID_FIELD_TYPES = [
@@ -49,6 +51,17 @@ export type ComponentInternals = {
 
 const INTERNAL_FIELD_PREFIX = "$"
 
+export const MAX_COMPONENT_FIELDS = 8
+
+const COMPONENT_FIELD_ID_OFFSET = 10
+
+export function computeFieldId(
+	componentId: number, 
+	fieldOffset: number
+): number {
+	return componentId * COMPONENT_FIELD_ID_OFFSET + fieldOffset
+}
+
 export function compileComponentClass<
     D extends ComponentDefinition = ComponentDefinition
 >(
@@ -72,6 +85,11 @@ export function compileComponentClass<
 	if (keys.length < 1) {
 		compileRes.ok = false
 		compileRes.msg = "component definition must have more than one field defined. Did you mean to create a tag component?"
+		return compileRes
+	}
+	if (keys.length > MAX_COMPONENT_FIELDS) {
+		compileRes.ok = false
+		compileRes.msg = `component defintion can only have up to 8 fields, found ${keys.length}`
 		return compileRes
 	}
 	for (let i = 0; i < keys.length; i++) {
@@ -120,24 +138,6 @@ export function compileComponentClass<
 		writable: false,
 		enumerable: true
 	})
-	Object.defineProperty(Component, "def", {
-		value: def,
-		configurable: true,
-		writable: false,
-		enumerable: true
-	})
-	Object.defineProperty(Component, "fullname", {
-		value: fullname,
-		configurable: true,
-		writable: false,
-		enumerable: true
-	})
-	Object.defineProperty(Component, "id", {
-		value: id,
-		configurable: true,
-		writable: false,
-		enumerable: true
-	})
 	const componentPrototype: object = Object.create(null)
 	Object.defineProperty(componentPrototype, "index", {
 		value(this: ComponentInternals, index: number) {
@@ -148,20 +148,25 @@ export function compileComponentClass<
 		configurable: true,
 		writable: false
 	})
+	let sizeof = 0
+	const fieldMeta: ComponentFieldMeta[] = []
 	for (let i = 0; i < tokens.length; i++) {
 		const {name, type} = tokens[i]
 		const offset = i
+		const fieldId = computeFieldId(id, offset)
+		fieldMeta.push({name, offset, id: fieldId})
+		sizeof += 32
 		switch (type) {
 		case "i32": {
 			Object.defineProperty(componentPrototype, name, {
 				get(this: ComponentInternals): number {
 					return this.h$.i32[
-						// get array pointer for field 
-						// from heap.
+					// get array pointer for field 
+					// from heap.
 						this.h$.u32[this.p$ + offset]
-						// add offset of element being
-						// inspected
-						+ this.o$
+							// add offset of element being
+							// inspected
+							+ this.o$
 					]
 				},
 				set(this: ComponentInternals, i32: number): void {
@@ -222,6 +227,15 @@ export function compileComponentClass<
 	}
 	Component.prototype = componentPrototype
 	compileRes.ok = true
-	compileRes.componentClass = Component as unknown as ComponentClass<D>
+	const component: ComponentClass<D> = {
+		new: (objPtr, jsHeap) => new (Component as unknown as { new(ptr: number, heap: JsHeapRef): MutableComponentAccessor<D> })(objPtr, jsHeap),
+		def,
+		name: componentName,
+		fullname,
+		id,
+		sizeof,
+		fields: fieldMeta
+	}
+	compileRes.componentClass = component
 	return compileRes
 }

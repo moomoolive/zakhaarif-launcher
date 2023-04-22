@@ -16,7 +16,7 @@ export const main = async (args: MainScriptArguments) => {
 	if (!gameSave) {
 		console.error("inputted game id doesn't exist", gameId)
 		messageAppShell("signalFatalError", {
-			details: "game save doesn't exist"
+			details: "game save doesn't exist",
 		})
 		return
 	}
@@ -28,25 +28,14 @@ export const main = async (args: MainScriptArguments) => {
 		return
 	}
 	console.info("Permissions configured! starting game!")
-	const cssSheet = document.createElement("link")
-	cssSheet.rel = "stylesheet"
-	cssSheet.crossOrigin = ""
-	cssSheet.href = recommendedStyleSheetUrl
-	cssSheet.id = "main-style-sheet"
-	document.head.appendChild(cssSheet)
+	
 	console.info("attempting to import mods")
-	const importUrls: string[] = []
-	console.info(gameSave.mods)
-	for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
-		const resolved = gameSave.mods.resolvedUrls[i]
-		const entry = gameSave.mods.entryUrls[i]
-		importUrls.push(resolved + entry)
-	}
 	const importPromises: Promise<ModLinkInfo | null>[] = []
 	for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
 		const resolved = gameSave.mods.resolvedUrls[i]
 		const entry = gameSave.mods.entryUrls[i]
 		const canonicalUrl = gameSave.mods.canonicalUrls[i]
+		const semver = gameSave.mods.semvers[i]
 		const url = resolved + entry
 		importPromises.push((async () => {
 			const modModule = await import(/* @vite-ignore */url)
@@ -58,6 +47,7 @@ export const main = async (args: MainScriptArguments) => {
 				entryUrl: url,
 				resolvedUrl: resolved,
 				canonicalUrl,
+				semver
 			}
 		})())
 	}
@@ -85,6 +75,8 @@ export const main = async (args: MainScriptArguments) => {
 		threadId: Engine.MAIN_THREAD_ID
 	})
 
+	engine.css.addGlobalSheet(recommendedStyleSheetUrl, [["id", "daemon-recommend-style-sheet"]])
+
 	Object.defineProperty(globalThis, "zengine", {
 		value: engine,
 		enumerable: true,
@@ -108,109 +100,11 @@ export const main = async (args: MainScriptArguments) => {
 		for (const {msg, status, statusText} of linkStatus.errors) {
 			console.error(`${status} (${statusText}) ${msg}`)
 		}
+		messageAppShell("signalFatalError", {
+			details: "One of game mods is invalid (link error)"
+		})
 		return
 	}
-
-	/*
-	for (const importMetadata of imports) {
-		const {importedModule, url} = importMetadata
-		if (!("mod" in importedModule)) {
-			console.error(`import ${url} does not contain a default export. ignoring...`)
-			continue
-		}
-
-		const mod = importedModule.mod
-		
-		const modMetadata: ModMetadata = {
-			name: mod.data.name,
-			canonicalUrl: importMetadata.canonicalUrl,
-			resolvedUrl: importMetadata.resolvedUrl,
-			dependencies: mod.data.dependencies || [],
-			id: importMetadata.id
-		}
-		
-		if (mod.onInit) {
-			await mod.onInit(modMetadata, engine)
-		}
-
-		let modState = {}
-		if (mod.data.state) {
-			modState = await mod.data.state(modMetadata, engine)
-		}
-
-		const queries = mod.data.queries || {}
-		const definedQueries = Object.keys(queries)
-		const queryAccessors = {}
-		for (let i = 0; i < definedQueries.length; i++) {
-			const queryname = definedQueries[i]
-			Object.defineProperty(queryAccessors, queryname, {
-				configurable: true,
-				enumerable: true,
-				writable: true,
-				value: () => ({})
-			})
-		}
-
-		const componentClasses: Record<string, ComponentClass> = Object.create(null)
-		const components = mod.data.components || {}
-		const componentNames = Object.keys(components)
-		for (let i = 0; i < componentNames.length; i++) {
-			const componentName = componentNames[i]
-			const definition = components[componentName]
-			const fullname = `${mod.data.name}.${componentName}`
-			const compilerResponse = compileComponentClass(
-				componentName,
-				definition,
-				fullname,
-				i
-			)
-			if (!compilerResponse.ok) {
-				console.warn(`couldn't compiled component "${fullname}": ${compilerResponse.msg}`)
-				continue
-			}
-			Object.defineProperty(componentClasses, componentName, {
-				value: compilerResponse.componentClass,
-				enumerable: true,
-				writable: true,
-				configurable: true
-			})
-		}
-
-		const modArchetypes = mod.data.archetypes || {}
-		const archetypes = {}
-		const archetypeKeys = Object.keys(modArchetypes)
-		for (let i = 0; i < archetypeKeys.length; i++) {
-			const key = archetypeKeys[i]
-			Object.defineProperty(archetypes, key, {
-				value: {},
-				enumerable: true,
-				writable: true,
-				configurable: true
-			})
-		}
-
-		const compiledMod = new CompiledMod({
-			state: modState,
-			meta: modMetadata,
-			resources: (mod.data.resources || {}) as Record<string, string>,
-			queries: queryAccessors,
-			componentClasses,
-			archetypes
-		})
-		
-		Object.defineProperty(engine.compiledMods, mod.data.name, {
-			configurable: true,
-			enumerable: true,
-			writable: false,
-			value: compiledMod
-		})
-
-		if (mod.onBeforeGameLoop) {
-			await mod.onBeforeGameLoop(engine)
-		}
-		
-	}
-	*/
 
 	const runGameLoop = (time: number) => {
 		engine.elapsedTime = time - engine.previousFrame
@@ -227,8 +121,8 @@ export const main = async (args: MainScriptArguments) => {
 		engine.previousFrame = time
 		engine.isRunning = true
 		console.info("starting game loop...")
+		const milliseconds = 2_000
+		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
 		window.requestAnimationFrame(runGameLoop)
 	})
-
-	messageAppShell("readyForDisplay")
 }

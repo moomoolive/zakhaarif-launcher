@@ -44,6 +44,13 @@ export type SaveType = (
     | QuickSave
 )
 
+export type SaveModMetadata = {
+    canonicalUrl: string
+    resolvedUrl: string
+    entryUrl: string
+    semver: string
+}
+
 export type SaveData = {
     id: number
     name: string
@@ -52,6 +59,7 @@ export type SaveData = {
         canonicalUrls: string[]
         resolvedUrls: string[]
         entryUrls: string[]
+        semvers: string[]
     }
 } 
 

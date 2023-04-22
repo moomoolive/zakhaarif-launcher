@@ -189,11 +189,13 @@ const LoadGamePage = (): JSX.Element => {
 							total.canonicalUrls.push(next.canonicalUrl)
 							total.resolvedUrls.push(next.resolvedUrl)
 							total.entryUrls.push(next.entry)
+							total.semvers.push(next.version)
 							return total
 						}, {
 							canonicalUrls: [] as string[],
 							resolvedUrls: [] as string[],
 							entryUrls: [] as string[],
+							semvers: [] as string[]
 						}),
 					} as const
 					database.gameSaves.updateOne(

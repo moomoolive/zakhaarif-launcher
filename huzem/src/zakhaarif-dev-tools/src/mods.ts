@@ -2,6 +2,7 @@ import type {
 	EngineCore, 
 	InitializedEngineCore,
 	PostInitializationCore,
+    ComponentFieldMeta
 } from "./engine"
 import type {
     ComponentDefinition,
@@ -222,10 +223,14 @@ export interface JsHeapRef {
 export type ComponentClass<
     C extends ComponentDefinition = ComponentDefinition
 > = {
-    new (ptr: number, heapRef: JsHeapRef): MutableComponentAccessor<C>,
+    new: (ptr: number, heapRef: JsHeapRef) => MutableComponentAccessor<C>,
     readonly def: Readonly<C>
     readonly fullname: string
     readonly id: number
+    readonly name: string
+    /** size of an each index in component */
+    readonly sizeof: number
+    readonly fields: ReadonlyArray<ComponentFieldMeta>
 }
 
 // This type is sooooo cancer.

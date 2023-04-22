@@ -7,7 +7,8 @@ import type {
 	ShaheenEngine,
 	LinkableMod,
 	ModMetadata,
-	ComponentClass
+	ComponentClass,
+	CssUtilityLibrary
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {validateCommandInput} from "../cli/parser"
@@ -20,6 +21,8 @@ import initWebHeap from "../../engine_allocator/pkg/engine_allocator"
 import {validateMod} from "./validateMod"
 import {defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
+import {MetaIndex} from "./meta"
+import {CssLib} from "./css"
 
 const MAIN_THREAD_ID = 0
 
@@ -39,6 +42,7 @@ export type ModLinkInfo = {
 	resolvedUrl: string,
 	canonicalUrl: string
     entryUrl: string
+	semver: string
 }
 
 type CompiledMods = {
@@ -55,7 +59,7 @@ export type EngineConfig = {
 export class Engine extends NullPrototype implements ShaheenEngine {
 	static async init(config: Omit<EngineConfig, "wasmHeap">): Promise<Engine> {
 		const isRunningInNode = (
-			typeof window === "undefined"
+			typeof global !== "undefined"
 			&& typeof require === "function"
 		)
 		if (isRunningInNode) {
@@ -85,11 +89,15 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	archetypes: Archetype[]
 
 	readonly currentThreadId: number
+	meta: MetaIndex
+	readonly css: CssUtilityLibrary
 
 	// will be null if running in Node (or Deno...)
 	private canvas: HTMLCanvasElement | null
 	private linkedMods: ModLinkInfo[]
 	private modIdCounter: number
+	private componentIdCounter: number
+	private componentFieldIdCounter: number
 
 	constructor(config: EngineConfig) {
 		super()
@@ -105,9 +113,13 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.elapsedTime = 0.0
 		this.canvas = rootCanvas
 		this.linkedMods = []
+		this.modIdCounter = 0
+		this.componentIdCounter = 0
+		this.componentFieldIdCounter = 0
+		this.meta = new MetaIndex()
+		this.css = new CssLib()
 		const self = this
 		this.ecs = new EcsCore({engine: self})
-		this.modIdCounter = 0
 	}
 
 	isMainThread(): boolean {
@@ -211,6 +223,11 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 
 		// some kind of type check on
 		// mods, components, state, & archetypes
+
+		for (let i = 0; i < mods.length; i++) {
+			const {wrapper, semver} = mods[i]
+			this.meta.modVersionIndex.set(wrapper.data.name, semver)
+		}
 		
 		for (let m = 0; m < mods.length; m++) {
 			const mod = mods[m]
@@ -240,12 +257,13 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 			for (let i = 0; i < componentNames.length; i++) {
 				const componentName = componentNames[i]
 				const definition = components[componentName]
-				const fullname = `${wrapper.data.name}.${componentName}`
+				const fullname = `${wrapper.data.name}_${componentName}`
+				const componentId = this.componentIdCounter++
 				const compilerResponse = compileComponentClass(
 					componentName,
 					definition,
 					fullname,
-					i
+					componentId
 				)
 				if (!compilerResponse.ok) {
 					console.warn(`couldn't compiled component "${fullname}": ${compilerResponse.msg}`)
@@ -257,6 +275,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 					writable: true,
 					configurable: true
 				})
+				this.meta.componentIndex.set(fullname, compilerResponse.componentClass)
 			}
 
 			const modArchetypes = wrapper.data.archetypes || {}
