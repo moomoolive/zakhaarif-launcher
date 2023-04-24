@@ -131,6 +131,7 @@ type SettingSubsection = {
     icon: IconDefinition
     name: string
     contents: ReactNode,
+	tooltip?: string
     onClick: () => unknown
     nameStyles?: Partial<{width: string}>
     contentStyles?: Partial<{width: string}>
@@ -270,7 +271,8 @@ const SettingsPage = (): JSX.Element => {
 								{
 									id: "acknowledgements",
 									icon: faHandshakeAngle, 
-									name: "Acknowledgments",
+									name: "OSS",
+									tooltip: "Open Source Libraries Used",
 									nameStyles: {width: "80%"},
 									contentStyles: {width: "20%"},
 									contents: OPEN_PAGE_ICON,
@@ -348,11 +350,12 @@ const SettingsPage = (): JSX.Element => {
 									icon, name, 
 									contents, onClick,
 									contentStyles = {},
-									nameStyles = {}
+									nameStyles = {},
+									tooltip = ""
 								} = subsection as SettingSubsection
 								return <Tooltip
 									key={`section-${index}-sub-${subIndex}`}
-									title={name}
+									title={tooltip || name}
 								>
 									<button
 										className="w-full px-4 py-3 flex hover:bg-neutral-700"
@@ -397,7 +400,7 @@ const SettingsPage = (): JSX.Element => {
 							<FontAwesomeIcon icon={faFaceLaughSquint} />
 						</div>
 						<div>
-							{"Welcome!"}
+							{"Welcome to Settings!"}
 						</div>
 					</div>
 				</div>

@@ -3,7 +3,6 @@ import {
 	faJs, 
 	faCss3, 
 	faHtml5,
-	faReact,
 	faOsi,
 } from "@fortawesome/free-brands-svg-icons"
 import {useEffect} from "react"
@@ -36,7 +35,7 @@ const AppLaunchPage = () => {
 						{icon: faJs, className: "text-yellow-500 animate-bounce", title: "Javascript", link: "https://developer.mozilla.org/en-US/docs/Learn/JavaScript/First_steps/What_is_JavaScript"},
 						{icon: faCss3, className: "text-blue-600 animate-wiggle", title: "CSS", link: "https://www.w3.org/Style/CSS/Overview.en.html"},
 						{icon: faHtml5, className: "text-orange-500 animate-pulse", title: "HTML", link: "https://www.w3.org/standards/webdesign/htmlcss.html"},
-						{icon: faReact, className: "text-blue-400 animate-spin-slow", title: "React", link: "https://reactjs.org/"},
+						//{icon: faReact, className: "text-blue-400 animate-spin-slow", title: "React", link: "https://reactjs.org/"},
 					] as const).map((metadata, i) => {
 						const {icon, className, title, link} = metadata
 						return <div

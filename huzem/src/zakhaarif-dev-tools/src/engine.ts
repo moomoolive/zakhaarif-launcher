@@ -49,17 +49,24 @@ export type CssUtilityLibrary = Readonly<{
     ) => {code: CssStatuses, sheet: HTMLElement | null}
 }>
 
+export type ThreadUtilityLibrary = Readonly<{
+    isMainThread: () => boolean
+    isWorkerThread: () => boolean
+    currentThreadId: () => number
+    mainThreadId: () => number
+    count: () => ReadonlyArray<0 | 1 | 2 | 3>
+}>
+
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement | null
     getDeltaTime: () => number
     getOriginTime: () => number
     getPreviousFrameTime: () => number
     getTotalElapsedTime: () => number
-    isMainThread: () => boolean
-    threadId: () => number
     console: Record<string, ConsoleCommand>
     readonly meta: MetaUtilities
     readonly css: CssUtilityLibrary
+    readonly thread: ThreadUtilityLibrary 
 }
 
 export interface Allocator {

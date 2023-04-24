@@ -8,7 +8,8 @@ import {
 	faNodeJs, 
 	faNpm, 
 	faFirefoxBrowser, 
-	faRust
+	faRust,
+	faGithub
 } from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../../lib/utils/consts/arabic"
 import type {Acknowledgment} from "../../lib/types/app"
@@ -88,7 +89,12 @@ export function Acknowledgments(): JSX.Element {
 				</div>
 			</> : <>
 				<div className="w-11/12 border-b-2 border-solid border-neutral-600 pb-2 text-xs md:text-sm text-neutral-400">
-					{"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source projects (and their dependencies)."}
+					<div className="mb-2">
+						{"This project wouldn't be possible without the help of the generous maintainers and contributors of these open-source projects and their dependencies."}
+					</div>
+					<div>
+						{"** Projects are not affliated with Zakhaarif."}
+					</div>
 				</div>
 				<div 
 					id={CREDITS_DIV_ID}
@@ -125,6 +131,10 @@ export function Acknowledgments(): JSX.Element {
 										case "crates.io":
 											return <span className="text-amber-300">
 												<FontAwesomeIcon icon={faCubes}/>
+											</span>
+										case "github":
+											return <span>
+												<FontAwesomeIcon icon={faGithub}/>
 											</span>
 										case "npm":
 										default:

@@ -8,7 +8,6 @@ import type {
 	LinkableMod,
 	ModMetadata,
 	ComponentClass,
-	CssUtilityLibrary
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {validateCommandInput} from "../cli/parser"
@@ -23,8 +22,7 @@ import {defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
 import {MetaIndex} from "./meta"
 import {CssLib} from "./css"
-
-const MAIN_THREAD_ID = 0
+import {ThreadLib, MAIN_THREAD_ID} from "./thread"
 
 const ENGINE_ERRORS = defineEnum(
 	["mod_package_invalid_type", 1_000],
@@ -87,10 +85,10 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	console: ConsoleCommandIndex
 	compiledMods: CompiledMods
 	archetypes: Archetype[]
-
-	readonly currentThreadId: number
+	
 	meta: MetaIndex
-	readonly css: CssUtilityLibrary
+	readonly css: CssLib
+	readonly thread: ThreadLib
 
 	// will be null if running in Node (or Deno...)
 	private canvas: HTMLCanvasElement | null
@@ -102,7 +100,6 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	constructor(config: EngineConfig) {
 		super()
 		const {wasmHeap, rootCanvas, threadId} = config
-		this.currentThreadId = threadId
 		this.archetypes = []
 		this.wasmHeap = wasmHeap
 		this.isRunning = false
@@ -118,16 +115,9 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.componentFieldIdCounter = 0
 		this.meta = new MetaIndex()
 		this.css = new CssLib()
+		this.thread = new ThreadLib({threadId})
 		const self = this
 		this.ecs = new EcsCore({engine: self})
-	}
-
-	isMainThread(): boolean {
-		return this.currentThreadId === MAIN_THREAD_ID
-	}
-
-	threadId(): number {
-		return this.currentThreadId
 	}
 
 	getOriginTime(): number {

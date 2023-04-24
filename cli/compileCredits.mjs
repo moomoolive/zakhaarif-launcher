@@ -68,7 +68,12 @@ const getNpm = async (packageJsonPath) => {
     const npmDependencies = [
         ...Object.keys(dependencies),
         ...Object.keys(devDependencies),
-        "npm"
+        "npm",
+        // these ECSs helped inform
+        // many of the game engine descisions
+        "@lastolivegames/becsy",
+        "@javelin/ecs",
+        "bitecs"
     ].sort()
     
     /** @type {AcknowledgementElement[]} */
@@ -127,12 +132,22 @@ const getDocsUsed = () => {
     return docs
 }
 
+const githubProjects = () => {
+    /** @type {AcknowledgementElement[]} */
+    const projects = [
+        {name: "flecs", type: "github", url: "https://github.com/SanderMertens/flecs"}
+    ]
+    console.info("found", projects.length, "github sources")
+    return projects
+}
+
 /** @type {AcknowledgementElement[]} */
 const allCredits = [
     ...getRuntimesUsed(),
     ...getDocsUsed(),
     ...(await allNpmPackages()),
-    ...(await getAllCargoDependencies())
+    ...(await getAllCargoDependencies()),
+    ...githubProjects(),
 ]
 
 await fs.writeFile(CREDITS_OUTPUT, JSON.stringify(allCredits), {
