@@ -262,7 +262,6 @@ export const visualChanges: System = (engine) => {
 	mesh.position.z = position.z
 	mesh.position.y = position.y
 	
-	
 	/*const {player} = zakhaarifStd.useArchetype()
 	const {zakhaarifStd_rendering, zakhaarifStd_position} = player.useComponents()
 	const len = player.entityCount()

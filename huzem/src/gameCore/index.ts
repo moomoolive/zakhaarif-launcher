@@ -72,10 +72,18 @@ export const main = async (args: MainScriptArguments) => {
 	const engine = await Engine.init({
 		rootCanvas,
 		threadedMode: false,
-		threadId: Engine.MAIN_THREAD_ID
+		threadId: Engine.MAIN_THREAD_ID,
+		rootElement
+	})
+	const {std} = engine
+
+	Object.defineProperty(globalThis, "zstd", {
+		value: std,
+		enumerable: true,
+		writable: false,
+		configurable: true
 	})
 
-	engine.css.addGlobalSheet(recommendedStyleSheetUrl, [["id", "daemon-recommend-style-sheet"]])
 
 	Object.defineProperty(globalThis, "zengine", {
 		value: engine,
@@ -89,6 +97,10 @@ export const main = async (args: MainScriptArguments) => {
 		enumerable: true,
 		writable: false,
 		configurable: true
+	})
+
+	std.css.addGlobalSheet(recommendedStyleSheetUrl, {
+		id: "daemon-recommend-style-sheet"
 	})
 
 	const linkStatus = await engine.linkMods(imports)
@@ -121,7 +133,7 @@ export const main = async (args: MainScriptArguments) => {
 		engine.previousFrame = time
 		engine.isRunning = true
 		console.info("starting game loop...")
-		const milliseconds = 2_000
+		const milliseconds = 1_000
 		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
 		window.requestAnimationFrame(runGameLoop)
 	})

@@ -21,8 +21,12 @@ import {validateMod} from "./validateMod"
 import {defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
 import {MetaIndex} from "./meta"
-import {CssLib} from "./css"
-import {ThreadLib, MAIN_THREAD_ID} from "./thread"
+import {MAIN_THREAD_ID} from "./thread"
+import {StandardLib} from "./standardLibrary"
+
+class EngineCompilers extends NullPrototype {
+	readonly ecsComponent = compileComponentClass
+}
 
 const ENGINE_ERRORS = defineEnum(
 	["mod_package_invalid_type", 1_000],
@@ -49,6 +53,7 @@ type CompiledMods = {
 
 export type EngineConfig = {
     rootCanvas: HTMLCanvasElement | null
+    rootElement: HTMLElement | null
 	wasmHeap: Allocator
 	threadId: number
 	threadedMode: boolean
@@ -87,19 +92,21 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	archetypes: Archetype[]
 	
 	meta: MetaIndex
-	readonly css: CssLib
-	readonly thread: ThreadLib
+	readonly compilers: EngineCompilers
+	readonly std: StandardLib
 
-	// will be null if running in Node (or Deno...)
-	private canvas: HTMLCanvasElement | null
 	private linkedMods: ModLinkInfo[]
 	private modIdCounter: number
 	private componentIdCounter: number
-	private componentFieldIdCounter: number
+
+	// Dom related stuff
+	// will be null if running in Node (or Deno...)
+	private canvas: HTMLCanvasElement | null
+	private rootElement: HTMLElement | null
 
 	constructor(config: EngineConfig) {
 		super()
-		const {wasmHeap, rootCanvas, threadId} = config
+		const {wasmHeap, rootCanvas, threadId, rootElement} = config
 		this.archetypes = []
 		this.wasmHeap = wasmHeap
 		this.isRunning = false
@@ -109,13 +116,13 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.previousFrame = 0.0
 		this.elapsedTime = 0.0
 		this.canvas = rootCanvas
+		this.rootElement = rootElement
 		this.linkedMods = []
 		this.modIdCounter = 0
 		this.componentIdCounter = 0
-		this.componentFieldIdCounter = 0
 		this.meta = new MetaIndex()
-		this.css = new CssLib()
-		this.thread = new ThreadLib({threadId})
+		this.std = new StandardLib({threadId})
+		this.compilers = new EngineCompilers()
 		const self = this
 		this.ecs = new EcsCore({engine: self})
 	}
@@ -173,6 +180,10 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 
 	getRootCanvas(): HTMLCanvasElement | null {
 		return this.canvas
+	}
+
+	getRootDomElement(): HTMLElement | null {
+		return this.rootElement
 	}
 
 	getDeltaTime(): number {
@@ -249,7 +260,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 				const definition = components[componentName]
 				const fullname = `${wrapper.data.name}_${componentName}`
 				const componentId = this.componentIdCounter++
-				const compilerResponse = compileComponentClass(
+				const compilerResponse = this.compilers.ecsComponent(
 					componentName,
 					definition,
 					fullname,

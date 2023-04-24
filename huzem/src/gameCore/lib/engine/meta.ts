@@ -1,11 +1,11 @@
 import type {
-	MetaUtilities,
+	MetaUtilitiyLibrary,
 	ComponentClass,
 	ComponentMetadata
 } from "zakhaarif-dev-tools"
 import {NullPrototype} from "../utils/nullProto"
 
-export class MetaIndex extends NullPrototype implements MetaUtilities {
+export class MetaIndex extends NullPrototype implements MetaUtilitiyLibrary {
 	modVersionIndex: Map<string, string>
 	componentIndex: Map<string, ComponentClass>
     

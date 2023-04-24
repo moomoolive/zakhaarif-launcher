@@ -19,3 +19,7 @@ NullPrototype.prototype = null
  * Same as "Object.create(null)" but with type generic.
  */
 export const nullObject = <T extends object>(): T => Object.create(null)
+
+export const EMPTY_OBJECT = {}
+
+export const EMPTY_FUNCTION = () => {}

@@ -18,7 +18,7 @@ export type ComponentMetadata = Readonly<{
     fields: ReadonlyArray<ComponentFieldMeta>
 }>
 
-export interface MetaUtilities {
+export interface MetaUtilitiyLibrary {
     /** 
      * Returns the semver string of a linked mod.
      * If mod with inputted name does not exist, returns
@@ -37,7 +37,7 @@ export interface MetaUtilities {
     getComponentMeta: (componentName: string) => ComponentMetadata | null
 }
 
-export type CssStatuses = (
+export type CssStatus = (
     "ok"
     | "DOM_not_found"
 )
@@ -45,8 +45,8 @@ export type CssStatuses = (
 export type CssUtilityLibrary = Readonly<{
     addGlobalSheet: (
         url: string, 
-        attributes?: [key: string, value: string][]
-    ) => {code: CssStatuses, sheet: HTMLElement | null}
+        attributes?: Record<string, string>
+    ) => {code: CssStatus, sheet: HTMLElement | null}
 }>
 
 export type ThreadUtilityLibrary = Readonly<{
@@ -57,16 +57,24 @@ export type ThreadUtilityLibrary = Readonly<{
     count: () => ReadonlyArray<0 | 1 | 2 | 3>
 }>
 
+export type EngineStandardLibrary = {
+    /** A collection of helpers for creating/managing CSS style sheets */
+    readonly css: CssUtilityLibrary
+    /** A collection of helpers for thread concurrency */
+    readonly thread: ThreadUtilityLibrary 
+}
+
 export type EngineCore = {
     getRootCanvas: () => HTMLCanvasElement | null
+    getRootDomElement: () => HTMLElement | null
     getDeltaTime: () => number
     getOriginTime: () => number
     getPreviousFrameTime: () => number
     getTotalElapsedTime: () => number
     console: Record<string, ConsoleCommand>
-    readonly meta: MetaUtilities
-    readonly css: CssUtilityLibrary
-    readonly thread: ThreadUtilityLibrary 
+    readonly meta: MetaUtilitiyLibrary
+    /** A collection of standard libraries that make common tasks and interacting with the engine easier */
+    readonly std: EngineStandardLibrary
 }
 
 export interface Allocator {
