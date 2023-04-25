@@ -1,5 +1,5 @@
 import type {
-	Allocator,
+	Allocator, JsHeapRef
 } from "zakhaarif-dev-tools"
 
 export type HeapConfig = {
@@ -15,6 +15,7 @@ export class WasmHeap implements Allocator {
 	calloc: Allocator["calloc"]
 	free: Allocator["free"]
 	realloc: Allocator["realloc"]
+	jsHeapRef: JsHeapRef
 	
 	private wasmMemory: WebAssembly.Memory
 
@@ -24,9 +25,20 @@ export class WasmHeap implements Allocator {
 		this.calloc = config.calloc
 		this.free = config.free
 		this.realloc = config.realloc
+		const buffer = config.memory.buffer
+		this.jsHeapRef = {
+			i32: new Int32Array(buffer),
+			f32: new Float32Array(buffer),
+			u32: new Uint32Array(buffer),
+			v: new DataView(buffer)
+		}
 	}
 	
 	getRawMemory(): WebAssembly.Memory {
 		return this.wasmMemory
+	}
+
+	jsHeap(): Readonly<JsHeapRef> {
+		return this.jsHeapRef
 	}
 }

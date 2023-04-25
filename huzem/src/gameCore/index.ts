@@ -119,22 +119,25 @@ export const main = async (args: MainScriptArguments) => {
 	}
 
 	const runGameLoop = (time: number) => {
-		engine.elapsedTime = time - engine.previousFrame
-		engine.previousFrame = time
-		engine.ecs.step()
+		const response = engine.runFrameTasks(time)
 		if (!engine.isRunning) {
+			console.warn("engine has stopped running, tasks returned with status", response)
 			return
 		}
 		window.requestAnimationFrame(runGameLoop)
 	}
 
-	window.requestAnimationFrame((time) => {
-		engine.originTime = time
-		engine.previousFrame = time
-		engine.isRunning = true
-		console.info("starting game loop...")
+	const initGameLoop = (time: number) => {
+		const response = engine.ignite(time)
+		if (response.status !== Engine.STATUS_CODES.ok.status) {
+			console.error("engine failed to start, returned with status", response)
+			return
+		}
 		const milliseconds = 1_000
 		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
+		console.info("starting game loop...")
 		window.requestAnimationFrame(runGameLoop)
-	})
+	}
+
+	window.requestAnimationFrame(initGameLoop)
 }

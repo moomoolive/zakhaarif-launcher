@@ -18,7 +18,7 @@ import {wasmMap} from "../../../wasmBinaryPaths.mjs"
 import {WasmHeap} from "../heap/wasmHeap"
 import initWebHeap from "../../engine_allocator/pkg/engine_allocator"
 import {validateMod} from "./validateMod"
-import {defineEnum} from "../utils/enum"
+import {EnumMember, defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
 import {MetaIndex} from "./meta"
 import {MAIN_THREAD_ID} from "./thread"
@@ -28,9 +28,12 @@ class EngineCompilers extends NullPrototype {
 	readonly ecsComponent = compileComponentClass
 }
 
-const ENGINE_ERRORS = defineEnum(
+const ENGINE_CODES = defineEnum(
+	["ok", 0],
 	["mod_package_invalid_type", 1_000],
 )
+
+export type EngineCode = EnumMember<typeof ENGINE_CODES>
 
 type ModLinkStatus = {
 	errors: {msg: string, status: number, statusText: string}[]
@@ -80,6 +83,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	}
 
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
+	static readonly STATUS_CODES = ENGINE_CODES
 	
 	wasmHeap: Allocator
 	ecs: EcsCore
@@ -100,7 +104,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 	private componentIdCounter: number
 
 	// Dom related stuff
-	// will be null if running in Node (or Deno...)
+	// will be null if running in Node (or Deno)
 	private canvas: HTMLCanvasElement | null
 	private rootElement: HTMLElement | null
 
@@ -123,8 +127,20 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		this.meta = new MetaIndex()
 		this.std = new StandardLib({threadId})
 		this.compilers = new EngineCompilers()
-		const self = this
-		this.ecs = new EcsCore({engine: self})
+		this.ecs = new EcsCore()
+	}
+
+	runFrameTasks(currentTime: number): number {
+		this.elapsedTime = currentTime - this.previousFrame
+		this.previousFrame = currentTime
+		return this.ecs.step(this)
+	}
+
+	ignite(currentTime: number): EngineCode {
+		this.originTime = currentTime
+		this.previousFrame = currentTime
+		this.isRunning = true
+		return ENGINE_CODES.ok
 	}
 
 	getOriginTime(): number {
@@ -194,7 +210,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		return this.compiledMods
 	}
 
-	async linkMods(mods: ModLinkInfo[]) {
+	async linkMods(mods: ModLinkInfo[]): Promise<ModLinkStatus> {
 		const modBuffer: CompiledMod[] = []
 
 		const linkStatus: ModLinkStatus = {
@@ -212,7 +228,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 				linkStatus.ok = false
 				linkStatus.errors.push({
 					msg: `[pkg => ${canonicalUrl}] ${error}`,
-					...ENGINE_ERRORS[0]
+					...ENGINE_CODES.mod_package_invalid_type
 				})
 				continue
 			}

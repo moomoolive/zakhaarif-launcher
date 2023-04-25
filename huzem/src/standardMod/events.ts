@@ -1,4 +1,4 @@
-import type {ModMetadata, InitializedEngineCore} from "zakhaarif-dev-tools"
+import type {ModMetadata, EngineCore} from "zakhaarif-dev-tools"
 import {
 	Scene, 
 	Engine,
@@ -27,7 +27,7 @@ import {createAxisRotation} from "./lib/math/index"
 
 export const stateHandler = async (
 	meta: ModMetadata, 
-	engine: InitializedEngineCore
+	engine: EngineCore
 ) => {
     
 	const canvas = engine.getRootCanvas()

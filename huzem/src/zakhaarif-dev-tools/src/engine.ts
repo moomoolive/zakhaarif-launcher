@@ -2,7 +2,9 @@ import type {ComponentDefinition} from "./components"
 
 export type ConsoleCommand = (input: object) => unknown
 
-export type ConsoleCommandIndex = Record<string, ConsoleCommand>
+export type ConsoleCommandIndex = {
+    readonly [key: string]: ConsoleCommand
+}
 
 export type ComponentFieldMeta = {
     name: string,
@@ -18,7 +20,7 @@ export type ComponentMetadata = Readonly<{
     fields: ReadonlyArray<ComponentFieldMeta>
 }>
 
-export interface MetaUtilitiyLibrary {
+export type MetaUtilityLibrary = Readonly<{
     /** 
      * Returns the semver string of a linked mod.
      * If mod with inputted name does not exist, returns
@@ -35,7 +37,7 @@ export interface MetaUtilitiyLibrary {
      * @returns 
      */
     getComponentMeta: (componentName: string) => ComponentMetadata | null
-}
+}>
 
 export type CssStatus = (
     "ok"
@@ -49,32 +51,45 @@ export type CssUtilityLibrary = Readonly<{
     ) => {code: CssStatus, sheet: HTMLElement | null}
 }>
 
+export type ParellelThreadIds = ReadonlyArray<0 | 1 | 2 | 3>
+
+export type ParellelThreadId = ParellelThreadIds[number]
+
 export type ThreadUtilityLibrary = Readonly<{
     isMainThread: () => boolean
     isWorkerThread: () => boolean
     currentThreadId: () => number
     mainThreadId: () => number
-    count: () => ReadonlyArray<0 | 1 | 2 | 3>
+    count: () => ParellelThreadIds
 }>
 
-export type EngineStandardLibrary = {
+export type EngineStandardLibrary = Readonly<{
     /** A collection of helpers for creating/managing CSS style sheets */
-    readonly css: CssUtilityLibrary
+    css: CssUtilityLibrary
     /** A collection of helpers for thread concurrency */
-    readonly thread: ThreadUtilityLibrary 
-}
+    thread: ThreadUtilityLibrary 
+}>
 
-export type EngineCore = {
+export type EngineCore = Readonly<{
     getRootCanvas: () => HTMLCanvasElement | null
     getRootDomElement: () => HTMLElement | null
     getDeltaTime: () => number
     getOriginTime: () => number
     getPreviousFrameTime: () => number
     getTotalElapsedTime: () => number
-    console: Record<string, ConsoleCommand>
-    readonly meta: MetaUtilitiyLibrary
+    
+    console: ConsoleCommandIndex
+    meta: MetaUtilityLibrary
     /** A collection of standard libraries that make common tasks and interacting with the engine easier */
-    readonly std: EngineStandardLibrary
+    std: EngineStandardLibrary
+    wasmHeap: Allocator
+}>
+
+export interface JsHeapRef {
+    i32: Int32Array
+    f32: Float32Array
+    u32: Uint32Array
+    v: DataView
 }
 
 export interface Allocator {
@@ -88,13 +103,5 @@ export interface Allocator {
         newByteSize: number
     ) => number
     free: (ptr: number, byteSize: number, alignment: number) => void
+    jsHeap: () => Readonly<JsHeapRef>
 }
-
-export type PostInitializationCore = {
-    wasmHeap: Allocator
-}
-
-export type InitializedEngineCore = (
-    EngineCore 
-    & PostInitializationCore
-)

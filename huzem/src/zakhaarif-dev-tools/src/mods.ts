@@ -1,8 +1,7 @@
 import type {
-	EngineCore, 
-	InitializedEngineCore,
-	PostInitializationCore,
-    ComponentFieldMeta
+	EngineCore,
+    ComponentFieldMeta,
+    JsHeapRef
 } from "./engine"
 import type {
     ComponentDefinition,
@@ -31,7 +30,7 @@ export type ModMetadata = Readonly<{
 
 export type StateEvent<State extends object> = (
     metadata: ModMetadata,
-    engineCore: InitializedEngineCore, 
+    engineCore: EngineCore, 
 ) => State | Promise<State>
 
 export type ImmutableResourceMap = object | undefined
@@ -163,10 +162,9 @@ export type EcsSystem<
     LinkedMods extends ModModules = []
 > = (engine: ShaheenEngine<LinkedMods>) => void 
 
-export type Ecs<LinkedMods extends ModModules = []> = {
+export type Ecs<LinkedMods extends ModModules = []> = Readonly<{
     addSystem: (handler: (engine: ShaheenEngine<LinkedMods>) => void) => number,
-    step: () => number
-}
+}>
 
 export type ModConsoleCommand<
     Engine extends ShaheenEngine<[]>,
@@ -213,12 +211,6 @@ export type ComponentAccessor<
         [key in keyof C as `${key & string}Ptr`]: () => number
     }
 )
-
-export interface JsHeapRef {
-    i32: Int32Array
-    f32: Float32Array
-    u32: Uint32Array
-}
 
 export type ComponentClass<
     C extends ComponentDefinition = ComponentDefinition
@@ -342,12 +334,12 @@ export interface ModAccessor<
 
 export interface ShaheenEngine<
     Mods extends ModModules = []
-> extends InitializedEngineCore {    
-    ecs: Ecs<Mods>
-    addConsoleCommand: <
+> extends EngineCore {    
+    readonly ecs: Ecs<Mods>
+    readonly addConsoleCommand: <
         T extends ConsoleCommandInputDeclaration
     >(command: ModConsoleCommand<ShaheenEngine<Mods>, T>) => void,
-    useMod: () => ({
+    readonly useMod: () => ({
         [Mod in Mods[number] as Mod["name"]]: ModAccessor<
             GlobalModIndex<Mods>,
             LocalModIndex<Mod>
@@ -362,7 +354,7 @@ export type BeforeGameLoopEvent<Mods extends ModModules> = (
 export type InitEvent = (
     metadata: ModMetadata,
     engineCore: EngineCore, 
-) => Promise<Partial<PostInitializationCore> | void> | Partial<PostInitializationCore> | void
+) => Promise<void> | void
 
 export type ExitEvent<
     LinkedMods extends ModModules

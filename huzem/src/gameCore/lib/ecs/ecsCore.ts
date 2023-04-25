@@ -1,15 +1,9 @@
 import {ShaheenEngine, Ecs, EcsSystem} from "zakhaarif-dev-tools"
 
-type EcsConfig = {
-    engine: ShaheenEngine
-}
-
 export class EcsCore implements Ecs {
-	engine: ShaheenEngine
 	systems: Array<EcsSystem>
 
-	constructor(config: EcsConfig) {
-		this.engine = config.engine
+	constructor(_config = {}) {
 		this.systems = []
 	}
     
@@ -18,8 +12,8 @@ export class EcsCore implements Ecs {
 		return this.systems.length - 1
 	}
 
-	step(): number {
-		const {systems, engine} = this
+	step(engine: ShaheenEngine): number {
+		const {systems} = this
 		const len = systems.length
 		for (let i = 0; i < len; i++) {
 			const system = systems[i]
