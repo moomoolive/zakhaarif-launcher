@@ -1,6 +1,4 @@
-import type {
-	Allocator, JsHeapRef
-} from "zakhaarif-dev-tools"
+import type {Allocator, JsHeapRef} from "zakhaarif-dev-tools"
 
 export type HeapConfig = {
     malloc: Allocator["malloc"]
@@ -30,6 +28,7 @@ export class WasmHeap implements Allocator {
 			i32: new Int32Array(buffer),
 			f32: new Float32Array(buffer),
 			u32: new Uint32Array(buffer),
+			f64: new Float64Array(buffer),
 			v: new DataView(buffer)
 		}
 	}

@@ -1,5 +1,5 @@
 import {MainScriptArguments} from "zakhaarif-dev-tools"
-import {Engine, ModLinkInfo} from "./lib/engine/core"
+import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -69,21 +69,11 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 	
-	const engine = await Engine.init({
+	const engine = await MainEngine.init({
 		rootCanvas,
 		threadedMode: false,
-		threadId: Engine.MAIN_THREAD_ID,
 		rootElement
 	})
-	const {std} = engine
-
-	Object.defineProperty(globalThis, "zstd", {
-		value: std,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-
 
 	Object.defineProperty(globalThis, "zengine", {
 		value: engine,
@@ -93,13 +83,13 @@ export const main = async (args: MainScriptArguments) => {
 	})
 
 	Object.defineProperty(globalThis, "zconsole", {
-		value: engine.console,
+		value: engine.devConsole.index,
 		enumerable: true,
 		writable: false,
 		configurable: true
 	})
 
-	std.css.addGlobalSheet(recommendedStyleSheetUrl, {
+	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
 		id: "daemon-recommend-style-sheet"
 	})
 
@@ -126,10 +116,11 @@ export const main = async (args: MainScriptArguments) => {
 		}
 		window.requestAnimationFrame(runGameLoop)
 	}
+	engine.gameLoopHandler = runGameLoop
 
-	const initGameLoop = (time: number) => {
+	window.requestAnimationFrame(function initGameLoop(time: number) {
 		const response = engine.ignite(time)
-		if (response.status !== Engine.STATUS_CODES.ok.status) {
+		if (response.status !== MainEngine.STATUS_CODES.ok.status) {
 			console.error("engine failed to start, returned with status", response)
 			return
 		}
@@ -137,7 +128,5 @@ export const main = async (args: MainScriptArguments) => {
 		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
 		console.info("starting game loop...")
 		window.requestAnimationFrame(runGameLoop)
-	}
-
-	window.requestAnimationFrame(initGameLoop)
+	})
 }

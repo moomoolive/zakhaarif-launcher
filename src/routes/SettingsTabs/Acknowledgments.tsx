@@ -9,7 +9,8 @@ import {
 	faNpm, 
 	faFirefoxBrowser, 
 	faRust,
-	faGithub
+	faGithub,
+	faGolang
 } from "@fortawesome/free-brands-svg-icons"
 import {bismillah} from "../../lib/utils/consts/arabic"
 import type {Acknowledgment} from "../../lib/types/app"
@@ -135,6 +136,10 @@ export function Acknowledgments(): JSX.Element {
 										case "github":
 											return <span>
 												<FontAwesomeIcon icon={faGithub}/>
+											</span>
+										case "go":
+											return <span className="text-blue-400">
+												<FontAwesomeIcon icon={faGolang}/>
 											</span>
 										case "npm":
 										default:

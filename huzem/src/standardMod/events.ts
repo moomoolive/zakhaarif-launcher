@@ -1,4 +1,4 @@
-import type {ModMetadata, EngineCore} from "zakhaarif-dev-tools"
+import type {ModMetadata, MainThreadEngineCore} from "zakhaarif-dev-tools"
 import {
 	Scene, 
 	Engine,
@@ -27,10 +27,9 @@ import {createAxisRotation} from "./lib/math/index"
 
 export const stateHandler = async (
 	meta: ModMetadata, 
-	engine: EngineCore
+	engine: MainThreadEngineCore
 ) => {
-    
-	const canvas = engine.getRootCanvas()
+	const canvas = engine.std.dom.rootCanvas()
 	const babylonJsEngine = new Engine(canvas, true, {
 		adaptToDeviceRatio: true,
 		powerPreference: "high-performance"

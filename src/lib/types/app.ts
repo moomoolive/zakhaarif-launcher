@@ -14,6 +14,7 @@ export type Acknowledgment = {
         | "rust"
         | "crates.io"
         | "github"
+        | "go"
 	)
     url: string
 }

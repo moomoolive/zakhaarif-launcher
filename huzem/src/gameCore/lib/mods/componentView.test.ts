@@ -95,6 +95,7 @@ describe("class compiler", () => {
         i32: new Int32Array(4),
         f32: new Float32Array(4),
         u32: new Uint32Array(4),
+        f64: new Float64Array(4),
         v: new DataView(new ArrayBuffer(4))
     }
     it("accessors should be generated correctly if correct definition is provided", () => {

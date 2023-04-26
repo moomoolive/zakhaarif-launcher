@@ -9,7 +9,7 @@ import {
 } from "./lib/math/index"
 
 export const playerController: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+	const {zakhaarifStd} = engine.mods
 	const {movementVec} = zakhaarifStd.useMutState()
 	const {camera, controller} = zakhaarifStd.useState()
 
@@ -41,8 +41,8 @@ export const playerController: System = (engine) => {
 }
 
 export const processMouseInput: System = (engine) => {
-	const deltaTime = engine.getDeltaTime()
-	const {zakhaarifStd} = engine.useMod()
+	const deltaTime = engine.std.time.deltaTime()
+	const {zakhaarifStd} = engine.mods
 	const {
 		camera,
 		controller,
@@ -116,7 +116,7 @@ export const processMouseInput: System = (engine) => {
 }
 
 export const cameraPosition: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+	const {zakhaarifStd} = engine.mods
 
 	const {camera} = zakhaarifStd.useMutState()
 	const {controller, playerEntity} = zakhaarifStd.useState()
@@ -140,7 +140,7 @@ const GRAVITY = 1_080.0
 const deceleration = new Vector3(-10.0, -0.0001, -10.0)
 
 export const movement: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+	const {zakhaarifStd} = engine.mods
 	const {
 		playerEntity: {
 			velocity: playerVelocity,
@@ -156,7 +156,7 @@ export const movement: System = (engine) => {
 	} = zakhaarifStd.useState()
 
 	const player = activeMeshes[playerEntity.rendering.id]
-	const deltaTime = engine.getDeltaTime()
+	const deltaTime = engine.std.time.deltaTime()
 	const deltaSeconds = deltaTime * 0.0001
 
 	const frameDecleration = new Vector3(
@@ -209,7 +209,7 @@ export const movement: System = (engine) => {
 }
 
 export const physics: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+	const {zakhaarifStd} = engine.mods
 
 	const {
 		impulse, 
@@ -228,7 +228,7 @@ export const physics: System = (engine) => {
 	velocity.z += impulse.z / kinematics.mass
 
 	impulse.x = impulse.y = impulse.z = 0.0
-	const deltaSeconds = engine.getDeltaTime() * 0.0001
+	const deltaSeconds = engine.std.time.deltaTime() * 0.0001
 
 	const {transform: diff} = sweepBoxCollisions(
 		position,
@@ -245,7 +245,7 @@ export const physics: System = (engine) => {
 }
 
 export const applyTransforms: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+	const {zakhaarifStd} = engine.mods
 	const {position} = zakhaarifStd.useMutState().playerEntity
 	const {transform} = zakhaarifStd.useState().playerEntity
 	position.x += transform.x
@@ -253,8 +253,8 @@ export const applyTransforms: System = (engine) => {
 	position.z += transform.z
 }
 
-export const visualChanges: System = (engine) => {
-	const {zakhaarifStd} = engine.useMod()
+export const visualChanges: System = ({mods}) => {
+	const {zakhaarifStd} = mods
 	const {activeMeshes} = zakhaarifStd.useMutState()
 	const {rendering, position} = zakhaarifStd.useState().playerEntity
 	const mesh = activeMeshes[rendering.id]
@@ -282,7 +282,7 @@ export const visualChanges: System = (engine) => {
 	const e2 = buildEnt.create()*/
 }
 
-export const render: System = (engine) => {
-	const {scene} = engine.useMod().zakhaarifStd.useMutState()
+export const render: System = ({mods}) => {
+	const {scene} = mods.zakhaarifStd.useMutState()
 	scene.render()
 }

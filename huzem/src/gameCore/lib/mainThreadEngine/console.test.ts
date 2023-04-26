@@ -1,7 +1,5 @@
 import {describe, it, expect} from "vitest"
-import {
-    validateCommandInput as validate
-} from "./parser"
+import {validateCommandInput as validate} from "./console"
 
 describe("cli argument parser", () => {
     it("should return error message if input is not an object", () => {

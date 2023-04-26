@@ -58,16 +58,17 @@ export const mod = initMod({
 		console.info("init called with meta", meta)
 	},
 	onBeforeGameLoop: (engine) => {
+		
 		console.info("before game loop called", engine)
 
-		const canvas = engine.getRootCanvas()
+		const canvas = engine.std.dom.rootCanvas()
 		if (canvas) {
 			canvas.style.width = "100vw"
 			canvas.style.height = "100vh"
 			canvas.onclick = () => canvas.requestPointerLock()
 		}
 
-		const {zakhaarifStd} = engine.useMod()
+		const {zakhaarifStd} = engine.mods
 		const state = zakhaarifStd.useMutState()
 
 		const {skybox, controller} = state
@@ -199,23 +200,23 @@ export const mod = initMod({
 			//chunkManager.showWater()
 		}
 		
-		engine.ecs.addSystem(playerController)
-		engine.ecs.addSystem(processMouseInput)
-		engine.ecs.addSystem(cameraPosition)
-		engine.ecs.addSystem(movement)
-		engine.ecs.addSystem(physics)
-		engine.ecs.addSystem(applyTransforms)
-		engine.ecs.addSystem(visualChanges)
-		engine.ecs.addSystem(render)
+		engine.systems.add(playerController)
+		engine.systems.add(processMouseInput)
+		engine.systems.add(cameraPosition)
+		engine.systems.add(movement)
+		engine.systems.add(physics)
+		engine.systems.add(applyTransforms)
+		engine.systems.add(visualChanges)
+		engine.systems.add(render)
 
-		engine.addConsoleCommand({
+		engine.devConsole.addCommand({
 			name: "gldebugger",
 			args: {show: "boolean?"},
 			fn: (gameEngine, input) => {
 				if (input.show === undefined) {
 					return "no valid options detected"
 				}
-				const {scene} = gameEngine.useMod().zakhaarifStd.useMutState()
+				const {scene} = gameEngine.mods.zakhaarifStd.useMutState()
 				if (!input.show) {
 					scene.debugLayer.hide()
 					return "closed"

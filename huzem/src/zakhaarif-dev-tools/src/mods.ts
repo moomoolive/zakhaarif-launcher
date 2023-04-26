@@ -1,7 +1,8 @@
 import type {
-	EngineCore,
+	MainThreadEngineCore,
     ComponentFieldMeta,
-    JsHeapRef
+    JsHeapRef,
+    ConsoleCommandIndex
 } from "./engine"
 import type {
     ComponentDefinition,
@@ -30,7 +31,7 @@ export type ModMetadata = Readonly<{
 
 export type StateEvent<State extends object> = (
     metadata: ModMetadata,
-    engineCore: EngineCore, 
+    engineCore: MainThreadEngineCore, 
 ) => State | Promise<State>
 
 export type ImmutableResourceMap = object | undefined
@@ -160,14 +161,14 @@ export const modData = <LinkedMods extends ModModules = []>() => ({
 
 export type EcsSystem<
     LinkedMods extends ModModules = []
-> = (engine: ShaheenEngine<LinkedMods>) => void 
+> = (engine: MainThreadEngine<LinkedMods>) => void 
 
-export type Ecs<LinkedMods extends ModModules = []> = Readonly<{
-    addSystem: (handler: (engine: ShaheenEngine<LinkedMods>) => void) => number,
+export type EcsSystemManager<LinkedMods extends ModModules = []> = Readonly<{
+    add: (handler: (engine: MainThreadEngine<LinkedMods>) => void) => number,
 }>
 
 export type ModConsoleCommand<
-    Engine extends ShaheenEngine<[]>,
+    Engine extends MainThreadEngine<[]>,
     CommandArgs extends ConsoleCommandInputDeclaration
 >  = {
     name: string
@@ -332,28 +333,35 @@ export interface ModAccessor<
     })
 }
 
-export interface ShaheenEngine<
+export type ConsoleCommandManager<
     Mods extends ModModules = []
-> extends EngineCore {    
-    readonly ecs: Ecs<Mods>
-    readonly addConsoleCommand: <
+> = Readonly<{
+    index: ConsoleCommandIndex,
+    addCommand: <
         T extends ConsoleCommandInputDeclaration
-    >(command: ModConsoleCommand<ShaheenEngine<Mods>, T>) => void,
-    readonly useMod: () => ({
+    >(command: ModConsoleCommand<MainThreadEngine<Mods>, T>) => void
+}>
+
+export interface MainThreadEngine<
+    Mods extends ModModules = []
+> extends MainThreadEngineCore {    
+    readonly systems: EcsSystemManager<Mods>
+    readonly devConsole: ConsoleCommandManager<Mods>
+    readonly mods: {
         [Mod in Mods[number] as Mod["name"]]: ModAccessor<
             GlobalModIndex<Mods>,
             LocalModIndex<Mod>
         >
-    })
+    }
 }
 
 export type BeforeGameLoopEvent<Mods extends ModModules> = (
-    engine: ShaheenEngine<Mods>
+    engine: MainThreadEngine<Mods>
 ) => Promise<void> | void
 
 export type InitEvent = (
     metadata: ModMetadata,
-    engineCore: EngineCore, 
+    engineCore: MainThreadEngineCore, 
 ) => Promise<void> | void
 
 export type ExitEvent<
@@ -408,8 +416,8 @@ export const initMod = <M extends ModDataWithDependents>(mod: LinkableMod<M>) =>
 type AllUtils<Mods extends ModModules> = (
     Required<ModLifeCycleEvents<Mods>>
     & {
-        Engine: ShaheenEngine<Mods>,
-        System: (engine: ShaheenEngine<Mods>) => void
+        Engine: MainThreadEngine<Mods>,
+        System: (engine: MainThreadEngine<Mods>) => void
     }
 )
 

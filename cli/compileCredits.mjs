@@ -117,7 +117,10 @@ const getRuntimesUsed = () => {
     /** @type {AcknowledgementElement[]} */
     const runtimes = [
         {name: "Node.js", type: "node", url: "https://nodejs.org/en/"},
-        {name: "Rust", type: "rust", url: "https://www.rust-lang.org/"},
+        {name: "Rust Lang", type: "rust", url: "https://www.rust-lang.org/"},
+        // tons of inspiration for engine taken from
+        // go - although no go code is actually used
+        {name: "Go Lang", type: "go", url: "https://go.dev/"},
     ]
     console.info("found", runtimes.length, "runtimes")
     return runtimes

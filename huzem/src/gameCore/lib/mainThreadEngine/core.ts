@@ -4,14 +4,18 @@ import type {
 	ConsoleCommandInputDeclaration,
 	ParsedConsoleCommandInput,
 	ModConsoleCommand,
-	ShaheenEngine,
+	MainThreadEngine,
 	LinkableMod,
 	ModMetadata,
 	ComponentClass,
+	ComponentMetadata,
+	MetaUtilityLibrary,
+	EcsSystem,
+	EcsSystemManager,
+	ConsoleCommandManager
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
-import {validateCommandInput} from "../cli/parser"
-import {EcsCore} from "../ecs/ecsCore"
+import {validateCommandInput} from "./console"
 import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
 import {wasmMap} from "../../../wasmBinaryPaths.mjs"
@@ -20,9 +24,7 @@ import initWebHeap from "../../engine_allocator/pkg/engine_allocator"
 import {validateMod} from "./validateMod"
 import {EnumMember, defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
-import {MetaIndex} from "./meta"
-import {MAIN_THREAD_ID} from "./thread"
-import {StandardLib} from "./standardLibrary"
+import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
 
 class EngineCompilers extends NullPrototype {
 	readonly ecsComponent = compileComponentClass
@@ -50,6 +52,21 @@ export type ModLinkInfo = {
 	semver: string
 }
 
+export type DomState = {
+	rootCanvas: HTMLCanvasElement | null
+	rootElement: HTMLElement | null
+}
+
+export type ThreadMeta = {
+	activeOsThreads: number
+}
+
+export type TimeState = {
+	originTime: number
+	previousFrame: number
+	elapsedTime: number
+}
+
 type CompiledMods = {
 	readonly [key: string]: CompiledMod
 }
@@ -58,12 +75,11 @@ export type EngineConfig = {
     rootCanvas: HTMLCanvasElement | null
     rootElement: HTMLElement | null
 	wasmHeap: Allocator
-	threadId: number
 	threadedMode: boolean
 }
 
-export class Engine extends NullPrototype implements ShaheenEngine {
-	static async init(config: Omit<EngineConfig, "wasmHeap">): Promise<Engine> {
+export class MainEngine extends NullPrototype implements MainThreadEngine {
+	static async init(config: Omit<EngineConfig, "wasmHeap">): Promise<MainEngine> {
 		const isRunningInNode = (
 			typeof global !== "undefined"
 			&& typeof require === "function"
@@ -73,141 +89,71 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 			const wasmHeap = new WasmHeap({
 				...nodeHeap, memory: nodeHeap.__wasm.memory
 			})
-			return new Engine({...config, wasmHeap})
+			return new MainEngine({...config, wasmHeap})
 		}
 		const relativeUrl = wasmMap.engine_allocator
 		const heapUrl = new URL(relativeUrl, import.meta.url).href
 		const innerHeap = await initWebHeap(heapUrl)
 		const wasmHeap = new WasmHeap(innerHeap)
-		return new Engine({wasmHeap, ...config})
+		return new MainEngine({wasmHeap, ...config})
 	}
 
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
 	
-	wasmHeap: Allocator
-	ecs: EcsCore
-	originTime: number
-	previousFrame: number
-	elapsedTime: number
-	isRunning: boolean
-	console: ConsoleCommandIndex
-	compiledMods: CompiledMods
-	archetypes: Archetype[]
+	unsafeWasmHeap: Allocator
 	
-	meta: MetaIndex
-	readonly compilers: EngineCompilers
-	readonly std: StandardLib
+	mods: CompiledMods = nullObject()
+	meta: MetaIndex = new MetaIndex()
+	isRunning = false
+	gameLoopHandler = (_: number) => {}
+	archetypes: Archetype[] = []
+	systems: SystemManager = new SystemManager()
+	readonly compilers: EngineCompilers = new EngineCompilers()
+	
+	std: MainStandardLib
+	devConsole: ConsoleCommands
 
-	private linkedMods: ModLinkInfo[]
-	private modIdCounter: number
-	private componentIdCounter: number
+	private modIdCounter = 0
+	private componentIdCounter = 0
 
-	// Dom related stuff
-	// will be null if running in Node (or Deno)
-	private canvas: HTMLCanvasElement | null
-	private rootElement: HTMLElement | null
+	/** Dom related stuff, will be null if running in Node (or Deno) */
+	private domState: DomState
+	private timeState: TimeState
+	private threadState: ThreadMeta
 
 	constructor(config: EngineConfig) {
 		super()
-		const {wasmHeap, rootCanvas, threadId, rootElement} = config
-		this.archetypes = []
-		this.wasmHeap = wasmHeap
-		this.isRunning = false
-		this.console = nullObject()
-		this.compiledMods = nullObject()
-		this.originTime = 0.0
-		this.previousFrame = 0.0
-		this.elapsedTime = 0.0
-		this.canvas = rootCanvas
-		this.rootElement = rootElement
-		this.linkedMods = []
-		this.modIdCounter = 0
-		this.componentIdCounter = 0
-		this.meta = new MetaIndex()
-		this.std = new StandardLib({threadId})
-		this.compilers = new EngineCompilers()
-		this.ecs = new EcsCore()
+		const {wasmHeap, rootCanvas, rootElement} = config
+		const threadId = MAIN_THREAD_ID
+		this.unsafeWasmHeap = wasmHeap
+		this.devConsole = new ConsoleCommands(this)
+		this.domState = {rootElement, rootCanvas}
+		this.threadState = {activeOsThreads: 1}
+		this.timeState = {
+			originTime: 0.0,
+			previousFrame: 0.0,
+			elapsedTime: 0.0,
+		}
+		this.std = new MainStandardLib({
+			domElements: this.domState, 
+			threadId,
+			threadMeta: this.threadState,
+			time: this.timeState
+		})
 	}
 
 	runFrameTasks(currentTime: number): number {
-		this.elapsedTime = currentTime - this.previousFrame
-		this.previousFrame = currentTime
-		return this.ecs.step(this)
+		this.timeState.elapsedTime = currentTime - this.timeState.previousFrame
+		this.timeState.previousFrame = currentTime
+		return this.systems.run(this)
 	}
 
 	ignite(currentTime: number): EngineCode {
-		this.originTime = currentTime
-		this.previousFrame = currentTime
+		this.timeState.originTime = currentTime
+		this.timeState.previousFrame = currentTime
 		this.isRunning = true
 		return ENGINE_CODES.ok
-	}
-
-	getOriginTime(): number {
-		return this.originTime
-	}
-
-	getPreviousFrameTime(): number {
-		return this.previousFrame
-	}
-
-	getTotalElapsedTime(): number {
-		return (this.previousFrame - this.originTime) + this.elapsedTime
-	}
-
-	addConsoleCommand<
-		Args extends ConsoleCommandInputDeclaration
-	>(command: ModConsoleCommand<Engine, Args>): void {
-		const {name, args, fn} = command
-		Object.defineProperty(fn, "name", {
-			value: name,
-			enumerable: true,
-			configurable: true,
-			writable: false
-		})
-		const self = this
-		const commandArgs = args || {}
-		Object.defineProperty(this.console, name, {
-			value: (input: Record<string, string | boolean | number | undefined> = {}) => {
-				if (
-					typeof input === "object" 
-					&& input !== null
-					&& input.args
-				) {
-					console.info(`[${name}] arguments`, args)
-					return "ok"
-				}
-				const validateResponse = validateCommandInput(commandArgs, input, name)
-				if (validateResponse.length > 0) {
-					console.error(validateResponse)
-					return "error"
-				}
-				const response = fn(
-					self, 
-					input as ParsedConsoleCommandInput<NonNullable<typeof args>>
-				) 
-				return response || "ok"
-			},
-			enumerable: true,
-			configurable: true,
-			writable: false
-		})
-	}
-
-	getRootCanvas(): HTMLCanvasElement | null {
-		return this.canvas
-	}
-
-	getRootDomElement(): HTMLElement | null {
-		return this.rootElement
-	}
-
-	getDeltaTime(): number {
-		return this.elapsedTime
-	}
-
-	useMod(): CompiledMods {
-		return this.compiledMods
 	}
 
 	async linkMods(mods: ModLinkInfo[]): Promise<ModLinkStatus> {
@@ -330,7 +276,7 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 				archetypes
 			})
             
-			Object.defineProperty(this.compiledMods, wrapper.data.name, {
+			Object.defineProperty(this.mods, wrapper.data.name, {
 				configurable: true,
 				enumerable: true,
 				writable: false,
@@ -345,5 +291,97 @@ export class Engine extends NullPrototype implements ShaheenEngine {
 		}
 
 		return linkStatus
+	}
+}
+
+export class MetaIndex extends NullPrototype implements MetaUtilityLibrary {
+	modVersionIndex: Map<string, string>
+	componentIndex: Map<string, ComponentClass>
+    
+	constructor() {
+		super()
+		this.modVersionIndex = new Map()
+		this.componentIndex = new Map()
+	}
+
+	getModVersion(modName: string): string {
+		return this.modVersionIndex.get(modName) || ""
+	}
+
+	getComponentMeta(componentName: string): ComponentMetadata | null {
+		return this.componentIndex.get(componentName) || null
+	}
+}
+
+export class ConsoleCommands extends NullPrototype implements ConsoleCommandManager {
+	index: ConsoleCommandIndex = nullObject()
+	private engineRef: MainThreadEngine
+	
+	constructor(engine: MainThreadEngine) {
+		super()
+		this.engineRef = engine
+	}
+
+	addCommand<Args extends ConsoleCommandInputDeclaration>(
+		command: ModConsoleCommand<MainThreadEngine, Args>
+	): void {
+		const {name, args, fn} = command
+		Object.defineProperty(fn, "name", {
+			value: name,
+			enumerable: true,
+			configurable: true,
+			writable: false
+		})
+		const self = this.engineRef
+		const commandArgs = args || {}
+		Object.defineProperty(this.index, name, {
+			value: (input: Record<string, string | boolean | number | undefined> = {}) => {
+				if (
+					typeof input === "object" 
+					&& input !== null
+					&& input.args
+				) {
+					console.info(`[${name}] arguments`, args)
+					return "ok"
+				}
+				const validateResponse = validateCommandInput(commandArgs, input, name)
+				if (validateResponse.length > 0) {
+					console.error(validateResponse)
+					return "error"
+				}
+				const response = fn(
+					self, 
+					input as ParsedConsoleCommandInput<NonNullable<typeof args>>
+				) 
+				return response || "ok"
+			},
+			enumerable: true,
+			configurable: true,
+			writable: false
+		})
+	}
+}
+
+export class SystemManager extends NullPrototype implements EcsSystemManager {
+	systems: Array<EcsSystem>
+
+	constructor() {
+		super()
+		this.systems = []
+	}
+    
+	add(system: EcsSystem): number {
+		this.systems.push(system)
+		return this.systems.length - 1
+	}
+
+	run(engine: MainThreadEngine): number {
+		const {systems} = this
+		const len = systems.length
+		for (let i = 0; i < len; i++) {
+			const system = systems[i]
+			system(engine)
+		}
+		return 0
 	}
 }
