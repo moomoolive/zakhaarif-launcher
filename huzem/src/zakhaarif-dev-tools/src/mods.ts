@@ -6,7 +6,7 @@ import type {
 } from "./engine"
 import type {
     ComponentDefinition,
-    ComponentType
+    Struct
 } from "./components"
 import type {
     ConsoleCommandInputDeclaration,
@@ -14,9 +14,9 @@ import type {
 } from "./console"
 
 export type DependencyMetadata<
-    N extends string = string
+    T extends string = string
 > = Readonly<{ 
-    name: N,
+    name: T,
     type?: "required" | "optional"
     version?: string
 }>
@@ -44,73 +44,72 @@ type ComponentQueryToken = (
     "required" | "optional" | "not"
 )
 
-export type QueryDeclaration<N extends string> = {
+export type QueryDeclaration<T extends string> = {
     readonly [key: string]: {
-        readonly [innerkey in N]?: ComponentQueryToken
+        readonly [innerkey in T]?: ComponentQueryToken
     }
 }
 
-export type ExtractComponentNames<
-    D extends ComponentDeclaration,
-    N extends string
+export type ExtractModComponentNames<
+    TComponents extends ComponentDeclaration,
+    TModName extends string
 > = (
-    keyof ({ readonly [key in keyof D as `${N}_${string & key}`]: string }) 
+    keyof ({ readonly [key in keyof TComponents as `${TModName}_${string & key}`]: string }) 
     & string
 )
 
 export type ArchetypeComponents<
-    ComponentsDef extends ComponentDeclaration = ComponentDeclaration
+    T extends ComponentDeclaration = ComponentDeclaration
 > = {
-    readonly [key in keyof ComponentsDef]?: (
-        Partial<ComponentType<ComponentsDef[key]>>
-    )
+    readonly [key in keyof T]?: Partial<
+        Struct<key & string, T[key]>
+    >
 }
 
 export type ArchetypeDeclaration<
-    ComponentsDef extends ComponentDeclaration = ComponentDeclaration
+    T extends ComponentDeclaration = ComponentDeclaration
 > = {
-    readonly [key: string]: ArchetypeComponents<ComponentsDef> 
+    readonly [key: string]: ArchetypeComponents<T> 
 }
 
 export type ComponentDefWithName<
-    D extends ComponentDeclaration,
-    N extends string
+    TComponents extends ComponentDeclaration,
+    TModName extends string
 > = {
-    readonly [key in keyof D as `${N}_${key & string}`]: D[key]
+    readonly [key in keyof TComponents as `${TModName}_${key & string}`]: TComponents[key]
 }
 
 export type ModData<
-    Name extends string = string,
-    ImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
-    State extends object = object,
-    ComponentDefs extends ComponentDeclaration = ComponentDeclaration,
-    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>> = QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
-    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>> = ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>,
+    TName extends string = string,
+    TImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
+    TState extends object = object,
+    TComponentDefs extends ComponentDeclaration = ComponentDeclaration,
+    TQueries extends QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>> = QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>>,
+    TArchetypes extends ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>> = ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>>,
 > = {
-    readonly name: Name,
-    readonly resources?: ImmutableResources
-    readonly components?: ComponentDefs
-    readonly queries?: Queries
-    readonly archetypes?: Archetypes
-    state?: StateEvent<State>,
+    readonly name: TName,
+    readonly resources?: TImmutableResources
+    readonly components?: TComponentDefs
+    readonly queries?: TQueries
+    readonly archetypes?: TArchetypes
+    state?: StateEvent<TState>,
 }
 
 export type ModModules = ReadonlyArray<ModData>
 
 export type DependenciesDeclaration<
-    Dependencies extends ModModules
-> = Dependencies extends [] ? {
+    T extends ModModules
+> = T extends [] ? {
     readonly dependencies?: DependencyMetadata[]
 } : {
     // generics here made with the help of these answers:
     // https://stackoverflow.com/questions/71918556/typescript-creating-object-type-from-readonly-array
     // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
-    
     readonly dependencies: {
-        [index in keyof Dependencies]: (
-            Dependencies[index] extends { name: string, }
+        [index in keyof T]: (
+            T[index] extends { name: string, }
                 ? DependencyMetadata<
-                    Dependencies[index]["name"]
+                    T[index]["name"]
                 > 
                 : never
         )
@@ -118,53 +117,53 @@ export type DependenciesDeclaration<
 }
 
 export type ModDataWithDependents<
-    Dependencies extends ModModules = [],
-    Name extends string = string,
-    ImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
-    State extends object = object,
-    ComponentDefs extends ComponentDeclaration = ComponentDeclaration,
-    Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>> = QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
-    Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>> = ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>
+    TDependencies extends ModModules = [],
+    TName extends string = string,
+    TImmutableResources extends ImmutableResourceMap = ImmutableResourceMap,
+    TState extends object = object,
+    TComponentDefs extends ComponentDeclaration = ComponentDeclaration,
+    TQueries extends QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>> = QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>>,
+    TArchetypes extends ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>> = ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>>
 > = (
-    DependenciesDeclaration<Dependencies> 
+    DependenciesDeclaration<TDependencies> 
     & ModData<
-        Name, 
-        ImmutableResources, 
-        State, 
-        ComponentDefs,
-        Queries,
-        Archetypes
+        TName, 
+        TImmutableResources, 
+        TState, 
+        TComponentDefs,
+        TQueries,
+        TArchetypes
     >
 )
 
-export const modData = <LinkedMods extends ModModules = []>() => ({
+export const modData = <TLinkedMods extends ModModules = []>() => ({
     define: <
-        Name extends string,
-        ImmutableResources extends ImmutableResourceMap,
-        State extends object,
-        ComponentDefs extends ComponentDeclaration,
-        Queries extends QueryDeclaration<ExtractComponentNames<ComponentDefs, Name>>,
-        Archetypes extends ArchetypeDeclaration<ComponentDefWithName<ComponentDefs, Name>>
-    >(zMod: ImmutableResources extends Record<string, string> | undefined 
+        TName extends string,
+        TImmutableResources extends ImmutableResourceMap,
+        TState extends object,
+        TComponentDefs extends ComponentDeclaration,
+        TQueries extends QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>>,
+        TArchetypes extends ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>>
+    >(zMod: TImmutableResources extends Record<string, string> | undefined 
         ? ModDataWithDependents<
-            LinkedMods, 
-            Name, 
-            ImmutableResources,
-            State,
-            ComponentDefs,
-            Queries,
-            Archetypes
+            TLinkedMods, 
+            TName, 
+            TImmutableResources,
+            TState,
+            TComponentDefs,
+            TQueries,
+            TArchetypes
         >
         : never
     ) => zMod
 })
 
-export type EcsSystem<
-    LinkedMods extends ModModules = []
-> = (engine: MainThreadEngine<LinkedMods>) => void 
+export type EcsSystem<T extends ModModules = []> = (
+    (engine: MainThreadEngine<T>) => void 
+)
 
-export type EcsSystemManager<LinkedMods extends ModModules = []> = Readonly<{
-    add: (handler: (engine: MainThreadEngine<LinkedMods>) => void) => number,
+export type EcsSystemManager<T extends ModModules = []> = Readonly<{
+    add: (handler: (engine: MainThreadEngine<T>) => void) => number,
 }>
 
 export type ModConsoleCommand<
@@ -192,32 +191,35 @@ export type DeepReadonly<T> = {
 }
 
 export type MutableComponentAccessor<
-    C extends ComponentDefinition = ComponentDefinition,
+    TName extends string = string,
+    TDef extends ComponentDefinition = ComponentDefinition,
 > = (
     {
-        index: (i: number) => ComponentType<C>
+        index: (i: number) => Struct<TName, TDef>
     }
     & {
-        [key in keyof C as `${key & string}Ptr`]: () => number
+        [key in keyof TDef as `${key & string}Ptr`]: () => number
     }
 )
 
 export type ComponentAccessor<
-    C extends ComponentDefinition = ComponentDefinition,
+    TName extends string = string,
+    TDef extends ComponentDefinition = ComponentDefinition,
 > = (
     {
-        index: (i: number) => Readonly<ComponentType<C>>
+        index: (i: number) => Readonly<Struct<TName, TDef>>
     }
     & {
-        [key in keyof C as `${key & string}Ptr`]: () => number
+        [key in keyof TDef as `${key & string}Ptr`]: () => number
     }
 )
 
 export type ComponentClass<
-    C extends ComponentDefinition = ComponentDefinition
+    TName extends string = string,
+    TDefinition extends ComponentDefinition = ComponentDefinition
 > = {
-    new: (ptr: number, heapRef: JsHeapRef) => MutableComponentAccessor<C>,
-    readonly def: Readonly<C>
+    new: (ptr: number, heapRef: JsHeapRef) => MutableComponentAccessor<TName, TDefinition>,
+    readonly def: Readonly<TDefinition>
     readonly fullname: string
     readonly id: number
     readonly name: string
@@ -228,40 +230,39 @@ export type ComponentClass<
 
 // This type is sooooo cancer.
 // Basically this takes any tuple and makes an intersection
-// (e.g index1 & index2 & index3 ...)
-// of all it's elements
+// (e.g index1 & index2 & index3 ...) of all it's elements
 // taken from: https://stackoverflow.com/questions/74217585/how-to-merge-of-many-generic-in-typescript
 export type TupleToIntersection<T extends ReadonlyArray<any>> = (
     { [I in keyof T]: (x: T[I]) => void }[number] extends 
     (x: infer I) => void ? I : never
 )
 
-export type GlobalModIndex<Mods extends ModModules = []> = {
+export type GlobalModIndex<T extends ModModules = []> = {
     components: TupleToIntersection<{
-        [I in keyof Mods]: Mods[I] extends 
-            { name: infer N, components?: infer C}
-            ? (C extends undefined ? {} : {
-                [key in keyof C as `${N & string}_${key & string}`]: C[key]
+        [index in keyof T]: T[index] extends 
+            { name: infer TName, components?: infer TComponents }
+            ? (TComponents extends undefined ? {} : {
+                [key in keyof TComponents as `${TName & string}_${key & string}`]: TComponents[key]
             })
             : {}
     }>
 } 
 
-export type LocalModIndex<M extends ModData = ModData> = {
-    state: M["state"] extends undefined ? {} : Awaited<
-        ReturnType<NonNullable<M["state"]>>
+export type LocalModIndex<T extends ModData = ModData> = {
+    state: T["state"] extends undefined ? {} : Awaited<
+        ReturnType<NonNullable<T["state"]>>
     >,
-    resources: M["resources"] extends undefined ? {} : { 
-        readonly [key in keyof NonNullable<M["resources"]>]: string 
+    resources: T["resources"] extends undefined ? {} : { 
+        readonly [key in keyof NonNullable<T["resources"]>]: string 
     }
-    components: M["components"] extends undefined ? {} : NonNullable<
-        M["components"]
+    components: T["components"] extends undefined ? {} : NonNullable<
+        T["components"]
     >
-    queries: M["queries"] extends undefined ? {} : {
-        readonly [key in keyof NonNullable<M["queries"]>]: QueryAccessor
+    queries: T["queries"] extends undefined ? {} : {
+        readonly [key in keyof NonNullable<T["queries"]>]: QueryAccessor
     }
-    archetypes: M["archetypes"] extends undefined ? {} : NonNullable<
-        M["archetypes"]
+    archetypes: T["archetypes"] extends undefined ? {} : NonNullable<
+        T["archetypes"]
     >
 }
 
@@ -291,18 +292,21 @@ export interface ArchetypeAccessor<
 
     useComponents: () => {
         [CKey in keyof TArchetype]: ComponentAccessor<
+            CKey & string,
             ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
         >
     }
 
     useMutComponents: () => {
         [CKey in keyof TArchetype]: MutableComponentAccessor<
+            CKey & string,
             ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
         >
     }
 
     initEntity: () => ({
-        [CKey in keyof TArchetype]: ComponentType<
+        [CKey in keyof TArchetype]: Struct<
+            CKey & string,
             ComponentDefFromGlobalIndex<CKey, TGlobalIndex>
         >
     } & {
@@ -321,7 +325,10 @@ export interface ModAccessor<
     useResource: () => TLocalIndex["resources"],
     useComponent: () => ({
         readonly [key in keyof TLocalIndex["components"]]: (
-            ComponentClass<TLocalIndex["components"][key]>
+            ComponentClass<
+                key & string,
+                TLocalIndex["components"][key]
+            >
         )
     })
     useArchetype: () => ({
@@ -334,29 +341,27 @@ export interface ModAccessor<
 }
 
 export type ConsoleCommandManager<
-    Mods extends ModModules = []
+    TMods extends ModModules = []
 > = Readonly<{
     index: ConsoleCommandIndex,
     addCommand: <
-        T extends ConsoleCommandInputDeclaration
-    >(command: ModConsoleCommand<MainThreadEngine<Mods>, T>) => void
+        TDef extends ConsoleCommandInputDeclaration
+    >(command: ModConsoleCommand<MainThreadEngine<TMods>, TDef>) => void
 }>
 
-export interface MainThreadEngine<
-    Mods extends ModModules = []
-> extends MainThreadEngineCore {    
-    readonly systems: EcsSystemManager<Mods>
-    readonly devConsole: ConsoleCommandManager<Mods>
+export interface MainThreadEngine<T extends ModModules = []> extends MainThreadEngineCore {
+    readonly systems: EcsSystemManager<T>
+    readonly devConsole: ConsoleCommandManager<T>
     readonly mods: {
-        [Mod in Mods[number] as Mod["name"]]: ModAccessor<
-            GlobalModIndex<Mods>,
+        [Mod in T[number] as Mod["name"]]: ModAccessor<
+            GlobalModIndex<T>,
             LocalModIndex<Mod>
         >
     }
 }
 
-export type BeforeGameLoopEvent<Mods extends ModModules> = (
-    engine: MainThreadEngine<Mods>
+export type BeforeGameLoopEvent<T extends ModModules> = (
+    engine: MainThreadEngine<T>
 ) => Promise<void> | void
 
 export type InitEvent = (
@@ -364,64 +369,60 @@ export type InitEvent = (
     engineCore: MainThreadEngineCore, 
 ) => Promise<void> | void
 
-export type ExitEvent<
-    LinkedMods extends ModModules
-> = BeforeGameLoopEvent<LinkedMods>
+export type ExitEvent<T extends ModModules> = BeforeGameLoopEvent<T>
 
-export type ModLifeCycleEvents<LinkedMods extends ModModules> = {
+export type ModLifeCycleEvents<T extends ModModules> = {
     onInit?: InitEvent
-    
-    onBeforeGameLoop?: BeforeGameLoopEvent<LinkedMods>
-    
-    onExit?: ExitEvent<LinkedMods>,
+    onBeforeGameLoop?: BeforeGameLoopEvent<T>
+    onExit?: ExitEvent<T>,
 }
 
-export type CompleteMod<LinkedMods extends ModModules> = (
-    ModLifeCycleEvents<LinkedMods> & {}
+export type CompleteMod<T extends ModModules> = (
+    ModLifeCycleEvents<T> & {}
 )
 
-export type ExtractMods<M> = (
-    M extends ModDataWithDependents<
-        infer Dependencies,
-        infer Name,
-        infer ImmutableResources,
-        infer State,
-        infer ComponentDefs,
-        infer Queries,
-        infer Archetypes
+export type ExtractMods<TMod> = (
+    TMod extends ModDataWithDependents<
+        infer TDependencies,
+        infer TName,
+        infer TImmutableResources,
+        infer TState,
+        infer TComponentDefs,
+        infer TQueries,
+        infer TArchetypes
     >  
         ? [
-            ...Dependencies, 
+            ...TDependencies, 
             ModData<
-                Name, 
-                ImmutableResources, 
-                State, 
-                ComponentDefs, 
-                Queries,
-                Archetypes
+                TName, 
+                TImmutableResources, 
+                TState, 
+                TComponentDefs, 
+                TQueries,
+                TArchetypes
             >
         ]
         : never
 )
 
 export type LinkableMod<
-    Mod extends ModDataWithDependents = ModDataWithDependents
+    T extends ModDataWithDependents = ModDataWithDependents
 > = (
-    { data: Mod } 
-    & CompleteMod<ExtractMods<Mod>>
+    { data: T } 
+    & CompleteMod<ExtractMods<T>>
 )
 
-export const initMod = <M extends ModDataWithDependents>(mod: LinkableMod<M>) => mod
+export const initMod = <T extends ModDataWithDependents>(mod: LinkableMod<T>) => mod
 
-type AllUtils<Mods extends ModModules> = (
-    Required<ModLifeCycleEvents<Mods>>
+type AllUtils<T extends ModModules> = (
+    Required<ModLifeCycleEvents<T>>
     & {
-        Engine: MainThreadEngine<Mods>,
-        System: (engine: MainThreadEngine<Mods>) => void
+        Engine: MainThreadEngine<T>,
+        System: (engine: MainThreadEngine<T>) => void
     }
 )
 
-export type Zutils<Mod extends ModDataWithDependents> = AllUtils<ExtractMods<Mod>>
+export type Zutils<T extends ModDataWithDependents> = AllUtils<ExtractMods<T>>
 
 export type ModEsModule = {
     mod: LinkableMod

@@ -1,7 +1,7 @@
 import type {
 	CssUtilityLibrary, 
 	DomUtilityLibrary, 
-	MainThreadStandardLibrary, 
+	MainThreadUtilityLibrary, 
 	ThreadUtilityLibrary,
 	TimeUtilityLibrary
 } from "zakhaarif-dev-tools"
@@ -16,7 +16,7 @@ export type StandardLibConfig = {
 	time: TimeState
 }
 
-export class MainStandardLib extends NullPrototype implements MainThreadStandardLibrary {
+export class MainStandardLib extends NullPrototype implements MainThreadUtilityLibrary {
 	readonly thread: ThreadUtilityLibrary
 	readonly css: CssUtilityLibrary
 	readonly dom: DomUtilityLibrary

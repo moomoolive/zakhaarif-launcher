@@ -63,11 +63,12 @@ export function computeFieldId(
 }
 
 export function compileComponentClass<
-    D extends ComponentDefinition = ComponentDefinition
+	TName extends string = string,
+    TDefinition extends ComponentDefinition = ComponentDefinition,
 >(
 	componentName: string,
-	def: D,
-	fullname: string,
+	def: TDefinition,
+	fullname: TName,
 	id: number
 ): CompileResponse<true> | CompileResponse<false> {
 	if (typeof def !== "object" || def === null) {
@@ -227,8 +228,13 @@ export function compileComponentClass<
 	}
 	Component.prototype = componentPrototype
 	compileRes.ok = true
-	const component: ComponentClass<D> = {
-		new: (objPtr, jsHeap) => new (Component as unknown as { new(ptr: number, heap: JsHeapRef): MutableComponentAccessor<D> })(objPtr, jsHeap),
+	type Factory = { 
+		new(ptr: number, heap: JsHeapRef): MutableComponentAccessor<
+			TName, TDefinition
+		> 
+	}
+	const component: ComponentClass<TName, TDefinition> = {
+		new: (objPtr, jsHeap) => new (Component as unknown as Factory)(objPtr, jsHeap),
 		def,
 		name: componentName,
 		fullname,

@@ -12,19 +12,23 @@ import type {
 	MetaUtilityLibrary,
 	EcsSystem,
 	EcsSystemManager,
-	ConsoleCommandManager
+	ConsoleCommandManager,
+	MainThreadStandardLibrary,
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {validateCommandInput} from "./console"
 import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
 import {wasmMap} from "../../../wasmBinaryPaths.mjs"
-import {WasmHeap} from "../heap/wasmHeap"
-import initWebHeap from "../../engine_allocator/pkg/engine_allocator"
+import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
+import initEngineApis from "../../engine_allocator/pkg/engine_allocator"
 import {validateMod} from "./validateMod"
 import {EnumMember, defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
+import * as stdlib from "zakhaarif-dev-tools/std"
+
+type NodeEngineApis = typeof import("../../engine_allocator/pkg-node/engine_allocator.js")
 
 class EngineCompilers extends NullPrototype {
 	readonly ecsComponent = compileComponentClass
@@ -85,23 +89,26 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			&& typeof require === "function"
 		)
 		if (isRunningInNode) {
-			const nodeHeap = require("./engine_allocator/pkg-node/engine_allocator.js") // eslint-disable-line @typescript-eslint/no-var-requires
-			const wasmHeap = new WasmHeap({
-				...nodeHeap, memory: nodeHeap.__wasm.memory
-			})
+			const nodeEngineApis: NodeEngineApis = require("../../engine_allocator/pkg-node/engine_allocator.js") // eslint-disable-line @typescript-eslint/no-var-requires
+			type NodeAllocatorApis = NodeEngineApis & WasmAllocatorConfig
+			const wasmHeap = new WasmAllocator({
+				...nodeEngineApis, 
+				memory: nodeEngineApis.__wasm.memory
+			} as NodeAllocatorApis)
 			return new MainEngine({...config, wasmHeap})
 		}
 		const relativeUrl = wasmMap.engine_allocator
-		const heapUrl = new URL(relativeUrl, import.meta.url).href
-		const innerHeap = await initWebHeap(heapUrl)
-		const wasmHeap = new WasmHeap(innerHeap)
+		const binaryUrl = new URL(relativeUrl, import.meta.url).href
+		const webEngineApis = await initEngineApis(binaryUrl)
+		type WebAlloctorApis = typeof webEngineApis & WasmAllocatorConfig
+		const wasmHeap = new WasmAllocator(
+			webEngineApis as WebAlloctorApis
+		)
 		return new MainEngine({wasmHeap, ...config})
 	}
 
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
-	
-	unsafeWasmHeap: Allocator
 	
 	mods: CompiledMods = nullObject()
 	meta: MetaIndex = new MetaIndex()
@@ -111,7 +118,8 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	systems: SystemManager = new SystemManager()
 	readonly compilers: EngineCompilers = new EngineCompilers()
 	
-	std: MainStandardLib
+	wasmHeap: Allocator
+	std: MainThreadStandardLibrary
 	devConsole: ConsoleCommands
 
 	private modIdCounter = 0
@@ -126,7 +134,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		super()
 		const {wasmHeap, rootCanvas, rootElement} = config
 		const threadId = MAIN_THREAD_ID
-		this.unsafeWasmHeap = wasmHeap
+		this.wasmHeap = wasmHeap
 		this.devConsole = new ConsoleCommands(this)
 		this.domState = {rootElement, rootCanvas}
 		this.threadState = {activeOsThreads: 1}
@@ -135,12 +143,13 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			previousFrame: 0.0,
 			elapsedTime: 0.0,
 		}
-		this.std = new MainStandardLib({
+		const mainThreadLib = new MainStandardLib({
 			domElements: this.domState, 
 			threadId,
 			threadMeta: this.threadState,
 			time: this.timeState
 		})
+		this.std = {...mainThreadLib, ...stdlib}
 	}
 
 	runFrameTasks(currentTime: number): number {

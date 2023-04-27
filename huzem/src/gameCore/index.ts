@@ -75,6 +75,14 @@ export const main = async (args: MainScriptArguments) => {
 		rootElement
 	})
 
+	const {std} = engine
+	Object.defineProperty(globalThis, "zstd", {
+		value: std,
+		enumerable: true,
+		writable: false,
+		configurable: true
+	})
+
 	Object.defineProperty(globalThis, "zengine", {
 		value: engine,
 		enumerable: true,

@@ -7,8 +7,7 @@ export default {
         "build-manifest",
         "**/*.map"
     ],
-    
-    name: "Game-core",
+    name: "game-core",
     entry: "index.mjs",
     version: "0.1.0",
     description: "Starts game loop and injects any linked mods",

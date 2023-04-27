@@ -101,6 +101,6 @@ export class Archetype implements ArchetypeAccessor {
 	initEntity(): ReturnType<ArchetypeAccessor["initEntity"]> {
 		return {
 			create: () => 0
-		}
+		} as ReturnType<ArchetypeAccessor["initEntity"]>
 	}
 }

@@ -262,7 +262,8 @@ export const visualChanges: System = ({mods}) => {
 	mesh.position.z = position.z
 	mesh.position.y = position.y
 	
-	/*const {player} = zakhaarifStd.useArchetype()
+	/*
+	const {player} = zakhaarifStd.useArchetype()
 	const {zakhaarifStd_rendering, zakhaarifStd_position} = player.useComponents()
 	const len = player.entityCount()
 	for (let i = 0; i < len; i++) {
@@ -276,10 +277,13 @@ export const visualChanges: System = ({mods}) => {
 
 	const quickEntity = player.initEntity().create()
 	const buildEnt = player.initEntity()
+	type y = typeof buildEnt.zakhaarifStd_acceleration
+	type x = y
 	buildEnt.zakhaarifStd_acceleration.x = 2.0
 	buildEnt.zakhaarifStd_acceleration.y = 5.5
 	buildEnt.zakhaarifStd_position.x = 0.0
-	const e2 = buildEnt.create()*/
+	const e2 = buildEnt.create()
+	*/
 }
 
 export const render: System = ({mods}) => {

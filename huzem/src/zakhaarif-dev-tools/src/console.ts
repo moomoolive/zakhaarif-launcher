@@ -35,7 +35,7 @@ export type ConsoleCommandInputDeclaration = {
 }
 
 export type ParsedConsoleCommandInput<
-    Input extends ConsoleCommandInputDeclaration
+    T extends ConsoleCommandInputDeclaration
 > = {
-    [key in keyof Input]: ConsoleParsedArg<Input[key]>
+    [key in keyof T]: ConsoleParsedArg<T[key]>
 }
