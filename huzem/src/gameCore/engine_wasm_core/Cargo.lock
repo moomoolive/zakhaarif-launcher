@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "engine_allocator"
+name = "engine_wasm_core"
 version = "0.1.0"
 dependencies = [
  "dlmalloc",

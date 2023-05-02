@@ -7,7 +7,7 @@ import toml from "toml"
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 const rustPackagePaths = [
-    "../src/gameCore/engine_allocator"
+    "../src/gameCore/engine_wasm_core"
 ]
 
 const PUBLIC_BINARY_FOLDER = "wasm-lib"

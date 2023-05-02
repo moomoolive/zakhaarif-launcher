@@ -66,11 +66,11 @@ module.exports.realloc = function(ptr, old_size, old_align, new_size) {
     return ret;
 };
 
-module.exports.__wbg_info_e45e081e3c9935f5 = function(arg0, arg1) {
+module.exports.__wbg_info_f9adb6fefa4f0fb1 = function(arg0, arg1) {
     console.info(getStringFromWasm0(arg0, arg1));
 };
 
-const path = require('path').join(__dirname, 'engine_allocator_bg.wasm');
+const path = require('path').join(__dirname, 'engine_wasm_core_bg.wasm');
 const bytes = require('fs').readFileSync(path);
 
 const wasmModule = new WebAssembly.Module(bytes);

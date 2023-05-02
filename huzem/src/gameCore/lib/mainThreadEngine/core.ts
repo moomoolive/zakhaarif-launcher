@@ -21,14 +21,14 @@ import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
 import {wasmMap} from "../../../wasmBinaryPaths.mjs"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
-import initEngineApis from "../../engine_allocator/pkg/engine_allocator"
+import initEngineApis from "../../engine_wasm_core/pkg/engine_wasm_core"
 import {validateMod} from "./validateMod"
 import {EnumMember, defineEnum} from "../utils/enum"
 import {compileComponentClass} from "../mods/componentView"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
 import * as stdlib from "zakhaarif-dev-tools/std"
 
-type NodeEngineApis = typeof import("../../engine_allocator/pkg-node/engine_allocator.js")
+type NodeEngineApis = typeof import("../../engine_wasm_core/pkg-node/engine_wasm_core.js")
 
 class EngineCompilers extends NullPrototype {
 	readonly ecsComponent = compileComponentClass
@@ -89,7 +89,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			&& typeof require === "function"
 		)
 		if (isRunningInNode) {
-			const nodeEngineApis: NodeEngineApis = require("../../engine_allocator/pkg-node/engine_allocator.js") // eslint-disable-line @typescript-eslint/no-var-requires
+			const nodeEngineApis: NodeEngineApis = require("../../engine_wasm_core/pkg-node/engine_wasm_core.js") // eslint-disable-line @typescript-eslint/no-var-requires
 			type NodeAllocatorApis = NodeEngineApis & WasmAllocatorConfig
 			const wasmHeap = new WasmAllocator({
 				...nodeEngineApis, 
@@ -97,7 +97,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			} as NodeAllocatorApis)
 			return new MainEngine({...config, wasmHeap})
 		}
-		const relativeUrl = wasmMap.engine_allocator
+		const relativeUrl = wasmMap.engine_wasm_core
 		const binaryUrl = new URL(relativeUrl, import.meta.url).href
 		const webEngineApis = await initEngineApis(binaryUrl)
 		type WebAlloctorApis = typeof webEngineApis & WasmAllocatorConfig

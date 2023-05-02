@@ -28,7 +28,44 @@ export const main = async (args: MainScriptArguments) => {
 		return
 	}
 	console.info("Permissions configured! starting game!")
+    
+	const rootCanvas = document.createElement("canvas")
+	rootCanvas.id = "root-canvas"
+	rootElement.appendChild(rootCanvas)
 	
+	const engine = await MainEngine.init({
+		rootCanvas,
+		threadedMode: false,
+		rootElement
+	})
+	console.info("engine created")
+
+	const {std} = engine
+	Object.defineProperty(globalThis, "zstd", {
+		value: std,
+		enumerable: true,
+		writable: false,
+		configurable: true
+	})
+
+	Object.defineProperty(globalThis, "zengine", {
+		value: engine,
+		enumerable: true,
+		writable: false,
+		configurable: true
+	})
+
+	Object.defineProperty(globalThis, "zconsole", {
+		value: engine.devConsole.index,
+		enumerable: true,
+		writable: false,
+		configurable: true
+	})
+
+	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
+		id: "daemon-recommend-style-sheet"
+	})
+
 	console.info("attempting to import mods")
 	const importPromises: Promise<ModLinkInfo | null>[] = []
 	for (let i = 0; i < gameSave.mods.entryUrls.length; i++) {
@@ -64,42 +101,6 @@ export const main = async (args: MainScriptArguments) => {
 	}
 	
 	console.info(`Found ${imports.length} imports`)
-    
-	const rootCanvas = document.createElement("canvas")
-	rootCanvas.id = "root-canvas"
-	rootElement.appendChild(rootCanvas)
-	
-	const engine = await MainEngine.init({
-		rootCanvas,
-		threadedMode: false,
-		rootElement
-	})
-
-	const {std} = engine
-	Object.defineProperty(globalThis, "zstd", {
-		value: std,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-
-	Object.defineProperty(globalThis, "zengine", {
-		value: engine,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-
-	Object.defineProperty(globalThis, "zconsole", {
-		value: engine.devConsole.index,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-
-	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
-		id: "daemon-recommend-style-sheet"
-	})
 
 	const linkStatus = await engine.linkMods(imports)
 

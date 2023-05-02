@@ -1,0 +1,17 @@
+[unstable]
+build-std = ['std', 'panic_abort']
+
+[build]
+target = "wasm32-unknown-unknown"
+
+# Feature flags allow for the use of shared wasm memory.
+# "+simd128" option allows for the use of wasm fixed simd-128 
+# and is not strictly neccessary to compile.
+# More info on wasm simd-128: https://github.com/WebAssembly/simd/blob/master/proposals/simd/SIMD.md
+# Codegen options just allow for generated wasm module to be 
+# relocatable (uses relative addresses instead of absolute ones).
+# More info: https://doc.rust-lang.org/rustc/codegen-options/index.html#relocation-model
+rustflags = """\
+-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals,+simd128 \
+--codegen relocation-model=pic\
+"""

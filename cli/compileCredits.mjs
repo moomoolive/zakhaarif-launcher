@@ -31,7 +31,7 @@ const getCargo = async (cargoTomlPath) => {
 
 const getAllCargoDependencies = async () => {
     const cargoPaths = [
-        "huzem/src/gameCore/engine_allocator/Cargo.toml"
+        "huzem/src/gameCore/engine_wasm_core/Cargo.toml"
     ]
     const allDependencies = await Promise.all(
         cargoPaths.map((path) => getCargo(path))

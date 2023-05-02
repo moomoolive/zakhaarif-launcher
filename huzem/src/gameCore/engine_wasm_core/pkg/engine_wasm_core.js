@@ -97,7 +97,7 @@ async function load(module, imports) {
 function getImports() {
     const imports = {};
     imports.wbg = {};
-    imports.wbg.__wbg_info_e45e081e3c9935f5 = function(arg0, arg1) {
+    imports.wbg.__wbg_info_f9adb6fefa4f0fb1 = function(arg0, arg1) {
         console.info(getStringFromWasm0(arg0, arg1));
     };
 
@@ -133,7 +133,7 @@ function initSync(module) {
 
 async function init(input) {
     if (typeof input === 'undefined') {
-        input = new URL('engine_allocator_bg.wasm', import.meta.url);
+        input = new URL('engine_wasm_core_bg.wasm', import.meta.url);
     }
     const imports = getImports();
 

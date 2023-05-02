@@ -1,10 +1,10 @@
 import type {HuzmaCliConfig} from "huzma"
 import type {AllPermissions} from "./permissions"
 
-type stringKey =  string & {}
+type AnyString =  string & {}
 
 export type ZakhaarifMetadata = {
-    [x: stringKey]: string | undefined;
+    [x: AnyString]: string | undefined;
     /**
     * Tells package manager that package is an 
     * extension. Do not include this metadata
