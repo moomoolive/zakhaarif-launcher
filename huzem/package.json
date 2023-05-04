@@ -11,6 +11,7 @@
     "superstruct": "^1.0.3"
   },
   "devDependencies": {
+    "@faker-js/faker": "^7.6.0",
     "huzma": "^0.6.2",
     "jimp": "^0.22.7",
     "npm": "^9.6.2",

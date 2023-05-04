@@ -75,8 +75,15 @@ export const main = async (args: MainScriptArguments) => {
 		const semver = gameSave.mods.semvers[i]
 		const url = resolved + entry
 		importPromises.push((async () => {
-			const modModule = await import(/* @vite-ignore */url)
+			let modModule
+			try {
+				modModule = await import(/* @vite-ignore */url)
+			} catch (err) { 
+				console.error("error when importing module", err)
+				return null 
+			}
 			if (!("mod" in modModule)) {
+				console.error("could not find 'mod' in imported module")
 				return null
 			}
 			return {

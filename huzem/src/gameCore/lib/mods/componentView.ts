@@ -109,7 +109,6 @@ export function compileComponentClass<
 		switch (type) {
 		case "f32":
 		case "i32":
-		case "u32":
 			break
 		default:
 			compileRes.ok = false
@@ -191,25 +190,6 @@ export function compileComponentClass<
 				},
 				set(this: ComponentInternals, f32: number): void {
 					this.h$.f32[this.h$.u32[this.p$ + offset] + this.o$] = f32
-				},
-			})
-			Object.defineProperty(componentPrototype, `${name}Ptr`, {
-				value(this: ComponentInternals): number {
-					return this.h$.u32[this.p$ + offset]
-				},
-				enumerable: true,
-				configurable: true,
-				writable: false
-			})
-			break
-		}
-		case "u32": {
-			Object.defineProperty(componentPrototype, name, {
-				get(this: ComponentInternals): number {
-					return this.h$.u32[this.h$.u32[this.p$ + offset] + this.o$]
-				},
-				set(this: ComponentInternals, u32: number): void {
-					this.h$.u32[this.h$.u32[this.p$ + offset] + this.o$] = u32
 				},
 			})
 			Object.defineProperty(componentPrototype, `${name}Ptr`, {

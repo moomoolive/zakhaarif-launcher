@@ -56,7 +56,7 @@ describe("component tokenizer", () => {
         const tests = [
             {field$: "i32"},
             {ptr$: "f32", field2: "f32"},
-            {field: "f32", field2: "f32", x$: "u32"},
+            {field: "i32", field2: "i32", x$: "i32"},
         ] as const
         for (const def of tests) {
             const response = compileComponentClass("", def, "", 0)
@@ -102,7 +102,6 @@ describe("class compiler", () => {
         const tests = [
             {tokens: {f: "f32"}, name: "floaty"},
             {tokens: {i: "i32"}, name: "inty"},
-            {tokens: {u: "u32"}, name: "uinty"},
         ] as const
         let id = 0
         for (const {tokens, name} of tests) {
@@ -148,8 +147,8 @@ describe("class compiler", () => {
     it("component class size should be calculated correctly", () => {
         const tests = [
             {x: "i32", y: "i32", z: "i32"},
-            {x: "i32", y: "u32"},
-            {x: "i32", y: "i32", z: "i32", w: "f32"},
+            {x: "i32", y: "i32"},
+            {x: "f32", y: "f32", z: "f32", w: "f32"},
         ] as const
 
         for (const test of tests) {
@@ -162,7 +161,6 @@ describe("class compiler", () => {
             let expectedSize = 0
             for (const [_, value]  of Object.entries(test)) {
                 switch (value) {
-                    case "u32":
                     case "i32":
                     case "f32":
                         expectedSize += 32
@@ -177,8 +175,8 @@ describe("class compiler", () => {
     it("component field meta should be generated correctly", () => {
         const tests = [
             {x: "i32", y: "i32", z: "i32"},
-            {x: "i32", y: "u32"},
-            {x: "i32", y: "i32", z: "i32", w: "f32"},
+            {x: "i32", y: "i32"},
+            {x: "f32", y: "f32", z: "f32", w: "f32"},
         ] as const
 
         for (let i = 0; i < tests.length; i++) {

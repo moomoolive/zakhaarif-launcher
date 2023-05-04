@@ -27,7 +27,7 @@ const data = modData().define({
 		impulse: {x: "f32", y: "f32", z: "f32"},
 		kinematics: {mass: "f32", gravityModifier: "f32"},
 		collider: {x: "f32", y: "f32", z: "f32"},
-		rendering: {id: "i32"}
+		rendering: {id: "i32"},
 	},
 	queries: {
 		visualChanges: {

@@ -9,9 +9,10 @@ export type ComponentToken = (
     f32Token | i32Token | u32Token
 )
 
-export type ComponentDefinition = {
-    readonly [key: string]: ComponentToken
-}
+export type ComponentDefinition = (
+    { readonly [key: string]: i32Token }
+    | { readonly [key: string]: f32Token }
+)
 
 export type StructToken = ComponentToken
 
@@ -39,4 +40,3 @@ export type Struct<
             : never
     }
 )
-

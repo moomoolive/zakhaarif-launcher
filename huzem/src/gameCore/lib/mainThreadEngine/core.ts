@@ -37,6 +37,9 @@ class EngineCompilers extends NullPrototype {
 const ENGINE_CODES = defineEnum(
 	["ok", 0],
 	["mod_package_invalid_type", 1_000],
+	["mod_init_hook_failed", 1_001],
+	["mod_js_state_init_failed", 1_002],
+	["mod_before_event_loop_failed", 1_002],
 )
 
 export type EngineCode = EnumMember<typeof ENGINE_CODES>
@@ -166,8 +169,6 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	}
 
 	async linkMods(mods: ModLinkInfo[]): Promise<ModLinkStatus> {
-		const modBuffer: CompiledMod[] = []
-
 		const linkStatus: ModLinkStatus = {
 			errors: [],
 			warnings: [],
@@ -175,35 +176,34 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			linkCount: 0
 		}
 
+		const typeCheckErrors = []
 		for (let i = 0; i < mods.length; i++) {
 			const mod = mods[i]
+			// some kind of light type check on
+			// mods, components, state, & archetypes
 			const {wrapper, canonicalUrl} = mod
 			const {ok, error} = validateMod(wrapper)
-			if (!ok) {
-				linkStatus.ok = false
-				linkStatus.errors.push({
-					msg: `[pkg => ${canonicalUrl}] ${error}`,
-					...ENGINE_CODES.mod_package_invalid_type
-				})
+			if (ok) {
 				continue
 			}
+			typeCheckErrors.push(`mod ${canonicalUrl} is not typed correctly ${error}`)
 		}
 
-		if (!linkStatus.ok) {
+		if (typeCheckErrors.length > 0) {
+			linkStatus.ok = false
+			const messages = typeCheckErrors.map((msg) => {
+				return {msg, ...ENGINE_CODES.mod_package_invalid_type}
+			})
+			linkStatus.errors.push(...messages)
 			return linkStatus
 		}
 
-		// some kind of type check on
-		// mods, components, state, & archetypes
-
+		// compile metadata for all mods
+		const modMetas: ModMetadata[] = []
 		for (let i = 0; i < mods.length; i++) {
-			const {wrapper, semver} = mods[i]
+			const mod = mods[i]
+			const {wrapper, resolvedUrl, canonicalUrl, semver} = mod
 			this.meta.modVersionIndex.set(wrapper.data.name, semver)
-		}
-		
-		for (let m = 0; m < mods.length; m++) {
-			const mod = mods[m]
-			const {wrapper, resolvedUrl, canonicalUrl} = mod
 			const {data} = wrapper
 			const id = this.modIdCounter++
 			const meta: ModMetadata = {
@@ -213,15 +213,75 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 				dependencies: data.dependencies || [],
 				id 
 			}
-			const engine = this
-			if (wrapper.onInit) {
-				await wrapper.onInit(meta, engine)
-			}
+			modMetas.push(meta)
+		}
 
-			let modState = {}
-			if (wrapper.data.state) {
-				modState = await wrapper.data.state(meta, this)
+		// lifecycle hook 1 => init hook
+		// runs all init hooks in parellel.
+		// This works because init hooks should not require
+		// any dependencies to run
+		const engine = this
+		const initErrors: string[] = []
+		await Promise.all(mods.map(async (mod, index) => {
+			const {wrapper} = mod
+			if (!wrapper.onInit) {
+				return
 			}
+			const meta = modMetas[index]
+			try {
+				await wrapper.onInit(meta, engine)
+			} catch (err) {
+				console.error("mod", meta.canonicalUrl, "threw exception in init hook", err)
+				initErrors.push(`mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`)
+			}
+		}))
+
+		if (initErrors.length > 0) {
+			linkStatus.ok = false
+			const messages = initErrors.map((msg) => {
+				return {msg, ...ENGINE_CODES.mod_init_hook_failed}
+			})
+			linkStatus.errors.push(...messages)
+			return linkStatus
+		}
+
+		// lifecycle hook 2 => js state hook
+		// initializes all states in parellel. 
+		// Same reason as init hook, see above
+		const jsStateErrors: string[] = []
+		const jsStatesAsync = mods.map(async (mod, index) => {
+			const {data} = mod.wrapper
+			const response = {ok: true, state: {}, msg: ""}
+			if (!data.state) {
+				return {}
+			}
+			const meta = modMetas[index]
+			try {
+				return await data.state(meta, engine)
+			} catch (err) {
+				console.error("mod", meta.canonicalUrl, "threw exception during js state initialization", err)
+				response.ok = false
+				jsStateErrors.push(`mod ${meta.canonicalUrl} threw exception during js state initialization ${String(err)}`)
+				return {}
+			}
+		})
+		const jsStates = await Promise.all(jsStatesAsync)
+
+		if (jsStateErrors.length > 0) {
+			linkStatus.ok = false
+			const messages = jsStateErrors.map((msg) => {
+				return {msg, ...ENGINE_CODES.mod_js_state_init_failed}
+			})
+			linkStatus.errors.push(...messages)
+			return linkStatus
+		}
+		
+		const modsCompiled = nullObject<CompiledMods>()
+		for (let m = 0; m < mods.length; m++) {
+			const mod = mods[m]
+			const {wrapper} = mod
+			const meta = modMetas[m]
+			const modState = jsStates[m]
 
 			const componentClasses: Record<string, ComponentClass> = Object.create(null)
 			const components = wrapper.data.components || {}
@@ -250,53 +310,52 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 				this.meta.componentIndex.set(fullname, compilerResponse.componentClass)
 			}
 
-			const modArchetypes = wrapper.data.archetypes || {}
-			const archetypes = {}
-			const archetypeKeys = Object.keys(modArchetypes)
-			for (let i = 0; i < archetypeKeys.length; i++) {
-				const key = archetypeKeys[i]
-				Object.defineProperty(archetypes, key, {
-					value: {},
-					enumerable: true,
-					writable: true,
-					configurable: true
-				})
-			}
-
-			const queries = wrapper.data.queries || {}
-			const definedQueries = Object.keys(queries)
-			const queryAccessors = {}
-			for (let i = 0; i < definedQueries.length; i++) {
-				const queryname = definedQueries[i]
-				Object.defineProperty(queryAccessors, queryname, {
-					configurable: true,
-					enumerable: true,
-					writable: true,
-					value: () => ({})
-				})
-			}
-
 			const compiled = new CompiledMod({
 				state: modState,
 				meta,
 				resources: (wrapper.data.resources || {}) as Record<string, string>,
-				queries: queryAccessors,
+				// TODO: queries
+				queries: {},
 				componentClasses,
-				archetypes
+				// TODO: archetypes
+				archetypes: {}
 			})
             
-			Object.defineProperty(this.mods, wrapper.data.name, {
+			Object.defineProperty(modsCompiled, wrapper.data.name, {
 				configurable: true,
 				enumerable: true,
 				writable: false,
 				value: compiled
 			})
+		}
+		this.mods = modsCompiled
 
-			if (wrapper.onBeforeGameLoop) {
-				await wrapper.onBeforeGameLoop(engine)
+		// lifecycle hook 3 => before game loop hook
+		// cannot run in parellel because mods can be
+		// dependant on other mods here.
+		// TODO: determine mod order (based on dependencies)
+		const beforeGameLoopErrors = []
+		for (let i = 0; i < mods.length; i++) {
+			const {wrapper} = mods[i]
+			if (!wrapper.onBeforeGameLoop) {
+				continue
 			}
+			try {
+				await wrapper.onBeforeGameLoop(this)
+			} catch (err) {
+				const meta = modMetas[i]
+				console.error("mod", meta.canonicalUrl, "threw exception during before game loop event", err)
+				beforeGameLoopErrors.push(`mod ${meta.canonicalUrl} threw exception during before game loop event ${String(err)}`)
+			}
+		}
 
-			modBuffer.push(compiled)
+		if (beforeGameLoopErrors.length > 0) {
+			linkStatus.ok = false
+			const messages = beforeGameLoopErrors.map((msg) => {
+				return {msg, ...ENGINE_CODES.mod_before_event_loop_failed}
+			})
+			linkStatus.errors.push(...messages)
+			return linkStatus
 		}
 
 		return linkStatus
