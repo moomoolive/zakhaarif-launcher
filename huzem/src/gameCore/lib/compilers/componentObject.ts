@@ -1,5 +1,6 @@
 import type {
-	ComponentDefinition
+	ComponentDefinition,
+	JsHeapRef
 } from "zakhaarif-dev-tools"
 
 export type ComponentToken = Readonly<{
@@ -11,10 +12,15 @@ export type ComponentObjectConfig = {
     components: ComponentToken[]
 } 
 
-export const layoutMapProperties = ["size$", "id$"] as const
+export const layoutMapProperties = ["size$", "layoutId$"] as const
+type LayoutMapProps = {
+	size$: number
+	classId$: number
+}
 export type LayoutFieldName<T extends number> = `f${T}`
 const fieldName = <T extends number>(index: T): LayoutFieldName<T> => `f${index}`
 const NO_DUPLICATE_REF = -1
+export const STANDARD_CLASS_COUNT = 1
 
 export type ComponentObjectMeta = {
     name: string, 
@@ -47,8 +53,8 @@ export function generateComponentObjectTokens(
 		const fieldOffsetMap: Record<string, number> = {}
 		const bytesPer32bits = 4
 		layout[layoutMapProperties[0]] = defKeys.length * bytesPer32bits
-		// class id 0 is reserved, so class ids start from 1
-		const classId = 1 + componentCount++
+		// a couple of class a reserved
+		const classId = STANDARD_CLASS_COUNT + componentCount++
 		fieldOffsetMap[layoutMapProperties[1]] = classId
 		for (let f = 0; f < defKeys.length; f++) {
 			const key = defKeys[f]
@@ -94,27 +100,23 @@ export const layoutMapName = "LayoutMap"
 export const layoutMapRegistryName = "layoutMapRegistry"
 export const pointerViewI32Name = "PointerViewI32"
 export const pointerViewF32Name = "PointerViewF32"
-/** 
- * p$ stands for pointer (an u32), 
- * o$ stands for offset (an i32)
- * l$ stands for layout pointer (a js object)
- * */
 export const pointerViewProperties = ["p$", "o$", "l$"] as const
+type _PointerViewProps = {
+	/** stands for pointer (a u32) */
+	p$: number,
+	/** stands for offset (an i32) from pointer */
+	o$: number,
+	/**
+	 * stands for layout map. This is essential a large
+	 * object that maps getter and setter fields to certain
+	 * offsets from pointer.
+	 */
+	l$: LayoutMapProps
+}
 const heapVarName = "h"
-/** 
- * "v" property corresponds to dataview on the JsHeapRef
- * interface in "zakhaarif-dev-tools"
- */
-const heapDataview: "h.v" = `${heapVarName}.v`
-export const STANDARD_CLASS_COUNT = 1
-const useLittleEndian = "true"
-
-const dv = new DataView(new ArrayBuffer(1))
-dv.getFloat32
-
-export type ClassLayoutName<T extends number> = `classLayout${T}`
-const classLayoutName = <T extends number>(classId: T): ClassLayoutName<T> => `classLayout${classId}`
-const baseLayoutName =  classLayoutName(0)
+type LayoutMapRefName<T extends number> = `layoutMapRef${T}`
+const layoutMapRefName = <T extends number>(classId: T): LayoutMapRefName<T> => `layoutMapRef${classId}`
+const baseLayoutName =  layoutMapRefName(0)
 
 export function generateComponentObjectCode$(
 	tokens: ComponentObjectTokens
@@ -128,87 +130,117 @@ export function generateComponentObjectCode$(
 	const uniqueLayouts = meta.filter(
 		(comp) => comp.duplicateRef === NO_DUPLICATE_REF
 	)
-	const componentObjectContext = `(${heapVarName}) => {
-        class ${layoutMapName} {
-            constructor({${layoutMapProperties.reduce(
+	const standardPropDestructure = layoutMapProperties.reduce(
 		(total, next) => `${total}${next}=0,`,
 		""
-	)}${allFields.reduce(
-	(total, _, index) => `${total}${fieldName(index)}=0,`,
-	""
-)}}={}) {
-                ${layoutMapProperties.reduce(
-		(total, next) => `${total}this.${next}=${next};`,
+	)
+	const fieldPropDestructure = allFields.reduce(
+		(total, _, index) => `${total}${fieldName(index)}=0,`,
 		""
-	)}${allFields.reduce(
-	(total, _, index) => `${total}this.${fieldName(index)}=${fieldName(index)};`,
-	""
-)}
+	)
+	const baseLayoutProps = JSON.stringify({
+		[layoutMapProperties[0]]: 0,
+		[layoutMapProperties[1]]: 0
+	})
+	const componentObjectContext = `(${heapVarName}) => {
+        class ${layoutMapName} {
+            constructor({${standardPropDestructure}${fieldPropDestructure}}={}) {
+                ${layoutMapProperties.reduce((total, next) => `${total}this.${next}=${next};`, "")}
+				${allFields.reduce((total, _, index) => `${total}this.${fieldName(index)}=${fieldName(index)};`, "")}
             }
         }
 
-        const ${baseLayoutName} = new ${layoutMapName}(${JSON.stringify({
-	[layoutMapProperties[0]]: 0,
-	[layoutMapProperties[1]]: 0
-})});${uniqueLayouts.reduce(
-	(total, next) => {
+        const ${baseLayoutName} = new ${layoutMapName}(${baseLayoutProps});
+		${uniqueLayouts.reduce((total, next) => {
 		const {fieldOffsetMap, classId} = next
-		const name = classLayoutName(classId)
+		const name = layoutMapRefName(classId)
 		return `${total}const ${name} = new ${layoutMapName}(${JSON.stringify(fieldOffsetMap)});`
-	}, 
-	""
-)}
+	}, "")}
         
-        const ${layoutMapRegistryName} = [${baseLayoutName},${uniqueLayouts.reduce(
-	(total, {classId}) => `${total}${classLayoutName(classId)},`,
-	""
-)}]
+        const ${layoutMapRegistryName} = [
+			${baseLayoutName},
+			${uniqueLayouts.reduce((total, {classId}) => `${total}${layoutMapRefName(classId)},`, "")}
+		]
 
         class ${pointerViewI32Name} {
-            constructor() {
-                ${pointerViewProperties.reduce(
-		(total, next) => next === "l$" 
-			? `${total}this.${next}=${baseLayoutName}` 
-			: `${total}this.${next}=0;`,
-		""
-	)}
-            }
+			${createPointerViewConstructor(baseLayoutName)}
 
-            ${allFields.reduce(
-		(total, next, index) => {
-			const getter = `get"${next}"(){return ${heapDataview}.getInt32(this.${pointerViewProperties[0]}+this.${pointerViewProperties[1]}+this.${pointerViewProperties[2]}.${fieldName(index)},${useLittleEndian})}`
-			const input = "val"
-			const setter = `set"${next}"(${input}){${heapDataview}.getInt32(this.${pointerViewProperties[0]}+this.${pointerViewProperties[1]}+this.${pointerViewProperties[2]}.${fieldName(index)},${input},${useLittleEndian})}`
-			return `${total}${getter};${setter};`
-		},
-		""
-	)}
+			${createPropertyAccessors(allFields, heapVarName, "v", "getInt32", "setInt32")}
+			
+			${createLayoutModifiers(meta)}
+
+			${pointerViewStandardMethods()}
         }
 
-        class ${pointerViewF32Name} {
-            constructor() {
-                ${pointerViewProperties.reduce(
-		(total, next) => next === "l$" 
-			? `${total}this.${next}=${baseLayoutName}` 
-			: `${total}this.${next}=0;`,
-		""
-	)}
-            }
-
-            ${allFields.reduce(
-		(total, next, index) => {
-			const getter = `get"${next}"(){return ${heapDataview}.getFloat32(this.${pointerViewProperties[0]}+this.${pointerViewProperties[1]}+this.${pointerViewProperties[2]}.${fieldName(index)},${useLittleEndian})}`
-			const input = "val"
-			const setter = `set"${next}"(${input}){${heapDataview}.setFloat32(this.${pointerViewProperties[0]}+this.${pointerViewProperties[1]}+this.${pointerViewProperties[2]}.${fieldName(index)},${input},${useLittleEndian})}`
-			return `${total}${getter};${setter};`
-		},
-		""
-	)}
-        }
-
-        return {${layoutMapName},${layoutMapRegistryName},${pointerViewI32Name},${pointerViewF32Name}}
+        return {
+			${layoutMapName},${layoutMapRegistryName},
+			${pointerViewI32Name},${""}
+		}
     }`
 	return {
 		componentObjectContext
 	} as const
 }
+
+type DataViewAccessor = `get${string}`
+type DataViewMutator = `set${string}`
+
+function createPropertyAccessors<T extends keyof JsHeapRef>(
+	properties: string[],
+	heapTokenName: string,
+	targetHeapView: T,
+	accessorMethod: T extends "v" 
+		? keyof DataView & DataViewAccessor 
+		: "must-pick-dataview",
+	mutatorMethod: T extends "v" 
+		? keyof DataView & DataViewMutator 
+		: "must-pick-dataview",
+): string {
+	let accessors = ""
+	const [
+		pointerProp, offsetProp, layoutProp
+	] = pointerViewProperties
+	for (let i = 0; i < properties.length; i++) {
+		const accessorName = properties[i]
+		const index = i
+		const targetAddress = `this.${pointerProp}+this.${offsetProp}+this.${layoutProp}.${fieldName(index)}`
+		const useLittleEndian = "true"
+		const getter = `get"${accessorName}"(){return ${heapTokenName}.${targetHeapView}.${accessorMethod}(${targetAddress},${useLittleEndian})};`
+		const newValueToken = "val"
+		const setter = `set"${accessorName}"(${newValueToken}){${heapTokenName}.${targetHeapView}.${mutatorMethod}(${targetAddress},${newValueToken},${useLittleEndian})};`
+		accessors += `${getter}${setter}`
+	}
+	return accessors
+}
+
+function createPointerViewConstructor(
+	defaultLayoutName: string
+): string {
+	const [pointerProp, offsetProp, layoutProp] = pointerViewProperties
+	const construct = `constructor(){this.$${pointerProp}=0;this.${offsetProp}=0;this.${layoutProp}=${defaultLayoutName}}`
+	return construct
+}
+
+function pointerViewStandardMethods(): string {
+	let methods = ""
+	const [pointerProp, offsetProp, layoutPointerProp] = pointerViewProperties
+	const [sizeofProp] = layoutMapProperties
+	const getSizeOf = `this.${layoutPointerProp}.${sizeofProp}`
+	methods += `sizeof$(){return ${getSizeOf}};`
+	const indexToken = "i"
+	methods += `index(${indexToken}){this.${offsetProp}=${indexToken}*${getSizeOf};return this};`
+	methods += `get ptr$(){return this.${pointerProp}};`
+	const newPtrToken = "ptr"
+	const castToU32 = ">>>0"
+	methods += `set ptr$(${newPtrToken}){this.${pointerProp}=(${newPtrToken}${castToU32})};`
+	return methods
+}
+
+function createLayoutModifiers(metas: ComponentObjectMeta[]): string {
+	return metas.reduce((total, next) => {
+		const [_p, _o, layoutMapProp] = pointerViewProperties
+		const {name, classId} = next
+		return `${total}get"${name}"(){this.${layoutMapProp}=${layoutMapRefName(classId)};return this};`
+	}, "")
+}
+3>>>0

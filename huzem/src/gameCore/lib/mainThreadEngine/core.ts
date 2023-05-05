@@ -252,12 +252,12 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		const jsStatesAsync = mods.map(async (mod, index) => {
 			const {data} = mod.wrapper
 			const response = {ok: true, state: {}, msg: ""}
-			if (!data.state) {
+			if (!data.jsState) {
 				return {}
 			}
 			const meta = modMetas[index]
 			try {
-				return await data.state(meta, engine)
+				return await data.jsState(meta, engine)
 			} catch (err) {
 				console.error("mod", meta.canonicalUrl, "threw exception during js state initialization", err)
 				response.ok = false

@@ -18,7 +18,7 @@ import {DebugLayer} from "babylonjs"
 
 const data = modData().define({
 	name: "zakhaarifStd",
-	state: stateHandler,
+	jsState: stateHandler,
 	components: {
 		transform: {x: "f32", y: "f32", z: "f32"},
 		velocity: {x: "f32", y: "f32", z: "f32"},

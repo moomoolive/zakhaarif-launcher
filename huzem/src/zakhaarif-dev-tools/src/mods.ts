@@ -92,7 +92,7 @@ export type ModData<
     readonly components?: TComponentDefs
     readonly queries?: TQueries
     readonly archetypes?: TArchetypes
-    state?: StateEvent<TState>,
+    jsState?: StateEvent<TState>,
 }
 
 export type ModModules = ReadonlyArray<ModData>
@@ -249,8 +249,8 @@ export type GlobalModIndex<T extends ModModules = []> = {
 } 
 
 export type LocalModIndex<T extends ModData = ModData> = {
-    state: T["state"] extends undefined ? {} : Awaited<
-        ReturnType<NonNullable<T["state"]>>
+    state: T["jsState"] extends undefined ? {} : Awaited<
+        ReturnType<NonNullable<T["jsState"]>>
     >,
     resources: T["resources"] extends undefined ? {} : { 
         readonly [key in keyof NonNullable<T["resources"]>]: string 
