@@ -10,7 +10,11 @@ import {
     pointerViewI32Name,
     pointerViewF32Name
 } from "./componentObject"
+import {
+    hydrateComponentObjectContext
+} from "./hydrateContext"
 import {faker} from "@faker-js/faker"
+import { JsHeapRef } from "zakhaarif-dev-tools"
 
 const randomComponent = (): ComponentToken => {
     const type = Math.random() > 0.5 ? "f32" : "i32"
@@ -77,8 +81,7 @@ describe("generating component object tokens", () => {
                     .sort()
                 for (let i = 0; i < keys.length; i++) {
                     const key = keys[i]
-                    const bytesPer32bits = 4
-                    expect(layout[key]).toBe(i * bytesPer32bits)
+                    expect(layout[key]).toBe(i)
                 }
             }
         }
@@ -98,17 +101,22 @@ describe("generating component object tokens", () => {
 })
 
 describe("generating class object code", () => {
+    const i32buf = new Int32Array(50)
+    const heap: JsHeapRef = {
+        i32: i32buf,
+        u32: new Uint32Array(i32buf.buffer),
+        f32: new Float32Array(i32buf.buffer),
+        f64: new Float64Array(i32buf.buffer),
+        v: new DataView(i32buf.buffer)
+    }
     it("all generated code should be valid javascript", () => {
         for (let i = 0; i < 1; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
-            console.log(code)
-            const createFn = () => {
-                return Function(`return ${code.componentObjectContext}`)()()
-            }
-            expect(createFn).not.toThrow()
-            const context = createFn()
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
             expect(context).toBeTypeOf("object")
             expect(context[layoutMapName]).toBeTypeOf("function")
             expect(context[pointerViewI32Name]).toBeTypeOf("function")
@@ -123,10 +131,9 @@ describe("generating class object code", () => {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
-            const createFn = () => {
-                return Function(`return ${code.componentObjectContext}`)()()
-            }
-            const context = createFn()
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
             const instance = new context[layoutMapName]()
             for (const prop of layoutMapProperties) {
                 expect(instance[prop]).toBeTypeOf("number")
@@ -139,17 +146,70 @@ describe("generating class object code", () => {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
-            const createFn = () => {
-                return Function(`return ${code.componentObjectContext}`)()()
-            }
-            const context = createFn()
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
             const instance = new context[layoutMapName]()
             for (let i = 0; i < tokens.allFields.length; i++) {
                 // f${i} => corresponds to same element in "allFields"
                 // array. For example if "x" is at element 1, it's
                 // corresponding property would be name f1.
-                const name = `f${i}`
+                const name = `f${i}` as const
                 expect(instance[name]).toBeTypeOf("number")
+            }
+        }
+    })
+
+    it("generated pointer view should generate getter fields named after every component that returns the object itself", () => {
+        for (let i = 0; i < 1; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const instance = new context.PointerViewI32()
+            expect(instance).not.toBe(undefined)
+            for (const token of tokens.meta) {
+                const {name} = token
+                const value = instance[name as keyof typeof instance]
+                expect(value).toBe(instance)
+            }
+        }
+    })
+
+    it("generated pointer view should generate getter & setter fields for all unique fields", () => {
+        for (let i = 0; i < 1; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const instance = new context.PointerViewI32()
+            expect(instance).not.toBe(undefined)
+            for (const fieldName of tokens.allFields) {
+                const value = instance[fieldName as keyof typeof instance]
+                expect(value).toBeTypeOf("number")
+            }
+        }
+    })
+
+    it("generated accessing component name should set class layout to corresponding token 'classId'", () => {
+        for (let i = 0; i < 1; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const instance = new context.PointerViewI32()
+            expect(instance).not.toBe(undefined)
+            for (const meta of tokens.meta) {
+                const {name, classId} = meta
+                const value = instance[name as keyof typeof instance]
+                expect(value).toBe(instance)
+                expect(instance.l$.layoutId$).toBe(classId)
             }
         }
     })
