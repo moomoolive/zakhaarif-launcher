@@ -5,15 +5,17 @@ import {
 	layoutMapRegistryName,
 	pointerViewI32Name,
 	PointerViewInstance,
-	LayoutMap
+	LayoutMap,
+	pointerViewF32Name
 } from "./componentObject"
 
+export type PointerViewFactory = { new(): PointerViewInstance }
+
 export type HydratedComponentObjectContext = {
-    [layoutMapName]: {
-        new(args?: Partial<LayoutMap>): LayoutMap
-    }
+    [layoutMapName]: { new(args?: Partial<LayoutMap>): LayoutMap }
     [layoutMapRegistryName]: Array<LayoutMap>
-    [pointerViewI32Name]: { new(): PointerViewInstance }
+    [pointerViewI32Name]: PointerViewFactory
+    [pointerViewF32Name]: PointerViewFactory
 }
 
 export type ComponentHydrationArgs = JsHeapRef

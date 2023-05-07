@@ -7,10 +7,11 @@ import {
     layoutMapProperties,
     layoutMapRegistryName,
     STANDARD_CLASS_COUNT,
-    pointerViewI32Name,
-    pointerViewF32Name
+    pointerViewProperties,
+    componentObjectCodeExports
 } from "./componentObject"
 import {
+    PointerViewFactory,
     hydrateComponentObjectContext
 } from "./hydrateContext"
 import {faker} from "@faker-js/faker"
@@ -101,7 +102,7 @@ describe("generating component object tokens", () => {
 })
 
 describe("generating class object code", () => {
-    const i32buf = new Int32Array(50)
+    const i32buf = new Int32Array(300)
     const heap: JsHeapRef = {
         i32: i32buf,
         u32: new Uint32Array(i32buf.buffer),
@@ -109,8 +110,9 @@ describe("generating class object code", () => {
         f64: new Float64Array(i32buf.buffer),
         v: new DataView(i32buf.buffer)
     }
+    const testcount = 10
     it("all generated code should be valid javascript", () => {
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
@@ -118,16 +120,20 @@ describe("generating class object code", () => {
                 code.componentObjectContext, heap
             )
             expect(context).toBeTypeOf("object")
-            expect(context[layoutMapName]).toBeTypeOf("function")
-            expect(context[pointerViewI32Name]).toBeTypeOf("function")
-            //expect(context[pointerViewF32Name]).toBeTypeOf("function")
-            expect(Array.isArray(context[layoutMapRegistryName])).toBe(true)
+            for (const prop of componentObjectCodeExports) {
+                expect(context[prop]).not.toBe(undefined)
+                if (prop.toLowerCase().includes("array")) {
+                    expect(Array.isArray(context[prop])).toBe(true)
+                } else {
+                    expect(context[prop]).toBeTypeOf("function")
+                }
+            }
             expect(context[layoutMapRegistryName].length).greaterThan(STANDARD_CLASS_COUNT)
         }
     })
 
     it("generated LayoutMap class instances should have all of the standard properties", () => {
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
@@ -142,7 +148,7 @@ describe("generating class object code", () => {
     })
 
     it("generated LayoutMap a field numbered after the index of each unique field in tokens", () => {
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
@@ -160,56 +166,198 @@ describe("generating class object code", () => {
         }
     })
 
-    it("generated pointer view should generate getter fields named after every component that returns the object itself", () => {
-        for (let i = 0; i < 1; i++) {
+    it("generated pointer view class should have all standard properties and methods", () => {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
             const context = hydrateComponentObjectContext(
                 code.componentObjectContext, heap
             )
-            const instance = new context.PointerViewI32()
-            expect(instance).not.toBe(undefined)
-            for (const token of tokens.meta) {
-                const {name} = token
-                const value = instance[name as keyof typeof instance]
-                expect(value).toBe(instance)
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const ptrview = new cls()
+                for (const prop of pointerViewProperties) {
+                    expect(ptrview[prop]).not.toBe(undefined)
+                }
+            }
+        }
+    })
+
+    it("generated pointer view should generate getter fields named after every component that returns the object itself", () => {
+        for (let i = 0; i < testcount; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const token of tokens.meta) {
+                    const {name} = token
+                    const value = instance[name as keyof typeof instance]
+                    expect(value).toBe(instance)
+                }
             }
         }
     })
 
     it("generated pointer view should generate getter & setter fields for all unique fields", () => {
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
             const context = hydrateComponentObjectContext(
                 code.componentObjectContext, heap
             )
-            const instance = new context.PointerViewI32()
-            expect(instance).not.toBe(undefined)
-            for (const fieldName of tokens.allFields) {
-                const value = instance[fieldName as keyof typeof instance]
-                expect(value).toBeTypeOf("number")
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const fieldName of tokens.allFields) {
+                    const value = instance[fieldName as keyof typeof instance]
+                    expect(value).toBeTypeOf("number")
+                }
             }
         }
     })
 
     it("generated accessing component name should set class layout to corresponding token 'classId'", () => {
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < testcount; i++) {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
             const context = hydrateComponentObjectContext(
                 code.componentObjectContext, heap
             )
-            const instance = new context.PointerViewI32()
-            expect(instance).not.toBe(undefined)
-            for (const meta of tokens.meta) {
-                const {name, classId} = meta
-                const value = instance[name as keyof typeof instance]
-                expect(value).toBe(instance)
-                expect(instance.l$.layoutId$).toBe(classId)
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const meta of tokens.meta) {
+                    const {name, classId} = meta
+                    const value = instance[name as keyof typeof instance]
+                    expect(value).toBe(instance)
+                    expect(instance.l$.layoutId$).toBe(classId)
+                }
+            }
+        }
+    })
+
+    it("generated component should have correct size (in blocks of 4 bytes)", () => {
+        for (let i = 0; i < testcount; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const meta of tokens.meta) {
+                    const comp = instance[meta.name as keyof typeof instance]
+                    expect(comp).toBe(instance)
+                    const bytesPer32Bits = 4
+                    expect(instance.sizeof$()).toBe(Object.keys(meta.layout).length * bytesPer32Bits)
+                }
+            }
+        }
+    })
+
+    it("generated component index method should move pointer by index multiplied my sizeof", () => {
+        for (let i = 0; i < testcount; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const meta of tokens.meta) {
+                    const comp = instance[meta.name as keyof typeof instance]
+                    expect(comp).toBe(instance)
+                    const {computedPtr$: outerptr} = instance.index(0)
+                    expect(outerptr).toBe(0)
+                    let prevPtr = outerptr
+                    const sizeof = instance.sizeof$()
+                    for (let i = 1; i < 5; i++) {
+                        const c = instance.index(i)
+                        const innerptr = instance.computedPtr$
+                        expect(innerptr).toBe(prevPtr + sizeof)
+                        prevPtr = innerptr
+                    }
+                }
+            }
+        }
+    })
+
+    it("generated component view should mutate underlying buffer correctly", () => {
+        for (let i = 0; i < testcount; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const m of tokens.meta) {
+                    const {layout, name} = m
+                    const c = instance[name as keyof typeof instance]
+                    expect(c).toBe(instance)
+                    const keys = Object.keys(layout)
+                    for (let i = 0; i < keys.length; i++) {
+                        const inc = i * 10
+                        const mut = instance.index(i)
+                        for (let k = 0; k < keys.length; k++) {
+                            const key = keys[k]
+                            const val = inc + k
+                            {(mut as unknown as Record<string, number>)[key] = val}
+                            expect(mut[key as keyof typeof mut]).toBe(val)
+                        }
+                    }
+                    // see if it was all mutated correct
+                    for (let i = 0; i < keys.length; i++) {
+                        const inc = i * 10
+                        const read = instance.index(i)
+                        for (let k = 0; k < keys.length; k++) {
+                            const key = keys[k]
+                            const val = inc + k
+                            expect(read[key as keyof typeof read]).toBe(val)
+                        }
+                    }
+                }
             }
         }
     })

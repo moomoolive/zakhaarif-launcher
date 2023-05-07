@@ -109,20 +109,30 @@ export function generateComponentObjectTokens(
 
 
 export const layoutMapName = "LayoutMap"
-export const layoutMapRegistryName = "layoutMapRegistry"
+export const layoutMapRegistryName = "layoutMapRegistryArray"
 export const pointerViewI32Name = "PointerViewI32"
 export const pointerViewF32Name = "PointerViewF32"
+export const componentObjectCodeExports = [
+	layoutMapName, layoutMapRegistryName,
+	pointerViewI32Name, pointerViewF32Name
+] as const
+export const pointerViewI32SoaName = "PointerViewSoaI32"
 const pointerViewPointerProp = "p$"
 const pointerViewOffsetProp = "o$"
 const pointerViewLayoutMapProp = "l$"
 const pointerViewSizeofMethod = "sizeof$"
 const pointerViewIndexMethod = "index"
+const pointerViewPtrGetterSetterProp = "ptr$"
+const pointerViewPtrComputedPtrProp = "computedPtr$"
 export const pointerViewProperties = [
 	pointerViewPointerProp, 
 	pointerViewOffsetProp, 
-	pointerViewLayoutMapProp
+	pointerViewLayoutMapProp,
+	pointerViewSizeofMethod,
+	pointerViewIndexMethod,
+	pointerViewPtrGetterSetterProp,
+	pointerViewPtrComputedPtrProp
 ] as const
-const pointerViewPtrGetterSetterProp = "ptr$"
 export type PointerViewInstance = {
 	/** stands for pointer (a u32) */
 	[pointerViewPointerProp]: strict_u32
@@ -135,9 +145,10 @@ export type PointerViewInstance = {
 	 */
 	[pointerViewLayoutMapProp]: LayoutMap
 	[pointerViewPtrGetterSetterProp]: strict_u32
+	[pointerViewPtrComputedPtrProp]: strict_u32
 
 	[pointerViewIndexMethod](index: number): PointerViewInstance
-	readonly [pointerViewSizeofMethod]: number
+	[pointerViewSizeofMethod](): number
 }
 
 type LayoutMapRefName<T extends number> = `layoutMapRef${T}`
@@ -197,11 +208,12 @@ export function generateComponentObjectCode$(
 			${uniqueLayouts.reduce((total, {classId}) => `${total}${layoutMapRefName(classId)},`, "")}
 		]
 
-		${createPointerViewClass(pointerViewI32Name, baseLayoutName, "i32", tokens, heapVarName)}
+		${createPointerViewClass(pointerViewI32Name, baseLayoutName, "i32", tokens, heapVarName, "aos", "u32")}
+		${createPointerViewClass(pointerViewF32Name, baseLayoutName, "f32", tokens, heapVarName, "aos", "u32")}
 
         return {
 			${layoutMapName},${layoutMapRegistryName},
-			${pointerViewI32Name},
+			${pointerViewI32Name}, ${pointerViewF32Name}
 		}
     }` as ContextString<"co_ctx">
 	return {
@@ -227,7 +239,10 @@ function createPointerViewClass(
 	baseLayoutTokenName: string,
 	targetHeapView: keyof JsHeapRef & ("i32" | "f32"),
 	tokens: ComponentObjectTokens,
-	heapVarTokenName: string
+	heapVarTokenName: string,
+	// stands for struct of arrays (soa) or array of structs (aos)
+	memoryLayout: "soa" | "aos",
+	u32HeapView: keyof JsHeapRef & ("u32")
 ): string {
 	const {meta, allFields} = tokens
 	const [
@@ -241,7 +256,9 @@ function createPointerViewClass(
 	const propertyGettersSetters = allFields.reduce((total, next, i) => {
 		const accessorName = next
 		const index = i
-		const targetAddress = `this.${pointerProp}+this.${offsetProp}+this.${layoutProp}.${fieldName(index)}`
+		const targetAddress = memoryLayout === "aos" 
+			? `this.${pointerProp}+this.${offsetProp}+this.${layoutProp}.${fieldName(index)}`
+			: `${heapVarTokenName}.${u32HeapView}[this.${pointerProp}+this.${layoutProp}.${fieldName(index)}]+this.${offsetProp}`
 		const getter = `get "${accessorName}"() {return ${heapVarTokenName}.${targetHeapView}[${targetAddress}]}`
 		const newValueToken = "val"
 		const setter = `set "${accessorName}"(${newValueToken}) {${heapVarTokenName}.${targetHeapView}[${targetAddress}]=${newValueToken}}`
@@ -255,9 +272,10 @@ function createPointerViewClass(
 		
 		${meta.reduce((total, {name, classId}) => `${total}get "${name}"() {this.${layoutProp}=${layoutMapRefName(classId)};return this}`, "")}
 
-		${pointerViewSizeofMethod}() {return ${getSizeOf}}
+		${pointerViewSizeofMethod}() {return ${getSizeOf}*${bytesPer32Bits}}
 		${pointerViewIndexMethod}(ptr) {this.${offsetProp}=(ptr${castToI32})*${getSizeOf};return this}
 		get ${pointerViewPtrGetterSetterProp}() {return this.${pointerProp}*${bytesPer32Bits}}
+		get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerProp}+this.${offsetProp})*${bytesPer32Bits}}
 		set ${pointerViewPtrGetterSetterProp}(ptr){this.${pointerProp}=((ptr/${bytesPer32Bits})${castToU32})}
 	}
 	`.trim()
