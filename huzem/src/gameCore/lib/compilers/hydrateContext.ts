@@ -6,16 +6,22 @@ import {
 	pointerViewI32Name,
 	PointerViewInstance,
 	LayoutMap,
-	pointerViewF32Name
+	pointerViewF32Name,
+	pointerViewI32SoaName,
+	pointerViewF32SoaName,
+	PointerViewSoaInstance
 } from "./componentObject"
 
 export type PointerViewFactory = { new(): PointerViewInstance }
+export type PointerViewSoaFactory = { new(): PointerViewSoaInstance }
 
 export type HydratedComponentObjectContext = {
     [layoutMapName]: { new(args?: Partial<LayoutMap>): LayoutMap }
     [layoutMapRegistryName]: Array<LayoutMap>
     [pointerViewI32Name]: PointerViewFactory
     [pointerViewF32Name]: PointerViewFactory
+    [pointerViewI32SoaName]: PointerViewSoaFactory
+    [pointerViewF32SoaName]: PointerViewSoaFactory
 }
 
 export type ComponentHydrationArgs = JsHeapRef

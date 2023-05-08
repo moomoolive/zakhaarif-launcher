@@ -112,11 +112,14 @@ export const layoutMapName = "LayoutMap"
 export const layoutMapRegistryName = "layoutMapRegistryArray"
 export const pointerViewI32Name = "PointerViewI32"
 export const pointerViewF32Name = "PointerViewF32"
+// "Soa" stands for "struct of arrays"
+export const pointerViewI32SoaName = "PointerViewSoaI32"
+export const pointerViewF32SoaName = "PointerViewSoaF32"
 export const componentObjectCodeExports = [
 	layoutMapName, layoutMapRegistryName,
-	pointerViewI32Name, pointerViewF32Name
+	pointerViewI32Name, pointerViewF32Name,
+	pointerViewI32SoaName, pointerViewF32SoaName
 ] as const
-export const pointerViewI32SoaName = "PointerViewSoaI32"
 const pointerViewPointerProp = "p$"
 const pointerViewOffsetProp = "o$"
 const pointerViewLayoutMapProp = "l$"
@@ -150,6 +153,12 @@ export type PointerViewInstance = {
 	[pointerViewIndexMethod](index: number): PointerViewInstance
 	[pointerViewSizeofMethod](): number
 }
+declare const layout: unique symbol
+export type PointerViewSoaInstance = (
+	PointerViewInstance & {
+		[layout]: "soa"
+	} 
+)
 
 type LayoutMapRefName<T extends number> = `layoutMapRef${T}`
 const layoutMapRefName = <T extends number>(classId: T): LayoutMapRefName<T> => `layoutMapRef${classId}`
@@ -210,10 +219,13 @@ export function generateComponentObjectCode$(
 
 		${createPointerViewClass(pointerViewI32Name, baseLayoutName, "i32", tokens, heapVarName, "aos", "u32")}
 		${createPointerViewClass(pointerViewF32Name, baseLayoutName, "f32", tokens, heapVarName, "aos", "u32")}
+		${createPointerViewClass(pointerViewI32SoaName, baseLayoutName, "i32", tokens, heapVarName, "soa", "u32")}
+		${createPointerViewClass(pointerViewF32SoaName, baseLayoutName, "f32", tokens, heapVarName, "soa", "u32")}
 
         return {
 			${layoutMapName},${layoutMapRegistryName},
-			${pointerViewI32Name}, ${pointerViewF32Name}
+			${pointerViewI32Name},${pointerViewF32Name},
+			${pointerViewI32SoaName},${pointerViewF32SoaName}
 		}
     }` as ContextString<"co_ctx">
 	return {
@@ -273,10 +285,11 @@ function createPointerViewClass(
 		${meta.reduce((total, {name, classId}) => `${total}get "${name}"() {this.${layoutProp}=${layoutMapRefName(classId)};return this}`, "")}
 
 		${pointerViewSizeofMethod}() {return ${getSizeOf}*${bytesPer32Bits}}
-		${pointerViewIndexMethod}(ptr) {this.${offsetProp}=(ptr${castToI32})*${getSizeOf};return this}
+		${pointerViewIndexMethod}(idx) {this.${offsetProp}=${memoryLayout === "aos" ? `(idx${castToI32})*${getSizeOf}` : `(idx${castToI32})`};return this}
 		get ${pointerViewPtrGetterSetterProp}() {return this.${pointerProp}*${bytesPer32Bits}}
-		get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerProp}+this.${offsetProp})*${bytesPer32Bits}}
 		set ${pointerViewPtrGetterSetterProp}(ptr){this.${pointerProp}=((ptr/${bytesPer32Bits})${castToU32})}
+
+		get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerProp}+this.${offsetProp})*${bytesPer32Bits}}
 	}
 	`.trim()
 }
