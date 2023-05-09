@@ -5,13 +5,13 @@ import type {
 	strict_i32,
 } from "zakhaarif-dev-tools"
 
-export type ComponentToken = Readonly<{
+export type ComponentRegisterMeta = Readonly<{
     name: string,
     definition: ComponentDefinition
 }>
 
 export type ComponentObjectConfig = {
-    components: ComponentToken[]
+    components: ComponentRegisterMeta[]
 } 
 
 const layoutMapSizeProp = "size$"
@@ -35,8 +35,8 @@ export type ComponentObjectMeta = {
     layout: Record<string, number>,
     fieldOffsetMap: Record<string, number>
     classId: number
-    duplicateRef: number
 	maxComponentFields: number
+	duplicateRef: number
 }
 
 export type ComponentObjectTokens = {
@@ -46,7 +46,7 @@ export type ComponentObjectTokens = {
 }
 
 export function generateComponentObjectTokens(
-	components: ComponentToken[]
+	components: ComponentRegisterMeta[]
 ): ComponentObjectTokens {
 	const fieldNameMap = new Map<string, number>()
 	const meta: ComponentObjectMeta[] = []
@@ -66,8 +66,21 @@ export function generateComponentObjectTokens(
 			maxComponentFields, defKeys.length
 		)
 		fieldOffsetMap[layoutMapProperties[0]] = defKeys.length
+		const componentKey = defKeys.reduce(
+			(total, next) => `${total}_${next}`,
+			`${type}_`
+		)
+		let classId = NO_DUPLICATE_REF
+		let duplicateRef = NO_DUPLICATE_REF
+		if (duplicateMap.has(componentKey)) {
+			classId = duplicateMap.get(componentKey) || 0
+			duplicateRef = classId
+		} else {
+			classId = STANDARD_CLASS_COUNT + componentCount++
+			duplicateMap.set(componentKey, classId)
+		}
 		// a couple of class a reserved
-		const classId = STANDARD_CLASS_COUNT + componentCount++
+		//const classId = STANDARD_CLASS_COUNT + componentCount++
 		fieldOffsetMap[layoutMapProperties[1]] = classId
 		for (let f = 0; f < defKeys.length; f++) {
 			const key = defKeys[f]
@@ -81,16 +94,6 @@ export function generateComponentObjectTokens(
 			const fieldMapIndex = fieldNameMap.size
 			fieldNameMap.set(key, fieldMapIndex)
 			fieldOffsetMap[fieldName(fieldMapIndex)] = byteOffset
-		}
-		const componentKey = defKeys.reduce(
-			(total, next) => `${total}_${next}`,
-			`${type}_`
-		)
-		let duplicateRef = NO_DUPLICATE_REF
-		if (duplicateMap.has(componentKey)) {
-			duplicateRef = duplicateMap.get(componentKey) || 0
-		} else {
-			duplicateMap.set(componentKey, classId)
 		}
 		meta.push({
 			name, 
@@ -303,7 +306,12 @@ function createPointerViewClass(
 		const setter = `set "${accessorName}"(${newValueToken}) {${heapVarTokenName}.${targetHeapView}[${targetAddress}]=${newValueToken}}`
 		return `${total}${getter}; ${setter};\n`
 	}, "")
+	const classSwitchMap = new Map<number, boolean>()
 	const toObjectMethodSwitch = meta.reduce((switchToken, nextMeta) => {
+		if (classSwitchMap.has(nextMeta.classId)) {
+			return switchToken
+		}
+		classSwitchMap.set(nextMeta.classId, true)
 		const objectKeys = Object.keys(nextMeta.layout)
 		const objectReperesentation = objectKeys.reduce((object, nextKey) => {
 			return `${object}"${nextKey}":this["${nextKey}"],`

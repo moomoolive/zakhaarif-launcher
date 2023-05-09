@@ -1,7 +1,7 @@
 import {it, expect, describe} from "vitest"
 import {
     generateComponentObjectTokens, 
-    ComponentToken,
+    ComponentRegisterMeta,
     generateComponentObjectCode$,
     layoutMapName,
     layoutMapProperties,
@@ -16,7 +16,7 @@ import {
 import {faker} from "@faker-js/faker"
 import { JsHeapRef } from "zakhaarif-dev-tools"
 
-const randomComponent = (): ComponentToken => {
+const randomComponent = (): ComponentRegisterMeta => {
     const type = Math.random() > 0.5 ? "f32" : "i32"
     type Def = Record<string, "f32"> | Record<string, "i32">
     const definition: Def  = {}
@@ -491,7 +491,7 @@ describe("layout merging", () => {
     }
     
     it("components that have the same fields should point to the same class layout", () => {
-        const test: ComponentToken[] = [
+        const test: ComponentRegisterMeta[] = [
             {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}},
             {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}},
         ]
@@ -500,7 +500,7 @@ describe("layout merging", () => {
         const context = hydrateComponentObjectContext(
             code.componentObjectContext, heap
         )
-        const instance1 = new context.PointerViewI32()
+        const instance1 = new context.PointerViewSoaI32()
         const comp = instance1[test[0].name as keyof typeof instance1]
         expect(comp).toBe(instance1)
         const instance2 = new context.PointerViewI32()

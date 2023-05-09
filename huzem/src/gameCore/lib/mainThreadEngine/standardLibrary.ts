@@ -1,13 +1,14 @@
 import type {
 	CssUtilityLibrary, 
 	DomUtilityLibrary, 
-	MainThreadUtilityLibrary, 
+	MainThreadStandardLibrary, 
 	ThreadUtilityLibrary,
 	TimeUtilityLibrary
 } from "zakhaarif-dev-tools"
 import {NullPrototype} from "../utils/nullProto"
 import type {DomState, ThreadMeta, TimeState} from "./core"
 import {EMPTY_OBJECT} from "../utils/nullProto"
+import {cast, type} from "zakhaarif-dev-tools/std"
 
 export type StandardLibConfig = {
     threadId: number,
@@ -16,11 +17,13 @@ export type StandardLibConfig = {
 	time: TimeState
 }
 
-export class MainStandardLib extends NullPrototype implements MainThreadUtilityLibrary {
+export class MainStandardLib extends NullPrototype implements MainThreadStandardLibrary {
 	readonly thread: ThreadUtilityLibrary
 	readonly css: CssUtilityLibrary
 	readonly dom: DomUtilityLibrary
 	readonly time: TimeUtilityLibrary
+	readonly cast = cast
+	readonly type = type
     
 	constructor(config: StandardLibConfig) {
 		super()

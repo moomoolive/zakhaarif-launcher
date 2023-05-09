@@ -1,5 +1,6 @@
 import {MainScriptArguments} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
+import {initEngine} from "./lib/mainThreadEngine/index"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -33,7 +34,7 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 	
-	const engine = await MainEngine.init({
+	const engine = await initEngine({
 		rootCanvas,
 		threadedMode: false,
 		rootElement

@@ -10,7 +10,6 @@ import {
 	pointerViewI32SoaName,
 	pointerViewF32SoaName,
 	PointerViewSoaInstance,
-    
 } from "./componentObject"
 
 export type PointerViewFactory = { new(): PointerViewInstance }
