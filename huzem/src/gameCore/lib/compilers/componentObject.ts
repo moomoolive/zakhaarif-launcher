@@ -56,7 +56,9 @@ export function generateComponentObjectTokens(
 	for (let i = 0; i < components.length; i++) {
 		const component = components[i]
 		const {name, definition} = component
-		const defKeys = Object.keys(definition).sort()
+		const defKeys = Object.keys(definition)
+			.filter((key) => isAllowKey(key))
+			.sort()
 		const [type] = Object.values(definition)
 		const layout: Record<string, number> = {}
 		const fieldOffsetMap: Record<string, number> = {}
@@ -107,9 +109,23 @@ export function generateComponentObjectTokens(
 	}
 }
 
+export function isAllowKey(key: string): boolean {
+	if (key.includes("$")) {
+		return false
+	}
+	switch (key) {
+	case pointerViewToObjectMethod:
+	case pointerViewIndexMethod:
+		return false
+	default:
+		return true
+	}
+}
 
 export const layoutMapName = "LayoutMap"
 export const layoutMapRegistryName = "layoutMapRegistryArray"
+// by default the layout of pointer views are
+// "Aos" array of struct views
 export const pointerViewI32Name = "PointerViewI32"
 export const pointerViewF32Name = "PointerViewF32"
 // "Soa" stands for "struct of arrays"
@@ -125,8 +141,10 @@ const pointerViewOffsetProp = "o$"
 const pointerViewLayoutMapProp = "l$"
 const pointerViewSizeofMethod = "sizeof$"
 const pointerViewIndexMethod = "index"
+const pointerViewToObjectMethod = "toObject"
 const pointerViewPtrGetterSetterProp = "ptr$"
 const pointerViewPtrComputedPtrProp = "computedPtr$"
+const pointerViewlayoutIdMethod = "layoutId$"
 export const pointerViewProperties = [
 	pointerViewPointerProp, 
 	pointerViewOffsetProp, 
@@ -134,7 +152,9 @@ export const pointerViewProperties = [
 	pointerViewSizeofMethod,
 	pointerViewIndexMethod,
 	pointerViewPtrGetterSetterProp,
-	pointerViewPtrComputedPtrProp
+	pointerViewPtrComputedPtrProp,
+	pointerViewToObjectMethod,
+	pointerViewlayoutIdMethod
 ] as const
 export type PointerViewInstance = {
 	/** stands for pointer (a u32) */
@@ -150,8 +170,11 @@ export type PointerViewInstance = {
 	[pointerViewPtrGetterSetterProp]: strict_u32
 	[pointerViewPtrComputedPtrProp]: strict_u32
 
-	[pointerViewIndexMethod](index: number): PointerViewInstance
-	[pointerViewSizeofMethod](): number
+	// methods
+	[pointerViewIndexMethod]: (index: number) => PointerViewInstance
+	[pointerViewSizeofMethod]: () => number
+	[pointerViewToObjectMethod]: () => object
+	[pointerViewlayoutIdMethod]: () => number
 }
 declare const layout: unique symbol
 export type PointerViewSoaInstance = (
@@ -203,7 +226,10 @@ export function generateComponentObjectCode$(
 	const baseLayoutName =  layoutMapRefName(0)
 	const componentObjectContext = `(${heapVarName}) => {
         class ${layoutMapName} {
-            constructor({${standardPropDestructure}${fieldPropDestructure}}={}) {
+            constructor({
+				${standardPropDestructure}
+				${fieldPropDestructure}
+			}={}) {
                 ${layoutMapProperties.reduce((total, next) => `${total}this.${next}=${next};`, "")}
 				${allFields.reduce((total, _, index) => `${total}this.${fieldName(index)}=${fieldName(index)};`, "")}
             }
@@ -260,8 +286,9 @@ function createPointerViewClass(
 	const [
 		pointerProp, offsetProp, layoutProp
 	] = pointerViewProperties
-	const [sizeofProp] = layoutMapProperties
+	const [sizeofProp, layoutMapIdProp] = layoutMapProperties
 	const getSizeOf = `this.${layoutProp}.${sizeofProp}`
+	const getLayoutMapId = `this.${layoutProp}.${layoutMapIdProp}`
 	const castToI32 = "|0"
 	const castToU32 = ">>>0"
 	const bytesPer32Bits = 4
@@ -276,14 +303,23 @@ function createPointerViewClass(
 		const setter = `set "${accessorName}"(${newValueToken}) {${heapVarTokenName}.${targetHeapView}[${targetAddress}]=${newValueToken}}`
 		return `${total}${getter}; ${setter};\n`
 	}, "")
+	const toObjectMethodSwitch = meta.reduce((switchToken, nextMeta) => {
+		const objectKeys = Object.keys(nextMeta.layout)
+		const objectReperesentation = objectKeys.reduce((object, nextKey) => {
+			return `${object}"${nextKey}":this["${nextKey}"],`
+		}, "")
+		return `${switchToken}case ${nextMeta.classId}:{return {${objectReperesentation}}};`
+	}, "")
 	return `
 	class ${className} {
 		constructor() {this.${pointerProp}=0;this.${offsetProp}=0;this.${layoutProp}=${baseLayoutTokenName}}
 
 		${propertyGettersSetters}
 		
-		${meta.reduce((total, {name, classId}) => `${total}get "${name}"() {this.${layoutProp}=${layoutMapRefName(classId)};return this}`, "")}
+		${meta.reduce((total, {name, classId, duplicateRef}) => `${total}get "${name}"() {this.${layoutProp}=${layoutMapRefName(duplicateRef === NO_DUPLICATE_REF ? classId : duplicateRef)};return this}`, "")}
 
+		${pointerViewlayoutIdMethod}() {return ${getLayoutMapId}}
+		${pointerViewToObjectMethod}() {switch(${getLayoutMapId}){${toObjectMethodSwitch}default:{throw new Error("object layout doesn't exist")};}}
 		${pointerViewSizeofMethod}() {return ${getSizeOf}*${bytesPer32Bits}}
 		${pointerViewIndexMethod}(idx) {this.${offsetProp}=${memoryLayout === "aos" ? `(idx${castToI32})*${getSizeOf}` : `(idx${castToI32})`};return this}
 		get ${pointerViewPtrGetterSetterProp}() {return this.${pointerProp}*${bytesPer32Bits}}

@@ -22,7 +22,7 @@ const randomComponent = (): ComponentToken => {
     const definition: Def  = {}
     const len = faker.datatype.number({min: 1, max: 9})
     for (let i = 0; i < len; i++) {
-        definition[faker.word.noun()] = type
+        definition[`_${faker.word.noun()}`] = type
     }
     return {
         name: `randomPkg_${faker.word.noun()}`,
@@ -292,6 +292,38 @@ describe("generating class object code", () => {
             }
         }
     })
+
+    it("to object method should return a js object repersentation of component", () => {
+        for (let i = 0; i < TEST_COUNT; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+                context.PointerViewSoaI32,
+                context.PointerViewSoaF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const m of tokens.meta) {
+                    const {name, layout} = m
+                    const comp = instance[name as keyof typeof instance]
+                    expect(comp).toBe(instance)
+                    const obj = instance.toObject()
+                    expect(obj).toBeTypeOf("object")
+                    for (const fieldName of Object.keys(layout)) {
+                        const value = obj[fieldName as keyof typeof obj]
+                        expect(value).toBeTypeOf("number")
+                    }
+                }
+            }
+        }
+    })
 })
 
 describe("pointer view array-of-struct layouts", () => {
@@ -397,6 +429,7 @@ describe("pointer view array-of-struct layouts", () => {
             const test = randomSetOfComponents()
             const tokens = generateComponentObjectTokens(test)
             const code = generateComponentObjectCode$(tokens)
+            
             const context = hydrateComponentObjectContext(
                 code.componentObjectContext, heap
             )
@@ -444,5 +477,35 @@ describe("pointer view array-of-struct layouts", () => {
                 }
             }
         }
+    })
+})
+
+describe("layout merging", () => {
+    const i32buf = new Int32Array(300)
+    const heap: JsHeapRef = {
+        i32: i32buf,
+        u32: new Uint32Array(i32buf.buffer),
+        f32: new Float32Array(i32buf.buffer),
+        f64: new Float64Array(i32buf.buffer),
+        v: new DataView(i32buf.buffer)
+    }
+    
+    it("components that have the same fields should point to the same class layout", () => {
+        const test: ComponentToken[] = [
+            {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}},
+            {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}},
+        ]
+        const tokens = generateComponentObjectTokens(test)
+        const code = generateComponentObjectCode$(tokens)
+        const context = hydrateComponentObjectContext(
+            code.componentObjectContext, heap
+        )
+        const instance1 = new context.PointerViewI32()
+        const comp = instance1[test[0].name as keyof typeof instance1]
+        expect(comp).toBe(instance1)
+        const instance2 = new context.PointerViewI32()
+        const comp2 = instance2[test[1].name as keyof typeof instance2]
+        expect(comp2).toBe(instance2)
+        expect(instance1.layoutId$()).toBe(instance2.layoutId$())
     })
 })
