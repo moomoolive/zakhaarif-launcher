@@ -1,13 +1,33 @@
-import {MainThreadEngine, MainThreadEngineCore, ModMetadata} from "zakhaarif-dev-tools"
-import type {ModLinkInfo} from "./core"
+import {
+	ArchetypeAccessor,
+	MainThreadEngine, 
+	MainThreadEngineCore, 
+	ModMetadata,
+	QueryAccessor
+} from "zakhaarif-dev-tools"
+import type {ModLinkInfo, CompiledMods} from "./core"
 import {ENGINE_CODES} from "./status"
 import {validateMod} from "./validateMod"
+import {nullObject} from "../utils/nullProto"
+import {CompiledMod} from "../mods/compiledMod"
 
 export class ModLinkStatus {
-	errors: {msg: string, status: number, statusText: string}[] = []
-	warnings: {msg: string, status: number, statusText: string}[] = []
-	ok = true
-	linkCount = 0
+	errors: {msg: string, status: number, statusText: string}[]
+	warnings: {msg: string, status: number, statusText: string}[]
+	ok: boolean
+	linkCount: number
+
+	constructor({
+		linkCount = 0,
+		ok = true,
+		warnings = [],
+		errors = []
+	}: Partial<ModLinkStatus> = {}) {
+		this.linkCount = linkCount
+		this.ok = ok
+		this.warnings = warnings
+		this.errors = errors
+	}
 }
 
 export type ModLinkStatusWithPayload<T = unknown> = {
@@ -16,7 +36,8 @@ export type ModLinkStatusWithPayload<T = unknown> = {
 }
 
 export const lifecycle = {
-	typeCheck, init, jsStateInit, beforeGameloop
+	typeCheck, init, jsStateInit, beforeGameloop, 
+	compileMeta, compileMods, nativeStateInit
 } as const
 
 function typeCheck(mods: ModLinkInfo[]): ModLinkStatus {
@@ -138,6 +159,79 @@ async function beforeGameloop(
 		}
 	}
 	return response
+}
+
+function compileMeta(mods: ModLinkInfo[]): ModMetadata[] {
+	const metas = []
+	let idCounter = 0
+	for (let i = 0; i < mods.length; i++) {
+		const {wrapper, resolvedUrl, canonicalUrl} = mods[i]
+		const {data} = wrapper
+		const meta: ModMetadata = {
+			name: data.name,
+			canonicalUrl,
+			resolvedUrl,
+			dependencies: data.dependencies || [],
+			id: idCounter++
+		}
+		metas.push(meta)
+	}
+	return metas
+}
+
+type NativeState = {
+	staticStates: object[]
+	archetypes: Record<string, ArchetypeAccessor>[]
+	queries: Record<string, QueryAccessor>[]
+}
+
+function nativeStateInit(
+	mods: ModLinkInfo[],
+	_metas: ModMetadata[]
+): NativeState {
+	const state: NativeState = {
+		staticStates: [],
+		archetypes: [],
+		queries: []
+	}
+	for (let i = 0; i < mods.length; i++) {
+		const _mod = mods[i]
+		state.staticStates.push({})
+		state.archetypes.push({})
+		state.queries.push({})
+	}
+	return state
+}
+
+
+function compileMods(
+	mods: ModLinkInfo[], 
+	states: object[],
+	metas: ModMetadata[],
+	nativeState: NativeState
+): CompiledMods {
+	const modIndex = nullObject<CompiledMods>()
+	for (let i = 0; i < mods.length; i++) {
+		const mod = mods[i]
+		const {wrapper} = mod
+		const compiledMod = new CompiledMod({
+			state: states[i],
+			meta: metas[i],
+			resources: (wrapper.data.resources || {}) as Record<string, string>,
+			queries: nativeState.queries[i],
+			// TODO: classes? should this even be accessable
+			componentClasses: {},
+			archetypes: nativeState.archetypes[i]
+		})
+		
+		Object.defineProperty(modIndex, wrapper.data.name, {
+			configurable: true,
+			enumerable: true,
+			writable: false,
+			value: compiledMod
+		})
+	}
+	return modIndex
 }
 
 // component object create

@@ -6,7 +6,6 @@ import type {
 	ModConsoleCommand,
 	MainThreadEngine,
 	LinkableMod,
-	ModMetadata,
 	ComponentClass,
 	ComponentMetadata,
 	ConsoleCommandManager,
@@ -45,7 +44,7 @@ export type TimeState = {
 	elapsedTime: number
 }
 
-type CompiledMods = {
+export type CompiledMods = {
 	readonly [key: string]: CompiledMod
 }
 
@@ -127,23 +126,12 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			return typecheck
 		}
 
-		// compile metadata for all mods
-		const modMetas: ModMetadata[] = []
 		for (let i = 0; i < mods.length; i++) {
 			const mod = mods[i]
-			const {wrapper, resolvedUrl, canonicalUrl, semver} = mod
-			this.meta.modVersionIndex.set(wrapper.data.name, semver)
-			const {data} = wrapper
-			const id = this.modIdCounter++
-			const meta: ModMetadata = {
-				name: data.name,
-				canonicalUrl,
-				resolvedUrl,
-				dependencies: data.dependencies || [],
-				id 
-			}
-			modMetas.push(meta)
+			this.meta.modVersionIndex.set(mod.wrapper.data.name, mod.semver)
 		}
+
+		const modMetas = lifecycle.compileMeta(mods)
 
 		const init = await lifecycle.init(mods, modMetas, this)
 		if (!init.ok) {
@@ -156,42 +144,17 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		}
 		const {data: jsStates} = jsState
 		
-		const modsCompiled = nullObject<CompiledMods>()
-		for (let m = 0; m < mods.length; m++) {
-			const mod = mods[m]
-			const {wrapper} = mod
-			const meta = modMetas[m]
-			const modState = jsStates[m]
+		// should this come before "jsState"?
+		const nativeState = lifecycle.nativeStateInit(mods, modMetas)
 
-			const compiled = new CompiledMod({
-				state: modState,
-				meta,
-				resources: (wrapper.data.resources || {}) as Record<string, string>,
-				// TODO: queries
-				queries: {},
-				// TODO: classes? should this even be accessable
-				componentClasses: {},
-				// TODO: archetypes
-				archetypes: {}
-			})
-            
-			Object.defineProperty(modsCompiled, wrapper.data.name, {
-				configurable: true,
-				enumerable: true,
-				writable: false,
-				value: compiled
-			})
-		}
-		this.mods = modsCompiled
+		this.mods = lifecycle.compileMods(mods, jsStates, modMetas, nativeState)
 
 		const beforeloop = await lifecycle.beforeGameloop(mods, this)
 		if (!beforeloop.ok) {
 			return beforeloop
 		}
 
-		const okLinkStatus = new ModLinkStatus()
-		okLinkStatus.linkCount = mods.length
-		return okLinkStatus
+		return new ModLinkStatus({ok: true, linkCount: mods.length})
 	}
 }
 
