@@ -79,9 +79,6 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	std: MainThreadStandardLibrary
 	devConsole: ConsoleCommands
 
-	private modIdCounter = 0
-	private componentIdCounter = 0
-
 	/** Dom related stuff, will be null if running in Node (or Deno) */
 	private domState: DomState
 	private timeState: TimeState
@@ -144,10 +141,9 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		}
 		const {data: jsStates} = jsState
 		
-		// should this come before "jsState"?
-		const nativeState = lifecycle.nativeStateInit(mods, modMetas)
+		const stateRef = lifecycle.nativeStateInit(mods, modMetas, jsStates)
 
-		this.mods = lifecycle.compileMods(mods, jsStates, modMetas, nativeState)
+		this.mods = lifecycle.compileMods(mods, stateRef)
 
 		const beforeloop = await lifecycle.beforeGameloop(mods, this)
 		if (!beforeloop.ok) {

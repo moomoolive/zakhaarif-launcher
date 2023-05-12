@@ -266,6 +266,44 @@ describe("generating class object code", () => {
         }
     })
 
+    it("inputting a correct class id into 'toLayout$' method should set layout to relavent", () => {
+        for (let i = 0; i < TEST_COUNT; i++) {
+            const test = randomSetOfComponents()
+            const tokens = generateComponentObjectTokens(test)
+            const code = generateComponentObjectCode$(tokens)
+            const context = hydrateComponentObjectContext(
+                code.componentObjectContext, heap
+            )
+            const classes = [
+                context.PointerViewI32,
+                context.PointerViewF32,
+                context.PointerViewSoaI32,
+                context.PointerViewSoaF32,
+            ]
+            for (const cls of classes) {
+                const instance = new cls()
+                expect(instance).not.toBe(undefined)
+                for (const meta of tokens.meta) {
+                    const {classId} = meta
+                    const value = instance.toLayout$(classId)
+                    expect(value).toBe(instance)
+                    expect(instance.l$.layoutId$).toBe(classId)
+                }
+            }
+        }
+    })
+
+    it("inputting a incorrect class id into 'toLayout$' method should throw exception", () => {
+        const test = randomSetOfComponents()
+        const tokens = generateComponentObjectTokens(test)
+        const code = generateComponentObjectCode$(tokens)
+        const context = hydrateComponentObjectContext(
+            code.componentObjectContext, heap
+        )
+        const i = new context.PointerViewF32()
+        expect(() => i.toLayout$(10_000)).toThrow()
+    })
+
     it("generated component should have correct size (in blocks of 4 bytes)", () => {
         for (let i = 0; i < TEST_COUNT; i++) {
             const test = randomSetOfComponents()

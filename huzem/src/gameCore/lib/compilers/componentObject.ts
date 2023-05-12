@@ -148,6 +148,7 @@ const pointerViewToObjectMethod = "toObject"
 const pointerViewPtrGetterSetterProp = "ptr$"
 const pointerViewPtrComputedPtrProp = "computedPtr$"
 const pointerViewlayoutIdMethod = "layoutId$"
+const pointerViewToLayoutMethod = "toLayout$"
 export const pointerViewProperties = [
 	pointerViewPointerProp, 
 	pointerViewOffsetProp, 
@@ -157,7 +158,8 @@ export const pointerViewProperties = [
 	pointerViewPtrGetterSetterProp,
 	pointerViewPtrComputedPtrProp,
 	pointerViewToObjectMethod,
-	pointerViewlayoutIdMethod
+	pointerViewlayoutIdMethod,
+	pointerViewToLayoutMethod
 ] as const
 export type PointerViewInstance = {
 	/** stands for pointer (a u32) */
@@ -178,12 +180,11 @@ export type PointerViewInstance = {
 	[pointerViewSizeofMethod]: () => number
 	[pointerViewToObjectMethod]: () => object
 	[pointerViewlayoutIdMethod]: () => number
+	[pointerViewToLayoutMethod]: (layoutId: number) => PointerViewInstance
 }
 declare const layout: unique symbol
 export type PointerViewSoaInstance = (
-	PointerViewInstance & {
-		[layout]: "soa"
-	} 
+	PointerViewInstance & { [layout]: "soa" } 
 )
 
 type LayoutMapRefName<T extends number> = `layoutMapRef${T}`
@@ -318,6 +319,12 @@ function createPointerViewClass(
 		}, "")
 		return `${switchToken}case ${nextMeta.classId}:{return {${objectReperesentation}}};`
 	}, "")
+	const toLayoutMethod = meta.reduce((switchToken, nextMeta) => {
+		if (nextMeta.duplicateRef !== NO_DUPLICATE_REF) {
+			return switchToken
+		}
+		return `${switchToken}case ${nextMeta.classId}:{return this["${nextMeta.name}"]};`
+	}, "")
 	return `
 	class ${className} {
 		constructor() {this.${pointerProp}=0;this.${offsetProp}=0;this.${layoutProp}=${baseLayoutTokenName}}
@@ -332,8 +339,8 @@ function createPointerViewClass(
 		${pointerViewIndexMethod}(idx) {this.${offsetProp}=${memoryLayout === "aos" ? `(idx${castToI32})*${getSizeOf}` : `(idx${castToI32})`};return this}
 		get ${pointerViewPtrGetterSetterProp}() {return this.${pointerProp}*${bytesPer32Bits}}
 		set ${pointerViewPtrGetterSetterProp}(ptr){this.${pointerProp}=((ptr/${bytesPer32Bits})${castToU32})}
-
 		get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerProp}+this.${offsetProp})*${bytesPer32Bits}}
+		${pointerViewToLayoutMethod}(id) {switch(id){${toLayoutMethod}default:{throw new Error(\`layout map id \${id} doesn't exist. Is inputted id valid?\`)};}}
 	}
 	`.trim()
 }

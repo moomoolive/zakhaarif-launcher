@@ -76,7 +76,7 @@ export const mod = initMod({
 		console.info("IMPORT META", import.meta.url)
 		DebugLayer.InspectorURL = new URL(
 			"/debug/babylonjs-inspector.js", 
-			zakhaarifStd.useMetadata().resolvedUrl
+			zakhaarifStd.meta.resolvedUrl
 		).href
 
 		window.addEventListener("keydown", (e) => {

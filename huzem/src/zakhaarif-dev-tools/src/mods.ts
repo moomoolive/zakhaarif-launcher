@@ -321,16 +321,11 @@ export interface ModAccessor<
     useMutState: () => TLocalIndex["state"]
     useState: () => DeepReadonly<TLocalIndex["state"]>
     useQuery: () => TLocalIndex["queries"] 
-    useMetadata: () => ModMetadata,
-    useResource: () => TLocalIndex["resources"],
-    useComponent: () => ({
-        readonly [key in keyof TLocalIndex["components"]]: (
-            ComponentClass<
-                key & string,
-                TLocalIndex["components"][key]
-            >
-        )
-    })
+    readonly meta: ModMetadata
+    readonly comps: {
+        readonly [key in keyof TLocalIndex["components"]]: number
+    }
+    useResource: () => TLocalIndex["resources"]
     useArchetype: () => ({
         readonly [key in keyof TLocalIndex["archetypes"]]: (
             ArchetypeAccessor<

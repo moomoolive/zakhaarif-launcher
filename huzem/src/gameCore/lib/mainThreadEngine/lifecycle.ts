@@ -179,49 +179,73 @@ function compileMeta(mods: ModLinkInfo[]): ModMetadata[] {
 	return metas
 }
 
-type NativeState = {
+const idMeta = {
+	value: 0,
+	enumerable: true,
+	configurable: true,
+	writable: false
+}
+
+type StateRefs = {
 	staticStates: object[]
 	archetypes: Record<string, ArchetypeAccessor>[]
 	queries: Record<string, QueryAccessor>[]
+	componentIds: Record<string, number>[]
+	metadatas: ModMetadata[]
+	jsStates: object[]
+	componentCount: number
 }
 
 function nativeStateInit(
 	mods: ModLinkInfo[],
-	_metas: ModMetadata[]
-): NativeState {
-	const state: NativeState = {
+	metas: ModMetadata[],
+	jsStates: object[]
+): StateRefs {
+	const state: StateRefs = {
 		staticStates: [],
 		archetypes: [],
-		queries: []
+		queries: [],
+		componentIds: [],
+		metadatas: metas,
+		jsStates,
+		componentCount: 0
 	}
+	let id = 0
 	for (let i = 0; i < mods.length; i++) {
-		const _mod = mods[i]
+		const mod = mods[i]
+		const components = mod.wrapper.data.components || {}
+		const keys = Object.keys(components)
+		const componentRefs: Record<string, number> = {}
+		for (let f = 0; f < keys.length; f++) {
+			const name = keys[f]
+			idMeta.value = id++
+			Object.defineProperty(componentRefs, name, idMeta)
+		}
+		state.componentIds.push(componentRefs)
 		state.staticStates.push({})
 		state.archetypes.push({})
 		state.queries.push({})
 	}
+	state.componentCount = id
 	return state
 }
 
 
 function compileMods(
 	mods: ModLinkInfo[], 
-	states: object[],
-	metas: ModMetadata[],
-	nativeState: NativeState
+	stateRef: StateRefs
 ): CompiledMods {
 	const modIndex = nullObject<CompiledMods>()
 	for (let i = 0; i < mods.length; i++) {
 		const mod = mods[i]
 		const {wrapper} = mod
 		const compiledMod = new CompiledMod({
-			state: states[i],
-			meta: metas[i],
+			state: stateRef.jsStates[i],
+			meta: stateRef.metadatas[i],
 			resources: (wrapper.data.resources || {}) as Record<string, string>,
-			queries: nativeState.queries[i],
-			// TODO: classes? should this even be accessable
-			componentClasses: {},
-			archetypes: nativeState.archetypes[i]
+			queries: stateRef.queries[i],
+			archetypes: stateRef.archetypes[i],
+			componentIds: stateRef.componentIds[i]
 		})
 		
 		Object.defineProperty(modIndex, wrapper.data.name, {
