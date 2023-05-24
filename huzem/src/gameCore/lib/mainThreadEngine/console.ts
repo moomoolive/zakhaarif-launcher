@@ -1,5 +1,8 @@
 import type {
+	ConsoleCommandIndex,
 	ConsoleCommandInputDeclaration,
+	MainThreadEngine,
+	ModConsoleCommand,
 	ParsedConsoleCommandInput,
 } from "zakhaarif-dev-tools"
 
@@ -94,4 +97,42 @@ export function validateCommandInput<
 	}
 
 	return ""
+}
+
+export type CommandArgs<T> = T extends ConsoleCommandInputDeclaration
+	? T
+	: never
+
+export function createCommand<T extends ConsoleCommandInputDeclaration>(
+	engine: MainThreadEngine,
+	index: ConsoleCommandIndex,
+	command: ModConsoleCommand<MainThreadEngine, T>
+) {
+	Object.defineProperty(command.fn, "name", {
+		value: command.name,
+		enumerable: true,
+		configurable: true,
+		writable: false
+	})
+	
+	Object.defineProperty(index, command.name, {
+		value: (input: Record<string, string | boolean | number | undefined> = {}) => {
+			if (typeof input === "object" && input !== null && input.args) {
+				console.info(`[${command.name}] arguments`, command.args)
+				return "ok"
+			}
+			const validateResponse = validateCommandInput(command.args || {}, input, command.name)
+			if (validateResponse.length > 0) {
+				console.error(validateResponse)
+				return "error"
+			} 
+			return command.fn(
+				engine, 
+				input as ParsedConsoleCommandInput<NonNullable<typeof command.args>>
+			)  || "ok"
+		},
+		enumerable: true,
+		configurable: true,
+		writable: false
+	})
 }

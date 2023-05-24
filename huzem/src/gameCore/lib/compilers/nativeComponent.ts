@@ -1,12 +1,40 @@
 import type {
 	ComponentDefinition,
 	JsHeapRef,
-	//strict_u32, 
-	//strict_i32,
 } from "zakhaarif-dev-tools"
 
 const RESERVED_LAYOUT_IDS = 1
 const BYTES_PER_32BITS = 4
+
+export interface BaseNativeViewer<Self extends object> {
+	p$: number
+	l$: LayoutMap
+	
+	index(i: number): this
+	toObject(): object
+	layoutId$(): number
+	sizeof$(): number
+	toLayout$(classId: number): this
+	ptr$(): number
+	cloneRef$(): Self
+	mut$(): this
+	ref$(): this
+	move$(): this
+}
+
+// default layout is "Aos", which stands for struct of arrays. 
+// Read more here: https://en.wikipedia.org/wiki/AoS_and_SoA
+export interface NativeViewer extends BaseNativeViewer<NativeViewer> {
+	o$: number
+}
+export type NativeViewerFactory = { new(): NativeViewer }
+
+// "Soa" stands for struct of arrays. 
+// Read more here: https://en.wikipedia.org/wiki/AoS_and_SoA
+export interface NativeViewerSoa extends BaseNativeViewer<NativeViewerSoa> {
+	o$: { v: number }
+}
+export type NativeViewerSoaFactory = { new(): NativeViewerSoa }
 
 export type LayoutMap = {
 	size$: number
@@ -21,7 +49,7 @@ type LayoutMeta = {
 }
 
 type NativeComponentMeta = {
-    componentId: number
+    classId: number
     layoutId: number
     name: string,
     fields: string[]
@@ -29,8 +57,21 @@ type NativeComponentMeta = {
     sizeof: number
 }
 
+export type GeneratedNativeComponents = {
+	layoutMap: { 
+		readonly new: () => LayoutMap, 
+		readonly registry: readonly LayoutMap[] 
+	}
+    componentLayoutRegistry: Map<number, number>
+    PointerViewI32: NativeViewerFactory
+    PointerViewF32: NativeViewerFactory
+    PointerViewSoaI32: NativeViewerSoaFactory
+    PointerViewSoaF32: NativeViewerSoaFactory
+	views: readonly (NativeViewerSoaFactory | NativeViewerFactory)[]
+}
+
 export type ComponentRegisterMeta = Readonly<{
-	componentId: number
+	classId: number
     name: string,
     definition: ComponentDefinition
 }>
@@ -38,22 +79,20 @@ export type ComponentRegisterMeta = Readonly<{
 export function nativeComponentFactory(
 	components: ComponentRegisterMeta[],
 	jsHeap: JsHeapRef
-) {
-	const defaultLayoutProps: (keyof LayoutMap)[] = [
-		"layoutId$", "size$"
-	]
-	const uniqueFieldNames = new Set<string>(defaultLayoutProps)
+): GeneratedNativeComponents {
+	const uniqueFieldNames = new Set<string>()
 	const componentMeta: NativeComponentMeta[] = []
 	const layouts: LayoutMeta[] = []
 	const layoutHashes = new Map<string, number>()
 	const componentLayoutRegistry = new Map<number, number>()
+	type LayoutRecord = { fields: string[] }
+	const layoutComponentRecord = new Map<number, LayoutRecord>()
 	for (const component of components) {
-		const {definition, componentId, name} = component
-		const fields = Object.keys(definition).sort()
+		const {definition, classId, name} = component
+		const fields = orderKeys(component)
         
 		let componentHash = ""
 		for (const field of fields) {
-			// components can't have field names with a "$"
 			if (field.includes("$")) {
 				continue
 			}
@@ -72,19 +111,20 @@ export function nativeComponentFactory(
 		const sizeof = fields.length
 		if (!layoutHashes.has(componentHash)) {
 			layouts.push({fields, id: layoutId, sizeof})
+			layoutComponentRecord.set(layoutId, {fields})
+			layoutHashes.set(componentHash, layoutId)
 		} else {
 			layoutId = layoutHashes.get(componentHash) || 0
 		}
-		componentLayoutRegistry.set(componentId, layoutId)
+		componentLayoutRegistry.set(classId, layoutId)
 		componentMeta.push({
-			fields, name, layoutId, sizeof, componentId
+			fields, name, layoutId, sizeof, classId
 		})
 	}
 
 	const uniqueFieldList = [...uniqueFieldNames].sort()
 	const baseLayout: LayoutMap = {size$: 0, layoutId$: 0}
-	for (let i = 0; i < uniqueFieldList.length; i++) {
-		const unique = uniqueFieldList[i]
+	for (const unique of uniqueFieldList) {
 		Object.defineProperty(baseLayout, unique, {
 			value: 0,
 			enumerable: true,
@@ -113,53 +153,172 @@ export function nativeComponentFactory(
 		layoutRegistry.push(layout)
 	}
 
-	class PointerViewI32 {
-		p$ = 0
-		o$ = 0
-		l$ = baseLayout
+	const viewVariants: (keyof typeof jsHeap)[] = ["i32", "f32"]
+	// "aos" stands for "array of structs"
+	const aosClasses: NativeViewerFactory[] = []
+	for (const variant of viewVariants) {
+		let objectSwitch: (obj: NativeViewer, layoutId: number) => object
+		{
+			const layoutRecord = layoutComponentRecord
+			let layoutSwitch = ""
+			const obj = "obj"
+			const layoutId = "layoutId"
+			for (const [key, {fields}] of layoutRecord) {
+				const jsObject = fields.reduce(
+					(total, next) => `${total}"${next}":${obj}["${next}"],`,
+					""
+				)
+				layoutSwitch += `case ${key}: return {${jsObject}};`
+			}
+			layoutSwitch += `default: {throw new Error(\`layout \${${layoutId}} doesn't exist\`)};`
+			
+			objectSwitch = Function(
+				`return (${obj},${layoutId}) => {switch(${layoutId}){${layoutSwitch}}}`
+			)()
+		}
 
-		index(i: number) {
-			this.o$ = (i >>> 0) * this.l$.size$
-			return this
+		class View implements NativeViewer {
+			p$ = 0
+			o$ = 0
+			l$ = baseLayout
+	
+			index(i: number) {
+				this.o$ = (i >>> 0) * this.l$.size$
+				return this
+			}
+			toLayout$(classId: number) {
+				this.l$ = layoutRegistry[componentLayoutRegistry.get(classId) || 0]
+				return this
+			}
+			cloneRef$() {
+				const ref = new View()
+				ref.p$ = this.p$; ref.o$ = this.o$; ref.l$ = this.l$
+				return ref
+			}
+			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
+			layoutId$() { return this.l$.layoutId$ }
+			sizeof$() { return this.l$.size$ * BYTES_PER_32BITS }
+			ptr$() { return this.p$ * BYTES_PER_32BITS }
+			mut$() { return this }
+			ref$() { return this }
+			move$() { return this }
 		}
-		toObject() {
-			return {}
-		}
-
-		// dollar-sign methods
-		layoutId$() { return this.l$.layoutId$ }
-		sizeof$() { return this.l$.size$ }
-		toLayout$(componentId: number) {
-			this.l$ = layoutRegistry[componentLayoutRegistry.get(componentId) || 0]
-			return this
-		}
-		ptr$() { return this.p$ * BYTES_PER_32BITS }
-		setPtr$(ptr: number) { this.p$ = (ptr / BYTES_PER_32BITS) >>> 0 }
-		cloneRef$() {
-			const ref = new PointerViewI32()
-			ref.p$ = this.p$; ref.o$ = this.o$; ref.l$ = this.l$
-			return ref
-		}
-		mut$() { return this }
-		ref$() { return this }
-		move$() { return this }
-	}
-
-	let heap: string
-	let computePtr: string
-	{
+		Object.defineProperty(View, "name", {
+			value: `PointerView${variant.toUpperCase()}`,
+			configurable: true,
+			enumerable: true
+		})
+	
 		const h = jsHeap
 		const [heapvar] = Object.keys({h})
-		heap = `${heapvar}.${<keyof typeof h>"i32"}`
-        type P = PointerViewI32
-        computePtr = `this.${<keyof P>"p$"}+this.${<keyof P>"o$"}+this.${<keyof P>"l$"}`
+		const heap = `${heapvar}.${variant}`
+		type K = keyof View
+		const ptrbase = `this.${<K>"p$"}+this.${<K>"o$"}+this.${<K>"l$"}`
+		const proto = View.prototype
+		for (const field of uniqueFieldList) {
+			type Accessors = { get: () => number, set: (v: number) => void }
+			const computePtr = `${ptrbase}["${field}"]`
+			const getSet: Accessors = Function(
+				heapvar, `return {
+				get() {return ${heap}[${computePtr}]},
+				set(v) {${heap}[${computePtr}] = v}
+			}`)(jsHeap)
+			
+			Object.defineProperty(proto, field, getSet)
+		}
+		aosClasses.push(View)
 	}
-	for (const field of uniqueFieldList) {
-        type Accessors = { get: () => number, set: (v: number) => void }
-        const getSet: Accessors = eval(`{
-            get() {return ${heap}[${computePtr}['${field}']]},
-            set(v) {${heap}[${computePtr}['${field}']] = v}
-        }`)
-        Object.defineProperty(PointerViewI32.prototype, field, getSet)
+
+	const soaClasses: NativeViewerSoaFactory[] = []
+	for (const variant of viewVariants) {
+		let objectSwitch: (obj: NativeViewerSoa, layoutId: number) => object
+		{
+			const layoutRecord = layoutComponentRecord
+			let layoutSwitch = ""
+			const obj = "obj"
+			const layoutId = "layoutId"
+			for (const [key, {fields}] of layoutRecord) {
+				const jsObject = fields.reduce(
+					(total, next) => `${total}"${next}":${obj}["${next}"],`,
+					""
+				)
+				layoutSwitch += `case ${key}: return {${jsObject}};`
+			}
+			layoutSwitch += `default: {throw new Error(\`layout \${${layoutId}} doesn't exist\`)};`
+			
+			objectSwitch = Function(
+				`return (${obj},${layoutId}) => {switch(${layoutId}){${layoutSwitch}}}`
+			)()
+		}
+
+		const defaultoffset = {v: 0}
+		class View implements NativeViewerSoa {
+			p$ = 0
+			o$ = defaultoffset
+			l$ = baseLayout
+	
+			index(i: number) {
+				this.o$.v = i >>> 0
+				return this
+			}
+			toLayout$(classId: number) {
+				this.l$ = layoutRegistry[componentLayoutRegistry.get(classId) || 0]
+				return this
+			}
+			cloneRef$() {
+				const ref = new View()
+				ref.p$ = this.p$; ref.o$ = {v: ref.o$.v}; ref.l$ = this.l$
+				return ref
+			}
+			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
+			layoutId$() { return this.l$.layoutId$ }
+			sizeof$() { return this.l$.size$ * BYTES_PER_32BITS }
+			ptr$() { return this.p$ * BYTES_PER_32BITS }
+			mut$() { return this }
+			ref$() { return this }
+			move$() { return this }
+		}
+		Object.defineProperty(View, "name", {
+			value: `PointerViewSoa${variant.toUpperCase()}`,
+			configurable: true,
+			enumerable: true
+		})
+	
+		const h = jsHeap
+		const [heapvar] = Object.keys({h})
+		const heap = `${heapvar}.${variant}`
+		const ptrview = `${heapvar}.${<keyof typeof h>"u32"}`
+		type K = keyof View
+		const ptrbase = `this.${<K>"p$"}+this.${<K>"l$"}`
+		const proto = View.prototype
+
+		for (const field of uniqueFieldList) {
+			type Accessors = { get: () => number, set: (v: number) => void }
+			const computePtr = `${ptrview}[${ptrbase}["${field}"]]+this.${<K>"o$"}.${<keyof View["o$"]>"v"}`
+			const getSet: Accessors = Function(
+				heapvar, `return {
+				get() {return ${heap}[${computePtr}]},
+				set(v) {${heap}[${computePtr}] = v}
+			}`)(jsHeap)
+			
+			Object.defineProperty(proto, field, getSet)
+		}
+		soaClasses.push(View)
+	}
+
+
+	return {
+		layoutMap: {
+			new: () => ({...baseLayout}),
+			registry: layoutRegistry
+		},
+		componentLayoutRegistry,
+		PointerViewI32: aosClasses[0],
+		PointerViewF32: aosClasses[1],
+		PointerViewSoaI32: soaClasses[0],
+		PointerViewSoaF32: soaClasses[1],
+		views: [...aosClasses, ...soaClasses,]
 	}
 }
+
+export const orderKeys = (meta: ComponentRegisterMeta) => Object.keys(meta.definition).sort()

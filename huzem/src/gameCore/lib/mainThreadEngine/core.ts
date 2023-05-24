@@ -2,7 +2,6 @@ import type {
 	Allocator,
 	ConsoleCommandIndex,
 	ConsoleCommandInputDeclaration,
-	ParsedConsoleCommandInput,
 	ModConsoleCommand,
 	MainThreadEngine,
 	LinkableMod,
@@ -12,7 +11,7 @@ import type {
 	MainThreadStandardLibrary,
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
-import {validateCommandInput} from "./console"
+import {createCommand} from "./console"
 import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
@@ -65,7 +64,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
 	
-	mods = nullObject<CompiledMods>()
+	mods = nullObject<{ readonly [key: string]: CompiledMod }>()
 	isRunning = false
 	gameLoopHandler = (_: number) => {}
 	archetypes = <Archetype[]>[]
@@ -80,6 +79,13 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			return this.componentIndex.get(componentName) || null
 		}
 	}
+	devConsole = (<T extends ConsoleCommandManager>(m: T) => m)({
+		index: nullObject<ConsoleCommandIndex>(),
+		engine: <MainEngine>this,
+		addCommand<T extends ConsoleCommandInputDeclaration>(
+			cmd: ModConsoleCommand<MainThreadEngine, T>
+		) { createCommand(this.engine, this.index, cmd) }
+	})
 
 	binary: {
 		coreInstance: WebAssembly.Instance
@@ -87,7 +93,6 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	}
 	wasmHeap: Allocator
 	std: MainThreadStandardLibrary
-	devConsole: ConsoleCommands
 
 	/** Dom related stuff, will be null if running in Node (or Deno) */
 	private domState: DomState
@@ -100,7 +105,6 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			config.wasmMemory, 
 			config.coreApis as AllocatorApis
 		)
-		this.devConsole = new ConsoleCommands(this)
 		this.domState = {
 			rootElement: config.rootElement, 
 			rootCanvas: config.rootCanvas
@@ -170,54 +174,5 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		}
 
 		return new ModLinkStatus({ok: true, linkCount: mods.length})
-	}
-}
-
-class ConsoleCommands extends NullPrototype implements ConsoleCommandManager {
-	index: ConsoleCommandIndex = nullObject()
-	private engineRef: MainThreadEngine
-	
-	constructor(engine: MainThreadEngine) {
-		super()
-		this.engineRef = engine
-	}
-
-	addCommand<Args extends ConsoleCommandInputDeclaration>(
-		command: ModConsoleCommand<MainThreadEngine, Args>
-	): void {
-		const {name, args, fn} = command
-		Object.defineProperty(fn, "name", {
-			value: name,
-			enumerable: true,
-			configurable: true,
-			writable: false
-		})
-		const self = this.engineRef
-		const commandArgs = args || {}
-		Object.defineProperty(this.index, name, {
-			value: (input: Record<string, string | boolean | number | undefined> = {}) => {
-				if (
-					typeof input === "object" 
-					&& input !== null
-					&& input.args
-				) {
-					console.info(`[${name}] arguments`, args)
-					return "ok"
-				}
-				const validateResponse = validateCommandInput(commandArgs, input, name)
-				if (validateResponse.length > 0) {
-					console.error(validateResponse)
-					return "error"
-				}
-				const response = fn(
-					self, 
-					input as ParsedConsoleCommandInput<NonNullable<typeof args>>
-				) 
-				return response || "ok"
-			},
-			enumerable: true,
-			configurable: true,
-			writable: false
-		})
 	}
 }
