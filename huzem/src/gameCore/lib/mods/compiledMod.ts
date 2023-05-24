@@ -32,23 +32,9 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 		this.comps = config.componentIds
 	}
 
-	useMutState() {
-		return this.state
-	}
-
-	useState() {
-		return this.state
-	}
-
-	useQuery() {
-		return this.queries
-	}
-
-	useResource() {
-		return this.resources
-	}
-
-	useArchetype() {
-		return this.archetypes
-	}
+	useMutState() { return this.state }
+	useState() { return this.state }
+	useQuery() { return this.queries }
+	useResource() { return this.resources }
+	useArchetype() { return this.archetypes }
 }

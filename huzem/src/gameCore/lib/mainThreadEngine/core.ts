@@ -15,11 +15,12 @@ import {CompiledMod} from "../mods/compiledMod"
 import {validateCommandInput} from "./console"
 import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
-//import {compileComponentClass} from "../mods/componentView"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
 import {ModLinkStatus, lifecycle} from "./lifecycle"
 import {ENGINE_CODES, EngineCode} from "./status"
 import {SystemManager} from "./systems"
+import {WasmCoreApis} from "../wasm/coreTypes"
+import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
 
 export type ModLinkInfo = {
 	wrapper: LinkableMod,
@@ -48,10 +49,15 @@ export type CompiledMods = {
 	readonly [key: string]: CompiledMod
 }
 
+type AllocatorApis = WasmCoreApis & WasmAllocatorConfig
+
 export type EngineConfig = {
     rootCanvas: HTMLCanvasElement | null
     rootElement: HTMLElement | null
-	wasmHeap: Allocator
+	coreApis: WasmCoreApis,
+	coreBinary: WebAssembly.Module
+	coreInstance: WebAssembly.Instance
+	wasmMemory: WebAssembly.Memory
 	threadedMode: boolean
 }
 
@@ -74,7 +80,11 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			return this.componentIndex.get(componentName) || null
 		}
 	}
-	
+
+	binary: {
+		coreInstance: WebAssembly.Instance
+		coreBinary: WebAssembly.Module
+	}
 	wasmHeap: Allocator
 	std: MainThreadStandardLibrary
 	devConsole: ConsoleCommands
@@ -86,11 +96,20 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 
 	constructor(config: EngineConfig) {
 		super()
-		const {wasmHeap, rootCanvas, rootElement} = config
-		this.wasmHeap = wasmHeap
+		this.wasmHeap = new WasmAllocator(
+			config.wasmMemory, 
+			config.coreApis as AllocatorApis
+		)
 		this.devConsole = new ConsoleCommands(this)
-		this.domState = {rootElement, rootCanvas}
+		this.domState = {
+			rootElement: config.rootElement, 
+			rootCanvas: config.rootCanvas
+		}
 		this.threadState = {activeOsThreads: 1}
+		this.binary = {
+			coreBinary: config.coreBinary,
+			coreInstance: config.coreInstance
+		}
 		this.timeState = {
 			originTime: 0.0,
 			previousFrame: 0.0,

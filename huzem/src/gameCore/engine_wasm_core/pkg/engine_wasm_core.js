@@ -1,68 +1,5 @@
 let wasm;
 
-const cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
-
-cachedTextDecoder.decode();
-
-let cachedUint8Memory0 = null;
-
-function getUint8Memory0() {
-    if (cachedUint8Memory0 === null || cachedUint8Memory0.byteLength === 0) {
-        cachedUint8Memory0 = new Uint8Array(wasm.memory.buffer);
-    }
-    return cachedUint8Memory0;
-}
-
-function getStringFromWasm0(ptr, len) {
-    return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
-}
-/**
-*/
-export function wasm_check() {
-    wasm.wasm_check();
-}
-
-/**
-* @param {number} size
-* @param {number} align
-* @returns {number}
-*/
-export function malloc(size, align) {
-    const ret = wasm.malloc(size, align);
-    return ret;
-}
-
-/**
-* @param {number} size
-* @param {number} align
-* @returns {number}
-*/
-export function calloc(size, align) {
-    const ret = wasm.calloc(size, align);
-    return ret;
-}
-
-/**
-* @param {number} ptr
-* @param {number} size
-* @param {number} align
-*/
-export function free(ptr, size, align) {
-    wasm.free(ptr, size, align);
-}
-
-/**
-* @param {number} ptr
-* @param {number} old_size
-* @param {number} old_align
-* @param {number} new_size
-* @returns {number}
-*/
-export function realloc(ptr, old_size, old_align, new_size) {
-    const ret = wasm.realloc(ptr, old_size, old_align, new_size);
-    return ret;
-}
-
 async function load(module, imports) {
     if (typeof Response === 'function' && module instanceof Response) {
         if (typeof WebAssembly.instantiateStreaming === 'function') {
@@ -97,30 +34,26 @@ async function load(module, imports) {
 function getImports() {
     const imports = {};
     imports.wbg = {};
-    imports.wbg.__wbg_info_f9adb6fefa4f0fb1 = function(arg0, arg1) {
-        console.info(getStringFromWasm0(arg0, arg1));
-    };
 
     return imports;
 }
 
 function initMemory(imports, maybe_memory) {
-
+    imports.wbg.memory = maybe_memory || new WebAssembly.Memory({initial:18,maximum:16384,shared:true});
 }
 
 function finalizeInit(instance, module) {
     wasm = instance.exports;
     init.__wbindgen_wasm_module = module;
-    cachedUint8Memory0 = null;
 
-
+    wasm.__wbindgen_start();
     return wasm;
 }
 
-function initSync(module) {
+function initSync(module, maybe_memory) {
     const imports = getImports();
 
-    initMemory(imports);
+    initMemory(imports, maybe_memory);
 
     if (!(module instanceof WebAssembly.Module)) {
         module = new WebAssembly.Module(module);
@@ -131,7 +64,7 @@ function initSync(module) {
     return finalizeInit(instance, module);
 }
 
-async function init(input) {
+async function init(input, maybe_memory) {
     if (typeof input === 'undefined') {
         input = new URL('engine_wasm_core_bg.wasm', import.meta.url);
     }
@@ -141,7 +74,7 @@ async function init(input) {
         input = fetch(input);
     }
 
-    initMemory(imports);
+    initMemory(imports, maybe_memory);
 
     const { instance, module } = await load(await input, imports);
 

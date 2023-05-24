@@ -1,6 +1,7 @@
 import {MainScriptArguments} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
-import {initEngine} from "./lib/mainThreadEngine/index"
+import {createWasmMemory, WasmCoreApis} from "./lib/wasm/coreTypes"
+import {wasmMap} from "../wasmBinaryPaths.mjs"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -34,11 +35,25 @@ export const main = async (args: MainScriptArguments) => {
 	rootCanvas.id = "root-canvas"
 	rootElement.appendChild(rootCanvas)
 	
-	const engine = await initEngine({
+	const wasmMemory = createWasmMemory()
+	const binaryUrl = new URL(
+		wasmMap.engine_wasm_core, import.meta.url
+	).href
+	const coreapisResponse = await WebAssembly.instantiateStreaming(
+		fetch(binaryUrl), {
+			wbg: {memory: wasmMemory}
+		}
+	)
+	const engine = new MainEngine({
 		rootCanvas,
 		threadedMode: false,
-		rootElement
+		rootElement,
+		wasmMemory,
+		coreBinary: coreapisResponse.module,
+		coreInstance: coreapisResponse.instance,
+		coreApis: coreapisResponse.instance.exports as WasmCoreApis
 	})
+
 	console.info("engine created")
 
 	const {std} = engine

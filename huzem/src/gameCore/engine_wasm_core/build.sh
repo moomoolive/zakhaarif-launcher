@@ -1,1 +1,0 @@
-wasm-pack build -t web --release && rm -f ./pkg/.gitignore ./pkg/package.json ./pkg/README.md

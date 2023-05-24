@@ -14,8 +14,7 @@ export type JsWasmHeapView = {
     v: DataView
 }
 
-export type WasmAllocatorConfig =  { 
-	memory: WebAssembly.Memory,
+export type WasmAllocatorConfig =  {
 	malloc: MallocAllocatorFn
 	calloc: CallocAllocatorFn
 	realloc: ReallocAllocatorFn
@@ -31,13 +30,13 @@ export class WasmAllocator implements Allocator {
 	
 	private wasmMemory: WebAssembly.Memory
 
-	constructor(config: WasmAllocatorConfig) {
-		this.wasmMemory = config.memory
+	constructor(memory: WebAssembly.Memory, config: WasmAllocatorConfig) {
+		this.wasmMemory = memory
 		this.unsafeMalloc = config.malloc
 		this.unsafeCalloc = config.calloc
 		this.unsafeFree = config.free
 		this.unsafeRealloc = config.realloc
-		const buffer = config.memory.buffer
+		const {buffer} = memory
 		this.jsHeapRef = {
 			i32: new Int32Array(buffer),
 			f32: new Float32Array(buffer),

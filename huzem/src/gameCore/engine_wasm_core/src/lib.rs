@@ -1,37 +1,26 @@
 use wasm_bindgen::prelude::*;
 use dlmalloc;
 use std::alloc::{GlobalAlloc, Layout};
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console, js_name = info)]
-    fn print(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn wasm_check() {
-    print("allocator is alive!")
-}
  
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator::new();
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn malloc(size: usize, align: usize) -> *mut u8 {
     ALLOCATOR.malloc(size, align)
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn calloc(size: usize, align: usize) -> *mut u8 {
     ALLOCATOR.calloc(size, align)
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn free(ptr: *mut u8, size: usize, align: usize) {
     ALLOCATOR.free(ptr, size, align)
 }
 
-#[wasm_bindgen]
+#[no_mangle]
 pub fn realloc(ptr: *mut u8, old_size: usize, old_align: usize, new_size: usize) -> *mut u8 {
     ALLOCATOR.realloc(ptr, old_size, old_align, new_size)
 }

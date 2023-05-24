@@ -16,7 +16,7 @@ import {
 import {faker} from "@faker-js/faker"
 import { JsHeapRef } from "zakhaarif-dev-tools"
 
-const randomComponent = (): ComponentRegisterMeta => {
+const randomComponent = (classId: number): ComponentRegisterMeta => {
     const type = Math.random() > 0.5 ? "f32" : "i32"
     type Def = Record<string, "f32"> | Record<string, "i32">
     const definition: Def  = {}
@@ -26,15 +26,16 @@ const randomComponent = (): ComponentRegisterMeta => {
     }
     return {
         name: `randomPkg_${faker.word.noun()}`,
-        definition
+        definition,
+        classId
     }
 }
 
 const randomSetOfComponents = (min = 1, max = 10) => {
     const test = []
     const len = faker.datatype.number({min, max})
-    for (let c = 0; c < len; c++) {
-        test.push(randomComponent())
+    for (let i = 0; i < len; i++) {
+        test.push(randomComponent(i))
     }
     return test
 }
@@ -89,8 +90,8 @@ describe("generating component object tokens", () => {
 
     it("duplicate field names should be filtered out of allFields", () => {
         const response = generateComponentObjectTokens([
-            {name: "rand", definition: {x: "i32"}},
-            {name: "rand2", definition: {x: "i32"}},
+            {name: "rand", definition: {x: "i32"}, classId: 0},
+            {name: "rand2", definition: {x: "i32"}, classId: 1},
         ])
         const xOccurence = response.allFields.reduce(
             (total, next) => total + (next === "x" ? 1 : 0),
@@ -101,15 +102,17 @@ describe("generating component object tokens", () => {
 })
 
 const TEST_COUNT = 10
+
+const i32buf = new Int32Array(300)
+const heap: JsHeapRef = {
+    i32: i32buf,
+    u32: new Uint32Array(i32buf.buffer),
+    f32: new Float32Array(i32buf.buffer),
+    f64: new Float64Array(i32buf.buffer),
+    v: new DataView(i32buf.buffer)
+}
+
 describe("generating class object code", () => {
-    const i32buf = new Int32Array(300)
-    const heap: JsHeapRef = {
-        i32: i32buf,
-        u32: new Uint32Array(i32buf.buffer),
-        f32: new Float32Array(i32buf.buffer),
-        f64: new Float64Array(i32buf.buffer),
-        v: new DataView(i32buf.buffer)
-    }
     it("all generated code should be valid javascript", () => {
         for (let i = 0; i < TEST_COUNT; i++) {
             const test = randomSetOfComponents()
@@ -257,10 +260,10 @@ describe("generating class object code", () => {
                 const instance = new cls()
                 expect(instance).not.toBe(undefined)
                 for (const meta of tokens.meta) {
-                    const {name, classId} = meta
+                    const {name, layoutId} = meta
                     const value = instance[name as keyof typeof instance]
                     expect(value).toBe(instance)
-                    expect(instance.l$.layoutId$).toBe(classId)
+                    expect(instance.l$.layoutId$).toBe(layoutId)
                 }
             }
         }
@@ -284,10 +287,10 @@ describe("generating class object code", () => {
                 const instance = new cls()
                 expect(instance).not.toBe(undefined)
                 for (const meta of tokens.meta) {
-                    const {classId} = meta
+                    const {layoutId, classId} = meta
                     const value = instance.toLayout$(classId)
                     expect(value).toBe(instance)
-                    expect(instance.l$.layoutId$).toBe(classId)
+                    expect(instance.l$.layoutId$).toBe(layoutId)
                 }
             }
         }
@@ -365,14 +368,6 @@ describe("generating class object code", () => {
 })
 
 describe("pointer view array-of-struct layouts", () => {
-    const i32buf = new Int32Array(300)
-    const heap: JsHeapRef = {
-        i32: i32buf,
-        u32: new Uint32Array(i32buf.buffer),
-        f32: new Float32Array(i32buf.buffer),
-        f64: new Float64Array(i32buf.buffer),
-        v: new DataView(i32buf.buffer)
-    }
     it("generated component index method should move pointer by index multiplied my sizeof", () => {
         for (let i = 0; i < TEST_COUNT; i++) {
             const test = randomSetOfComponents()
@@ -454,14 +449,6 @@ describe("pointer view array-of-struct layouts", () => {
 })
 
 describe("pointer view array-of-struct layouts", () => {
-    const i32buf = new Int32Array(300)
-    const heap: JsHeapRef = {
-        i32: i32buf,
-        u32: new Uint32Array(i32buf.buffer),
-        f32: new Float32Array(i32buf.buffer),
-        f64: new Float64Array(i32buf.buffer),
-        v: new DataView(i32buf.buffer)
-    }
     it("generated component view should mutate underlying buffer correctly", () => {
         for (let i = 0; i < TEST_COUNT; i++) {
             const test = randomSetOfComponents()
@@ -519,19 +506,10 @@ describe("pointer view array-of-struct layouts", () => {
 })
 
 describe("layout merging", () => {
-    const i32buf = new Int32Array(300)
-    const heap: JsHeapRef = {
-        i32: i32buf,
-        u32: new Uint32Array(i32buf.buffer),
-        f32: new Float32Array(i32buf.buffer),
-        f64: new Float64Array(i32buf.buffer),
-        v: new DataView(i32buf.buffer)
-    }
-    
     it("components that have the same fields should point to the same class layout", () => {
         const test: ComponentRegisterMeta[] = [
-            {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}},
-            {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}},
+            {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}, classId: 0},
+            {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}, classId: 1},
         ]
         const tokens = generateComponentObjectTokens(test)
         const code = generateComponentObjectCode$(tokens)
@@ -545,5 +523,27 @@ describe("layout merging", () => {
         const comp2 = instance2[test[1].name as keyof typeof instance2]
         expect(comp2).toBe(instance2)
         expect(instance1.layoutId$()).toBe(instance2.layoutId$())
+    })
+})
+
+describe("pointer view utilities", () => {
+    it("clone ref creates a shallow copy of pointer view", () => {
+        const tokens = generateComponentObjectTokens([
+            {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}, classId: 0},
+        ])
+        const code = generateComponentObjectCode$(tokens)
+        const context = hydrateComponentObjectContext(
+            code.componentObjectContext, heap
+        )
+        const ptr = new context.PointerViewSoaI32()
+        ptr.mut()
+        ptr.ref()
+        const clone = ptr.cloneRef()
+        // should point to same address, offset, and be of same
+        // layout type
+        expect(ptr.p$).toStrictEqual(clone.p$)
+        expect(ptr.o$).toStrictEqual(clone.o$)
+        expect(ptr.l$).toStrictEqual(clone.l$)
+        expect(ptr).toStrictEqual(clone)
     })
 })

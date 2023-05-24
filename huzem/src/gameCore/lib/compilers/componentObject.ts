@@ -6,6 +6,7 @@ import type {
 } from "zakhaarif-dev-tools"
 
 export type ComponentRegisterMeta = Readonly<{
+	classId: number
     name: string,
     definition: ComponentDefinition
 }>
@@ -34,9 +35,10 @@ export type ComponentObjectMeta = {
     type: string, 
     layout: Record<string, number>,
     fieldOffsetMap: Record<string, number>
-    classId: number
+    layoutId: number
 	maxComponentFields: number
 	duplicateRef: number
+	classId: number
 }
 
 export type ComponentObjectTokens = {
@@ -55,7 +57,7 @@ export function generateComponentObjectTokens(
 	let maxComponentFields = 0
 	for (let i = 0; i < components.length; i++) {
 		const component = components[i]
-		const {name, definition} = component
+		const {name, definition, classId} = component
 		const defKeys = Object.keys(definition)
 			.filter((key) => isAllowKey(key))
 			.sort()
@@ -70,18 +72,18 @@ export function generateComponentObjectTokens(
 			(total, next) => `${total}_${next}`,
 			`${type}_`
 		)
-		let classId = NO_DUPLICATE_REF
+		let layoutId = 0
 		let duplicateRef = NO_DUPLICATE_REF
 		if (duplicateMap.has(componentKey)) {
-			classId = duplicateMap.get(componentKey) || 0
-			duplicateRef = classId
+			layoutId = duplicateMap.get(componentKey) || 0
+			duplicateRef = layoutId
 		} else {
-			classId = STANDARD_CLASS_COUNT + componentCount++
-			duplicateMap.set(componentKey, classId)
+			layoutId = STANDARD_CLASS_COUNT + componentCount++
+			duplicateMap.set(componentKey, layoutId)
 		}
 		// a couple of class a reserved
 		//const classId = STANDARD_CLASS_COUNT + componentCount++
-		fieldOffsetMap[layoutMapProperties[1]] = classId
+		fieldOffsetMap[layoutMapProperties[1]] = layoutId
 		for (let f = 0; f < defKeys.length; f++) {
 			const key = defKeys[f]
 			const byteOffset = f
@@ -99,10 +101,11 @@ export function generateComponentObjectTokens(
 			name, 
 			type, 
 			layout, 
-			classId,
+			layoutId,
 			duplicateRef,
 			fieldOffsetMap,
-			maxComponentFields
+			maxComponentFields,
+			classId
 		})
 	}
 	return {
@@ -119,6 +122,10 @@ export function isAllowKey(key: string): boolean {
 	switch (key) {
 	case pointerViewToObjectMethod:
 	case pointerViewIndexMethod:
+	case pointerViewCloneRefMethod:
+	case pointerViewConstRefMethod:
+	case pointerViewMutRefMethod:
+	case pointerViewMoveRefMethod:
 		return false
 	default:
 		return true
@@ -145,6 +152,10 @@ const pointerViewLayoutMapProp = "l$"
 const pointerViewSizeofMethod = "sizeof$"
 const pointerViewIndexMethod = "index"
 const pointerViewToObjectMethod = "toObject"
+const pointerViewConstRefMethod = "ref"
+const pointerViewMutRefMethod = "mut"
+const pointerViewMoveRefMethod = "move"
+const pointerViewCloneRefMethod = "cloneRef"
 const pointerViewPtrGetterSetterProp = "ptr$"
 const pointerViewPtrComputedPtrProp = "computedPtr$"
 const pointerViewlayoutIdMethod = "layoutId$"
@@ -159,7 +170,11 @@ export const pointerViewProperties = [
 	pointerViewPtrComputedPtrProp,
 	pointerViewToObjectMethod,
 	pointerViewlayoutIdMethod,
-	pointerViewToLayoutMethod
+	pointerViewToLayoutMethod,
+	pointerViewCloneRefMethod,
+	pointerViewConstRefMethod,
+	pointerViewMutRefMethod,
+	pointerViewMoveRefMethod,
 ] as const
 export type PointerViewInstance = {
 	/** stands for pointer (a u32) */
@@ -181,6 +196,10 @@ export type PointerViewInstance = {
 	[pointerViewToObjectMethod]: () => object
 	[pointerViewlayoutIdMethod]: () => number
 	[pointerViewToLayoutMethod]: (layoutId: number) => PointerViewInstance
+	[pointerViewCloneRefMethod]: () => PointerViewInstance
+	[pointerViewConstRefMethod]: () => PointerViewInstance
+	[pointerViewMutRefMethod]: () => PointerViewInstance
+	[pointerViewMoveRefMethod]: () => PointerViewInstance
 }
 declare const layout: unique symbol
 export type PointerViewSoaInstance = (
@@ -195,6 +214,8 @@ declare const componentCtx: unique symbol
 type ContextString<T extends string> = string & {
 	[componentCtx]: T
 }
+
+const BASE_LAYOUT_NAME = layoutMapRefName(0)
 
 export type ComponentContextString = ContextString<"co_ctx">
 
@@ -222,12 +243,58 @@ export function generateComponentObjectCode$(
 		(total, _, index) => `${total}${fieldName(index)}=0,`,
 		""
 	)
+	const classSwitchMap = new Map<number, boolean>()
+	const toObjectMethodSwitch = meta.reduce((switchToken, nextMeta) => {
+		if (classSwitchMap.has(nextMeta.layoutId)) {
+			return switchToken
+		}
+		classSwitchMap.set(nextMeta.layoutId, true)
+		const objectKeys = Object.keys(nextMeta.layout)
+		const objectReperesentation = objectKeys.reduce((object, nextKey) => {
+			return `${object}"${nextKey}":this["${nextKey}"],`
+		}, "")
+		return `${switchToken}case ${nextMeta.layoutId}:{return {${objectReperesentation}}};`
+	}, "")
+	const pointerViewToObjectToken = `${pointerViewToObjectMethod}() {switch(${POINTER_VIEW_GET_LAYOUT_ID}){${toObjectMethodSwitch}default:{throw new Error("object layout doesn't exist")};}}`
+	type LayoutRef = number
+	type ClassList = { classes: number[], key: string, layout: number }
+	const layoutMapper = new Map<LayoutRef, ClassList>()
+	for (let i = 0; i < meta.length; i++) {
+		const nextMeta = meta[i]
+		const {layoutId, classId, name} = nextMeta
+		const entry = layoutMapper.get(layoutId)
+		if (entry) {
+			entry.classes.push(classId)
+			continue
+		}
+		layoutMapper.set(layoutId, {
+			classes: [classId],
+			key: name,
+			layout: layoutId
+		})
+	}
+	let toLayoutMethodSwitch = ""
+	for (const list of layoutMapper.values()) {
+		let cases = ""
+		for (let i = 0; i < list.classes.length; i++) {
+			cases += `case ${list.classes[i]}:`
+		}
+		cases += `{this.${pointerViewLayoutMapProp}=${layoutMapRefName(list.layout)};return this}`
+		toLayoutMethodSwitch += cases
+	}
+	const pointerViewToLayoutToken = `${pointerViewToLayoutMethod}(id) {switch(id){${toLayoutMethodSwitch}default:{throw new Error(\`class id \${id} doesn't exist. Is inputted class id valid?\`)};}}`
+	const changeClassLayoutMethods = meta.reduce((total, {name, layoutId, duplicateRef}) => `${total}get "${name}"() {this.${pointerViewLayoutMapProp}=${layoutMapRefName(duplicateRef === NO_DUPLICATE_REF ? layoutId : duplicateRef)};return this}`, "")
+	const pointerViewJITMethods = `
+	${changeClassLayoutMethods}
+
+	${pointerViewToLayoutToken}
+	${pointerViewToObjectToken}
+	`
 	const baseLayoutProps = JSON.stringify({
 		[layoutMapProperties[0]]: 0,
 		[layoutMapProperties[1]]: 0
 	})
 	const heapVarName = "h"
-	const baseLayoutName =  layoutMapRefName(0)
 	const componentObjectContext = `(${heapVarName}) => {
         class ${layoutMapName} {
             constructor({
@@ -239,18 +306,18 @@ export function generateComponentObjectCode$(
             }
         }
 
-        const ${baseLayoutName} = new ${layoutMapName}(${baseLayoutProps});
+        const ${BASE_LAYOUT_NAME} = new ${layoutMapName}(${baseLayoutProps});
 		${createUniqueLayoutMaps(uniqueLayouts)}
         
         const ${layoutMapRegistryName} = [
-			${baseLayoutName},
-			${uniqueLayouts.reduce((total, {classId}) => `${total}${layoutMapRefName(classId)},`, "")}
+			${BASE_LAYOUT_NAME},
+			${uniqueLayouts.reduce((total, {layoutId}) => `${total}${layoutMapRefName(layoutId)},`, "")}
 		]
 
-		${createPointerViewClass(pointerViewI32Name, baseLayoutName, "i32", tokens, heapVarName, "aos", "u32")}
-		${createPointerViewClass(pointerViewF32Name, baseLayoutName, "f32", tokens, heapVarName, "aos", "u32")}
-		${createPointerViewClass(pointerViewI32SoaName, baseLayoutName, "i32", tokens, heapVarName, "soa", "u32")}
-		${createPointerViewClass(pointerViewF32SoaName, baseLayoutName, "f32", tokens, heapVarName, "soa", "u32")}
+		${createPointerViewClass(pointerViewI32Name, pointerViewJITMethods, "i32", tokens, heapVarName, "aos", "u32")}
+		${createPointerViewClass(pointerViewF32Name, pointerViewJITMethods, "f32", tokens, heapVarName, "aos", "u32")}
+		${createPointerViewClass(pointerViewI32SoaName, pointerViewJITMethods, "i32", tokens, heapVarName, "soa", "u32")}
+		${createPointerViewClass(pointerViewF32SoaName, pointerViewJITMethods, "f32", tokens, heapVarName, "soa", "u32")}
 
         return {
 			${layoutMapName},${layoutMapRegistryName},
@@ -269,34 +336,47 @@ function createUniqueLayoutMaps(
 	let layouts = ""
 	for (let i = 0; i < uniqueLayouts.length; i++) {
 		const next = uniqueLayouts[i]
-		const {fieldOffsetMap, classId} = next
-		const name = layoutMapRefName(classId)
+		const {fieldOffsetMap, layoutId} = next
+		const name = layoutMapRefName(layoutId)
 		layouts += `const ${name} = new ${layoutMapName}(${JSON.stringify(fieldOffsetMap)});`
 	}
 	return layouts
 }
 
+const POINTER_VIEW_GET_SIZEOF = `this.${pointerViewLayoutMapProp}.${layoutMapSizeProp}` as const
+const BYTES_PER_32BITS = 4
+const CAST_TO_U32 = ">>>0"
+const CAST_TO_I32 = "|0"
+const POINTER_VIEW_GET_LAYOUT_ID = `this.${pointerViewLayoutMapProp}.${layoutMapLayoutIdProp}` as const
+const STANDARD_POINTER_VIEW_METHODS = `
+constructor(ptr=0, offset=0, layout=${BASE_LAYOUT_NAME}) {this.${pointerViewPointerProp}=ptr;this.${pointerViewOffsetProp}=offset;this.${pointerViewLayoutMapProp}=layout}
+
+${pointerViewSizeofMethod}() {return ${POINTER_VIEW_GET_SIZEOF}*${BYTES_PER_32BITS}}
+${pointerViewlayoutIdMethod}() {return ${POINTER_VIEW_GET_LAYOUT_ID}}
+get ${pointerViewPtrGetterSetterProp}() {return this.${pointerViewPointerProp}*${BYTES_PER_32BITS}}
+set ${pointerViewPtrGetterSetterProp}(ptr){this.${pointerViewPointerProp}=((ptr/${BYTES_PER_32BITS})${CAST_TO_U32})}
+get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerViewPointerProp}+this.${pointerViewOffsetProp})*${BYTES_PER_32BITS}}
+${pointerViewCloneRefMethod}() {return new this.constructor(this.${pointerViewPointerProp},this.${pointerViewOffsetProp},this.${pointerViewLayoutMapProp})}
+` as const
+
 function createPointerViewClass(
 	className: string,
-	baseLayoutTokenName: string,
+	pointerViewJITMethods: string,
 	targetHeapView: keyof JsHeapRef & ("i32" | "f32"),
 	tokens: ComponentObjectTokens,
 	heapVarTokenName: string,
 	// stands for struct of arrays (soa) or array of structs (aos)
 	memoryLayout: "soa" | "aos",
-	u32HeapView: keyof JsHeapRef & ("u32")
+	u32HeapView: keyof JsHeapRef & ("u32"),
 ): string {
-	const {meta, allFields} = tokens
+	const {allFields} = tokens
 	const [
 		pointerProp, offsetProp, layoutProp
 	] = pointerViewProperties
-	const [sizeofProp, layoutMapIdProp] = layoutMapProperties
-	const getSizeOf = `this.${layoutProp}.${sizeofProp}`
-	const getLayoutMapId = `this.${layoutProp}.${layoutMapIdProp}`
-	const castToI32 = "|0"
-	const castToU32 = ">>>0"
-	const bytesPer32Bits = 4
-	const propertyGettersSetters = allFields.reduce((total, next, i) => {
+
+	let propertyGetSet = ""
+	for (let i = 0; i < allFields.length; i++) {
+		const next = allFields[i]
 		const accessorName = next
 		const index = i
 		const targetAddress = memoryLayout === "aos" 
@@ -305,42 +385,27 @@ function createPointerViewClass(
 		const getter = `get "${accessorName}"() {return ${heapVarTokenName}.${targetHeapView}[${targetAddress}]}`
 		const newValueToken = "val"
 		const setter = `set "${accessorName}"(${newValueToken}) {${heapVarTokenName}.${targetHeapView}[${targetAddress}]=${newValueToken}}`
-		return `${total}${getter}; ${setter};\n`
-	}, "")
-	const classSwitchMap = new Map<number, boolean>()
-	const toObjectMethodSwitch = meta.reduce((switchToken, nextMeta) => {
-		if (classSwitchMap.has(nextMeta.classId)) {
-			return switchToken
-		}
-		classSwitchMap.set(nextMeta.classId, true)
-		const objectKeys = Object.keys(nextMeta.layout)
-		const objectReperesentation = objectKeys.reduce((object, nextKey) => {
-			return `${object}"${nextKey}":this["${nextKey}"],`
-		}, "")
-		return `${switchToken}case ${nextMeta.classId}:{return {${objectReperesentation}}};`
-	}, "")
-	const toLayoutMethod = meta.reduce((switchToken, nextMeta) => {
-		if (nextMeta.duplicateRef !== NO_DUPLICATE_REF) {
-			return switchToken
-		}
-		return `${switchToken}case ${nextMeta.classId}:{return this["${nextMeta.name}"]};`
-	}, "")
-	return `
-	class ${className} {
-		constructor() {this.${pointerProp}=0;this.${offsetProp}=0;this.${layoutProp}=${baseLayoutTokenName}}
-
-		${propertyGettersSetters}
-		
-		${meta.reduce((total, {name, classId, duplicateRef}) => `${total}get "${name}"() {this.${layoutProp}=${layoutMapRefName(duplicateRef === NO_DUPLICATE_REF ? classId : duplicateRef)};return this}`, "")}
-
-		${pointerViewlayoutIdMethod}() {return ${getLayoutMapId}}
-		${pointerViewToObjectMethod}() {switch(${getLayoutMapId}){${toObjectMethodSwitch}default:{throw new Error("object layout doesn't exist")};}}
-		${pointerViewSizeofMethod}() {return ${getSizeOf}*${bytesPer32Bits}}
-		${pointerViewIndexMethod}(idx) {this.${offsetProp}=${memoryLayout === "aos" ? `(idx${castToI32})*${getSizeOf}` : `(idx${castToI32})`};return this}
-		get ${pointerViewPtrGetterSetterProp}() {return this.${pointerProp}*${bytesPer32Bits}}
-		set ${pointerViewPtrGetterSetterProp}(ptr){this.${pointerProp}=((ptr/${bytesPer32Bits})${castToU32})}
-		get ${pointerViewPtrComputedPtrProp}() {return (this.${pointerProp}+this.${offsetProp})*${bytesPer32Bits}}
-		${pointerViewToLayoutMethod}(id) {switch(id){${toLayoutMethod}default:{throw new Error(\`layout map id \${id} doesn't exist. Is inputted id valid?\`)};}}
+		propertyGetSet += `${getter}; ${setter};\n`
 	}
-	`.trim()
+	const returnThisMethod = `${className}ReturnThis`
+	return `class ${className} {
+		${STANDARD_POINTER_VIEW_METHODS}
+		${pointerViewJITMethods}
+
+		${propertyGetSet}
+		${pointerViewIndexMethod}(idx) {this.${offsetProp}=${memoryLayout === "aos" ? `(idx${CAST_TO_I32})*${POINTER_VIEW_GET_SIZEOF}` : `(idx${CAST_TO_I32})`};return this}
+	}
+	function ${returnThisMethod}() {
+		return this
+	}
+	Object.defineProperty(${className}.prototype, "${pointerViewConstRefMethod}", {
+		value: ${returnThisMethod}
+	})
+	Object.defineProperty(${className}.prototype, "${pointerViewMutRefMethod}", {
+		value: ${returnThisMethod}
+	})
+	Object.defineProperty(${className}.prototype, "${pointerViewMoveRefMethod}", {
+		value: ${returnThisMethod}
+	})`
+	
 }
