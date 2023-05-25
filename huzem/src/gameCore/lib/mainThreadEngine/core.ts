@@ -9,13 +9,15 @@ import type {
 	ComponentMetadata,
 	ConsoleCommandManager,
 	MainThreadStandardLibrary,
+	ModMetadata,
+	ArchetypeAccessor,
+	QueryAccessor
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {createCommand} from "./console"
 import {NullPrototype, nullObject} from "../utils/nullProto"
 import {Archetype} from "../mods/archetype"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
-import {ModLinkStatus, lifecycle} from "./lifecycle"
 import {ENGINE_CODES, EngineCode} from "./status"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
@@ -28,27 +30,6 @@ export type ModLinkInfo = {
     entryUrl: string
 	semver: string
 }
-
-export type DomState = {
-	rootCanvas: HTMLCanvasElement | null
-	rootElement: HTMLElement | null
-}
-
-export type ThreadMeta = {
-	activeOsThreads: number
-}
-
-export type TimeState = {
-	originTime: number
-	previousFrame: number
-	elapsedTime: number
-}
-
-export type CompiledMods = {
-	readonly [key: string]: CompiledMod
-}
-
-type AllocatorApis = WasmCoreApis & WasmAllocatorConfig
 
 export type EngineConfig = {
     rootCanvas: HTMLCanvasElement | null
@@ -64,9 +45,9 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
 	
-	mods = nullObject<{ readonly [key: string]: CompiledMod }>()
+	mods = nullObject<{readonly [key: string]: CompiledMod}>()
 	isRunning = false
-	gameLoopHandler = (_: number) => {}
+	gameLoopHandler = (_delta: number) => {}
 	archetypes = <Archetype[]>[]
 	systems = new SystemManager()
 	meta = {
@@ -94,30 +75,34 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	wasmHeap: Allocator
 	std: MainThreadStandardLibrary
 
+	private threadState = {activeOsThreads: 1}
+	private timeState = {
+		originTime: 0.0,
+		previousFrame: 0.0,
+		elapsedTime: 0.0,
+	}
 	/** Dom related stuff, will be null if running in Node (or Deno) */
-	private domState: DomState
-	private timeState: TimeState
-	private threadState: ThreadMeta
+	private domState: {
+		rootCanvas: HTMLCanvasElement | null
+		rootElement: HTMLElement | null
+	}
+	
 
 	constructor(config: EngineConfig) {
 		super()
 		this.wasmHeap = new WasmAllocator(
 			config.wasmMemory, 
-			config.coreApis as AllocatorApis
+			config.coreApis as (
+				WasmCoreApis & WasmAllocatorConfig
+			)
 		)
 		this.domState = {
 			rootElement: config.rootElement, 
 			rootCanvas: config.rootCanvas
 		}
-		this.threadState = {activeOsThreads: 1}
 		this.binary = {
 			coreBinary: config.coreBinary,
 			coreInstance: config.coreInstance
-		}
-		this.timeState = {
-			originTime: 0.0,
-			previousFrame: 0.0,
-			elapsedTime: 0.0,
 		}
 		this.std = new MainStandardLib({
 			domElements: this.domState, 
@@ -140,39 +125,253 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		return ENGINE_CODES.ok
 	}
 
-	async linkMods(mods: ModLinkInfo[]): Promise<ModLinkStatus> {
-		const typecheck = lifecycle.typeCheck(mods)
-		if (!typecheck.ok) {
-			return typecheck
+	async linkMods(inputMods: ModLinkInfo[]): Promise<ModLinkStatus> {
+		const linkResponse: ModLinkStatus = {
+			errors: [], warnings: [], ok: true, linkCount: 0
 		}
 
-		for (let i = 0; i < mods.length; i++) {
-			const mod = mods[i]
-			this.meta.modVersionIndex.set(mod.wrapper.data.name, mod.semver)
+		{ 	// Type check mod objects. 
+			// Light type-checking to avoid increasing startup 
+			// time significantly. Is this kinda unsafe?
+			// Yeah, but mods should be leveraging typescript
+			// (not recommended to write mods in pure js) anyhow
+			// so full type-check should not be neccessary.
+			const response = linkResponse
+			const linkinfo = inputMods
+
+			for (let i = 0; i < linkinfo.length; i++) {
+				const mod = linkinfo[i]
+				
+				const {canonicalUrl} = mod
+				const {ok, error} = {ok: true, error: ""}
+				if (ok) {
+					continue
+				}
+				response.ok = false
+				response.errors.push({
+					msg: `mod ${canonicalUrl} is not typed correctly ${error}`,
+					...ENGINE_CODES.mod_package_invalid_type
+				})
+			}
+		}
+		if (!linkResponse.ok) {
+			return linkResponse
 		}
 
-		const modMetas = lifecycle.compileMeta(mods)
+		let modMetas: ModMetadata[]
+		{ 	// Compile metadata for mods
+			const linkinfo = inputMods
+			const engine = this
 
-		const init = await lifecycle.init(mods, modMetas, this)
-		if (!init.ok) {
-			return init
+			const metas: ModMetadata[] = []
+			for (let i = 0; i < linkinfo.length; i++) {
+				const {
+					wrapper, resolvedUrl, canonicalUrl, semver
+				} = linkinfo[i]
+				const {data} = wrapper
+				engine.meta.modVersionIndex.set(
+					wrapper.data.name, semver
+				)
+				const id = i
+				metas.push({
+					name: data.name,
+					canonicalUrl,
+					resolvedUrl,
+					dependencies: data.dependencies || [],
+					id
+				})
+			}
+			modMetas = metas
 		}
 
-		const jsState = await lifecycle.jsStateInit(mods, modMetas, this)
-		if (!jsState.status.ok) {
-			return jsState.status
+		{ 	// Execute "init" lifecycle hook for all mods. 
+			// Note that all hooks are run in parellel 
+			// because the "init" should not require external 
+			// dependencies (such as other mods) to execute.
+			const response = linkResponse
+			const mods = inputMods
+			const metadata = modMetas
+			const engine = this
+
+			await Promise.all(mods.map(async (mod, index) => {
+				const {wrapper} = mod
+				if (!wrapper.onInit) {
+					return
+				}
+				const meta = metadata[index]
+				try {
+					await wrapper.onInit(meta, engine)
+				} catch (err) {
+					console.error("mod", meta.canonicalUrl, "threw exception in init hook", err)
+					response.errors.push({
+						msg: `mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`,
+						...ENGINE_CODES.mod_init_hook_failed
+					})
+				}
+			}))
 		}
-		const {data: jsStates} = jsState
+		if (!linkResponse.ok) {
+			return linkResponse
+		}
+
+		let stateSingletons: object[]
+		{	// Initialize mod state singleton for all mods.
+			// Note that all singletons are initialized in parellel 
+			// because the they should not require external 
+			// dependencies (such as other mods) to execute.
+			const status = linkResponse
+			const metadata = modMetas
+			const engine = this
+			const mods = inputMods
+
+			const allStates = mods.map(async (mod, index) => {
+				const {data} = mod.wrapper
+				const response = {ok: true, state: {}, msg: ""}
+				if (!data.jsState) {
+					return {}
+				}
+				const meta = metadata[index]
+				try {
+					return await data.jsState(meta, engine)
+				} catch (err) {
+					console.error("mod", meta.canonicalUrl, "threw exception during js state initialization", err)
+					response.ok = false
+					status.errors.push({
+						msg: `mod ${meta.canonicalUrl} threw exception during js state initialization ${String(err)}`,
+						...ENGINE_CODES.mod_js_state_init_failed
+					})
+					return {}
+				}
+			})
+			stateSingletons = allStates
+		}
+		if (!linkResponse.ok) {
+			return linkResponse
+		}
 		
-		const stateRef = lifecycle.nativeStateInit(mods, modMetas, jsStates)
-
-		this.mods = lifecycle.compileMods(mods, stateRef)
-
-		const beforeloop = await lifecycle.beforeGameloop(mods, this)
-		if (!beforeloop.ok) {
-			return beforeloop
+		type StateRefs = {
+			staticStates: object[]
+			archetypes: Record<string, ArchetypeAccessor>[]
+			queries: Record<string, QueryAccessor>[]
+			componentIds: Record<string, number>[]
+			metadatas: ModMetadata[]
+			jsStates: object[]
+			componentCount: number
+		}
+		let stateArrays: StateRefs
+		{	// Create component, query, and archetype
+			// accessors.
+			const mods = inputMods
+			const metas = modMetas
+			const jsStates = stateSingletons
+			
+			const state: StateRefs = {
+				staticStates: [],
+				archetypes: [],
+				queries: [],
+				componentIds: [],
+				metadatas: metas,
+				jsStates,
+				componentCount: 0
+			}
+			const idMeta = {
+				value: 0,
+				enumerable: true,
+				configurable: true,
+				writable: false
+			}
+			let id = 0
+			for (let i = 0; i < mods.length; i++) {
+				const mod = mods[i]
+				const components = mod.wrapper.data.components || {}
+				const keys = Object.keys(components)
+				const componentRefs: Record<string, number> = {}
+				for (let f = 0; f < keys.length; f++) {
+					const name = keys[f]
+					idMeta.value = id++
+					Object.defineProperty(componentRefs, name, idMeta)
+				}
+				state.componentIds.push(componentRefs)
+				state.staticStates.push({})
+				state.archetypes.push({})
+				state.queries.push({})
+			}
+			state.componentCount = id
+			stateArrays = state
 		}
 
-		return new ModLinkStatus({ok: true, linkCount: mods.length})
+		{	// Create mod wrappers for each mod.
+			// Mods wrappers allow mods to reference each 
+			// other via the "engine.mod" property - followed
+			// by the mods name. Wrappers allow access to a mod's
+			// state singleton, queries, etc.
+			// For example, if a mod is named
+			// "mycoolcats" accessing the mod is as easy as
+			// "engine.mod.mycoolcats". 
+			const mods = inputMods
+			const engine = this
+			const stateRef = stateArrays
+
+			const modIndex = nullObject<MainEngine["mods"]>()
+			for (let i = 0; i < mods.length; i++) {
+				const mod = mods[i]
+				const {wrapper} = mod
+				const compiledMod = new CompiledMod({
+					state: stateRef.jsStates[i],
+					meta: stateRef.metadatas[i],
+					resources: (wrapper.data.resources || {}) as Record<string, string>,
+					queries: stateRef.queries[i],
+					archetypes: stateRef.archetypes[i],
+					componentIds: stateRef.componentIds[i]
+				})
+				
+				Object.defineProperty(modIndex, wrapper.data.name, {
+					configurable: true,
+					enumerable: true,
+					writable: false,
+					value: compiledMod
+				})
+			}
+			engine.mods = modIndex
+		}
+
+		{ 	// Execute "beforeGameLoop" lifecycle event.
+			// May or may not be run in parellel we will see?
+			// For now all hooks run serially.
+			const mods = inputMods
+			const engine = this
+			const response = linkResponse
+
+			let allSuccess = true
+			for (let i = 0; i < mods.length; i++) {
+				const {wrapper} = mods[i]
+				if (!wrapper.onBeforeGameLoop) {
+					continue
+				}
+				try {
+					await wrapper.onBeforeGameLoop(engine)
+				} catch (err) {
+					allSuccess = false
+					const meta = mods[i]
+					console.error("mod", meta.canonicalUrl, "threw exception during before game loop event", err)
+					response.errors.push({
+						msg: `mod ${meta.canonicalUrl} threw exception during before game loop event ${String(err)}`,
+						...ENGINE_CODES.mod_before_event_loop_failed
+					})
+				}
+			}
+			if (allSuccess) {
+				response.linkCount = mods.length
+			}
+		}
+
+		return linkResponse
 	}
+}
+
+type ModLinkStatus = {
+	errors: {msg: string, status: number, statusText: string}[]
+	warnings: {msg: string, status: number, statusText: string}[]
+	ok: boolean
+	linkCount: number
 }

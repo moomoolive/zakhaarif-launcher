@@ -6,9 +6,13 @@ import type {
 	TimeUtilityLibrary
 } from "zakhaarif-dev-tools"
 import {NullPrototype} from "../utils/nullProto"
-import type {DomState, ThreadMeta, TimeState} from "./core"
+import type {MainEngine} from "./core"
 import {EMPTY_OBJECT} from "../utils/nullProto"
 import {cast, type} from "zakhaarif-dev-tools/std"
+
+type ThreadMeta = MainEngine["threadState"]
+type TimeState = MainEngine["timeState"]
+type DomState = MainEngine["domState"]
 
 export type StandardLibConfig = {
     threadId: number,
