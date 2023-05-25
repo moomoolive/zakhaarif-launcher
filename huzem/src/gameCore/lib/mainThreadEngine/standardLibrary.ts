@@ -1,14 +1,15 @@
-import type {
+import {
 	CssUtilityLibrary, 
 	DomUtilityLibrary, 
 	MainThreadStandardLibrary, 
 	ThreadUtilityLibrary,
-	TimeUtilityLibrary
+	TimeUtilityLibrary,
+	cast, 
+	type
 } from "zakhaarif-dev-tools"
-import {NullPrototype} from "../utils/nullProto"
+import {Null} from "../utils"
 import type {MainEngine} from "./core"
-import {EMPTY_OBJECT} from "../utils/nullProto"
-import {cast, type} from "zakhaarif-dev-tools/std"
+import {EMPTY_OBJECT} from "../utils"
 
 type ThreadMeta = MainEngine["threadState"]
 type TimeState = MainEngine["timeState"]
@@ -21,7 +22,7 @@ export type StandardLibConfig = {
 	time: TimeState
 }
 
-export class MainStandardLib extends NullPrototype implements MainThreadStandardLibrary {
+export class MainStandardLib extends Null implements MainThreadStandardLibrary {
 	readonly thread: ThreadUtilityLibrary
 	readonly css: CssUtilityLibrary
 	readonly dom: DomUtilityLibrary

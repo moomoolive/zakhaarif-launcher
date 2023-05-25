@@ -1,6 +1,6 @@
 import {MainScriptArguments} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
-import {createWasmMemory, WasmCoreApis} from "./lib/wasm/coreTypes"
+import {createWasmMemory} from "./lib/wasm/coreTypes"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 
 export const main = async (args: MainScriptArguments) => {
@@ -39,38 +39,28 @@ export const main = async (args: MainScriptArguments) => {
 	const binaryUrl = new URL(
 		wasmMap.engine_wasm_core, import.meta.url
 	).href
-	const coreapisResponse = await WebAssembly.instantiateStreaming(
-		fetch(binaryUrl), {
-			wbg: {memory: wasmMemory}
-		}
-	)
+	const core = await WebAssembly.instantiateStreaming(fetch(binaryUrl), {
+		wbg: {memory: wasmMemory}
+	})
 	const engine = new MainEngine({
 		rootCanvas,
 		threadedMode: false,
 		rootElement,
 		wasmMemory,
-		coreBinary: coreapisResponse.module,
-		coreInstance: coreapisResponse.instance,
-		coreApis: coreapisResponse.instance.exports as WasmCoreApis
+		coreBinary: core.module,
+		coreInstance: core.instance,
 	})
 
 	console.info("engine created")
-
-	const {std} = engine
-	Object.defineProperty(globalThis, "zstd", {
-		value: std,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-
+	// These engine properties are added to the 
+	// global object so that they
+	// can be easily accessed from browser console (or repl)
 	Object.defineProperty(globalThis, "zengine", {
 		value: engine,
 		enumerable: true,
 		writable: false,
 		configurable: true
 	})
-
 	Object.defineProperty(globalThis, "zconsole", {
 		value: engine.devConsole.index,
 		enumerable: true,
@@ -91,23 +81,22 @@ export const main = async (args: MainScriptArguments) => {
 		const semver = gameSave.mods.semvers[i]
 		const url = resolved + entry
 		importPromises.push((async () => {
-			let modModule
 			try {
-				modModule = await import(/* @vite-ignore */url)
+				const modModule = await import(/* @vite-ignore */url)
+				if (!("mod" in modModule)) {
+					console.error("could not find 'mod' in imported module")
+					return null
+				}
+				return {
+					wrapper: modModule.mod, 
+					entryUrl: url,
+					resolvedUrl: resolved,
+					canonicalUrl,
+					semver
+				}
 			} catch (err) { 
 				console.error("error when importing module", err)
 				return null 
-			}
-			if (!("mod" in modModule)) {
-				console.error("could not find 'mod' in imported module")
-				return null
-			}
-			return {
-				wrapper: modModule.mod, 
-				entryUrl: url,
-				resolvedUrl: resolved,
-				canonicalUrl,
-				semver
 			}
 		})())
 	}
@@ -131,8 +120,8 @@ export const main = async (args: MainScriptArguments) => {
 
 	if (!linkStatus.ok) {
 		console.error("failed to link mods, found", linkStatus.errors.length, "errors")
-		for (const {msg, status, statusText} of linkStatus.errors) {
-			console.error(`${status} (${statusText}) ${msg}`)
+		for (const {msg, status, text} of linkStatus.errors) {
+			console.error(`(${text}) ${msg} [code = ${status}]`)
 		}
 		messageAppShell("signalFatalError", {
 			details: "One of game mods is invalid (link error)"
@@ -140,25 +129,24 @@ export const main = async (args: MainScriptArguments) => {
 		return
 	}
 
-	const runGameLoop = (time: number) => {
-		const response = engine.runFrameTasks(time)
+	engine.gameLoopHandler = (delta: number) => {
+		const response = engine.runFrameTasks(delta)
 		if (!engine.isRunning) {
 			console.warn("engine has stopped running, tasks returned with status", response)
 			return
 		}
-		window.requestAnimationFrame(runGameLoop)
+		window.requestAnimationFrame(engine.gameLoopHandler)
 	}
-	engine.gameLoopHandler = runGameLoop
 
 	window.requestAnimationFrame(function initGameLoop(time: number) {
 		const response = engine.ignite(time)
-		if (response.status !== MainEngine.STATUS_CODES.ok.status) {
+		if (response !== MainEngine.STATUS_CODES.ok) {
 			console.error("engine failed to start, returned with status", response)
 			return
 		}
 		const milliseconds = 1_000
 		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
 		console.info("starting game loop...")
-		window.requestAnimationFrame(runGameLoop)
+		window.requestAnimationFrame(engine.gameLoopHandler)
 	})
 }

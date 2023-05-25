@@ -15,10 +15,9 @@ import type {
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {createCommand} from "./console"
-import {NullPrototype, nullObject} from "../utils/nullProto"
+import {Null} from "../utils"
 import {Archetype} from "../mods/archetype"
 import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
-import {ENGINE_CODES, EngineCode} from "./status"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
@@ -31,21 +30,32 @@ export type ModLinkInfo = {
 	semver: string
 }
 
+export const ENGINE_CODES = {
+	ok: 0,
+	mod_before_event_loop_failed: 100,
+	mod_js_state_init_failed: 101,
+	mod_init_hook_failed: 102,
+	mod_package_invalid_type: 103,
+} as const
+
+export type EngineCode = typeof ENGINE_CODES[keyof typeof ENGINE_CODES]
+export type EngineStatusText = keyof typeof ENGINE_CODES
+
 export type EngineConfig = {
-    rootCanvas: HTMLCanvasElement | null
-    rootElement: HTMLElement | null
-	coreApis: WasmCoreApis,
+    rootCanvas?: HTMLCanvasElement | null
+    rootElement?: HTMLElement | null
+	threadedMode?: boolean
+
 	coreBinary: WebAssembly.Module
 	coreInstance: WebAssembly.Instance
 	wasmMemory: WebAssembly.Memory
-	threadedMode: boolean
 }
 
-export class MainEngine extends NullPrototype implements MainThreadEngine {
+export class MainEngine extends Null implements MainThreadEngine {
 	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
 	
-	mods = nullObject<{readonly [key: string]: CompiledMod}>()
+	mods = new Null<{readonly [key: string]: CompiledMod}>()
 	isRunning = false
 	gameLoopHandler = (_delta: number) => {}
 	archetypes = <Archetype[]>[]
@@ -61,7 +71,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		}
 	}
 	devConsole = (<T extends ConsoleCommandManager>(m: T) => m)({
-		index: nullObject<ConsoleCommandIndex>(),
+		index: new Null<ConsoleCommandIndex>(),
 		engine: <MainEngine>this,
 		addCommand<T extends ConsoleCommandInputDeclaration>(
 			cmd: ModConsoleCommand<MainThreadEngine, T>
@@ -87,18 +97,17 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 		rootElement: HTMLElement | null
 	}
 	
-
 	constructor(config: EngineConfig) {
 		super()
+		const coreApis = config.coreInstance.exports as WasmCoreApis
 		this.wasmHeap = new WasmAllocator(
-			config.wasmMemory, 
-			config.coreApis as (
+			config.wasmMemory, coreApis as (
 				WasmCoreApis & WasmAllocatorConfig
 			)
 		)
 		this.domState = {
-			rootElement: config.rootElement, 
-			rootCanvas: config.rootCanvas
+			rootElement: config.rootElement || null, 
+			rootCanvas: config.rootCanvas || null
 		}
 		this.binary = {
 			coreBinary: config.coreBinary,
@@ -126,9 +135,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 	}
 
 	async linkMods(inputMods: ModLinkInfo[]): Promise<ModLinkStatus> {
-		const linkResponse: ModLinkStatus = {
-			errors: [], warnings: [], ok: true, linkCount: 0
-		}
+		const linkResponse: ModLinkStatus = {ok: true, errors: []}
 
 		{ 	// Type check mod objects. 
 			// Light type-checking to avoid increasing startup 
@@ -150,7 +157,8 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 				response.ok = false
 				response.errors.push({
 					msg: `mod ${canonicalUrl} is not typed correctly ${error}`,
-					...ENGINE_CODES.mod_package_invalid_type
+					text: "mod_package_invalid_type",
+					status: ENGINE_CODES.mod_package_invalid_type
 				})
 			}
 		}
@@ -205,7 +213,8 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 					console.error("mod", meta.canonicalUrl, "threw exception in init hook", err)
 					response.errors.push({
 						msg: `mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`,
-						...ENGINE_CODES.mod_init_hook_failed
+						text: "mod_init_hook_failed",
+						status: ENGINE_CODES.mod_init_hook_failed
 					})
 				}
 			}))
@@ -227,18 +236,19 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			const allStates = mods.map(async (mod, index) => {
 				const {data} = mod.wrapper
 				const response = {ok: true, state: {}, msg: ""}
-				if (!data.jsState) {
+				if (!data.state) {
 					return {}
 				}
 				const meta = metadata[index]
 				try {
-					return await data.jsState(meta, engine)
+					return await data.state(meta, engine)
 				} catch (err) {
 					console.error("mod", meta.canonicalUrl, "threw exception during js state initialization", err)
 					response.ok = false
 					status.errors.push({
 						msg: `mod ${meta.canonicalUrl} threw exception during js state initialization ${String(err)}`,
-						...ENGINE_CODES.mod_js_state_init_failed
+						text: "mod_js_state_init_failed",
+						status: ENGINE_CODES.mod_js_state_init_failed
 					})
 					return {}
 				}
@@ -312,7 +322,7 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			const engine = this
 			const stateRef = stateArrays
 
-			const modIndex = nullObject<MainEngine["mods"]>()
+			const modIndex = new Null<MainEngine["mods"]>()
 			for (let i = 0; i < mods.length; i++) {
 				const mod = mods[i]
 				const {wrapper} = mod
@@ -342,7 +352,6 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 			const engine = this
 			const response = linkResponse
 
-			let allSuccess = true
 			for (let i = 0; i < mods.length; i++) {
 				const {wrapper} = mods[i]
 				if (!wrapper.onBeforeGameLoop) {
@@ -351,17 +360,14 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 				try {
 					await wrapper.onBeforeGameLoop(engine)
 				} catch (err) {
-					allSuccess = false
 					const meta = mods[i]
 					console.error("mod", meta.canonicalUrl, "threw exception during before game loop event", err)
 					response.errors.push({
 						msg: `mod ${meta.canonicalUrl} threw exception during before game loop event ${String(err)}`,
-						...ENGINE_CODES.mod_before_event_loop_failed
+						text: "mod_before_event_loop_failed",
+						status: ENGINE_CODES.mod_before_event_loop_failed
 					})
 				}
-			}
-			if (allSuccess) {
-				response.linkCount = mods.length
 			}
 		}
 
@@ -370,8 +376,10 @@ export class MainEngine extends NullPrototype implements MainThreadEngine {
 }
 
 type ModLinkStatus = {
-	errors: {msg: string, status: number, statusText: string}[]
-	warnings: {msg: string, status: number, statusText: string}[]
+	errors: {
+		msg: string 
+		text: EngineStatusText 
+		status: EngineCode
+	}[]
 	ok: boolean
-	linkCount: number
 }

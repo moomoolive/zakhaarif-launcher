@@ -11,5 +11,6 @@ export const DEV_TOOL_ENTRIES = [
     "console.ts",
     "components.ts",
     "primitives.ts",
-    "std.ts"
+    "std.ts",
+    "stdFullLib.ts"
 ]

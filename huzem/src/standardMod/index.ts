@@ -1,7 +1,6 @@
 import {
 	Zutils,
-	modData,
-	initMod,
+	define,
 } from "zakhaarif-dev-tools"
 import {stateHandler} from "./events"
 import {
@@ -16,9 +15,9 @@ import {
 } from "./systems"
 import {DebugLayer} from "babylonjs"
 
-const data = modData().define({
+const data = define().data({
 	name: "zakhaarifStd",
-	jsState: stateHandler,
+	state: stateHandler,
 	components: {
 		transform: {x: "f32", y: "f32", z: "f32"},
 		velocity: {x: "f32", y: "f32", z: "f32"},
@@ -27,7 +26,7 @@ const data = modData().define({
 		impulse: {x: "f32", y: "f32", z: "f32"},
 		kinematics: {mass: "f32", gravityModifier: "f32"},
 		collider: {x: "f32", y: "f32", z: "f32"},
-		rendering: {id: "i32"},
+		rendering: {id: "i32"}
 	},
 	queries: {
 		visualChanges: {
@@ -52,7 +51,7 @@ const data = modData().define({
 export type Utils = Zutils<typeof data>
 export type System = Utils["System"]
 
-export const mod = initMod({
+export const mod = define.mod({
 	data,
 	onInit: (meta) => {
 		console.info("init called with meta", meta)
@@ -69,7 +68,7 @@ export const mod = initMod({
 		}
 
 		const {zakhaarifStd} = engine.mods
-		const state = zakhaarifStd.useMutState()
+		const state = zakhaarifStd.mutState()
 
 		const {skybox, controller} = state
 		skybox.setEnabled(true)
@@ -216,7 +215,7 @@ export const mod = initMod({
 				if (input.show === undefined) {
 					return "no valid options detected"
 				}
-				const {scene} = gameEngine.mods.zakhaarifStd.useMutState()
+				const {scene} = gameEngine.mods.zakhaarifStd.mutState()
 				if (!input.show) {
 					scene.debugLayer.hide()
 					return "closed"

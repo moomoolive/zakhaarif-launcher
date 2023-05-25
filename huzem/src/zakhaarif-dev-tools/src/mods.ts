@@ -34,7 +34,7 @@ export type StateEvent<State extends object> = (
     engineCore: MainThreadEngineCore, 
 ) => State | Promise<State>
 
-export type ImmutableResourceMap = object | undefined
+export type ImmutableResourceMap = { readonly [key: string]: string }
 
 export type ComponentDeclaration = {
     readonly [key: string]: ComponentDefinition
@@ -92,7 +92,7 @@ export type ModData<
     readonly components?: TComponentDefs
     readonly queries?: TQueries
     readonly archetypes?: TArchetypes
-    jsState?: StateEvent<TState>,
+    state?: StateEvent<TState>,
 }
 
 export type ModModules = ReadonlyArray<ModData>
@@ -135,28 +135,6 @@ export type ModDataWithDependents<
         TArchetypes
     >
 )
-
-export const modData = <TLinkedMods extends ModModules = []>() => ({
-    define: <
-        TName extends string,
-        TImmutableResources extends ImmutableResourceMap,
-        TState extends object,
-        TComponentDefs extends ComponentDeclaration,
-        TQueries extends QueryDeclaration<ExtractModComponentNames<TComponentDefs, TName>>,
-        TArchetypes extends ArchetypeDeclaration<ComponentDefWithName<TComponentDefs, TName>>
-    >(zMod: TImmutableResources extends Record<string, string> | undefined 
-        ? ModDataWithDependents<
-            TLinkedMods, 
-            TName, 
-            TImmutableResources,
-            TState,
-            TComponentDefs,
-            TQueries,
-            TArchetypes
-        >
-        : never
-    ) => zMod
-})
 
 export type EcsSystem<T extends ModModules = []> = (
     (engine: MainThreadEngine<T>) => void 
@@ -249,8 +227,8 @@ export type GlobalModIndex<T extends ModModules = []> = {
 } 
 
 export type LocalModIndex<T extends ModData = ModData> = {
-    state: T["jsState"] extends undefined ? {} : Awaited<
-        ReturnType<NonNullable<T["jsState"]>>
+    state: T["state"] extends undefined ? {} : Awaited<
+        ReturnType<NonNullable<T["state"]>>
     >,
     resources: T["resources"] extends undefined ? {} : { 
         readonly [key in keyof NonNullable<T["resources"]>]: string 
@@ -318,14 +296,15 @@ export interface ModAccessor<
     TGlobalIndex extends GlobalModIndex = GlobalModIndex,
     TLocalIndex extends LocalModIndex = LocalModIndex
 > {
-    useMutState: () => TLocalIndex["state"]
-    useState: () => DeepReadonly<TLocalIndex["state"]>
-    useQuery: () => TLocalIndex["queries"] 
+    readonly queries: TLocalIndex["queries"] 
     readonly meta: ModMetadata
     readonly comps: {
         readonly [key in keyof TLocalIndex["components"]]: number
     }
-    useResource: () => TLocalIndex["resources"]
+    readonly resources: TLocalIndex["resources"]
+
+    mutState: () => TLocalIndex["state"]
+    state: () => DeepReadonly<TLocalIndex["state"]>
     useArchetype: () => ({
         readonly [key in keyof TLocalIndex["archetypes"]]: (
             ArchetypeAccessor<
@@ -407,8 +386,6 @@ export type LinkableMod<
     & CompleteMod<ExtractMods<T>>
 )
 
-export const initMod = <T extends ModDataWithDependents>(mod: LinkableMod<T>) => mod
-
 type AllUtils<T extends ModModules> = (
     Required<ModLifeCycleEvents<T>>
     & {
@@ -419,6 +396,4 @@ type AllUtils<T extends ModModules> = (
 
 export type Zutils<T extends ModDataWithDependents> = AllUtils<ExtractMods<T>>
 
-export type ModEsModule = {
-    mod: LinkableMod
-}
+export type ModEsModule = { mod: LinkableMod }

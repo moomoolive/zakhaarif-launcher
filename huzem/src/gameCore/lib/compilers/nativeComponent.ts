@@ -6,12 +6,18 @@ import type {
 const RESERVED_LAYOUT_IDS = 1
 const BYTES_PER_32BITS = 4
 
+export const NULL_PTR = 0
+
 export interface BaseNativeViewer<Self extends object> {
 	p$: number
 	l$: LayoutMap
 	
 	index(i: number): this
 	toObject(): object
+	isSome(): boolean
+	isNone(): boolean
+	unwrap(): this
+
 	layoutId$(): number
 	sizeof$(): number
 	toLayout$(classId: number): this
@@ -97,8 +103,13 @@ export function nativeComponentFactory(
 				continue
 			}
 			switch (field) {
+			// beyond field names with "$" 
+			// these are field name are also reserved
 			case "index":
 			case "toObject":
+			case "isSome":
+			case "isNone":
+			case "unwrap":
 				continue
 			default:
 				break
@@ -182,10 +193,12 @@ export function nativeComponentFactory(
 			o$ = 0
 			l$ = baseLayout
 	
-			index(i: number) {
-				this.o$ = (i >>> 0) * this.l$.size$
-				return this
-			}
+			index(i: number) { this.o$ = (i >>> 0) * this.l$.size$; return this }
+			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
+			isNone() { return this.p$ === NULL_PTR }
+			isSome() { return this.p$ !== NULL_PTR }
+			unwrap() { return this }
+
 			toLayout$(classId: number) {
 				this.l$ = layoutRegistry[componentLayoutRegistry.get(classId) || 0]
 				return this
@@ -195,7 +208,6 @@ export function nativeComponentFactory(
 				ref.p$ = this.p$; ref.o$ = this.o$; ref.l$ = this.l$
 				return ref
 			}
-			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
 			layoutId$() { return this.l$.layoutId$ }
 			sizeof$() { return this.l$.size$ * BYTES_PER_32BITS }
 			ptr$() { return this.p$ * BYTES_PER_32BITS }
@@ -257,10 +269,12 @@ export function nativeComponentFactory(
 			o$ = defaultoffset
 			l$ = baseLayout
 	
-			index(i: number) {
-				this.o$.v = i >>> 0
-				return this
-			}
+			index(i: number) { this.o$.v = i >>> 0; return this }
+			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
+			isNone() { return this.p$ === NULL_PTR }
+			isSome() { return this.p$ !== NULL_PTR }
+			unwrap() { return this }
+
 			toLayout$(classId: number) {
 				this.l$ = layoutRegistry[componentLayoutRegistry.get(classId) || 0]
 				return this
@@ -270,7 +284,6 @@ export function nativeComponentFactory(
 				ref.p$ = this.p$; ref.o$ = {v: ref.o$.v}; ref.l$ = this.l$
 				return ref
 			}
-			toObject(): object { return objectSwitch(this, this.l$.layoutId$) }
 			layoutId$() { return this.l$.layoutId$ }
 			sizeof$() { return this.l$.size$ * BYTES_PER_32BITS }
 			ptr$() { return this.p$ * BYTES_PER_32BITS }

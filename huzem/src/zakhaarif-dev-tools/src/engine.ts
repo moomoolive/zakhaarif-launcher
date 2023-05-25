@@ -40,13 +40,8 @@ export type MetaUtilityLibrary = Readonly<{
     getComponentMeta: (componentName: string) => ComponentMetadata | null
 }>
 
-export type DomCode = (
-    "ok"
-    | "DOM_not_found"
-)
-
 export type DomStatus = Readonly<{
-    code: DomCode, 
+    code: "ok" | "DOM_not_found", 
     sheet: HTMLElement | null
 }>
 
@@ -106,7 +101,10 @@ export type MainThreadUtilityLibrary = Readonly<{
     time: TimeUtilityLibrary
 }>
 
-export type GlobalUtilityLibrary = typeof import("./std")
+export type GlobalUtilityLibrary = Omit<typeof import("./stdFullLib"), (
+    "define" 
+    | "ALLOW_ALL_PERMISSIONS"
+)>
 
 export type MainThreadStandardLibrary = (
     MainThreadUtilityLibrary 

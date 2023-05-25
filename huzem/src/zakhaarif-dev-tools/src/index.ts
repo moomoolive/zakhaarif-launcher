@@ -6,3 +6,4 @@ export * from "./engine"
 export * from "./console"
 export * from "./components"
 export * from "./primitives"
+export * from "./std" // all functions and consts from here

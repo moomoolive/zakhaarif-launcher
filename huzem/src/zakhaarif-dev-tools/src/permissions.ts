@@ -1,4 +1,4 @@
-export const ALLOW_ALL_PERMISSIONS = "allowAll"
+import {ALLOW_ALL_PERMISSIONS} from "./stdFullLib"
 
 export type AllowAllPermissions = typeof ALLOW_ALL_PERMISSIONS
 

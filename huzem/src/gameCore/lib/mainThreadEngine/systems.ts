@@ -1,11 +1,11 @@
-import {NullPrototype} from "../utils/nullProto"
+import {Null} from "../utils"
 import {
 	EcsSystem,
 	EcsSystemManager,
 	MainThreadEngine
 } from "zakhaarif-dev-tools"
 
-export class SystemManager extends NullPrototype implements EcsSystemManager {
+export class SystemManager extends Null implements EcsSystemManager {
 	systems: Array<EcsSystem>
 
 	constructor() {

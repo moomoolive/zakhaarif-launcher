@@ -10,8 +10,8 @@ import {
 
 export const playerController: System = (engine) => {
 	const {zakhaarifStd} = engine.mods
-	const {movementVec} = zakhaarifStd.useMutState()
-	const {camera, controller} = zakhaarifStd.useState()
+	const {movementVec} = zakhaarifStd.mutState()
+	const {camera, controller} = zakhaarifStd.state()
 
 	movementVec.horizontal = 0
 	movementVec.vertical = 0
@@ -47,7 +47,7 @@ export const processMouseInput: System = (engine) => {
 		camera,
 		controller,
 		mouseMovement
-	} = zakhaarifStd.useMutState()
+	} = zakhaarifStd.mutState()
 
 	const {
 		deltaDegreesX, currentXDegrees, 
@@ -118,8 +118,8 @@ export const processMouseInput: System = (engine) => {
 export const cameraPosition: System = (engine) => {
 	const {zakhaarifStd} = engine.mods
 
-	const {camera} = zakhaarifStd.useMutState()
-	const {controller, playerEntity} = zakhaarifStd.useState()
+	const {camera} = zakhaarifStd.mutState()
+	const {controller, playerEntity} = zakhaarifStd.state()
 
 	if (controller.cameraLeft) {
 		camera.alpha += controller.frameCameraXRotation
@@ -148,12 +148,12 @@ export const movement: System = (engine) => {
 		}, 
 		playerStats,
 		activeMeshes
-	} = zakhaarifStd.useMutState()
+	} = zakhaarifStd.mutState()
 	const {
 		controller, 
 		movementVec,
 		playerEntity
-	} = zakhaarifStd.useState()
+	} = zakhaarifStd.state()
 
 	const player = activeMeshes[playerEntity.rendering.id]
 	const deltaTime = engine.std.time.deltaTime()
@@ -215,13 +215,13 @@ export const physics: System = (engine) => {
 		impulse, 
 		velocity, 
 		transform
-	} = zakhaarifStd.useMutState().playerEntity
+	} = zakhaarifStd.mutState().playerEntity
 
 	const {
 		kinematics, 
 		position, 
 		collider,
-	} = zakhaarifStd.useState().playerEntity
+	} = zakhaarifStd.state().playerEntity
 
 	velocity.x += impulse.x / kinematics.mass
 	velocity.y += impulse.y / kinematics.mass
@@ -246,8 +246,8 @@ export const physics: System = (engine) => {
 
 export const applyTransforms: System = (engine) => {
 	const {zakhaarifStd} = engine.mods
-	const {position} = zakhaarifStd.useMutState().playerEntity
-	const {transform} = zakhaarifStd.useState().playerEntity
+	const {position} = zakhaarifStd.mutState().playerEntity
+	const {transform} = zakhaarifStd.state().playerEntity
 	position.x += transform.x
 	position.y += transform.y
 	position.z += transform.z
@@ -255,38 +255,15 @@ export const applyTransforms: System = (engine) => {
 
 export const visualChanges: System = ({mods}) => {
 	const {zakhaarifStd} = mods
-	const {activeMeshes} = zakhaarifStd.useMutState()
-	const {rendering, position} = zakhaarifStd.useState().playerEntity
+	const {activeMeshes} = zakhaarifStd.mutState()
+	const {rendering, position} = zakhaarifStd.state().playerEntity
 	const mesh = activeMeshes[rendering.id]
 	mesh.position.x = position.x
 	mesh.position.z = position.z
 	mesh.position.y = position.y
-	
-	/*
-	const {player} = zakhaarifStd.useArchetype()
-	const {zakhaarifStd_rendering, zakhaarifStd_position} = player.useComponents()
-	const len = player.entityCount()
-	for (let i = 0; i < len; i++) {
-		const rendering = zakhaarifStd_rendering.index(i)
-		const position = zakhaarifStd_position.index(i)
-		const mesh = activeMeshes[rendering.id]
-		mesh.position.x = position.x
-		mesh.position.y = position.y
-		mesh.position.z = position.z
-	}
-
-	const quickEntity = player.initEntity().create()
-	const buildEnt = player.initEntity()
-	type y = typeof buildEnt.zakhaarifStd_acceleration
-	type x = y
-	buildEnt.zakhaarifStd_acceleration.x = 2.0
-	buildEnt.zakhaarifStd_acceleration.y = 5.5
-	buildEnt.zakhaarifStd_position.x = 0.0
-	const e2 = buildEnt.create()
-	*/
 }
 
 export const render: System = ({mods}) => {
-	const {scene} = mods.zakhaarifStd.useMutState()
+	const {scene} = mods.zakhaarifStd.mutState()
 	scene.render()
 }

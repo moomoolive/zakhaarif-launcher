@@ -3,7 +3,7 @@ import type {
 	QueryAccessor,
 	ModAccessor,
 } from "zakhaarif-dev-tools"
-import {NullPrototype} from "../utils/nullProto"
+import {Null} from "../utils"
 
 export type CompiledModConfig = {
 	state: object
@@ -14,8 +14,8 @@ export type CompiledModConfig = {
 	componentIds: Record<string, number>
 }
 
-export class CompiledMod extends NullPrototype implements ModAccessor {
-	readonly state: object
+export class CompiledMod extends Null implements ModAccessor {
+	readonly singleton: object
 	readonly meta: ModMetadata
 	readonly resources: Record<string, string>
 	readonly queries: Record<string, QueryAccessor>
@@ -24,7 +24,7 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 
 	constructor(config: CompiledModConfig) {
 		super()
-		this.state = config.state
+		this.singleton = config.state
 		this.meta = config.meta
 		this.resources = config.resources
 		this.queries = config.queries
@@ -32,9 +32,7 @@ export class CompiledMod extends NullPrototype implements ModAccessor {
 		this.comps = config.componentIds
 	}
 
-	useMutState() { return this.state }
-	useState() { return this.state }
-	useQuery() { return this.queries }
-	useResource() { return this.resources }
+	mutState() { return this.singleton }
+	state() { return this.singleton }
 	useArchetype() { return this.archetypes }
 }
