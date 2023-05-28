@@ -1,9 +1,10 @@
 import {Null} from "../utils"
 import {
 	EcsSystem,
-	EcsSystemManager,
 	MainThreadEngine
 } from "zakhaarif-dev-tools"
+
+type EcsSystemManager = MainThreadEngine["systems"]
 
 export class SystemManager extends Null implements EcsSystemManager {
 	systems: Array<EcsSystem>

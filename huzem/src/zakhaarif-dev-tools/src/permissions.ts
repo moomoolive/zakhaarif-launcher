@@ -1,4 +1,4 @@
-import {ALLOW_ALL_PERMISSIONS} from "./stdFullLib"
+import {ALLOW_ALL_PERMISSIONS} from "./launcher"
 
 export type AllowAllPermissions = typeof ALLOW_ALL_PERMISSIONS
 

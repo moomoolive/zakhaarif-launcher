@@ -1,16 +1,6 @@
 import type {
-	ComponentAccessor, 
-	MutableComponentAccessor,
-	ArchetypeAccessor,
+	ModAccessor,
 } from "zakhaarif-dev-tools"
-
-export type MutableComponentRegistry = {
-	readonly [key: string]: MutableComponentAccessor
-}
-
-export type ComponentRegistry = {
-	readonly [key: string]: ComponentAccessor
-}
 
 export type ComponentFieldBuffer = {
     // pointer for jsBuffer type (elementSize = 0)
@@ -35,6 +25,8 @@ export type ComponentBuffer = {
 	readonly fieldCount: number
 }
 
+type ArchetypeAccessor = ModAccessor["archs"][string]
+
 // Sander Mertens's amazing post helped inform
 // the layout for archetypes.
 // link: https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9
@@ -43,10 +35,6 @@ export class Archetype implements ArchetypeAccessor {
 	readonly entitySize: number
 	numberOfEntities: number
 	capacityForEntities: number
-
-	// accessors & heaps for js
-	readonly mutComponents: MutableComponentRegistry
-	readonly components: ComponentRegistry
 
 	// should be in ascending order
 	// so binary search can be used for lookup
@@ -69,9 +57,6 @@ export class Archetype implements ArchetypeAccessor {
 		this.componentIds = []
 		this.componentCount = 0
 		this.componentBuffers = []
-
-		this.mutComponents = {}
-		this.components = {}
 	}
 
 	id(): number {
@@ -88,19 +73,5 @@ export class Archetype implements ArchetypeAccessor {
 
 	entityCapacity(): number {
 		return this.capacityForEntities
-	}
-
-	useComponents(): ReturnType<ArchetypeAccessor["useComponents"]> {
-		return this.components
-	}
-
-	useMutComponents(): ReturnType<ArchetypeAccessor["useMutComponents"]> {
-		return this.mutComponents
-	}
-
-	initEntity(): ReturnType<ArchetypeAccessor["initEntity"]> {
-		return {
-			create: () => 0
-		} as ReturnType<ArchetypeAccessor["initEntity"]>
 	}
 }

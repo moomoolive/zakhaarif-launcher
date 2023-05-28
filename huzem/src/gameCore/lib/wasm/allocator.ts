@@ -1,18 +1,14 @@
 import type {
-	Allocator,
-	MallocAllocatorFn,
-	CallocAllocatorFn,
-	ReallocAllocatorFn,
-	FreeAllocatorFn,
+	MainThreadEngineCore,
+	JsHeapRef
 } from "zakhaarif-dev-tools"
 
-export type JsWasmHeapView = {
-    i32: Int32Array
-    f32: Float32Array
-    u32: Uint32Array
-    f64: Float64Array
-    v: DataView
-}
+type Allocator = MainThreadEngineCore["wasmHeap"]
+
+type MallocAllocatorFn = Allocator["unsafeMalloc"]
+type CallocAllocatorFn = Allocator["unsafeCalloc"]
+type ReallocAllocatorFn = Allocator["unsafeRealloc"]
+type FreeAllocatorFn = Allocator["unsafeFree"]
 
 export type WasmAllocatorConfig =  {
 	malloc: MallocAllocatorFn
@@ -26,7 +22,7 @@ export class WasmAllocator implements Allocator {
 	unsafeCalloc: CallocAllocatorFn
 	unsafeFree: FreeAllocatorFn
 	unsafeRealloc: ReallocAllocatorFn
-	jsHeapRef: JsWasmHeapView
+	jsHeapRef: JsHeapRef
 	
 	private wasmMemory: WebAssembly.Memory
 
@@ -50,7 +46,7 @@ export class WasmAllocator implements Allocator {
 		return this.wasmMemory
 	}
 
-	jsHeap(): Readonly<JsWasmHeapView> {
+	jsHeap(): Readonly<JsHeapRef> {
 		return this.jsHeapRef
 	}
 }

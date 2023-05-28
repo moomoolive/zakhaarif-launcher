@@ -1,7 +1,4 @@
-import {
-	Zutils,
-	define,
-} from "zakhaarif-dev-tools"
+import {Zutils, def} from "zakhaarif-dev-tools"
 import {stateHandler} from "./events"
 import {
 	render,
@@ -15,9 +12,8 @@ import {
 } from "./systems"
 import {DebugLayer} from "babylonjs"
 
-const data = define().data({
+const data = def.data({
 	name: "zakhaarifStd",
-	state: stateHandler,
 	components: {
 		transform: {x: "f32", y: "f32", z: "f32"},
 		velocity: {x: "f32", y: "f32", z: "f32"},
@@ -28,6 +24,9 @@ const data = define().data({
 		collider: {x: "f32", y: "f32", z: "f32"},
 		rendering: {id: "i32"}
 	},
+
+	state: stateHandler,
+
 	queries: {
 		visualChanges: {
 			zakhaarifStd_position: "required",
@@ -51,7 +50,7 @@ const data = define().data({
 export type Utils = Zutils<typeof data>
 export type System = Utils["System"]
 
-export const mod = define.mod({
+export const mod = def({
 	data,
 	onInit: (meta) => {
 		console.info("init called with meta", meta)

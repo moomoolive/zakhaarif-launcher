@@ -1,1 +1,1 @@
-export * from "./stdFullLib"
+export * from "./freeStandingStdLib"

@@ -1,23 +1,21 @@
 import type {
-	Allocator,
 	ConsoleCommandIndex,
 	ConsoleCommandInputDeclaration,
 	ModConsoleCommand,
 	MainThreadEngine,
 	LinkableMod,
-	ComponentClass,
 	ComponentMetadata,
-	ConsoleCommandManager,
-	MainThreadStandardLibrary,
+	StandardLib,
 	ModMetadata,
-	ArchetypeAccessor,
-	QueryAccessor
+	QueryAccessor,
+	DependentsWithBrand,
+	ModAccessor
 } from "zakhaarif-dev-tools"
 import {CompiledMod} from "../mods/compiledMod"
 import {createCommand} from "./console"
 import {Null} from "../utils"
 import {Archetype} from "../mods/archetype"
-import {MainStandardLib, MAIN_THREAD_ID} from "./standardLibrary"
+import {stdlib} from "./standardLibrary"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
@@ -52,7 +50,6 @@ export type EngineConfig = {
 }
 
 export class MainEngine extends Null implements MainThreadEngine {
-	static readonly MAIN_THREAD_ID = MAIN_THREAD_ID
 	static readonly STATUS_CODES = ENGINE_CODES
 	
 	mods = new Null<{readonly [key: string]: CompiledMod}>()
@@ -62,7 +59,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 	systems = new SystemManager()
 	meta = {
 		modVersionIndex: new Map<string, string>(),
-		componentIndex: new Map<string, ComponentClass>(),
+		componentIndex: new Map<string, ComponentMetadata>(),
 		getModVersion(modName: string): string {
 			return this.modVersionIndex.get(modName) || ""
 		},
@@ -70,7 +67,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 			return this.componentIndex.get(componentName) || null
 		}
 	}
-	devConsole = (<T extends ConsoleCommandManager>(m: T) => m)({
+	devConsole = (<T extends MainThreadEngine["devConsole"]>(m: T) => m)({
 		index: new Null<ConsoleCommandIndex>(),
 		engine: <MainEngine>this,
 		addCommand<T extends ConsoleCommandInputDeclaration>(
@@ -82,10 +79,9 @@ export class MainEngine extends Null implements MainThreadEngine {
 		coreInstance: WebAssembly.Instance
 		coreBinary: WebAssembly.Module
 	}
-	wasmHeap: Allocator
-	std: MainThreadStandardLibrary
+	wasmHeap: MainThreadEngine["wasmHeap"]
+	std: StandardLib
 
-	private threadState = {activeOsThreads: 1}
 	private timeState = {
 		originTime: 0.0,
 		previousFrame: 0.0,
@@ -113,10 +109,8 @@ export class MainEngine extends Null implements MainThreadEngine {
 			coreBinary: config.coreBinary,
 			coreInstance: config.coreInstance
 		}
-		this.std = new MainStandardLib({
+		this.std = stdlib({
 			domElements: this.domState, 
-			threadId: MAIN_THREAD_ID,
-			threadMeta: this.threadState,
 			time: this.timeState
 		})
 	}
@@ -185,7 +179,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 					name: data.name,
 					canonicalUrl,
 					resolvedUrl,
-					dependencies: data.dependencies || [],
+					dependencies: (data.dependencies || []) as DependentsWithBrand<[]>,
 					id
 				})
 			}
@@ -261,7 +255,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 		
 		type StateRefs = {
 			staticStates: object[]
-			archetypes: Record<string, ArchetypeAccessor>[]
+			archetypes: Record<string, ModAccessor["archs"][string]>[]
 			queries: Record<string, QueryAccessor>[]
 			componentIds: Record<string, number>[]
 			metadatas: ModMetadata[]
@@ -329,7 +323,6 @@ export class MainEngine extends Null implements MainThreadEngine {
 				const compiledMod = new CompiledMod({
 					state: stateRef.jsStates[i],
 					meta: stateRef.metadatas[i],
-					resources: (wrapper.data.resources || {}) as Record<string, string>,
 					queries: stateRef.queries[i],
 					archetypes: stateRef.archetypes[i],
 					componentIds: stateRef.componentIds[i]

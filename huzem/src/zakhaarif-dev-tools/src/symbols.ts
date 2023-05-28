@@ -10,3 +10,5 @@ export declare const ReferenceType: unique symbol
 /** Refers to when a piece of heap memory is allow to be aliased */
 export declare const CanAlias: unique symbol
 export declare const PointerType: unique symbol
+
+export declare const InnerMods: unique symbol
