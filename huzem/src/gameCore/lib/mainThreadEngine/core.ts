@@ -5,20 +5,19 @@ import type {
 	MainThreadEngine,
 	LinkableMod,
 	ComponentMetadata,
-	StandardLib,
 	ModMetadata,
 	QueryAccessor,
 	DependentsWithBrand,
-	ModAccessor
 } from "zakhaarif-dev-tools"
-import {CompiledMod} from "../mods/compiledMod"
+import {Mod} from "../mods/mod"
 import {createCommand} from "./console"
 import {Null} from "../utils"
 import {Archetype} from "../mods/archetype"
-import {stdlib} from "./standardLibrary"
+import {stdlib, MetaManager} from "./standardLibrary"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
+import {NativeComponentContext, NativeDescriptor, nativeComponentFactory} from "../compilers/nativeComponent"
 
 export type ModLinkInfo = {
 	wrapper: LinkableMod,
@@ -27,17 +26,6 @@ export type ModLinkInfo = {
     entryUrl: string
 	semver: string
 }
-
-export const ENGINE_CODES = {
-	ok: 0,
-	mod_before_event_loop_failed: 100,
-	mod_js_state_init_failed: 101,
-	mod_init_hook_failed: 102,
-	mod_package_invalid_type: 103,
-} as const
-
-export type EngineCode = typeof ENGINE_CODES[keyof typeof ENGINE_CODES]
-export type EngineStatusText = keyof typeof ENGINE_CODES
 
 export type EngineConfig = {
     rootCanvas?: HTMLCanvasElement | null
@@ -50,48 +38,52 @@ export type EngineConfig = {
 }
 
 export class MainEngine extends Null implements MainThreadEngine {
-	static readonly STATUS_CODES = ENGINE_CODES
+	static readonly STATUS_CODES = {
+		ok: 0,
+		mod_before_event_loop_failed: 100,
+		mod_js_state_init_failed: 101,
+		mod_init_hook_failed: 102,
+		mod_package_invalid_type: 103,
+	} as const
 	
-	mods = new Null<{readonly [key: string]: CompiledMod}>()
+	mods = new Null<{ readonly [key: string]: Mod }>()
+	modState = {
+		mods: <Mod[]>[],
+		metadatas: <ModMetadata[]>[],
+		jsStates: <object[]>[],
+		componentMeta: <ComponentMetadata[]>[],
+		componentIds: <Record<string, number>[]>[],
+		queryCollections: <Record<string, QueryAccessor>[]>[],
+		archetypes: <Archetype[]>[],
+		archetypeCollections: <Record<string, Archetype>[]>[],
+	}
 	isRunning = false
 	gameLoopHandler = (_delta: number) => {}
-	archetypes = <Archetype[]>[]
 	systems = new SystemManager()
-	meta = {
-		modVersionIndex: new Map<string, string>(),
-		componentIndex: new Map<string, ComponentMetadata>(),
-		getModVersion(modName: string): string {
-			return this.modVersionIndex.get(modName) || ""
-		},
-		getComponentMeta(componentName: string): ComponentMetadata | null {
-			return this.componentIndex.get(componentName) || null
-		}
-	}
-	devConsole = (<T extends MainThreadEngine["devConsole"]>(m: T) => m)({
+	meta = new MetaManager(this.modState)
+	devConsole = {
 		index: new Null<ConsoleCommandIndex>(),
 		engine: <MainEngine>this,
 		addCommand<T extends ConsoleCommandInputDeclaration>(
 			cmd: ModConsoleCommand<MainThreadEngine, T>
 		) { createCommand(this.engine, this.index, cmd) }
-	})
-
-	binary: {
-		coreInstance: WebAssembly.Instance
-		coreBinary: WebAssembly.Module
 	}
-	wasmHeap: MainThreadEngine["wasmHeap"]
-	std: StandardLib
-
-	private timeState = {
+	wasm = {
+		componentJsBindings: null as NativeComponentContext | null,
+		coreInstance: null as WebAssembly.Instance | null,
+		coreBinary: null as WebAssembly.Module | null
+	}
+	stdState = {
 		originTime: 0.0,
 		previousFrame: 0.0,
 		elapsedTime: 0.0,
+		// dom stuff will be null if running in Node (or server env)
+		rootCanvas: null as HTMLCanvasElement | null,
+		rootElement: null as HTMLElement | null
 	}
-	/** Dom related stuff, will be null if running in Node (or Deno) */
-	private domState: {
-		rootCanvas: HTMLCanvasElement | null
-		rootElement: HTMLElement | null
-	}
+	std = stdlib(this.stdState)
+
+	wasmHeap: MainThreadEngine["wasmHeap"]
 	
 	constructor(config: EngineConfig) {
 		super()
@@ -101,35 +93,28 @@ export class MainEngine extends Null implements MainThreadEngine {
 				WasmCoreApis & WasmAllocatorConfig
 			)
 		)
-		this.domState = {
-			rootElement: config.rootElement || null, 
-			rootCanvas: config.rootCanvas || null
-		}
-		this.binary = {
-			coreBinary: config.coreBinary,
-			coreInstance: config.coreInstance
-		}
-		this.std = stdlib({
-			domElements: this.domState, 
-			time: this.timeState
-		})
+		this.stdState.rootCanvas = config.rootCanvas || null
+		this.stdState.rootElement = config.rootElement || null
+		this.wasm.coreBinary = config.coreBinary
+		this.wasm.coreInstance = config.coreInstance
 	}
 
 	runFrameTasks(currentTime: number): number {
-		this.timeState.elapsedTime = currentTime - this.timeState.previousFrame
-		this.timeState.previousFrame = currentTime
+		this.stdState.elapsedTime = currentTime - this.stdState.previousFrame
+		this.stdState.previousFrame = currentTime
 		return this.systems.run(this)
 	}
 
 	ignite(currentTime: number): EngineCode {
-		this.timeState.originTime = currentTime
-		this.timeState.previousFrame = currentTime
+		this.stdState.originTime = currentTime
+		this.stdState.previousFrame = currentTime
 		this.isRunning = true
-		return ENGINE_CODES.ok
+		return MainEngine.STATUS_CODES.ok
 	}
 
 	async linkMods(inputMods: ModLinkInfo[]): Promise<ModLinkStatus> {
 		const linkResponse: ModLinkStatus = {ok: true, errors: []}
+		const modStateRef = this.modState
 
 		{ 	// Type check mod objects. 
 			// Light type-checking to avoid increasing startup 
@@ -152,7 +137,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 				response.errors.push({
 					msg: `mod ${canonicalUrl} is not typed correctly ${error}`,
 					text: "mod_package_invalid_type",
-					status: ENGINE_CODES.mod_package_invalid_type
+					status: MainEngine.STATUS_CODES.mod_package_invalid_type
 				})
 			}
 		}
@@ -160,20 +145,16 @@ export class MainEngine extends Null implements MainThreadEngine {
 			return linkResponse
 		}
 
-		let modMetas: ModMetadata[]
 		{ 	// Compile metadata for mods
 			const linkinfo = inputMods
-			const engine = this
+			const modMetas = modStateRef.metadatas
 
-			const metas: ModMetadata[] = []
+			const metas = modMetas
 			for (let i = 0; i < linkinfo.length; i++) {
 				const {
-					wrapper, resolvedUrl, canonicalUrl, semver
+					wrapper, resolvedUrl, canonicalUrl
 				} = linkinfo[i]
 				const {data} = wrapper
-				engine.meta.modVersionIndex.set(
-					wrapper.data.name, semver
-				)
 				const id = i
 				metas.push({
 					name: data.name,
@@ -183,24 +164,23 @@ export class MainEngine extends Null implements MainThreadEngine {
 					id
 				})
 			}
-			modMetas = metas
 		}
 
 		{ 	// Execute "init" lifecycle hook for all mods. 
-			// Note that all hooks are run in parellel 
-			// because the "init" should not require external 
-			// dependencies (such as other mods) to execute.
+			// Note: all handlers are executed in parellel
 			const response = linkResponse
 			const mods = inputMods
-			const metadata = modMetas
+			const metadata = modStateRef.metadatas
 			const engine = this
+			const stateRef = modStateRef
 
-			await Promise.all(mods.map(async (mod, index) => {
+			await Promise.all(mods.map(async (mod, i) => {
 				const {wrapper} = mod
 				if (!wrapper.onInit) {
 					return
 				}
-				const meta = metadata[index]
+				const modId = stateRef.mods.length + i 
+				const meta = metadata[modId]
 				try {
 					await wrapper.onInit(meta, engine)
 				} catch (err) {
@@ -208,7 +188,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 					response.errors.push({
 						msg: `mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`,
 						text: "mod_init_hook_failed",
-						status: ENGINE_CODES.mod_init_hook_failed
+						status: MainEngine.STATUS_CODES.mod_init_hook_failed
 					})
 				}
 			}))
@@ -217,23 +197,22 @@ export class MainEngine extends Null implements MainThreadEngine {
 			return linkResponse
 		}
 
-		let stateSingletons: object[]
 		{	// Initialize mod state singleton for all mods.
-			// Note that all singletons are initialized in parellel 
-			// because the they should not require external 
-			// dependencies (such as other mods) to execute.
+			// Note: all handlers are executed in parellel 
 			const status = linkResponse
-			const metadata = modMetas
+			const metadata = modStateRef.metadatas
 			const engine = this
 			const mods = inputMods
+			const stateRef = modStateRef
 
-			const allStates = mods.map(async (mod, index) => {
+			const allStates = mods.map(async (mod, i) => {
 				const {data} = mod.wrapper
 				const response = {ok: true, state: {}, msg: ""}
 				if (!data.state) {
 					return {}
 				}
-				const meta = metadata[index]
+				const modId = stateRef.mods.length + i
+				const meta = metadata[modId]
 				try {
 					return await data.state(meta, engine)
 				} catch (err) {
@@ -242,68 +221,18 @@ export class MainEngine extends Null implements MainThreadEngine {
 					status.errors.push({
 						msg: `mod ${meta.canonicalUrl} threw exception during js state initialization ${String(err)}`,
 						text: "mod_js_state_init_failed",
-						status: ENGINE_CODES.mod_js_state_init_failed
+						status: MainEngine.STATUS_CODES.mod_js_state_init_failed
 					})
 					return {}
 				}
 			})
-			stateSingletons = allStates
+			const fulfilledStates = await Promise.all(allStates)
+			stateRef.jsStates.push(fulfilledStates)
 		}
 		if (!linkResponse.ok) {
 			return linkResponse
 		}
 		
-		type StateRefs = {
-			staticStates: object[]
-			archetypes: Record<string, ModAccessor["archs"][string]>[]
-			queries: Record<string, QueryAccessor>[]
-			componentIds: Record<string, number>[]
-			metadatas: ModMetadata[]
-			jsStates: object[]
-			componentCount: number
-		}
-		let stateArrays: StateRefs
-		{	// Create component, query, and archetype
-			// accessors.
-			const mods = inputMods
-			const metas = modMetas
-			const jsStates = stateSingletons
-			
-			const state: StateRefs = {
-				staticStates: [],
-				archetypes: [],
-				queries: [],
-				componentIds: [],
-				metadatas: metas,
-				jsStates,
-				componentCount: 0
-			}
-			const idMeta = {
-				value: 0,
-				enumerable: true,
-				configurable: true,
-				writable: false
-			}
-			let id = 0
-			for (let i = 0; i < mods.length; i++) {
-				const mod = mods[i]
-				const components = mod.wrapper.data.components || {}
-				const keys = Object.keys(components)
-				const componentRefs: Record<string, number> = {}
-				for (let f = 0; f < keys.length; f++) {
-					const name = keys[f]
-					idMeta.value = id++
-					Object.defineProperty(componentRefs, name, idMeta)
-				}
-				state.componentIds.push(componentRefs)
-				state.staticStates.push({})
-				state.archetypes.push({})
-				state.queries.push({})
-			}
-			state.componentCount = id
-			stateArrays = state
-		}
-
 		{	// Create mod wrappers for each mod.
 			// Mods wrappers allow mods to reference each 
 			// other via the "engine.mod" property - followed
@@ -314,59 +243,161 @@ export class MainEngine extends Null implements MainThreadEngine {
 			// "engine.mod.mycoolcats". 
 			const mods = inputMods
 			const engine = this
-			const stateRef = stateArrays
-
-			const modIndex = new Null<MainEngine["mods"]>()
+			const stateRef = modStateRef
+			
+			// initialize components
+			const compIdMeta = {
+				value: 0,
+				enumerable: true,
+				configurable: true,
+				writable: false
+			}
+			let componentIdCounter = stateRef.componentMeta.length
+			const nativeDescriptors: NativeDescriptor[] = []
+			const componentNameToIdMap = new Map<string, number>
 			for (let i = 0; i < mods.length; i++) {
 				const mod = mods[i]
-				const {wrapper} = mod
-				const compiledMod = new CompiledMod({
-					state: stateRef.jsStates[i],
-					meta: stateRef.metadatas[i],
-					queries: stateRef.queries[i],
-					archetypes: stateRef.archetypes[i],
-					componentIds: stateRef.componentIds[i]
-				})
+				const modData = mod.wrapper.data
 				
-				Object.defineProperty(modIndex, wrapper.data.name, {
+				const components = modData.components || {}
+				const allComps = Object.keys(components)
+				const componentRefs: Record<string, number> = {}
+				stateRef.componentIds.push(componentRefs)
+				for (let c = 0; c < allComps.length; c++) {
+					const compName = allComps[c]
+					const id = componentIdCounter++
+					compIdMeta.value = id
+					Object.defineProperty(
+						componentRefs, compName, compIdMeta
+					)
+					const def = components[compName]
+					const name = `${modData.name}_${compName}`
+					componentNameToIdMap.set(name, id)
+					const bytesPer32bits = 4
+					const fieldKeys = Object.keys(def)
+					const sizeof = fieldKeys.length * bytesPer32bits
+					const isFloat = def[fieldKeys[0]] === "f32"
+					stateRef.componentMeta.push({
+						name, def, id, sizeof, isFloat, fieldCount: fieldKeys.length
+					})
+					nativeDescriptors.push({
+						name, definition: def, classId: id
+					})
+				}
+			}
+			const componentContext = nativeComponentFactory(
+				nativeDescriptors, engine.wasmHeap.jsHeap()
+			)
+			engine.wasm.componentJsBindings = componentContext
+
+			// initalize archetypes
+			let archetypeIdCounter = stateRef.archetypes.length
+			for (let i = 0; i < mods.length; i++) {
+				const modId = stateRef.mods.length + i
+				const mod = mods[i]
+				const modData = mod.wrapper.data
+				const archetypes = modData.archetypes || {}
+				
+				const collection = new Null<Record<string, Archetype>>()
+				stateRef.archetypeCollections.push(collection)
+				const archKeys = Object.keys(archetypes)
+				for (let a = 0; a < archKeys.length; i++) {
+					const key = archKeys[a]
+					const arch = new Archetype()
+					stateRef.archetypes.push(arch)
+					Object.defineProperty(collection, key, {
+						value: arch,
+						enumerable: true,
+						writable: false,
+						configurable: true
+					})
+
+					arch.id = archetypeIdCounter++
+					arch.modId = modId
+					arch.name = `${modData}_${key}`
+					const def = archetypes[key]
+					const comps = Object.keys(def)
+					let sizeof = 0
+					for (let c = 0; c < comps.length; i++) {
+						const compKey = comps[c]
+						const compId = componentNameToIdMap.get(compKey) || -1
+						const compExists = compId >= 0
+						if (!compExists) {
+							// should warn here?
+							continue
+						}
+						arch.componentIds.push(compId)
+						const compMeta = stateRef.componentMeta[compId]
+						sizeof += compMeta.sizeof
+					}
+					arch.entityBytes = sizeof
+					arch.componentIds.sort()
+				}
+			}
+
+			// initialize queries
+			for (let i = 0; i < mods.length; i++) {
+				stateRef.queryCollections.push({})
+			}
+
+			// initialize mod wrapper
+			const modIndex = new Null<MainEngine["mods"]>()
+			engine.mods = modIndex
+			for (let i = 0; i < mods.length; i++) {
+				const modId = stateRef.mods.length + i
+				const mod = mods[i]
+				const modData = mod.wrapper.data
+
+				const compiled = new Mod({
+					id: modId,
+					name: modData.name,
+					version: mod.semver,
+					state: stateRef.jsStates[modId],
+					meta: stateRef.metadatas[modId],
+					queries: stateRef.queryCollections[modId],
+					archetypes: stateRef.archetypeCollections[modId],
+					componentIds: stateRef.componentIds[modId]
+				})
+				stateRef.mods.push(compiled)
+				Object.defineProperty(modIndex, modData.name, {
 					configurable: true,
 					enumerable: true,
 					writable: false,
-					value: compiledMod
+					value: compiled
 				})
 			}
-			engine.mods = modIndex
 		}
 
 		{ 	// Execute "beforeGameLoop" lifecycle event.
-			// May or may not be run in parellel we will see?
-			// For now all hooks run serially.
+			// Note: all handlers are executed in parellel 
 			const mods = inputMods
 			const engine = this
 			const response = linkResponse
 
-			for (let i = 0; i < mods.length; i++) {
-				const {wrapper} = mods[i]
+			await Promise.all(mods.map(async (mod) => {
+				const {wrapper} = mod
 				if (!wrapper.onBeforeGameLoop) {
-					continue
+					return
 				}
 				try {
 					await wrapper.onBeforeGameLoop(engine)
 				} catch (err) {
-					const meta = mods[i]
-					console.error("mod", meta.canonicalUrl, "threw exception during before game loop event", err)
+					console.error("mod", mod.canonicalUrl, "threw exception during before game loop event", err)
 					response.errors.push({
-						msg: `mod ${meta.canonicalUrl} threw exception during before game loop event ${String(err)}`,
+						msg: `mod ${mod.canonicalUrl} threw exception during before game loop event ${String(err)}`,
 						text: "mod_before_event_loop_failed",
-						status: ENGINE_CODES.mod_before_event_loop_failed
+						status: MainEngine.STATUS_CODES.mod_before_event_loop_failed
 					})
 				}
-			}
+			}))
 		}
 
 		return linkResponse
 	}
 }
+
+type EngineCode = typeof MainEngine.STATUS_CODES[keyof typeof MainEngine.STATUS_CODES]
+type EngineStatusText = keyof typeof MainEngine.STATUS_CODES
 
 type ModLinkStatus = {
 	errors: {

@@ -7,18 +7,13 @@ export type ConsoleCommandIndex = {
     readonly [key: string]: ConsoleCommand
 }
 
-export type ComponentFieldMeta = {
-    name: string,
-    id: number
-    offset: number
-}
-
 export type ComponentMetadata = Readonly<{
+    id: number
+    isFloat: boolean
+    fieldCount: number
     def: ComponentDefinition
-    fullname: string
     name: string
     sizeof: number
-    fields: ReadonlyArray<ComponentFieldMeta>
 }>
 
 export type DomStatus = Readonly<{
@@ -73,16 +68,17 @@ export type MainThreadEngineCore = Readonly<{
          * If mod with inputted name does not exist, returns
          * an empty string.
         */
-        getModVersion: (modName: string) => string
+        modVersion: (modName: string) => string
         /**
          * Returns various metadata about component. Returns
          * null if component does not exist.
-         * @param componentName the component's full name meaning
+         * @param name the component's full name meaning
          * the mod name followed by an underscore, then the name of
          * the component (eg. zakhaarifStd_acceleration)
          * @returns 
          */
-        getComponentMeta: (componentName: string) => ComponentMetadata | null
+        component: (name: string) => ComponentMetadata | null
+        componentById: (id: number) => ComponentMetadata | null
     }>
     /** A standard libraries that makes common tasks and interacting with the engine easier */
     std: StandardLib

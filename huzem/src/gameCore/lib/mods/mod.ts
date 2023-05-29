@@ -6,6 +6,9 @@ import type {
 import {Null} from "../utils"
 
 export type CompiledModConfig = {
+	id: number
+	name: string
+	version: string
 	state: object
 	meta: ModMetadata
 	queries: Record<string, QueryAccessor>
@@ -13,7 +16,10 @@ export type CompiledModConfig = {
 	componentIds: Record<string, number>
 }
 
-export class CompiledMod extends Null implements ModAccessor {
+export class Mod extends Null implements ModAccessor {
+	readonly id: number
+	readonly name: string
+	readonly version: string
 	readonly singleton: object
 	readonly meta: ModMetadata
 	readonly queries: Record<string, QueryAccessor>
@@ -22,6 +28,9 @@ export class CompiledMod extends Null implements ModAccessor {
 
 	constructor(config: CompiledModConfig) {
 		super()
+		this.id = config.id
+		this.name = config.name
+		this.version = config.version
 		this.singleton = config.state
 		this.meta = config.meta
 		this.queries = config.queries

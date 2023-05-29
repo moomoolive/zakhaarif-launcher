@@ -1,17 +1,17 @@
 import { 
+	ComponentMetadata,
+	MainThreadEngine,
 	StandardLib,
-	std
+	std,
+	DeepReadonly
 } from "zakhaarif-dev-tools"
 import {Null} from "../utils"
 import type {MainEngine} from "./core"
 import {EMPTY_OBJECT} from "../utils"
 
-export type StdConfig = {
-	domElements: MainEngine["domState"],
-	time: MainEngine["timeState"]
-}
-
-export function stdlib(config: StdConfig): StandardLib {	
+export function stdlib(
+	externState: Readonly<MainEngine["stdState"]>
+): StandardLib {	
 	const css: StandardLib["css"] = {
 		addGlobalSheet: (url, attributes = EMPTY_OBJECT) => {
 			const notRunningInBrowser = typeof window === "undefined"
@@ -30,25 +30,25 @@ export function stdlib(config: StdConfig): StandardLib {
 		}
 	}
 
-	const {domElements} = config
+	const extern = externState
+
 	const dom: StandardLib["dom"] = {
-		rootCanvas: () => domElements.rootCanvas,
-		rootElement: () => domElements.rootElement
+		rootCanvas: () => extern.rootCanvas,
+		rootElement: () => extern.rootElement
 	}
 
-	const {time} = config
-	const timelib: StandardLib["time"] = {
-		deltaTime: () => time.elapsedTime,
-		originTime: () => time.originTime,
-		previousFrame: () => time.previousFrame,
-		totalElapsedTime: () => (time.previousFrame - time.originTime) + time.elapsedTime
+	const time: StandardLib["time"] = {
+		deltaTime: () => extern.elapsedTime,
+		originTime: () => extern.originTime,
+		previousFrame: () => extern.previousFrame,
+		totalElapsedTime: () => (extern.previousFrame - extern.originTime) + extern.elapsedTime
 	}
 
 	const props: StandardLib = {
 		...std,
 		css,
 		dom,
-		time: timelib
+		time
 	}
 	class Std extends Null {
 		constructor() {
@@ -57,4 +57,46 @@ export function stdlib(config: StdConfig): StandardLib {
 		}
 	}
 	return new Std() as StandardLib
+}
+
+type EngineMeta = MainThreadEngine["meta"]
+
+export class MetaManager extends Null implements EngineMeta {
+	context: DeepReadonly<MainEngine["modState"]>
+
+	constructor(context: DeepReadonly<MainEngine["modState"]>) {
+		super()
+		this.context = context
+	}
+
+	modVersion(modName: string): string {
+		const {context} = this
+		for (let i = 0; i < context.mods.length; i++) {
+			const mod = context.mods[i]
+			if (mod.name === modName) {
+				return mod.version
+			}
+		}
+		return ""
+	}
+
+	component(name: string): ComponentMetadata | null {
+		const {context} = this
+		for (let i = 0; i < context.componentMeta.length; i++) {
+			const comp = context.componentMeta[i]
+			if (comp.name === name) {
+				return comp
+			}
+		}
+		return null
+	}
+
+	componentById(id: number): ComponentMetadata | null {
+		const idx = id >>> 0 // cast to u32
+		const {context} = this
+		if (idx >= context.componentMeta.length) {
+			return null
+		}
+		return context.componentMeta[idx]
+	}
 }

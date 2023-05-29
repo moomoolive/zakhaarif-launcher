@@ -24,9 +24,7 @@ const data = def.data({
 		collider: {x: "f32", y: "f32", z: "f32"},
 		rendering: {id: "i32"}
 	},
-
 	state: stateHandler,
-
 	queries: {
 		visualChanges: {
 			zakhaarifStd_position: "required",

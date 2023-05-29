@@ -188,7 +188,9 @@ export interface ModAccessor<
     }
     readonly archs: {
         readonly [key in keyof T["archetypes"]]: {
-            id: () => number
+            readonly id: number
+            readonly modId: number
+            readonly name: string
                 
             /** returns the amount of memory (bytes) a single entity consumes */
             sizeOfEntity: () => number
@@ -196,6 +198,7 @@ export interface ModAccessor<
             entityCount: () => number
             /** the number of entities that can be held before component buffers need to be resized */
             entityCapacity: () => number
+            componentCount: () => number
         } 
     }
 

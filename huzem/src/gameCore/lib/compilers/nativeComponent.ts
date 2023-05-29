@@ -63,7 +63,7 @@ type NativeComponentMeta = {
     sizeof: number
 }
 
-export type GeneratedNativeComponents = {
+export type NativeComponentContext = {
 	layoutMap: { 
 		readonly new: () => LayoutMap, 
 		readonly registry: readonly LayoutMap[] 
@@ -76,16 +76,16 @@ export type GeneratedNativeComponents = {
 	views: readonly (NativeViewerSoaFactory | NativeViewerFactory)[]
 }
 
-export type ComponentRegisterMeta = Readonly<{
+export type NativeDescriptor = Readonly<{
 	classId: number
     name: string,
     definition: ComponentDefinition
 }>
 
 export function nativeComponentFactory(
-	components: ComponentRegisterMeta[],
+	components: NativeDescriptor[],
 	jsHeap: JsHeapRef
-): GeneratedNativeComponents {
+): NativeComponentContext {
 	const uniqueFieldNames = new Set<string>()
 	const componentMeta: NativeComponentMeta[] = []
 	const layouts: LayoutMeta[] = []
@@ -334,4 +334,4 @@ export function nativeComponentFactory(
 	}
 }
 
-export const orderKeys = (meta: ComponentRegisterMeta) => Object.keys(meta.definition).sort()
+export const orderKeys = (meta: NativeDescriptor) => Object.keys(meta.definition).sort()

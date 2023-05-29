@@ -4,7 +4,7 @@ import { JsHeapRef } from "zakhaarif-dev-tools"
 import {
     nativeComponentFactory, 
     orderKeys,
-    ComponentRegisterMeta
+    NativeDescriptor
 } from "./nativeComponent"
 
 
@@ -12,7 +12,7 @@ const randomComponents = (min = 4, max = 10) => {
     const test = []
     const len = faker.datatype.number({min, max})
     for (let i = 0; i < len; i++) {
-        let comp: ComponentRegisterMeta
+        let comp: NativeDescriptor
         {
             const classId = i
             const type = Math.random() > 0.5 ? "f32" : "i32"
@@ -226,7 +226,7 @@ describe("pointer view array-of-struct layouts", () => {
 
 describe("layout merging", () => {
     it("components that have the same fields should point to the same class layout", () => {
-        const comps: ComponentRegisterMeta[] = [
+        const comps: NativeDescriptor[] = [
             {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}, classId: 0},
             {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}, classId: 1},
         ]
