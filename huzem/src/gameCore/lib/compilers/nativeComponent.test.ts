@@ -14,18 +14,18 @@ const randomComponents = (min = 4, max = 10) => {
     for (let i = 0; i < len; i++) {
         let comp: NativeDescriptor
         {
-            const classId = i
+            const id = i
             const type = Math.random() > 0.5 ? "f32" : "i32"
             type Def = Record<string, "f32"> | Record<string, "i32">
-            const definition: Def  = {}
+            const def: Def  = {}
             const len = faker.datatype.number({min: 1, max: 9})
             for (let i = 0; i < len; i++) {
-                definition[`_${faker.word.noun()}`] = type
+                def[`_${faker.word.noun()}`] = type
             }
             comp = {
                 name: `randomPkg_${faker.word.noun()}`,
-                definition,
-                classId
+                def,
+                id
             }
         }
         test.push(comp)
@@ -50,7 +50,7 @@ describe("generating class object code", () => {
         expect(instance.layoutId$).toBeTypeOf("number")
         expect(instance.size$).toBeTypeOf("number")
         const fields = comps.map(
-            ({definition}) => Object.keys(definition)
+            ({def}) => Object.keys(def)
         )
         for (const field of fields.flat()) {
             expect(instance[field]).toBeTypeOf("number")
@@ -61,7 +61,7 @@ describe("generating class object code", () => {
         const comps = randomComponents()
         const context = nativeComponentFactory(comps, heap)
         const fields = comps.map(
-            ({definition}) => Object.keys(definition)
+            ({def}) => Object.keys(def)
         ).flat()
 
         for (const V of context.views) {
@@ -80,7 +80,7 @@ describe("generating class object code", () => {
         for (const V of context.views) {
             const instance = new V()
             for (const c of comps) {
-                const self = instance.toLayout$(c.classId)
+                const self = instance.toLayout$(c.id)
                 expect(self.layoutId$()).toBeTypeOf("number")
                 expect(self.layoutId$()).not.toBe(0)
             }
@@ -92,7 +92,7 @@ describe("generating class object code", () => {
         const context = nativeComponentFactory(comps, heap)
         const nonExistent = 10_000
         const nonExistentComp = comps.find(
-            ({classId}) => classId === nonExistent
+            ({id}) => id === nonExistent
         )
         expect(nonExistentComp).toBe(undefined)
         for (const V of context.views) {
@@ -110,8 +110,8 @@ describe("generating class object code", () => {
             const v = new V()
             for (const c of comps) {
                 const BYTES_PER_32BITS = 4
-                expect(v.toLayout$(c.classId).sizeof$()).toBe(
-                    Object.keys(c.definition).length * BYTES_PER_32BITS 
+                expect(v.toLayout$(c.id).sizeof$()).toBe(
+                    Object.keys(c.def).length * BYTES_PER_32BITS 
                 )
             }
         }
@@ -124,8 +124,8 @@ describe("generating class object code", () => {
         for (const V of context.views) {
             const v = new V()
             for (const c of comps) {
-                const obj = v.toLayout$(c.classId).toObject()
-                const keys = Object.keys(c.definition)
+                const obj = v.toLayout$(c.id).toObject()
+                const keys = Object.keys(c.def)
                 expect(Object.keys(obj)).length(keys.length)
                 for (const key of keys) {
                     type K = keyof typeof obj
@@ -147,8 +147,8 @@ describe("pointer view array-of-struct layouts", () => {
         for (const V of views) {
             const v = new V()
             for (const m of comps) {
-                const comp = v.toLayout$(m.classId)
-                const keys = orderKeys(m)
+                const comp = v.toLayout$(m.id)
+                const keys = orderKeys(m.def)
                 const testindexes = 10
                 for (let i = 0; i < testindexes; i++) {
                     const inc = i * 10
@@ -186,9 +186,9 @@ describe("pointer view array-of-struct layouts", () => {
         for (const V of views) {
             const v = new V()
             for (const m of comps) {
-                const comp = v.toLayout$(m.classId)
+                const comp = v.toLayout$(m.id)
 
-                const fields = orderKeys(m)
+                const fields = orderKeys(m.def)
                 const fieldCount = fields.length
                 const datastart = fieldCount
                 const testfields = 10
@@ -227,8 +227,8 @@ describe("pointer view array-of-struct layouts", () => {
 describe("layout merging", () => {
     it("components that have the same fields should point to the same class layout", () => {
         const comps: NativeDescriptor[] = [
-            {name: "c1", definition: {x: "i32", y: "i32", z: "i32"}, classId: 0},
-            {name: "c2", definition: {x: "i32", z: "i32", y: "i32"}, classId: 1},
+            {name: "c1", def: {x: "i32", y: "i32", z: "i32"}, id: 0},
+            {name: "c2", def: {x: "i32", z: "i32", y: "i32"}, id: 1},
         ]
         const context = nativeComponentFactory(comps, heap)
         const instance1 = new context.PointerViewI32()

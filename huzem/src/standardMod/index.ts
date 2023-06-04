@@ -26,10 +26,10 @@ const data = def.data({
 	},
 	state: stateHandler,
 	queries: {
-		visualChanges: {
-			zakhaarifStd_position: "required",
-			zakhaarifStd_rendering: "required"
-		}
+		visualChanges: [
+			{component: "zakhaarifStd_position", type: "required"},
+			{component: "zakhaarifStd_rendering", type: "required"}
+		],
 	},
 	archetypes: {
 		player: {

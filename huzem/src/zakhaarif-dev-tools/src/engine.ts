@@ -9,9 +9,14 @@ export type ConsoleCommandIndex = {
 
 export type ComponentMetadata = Readonly<{
     id: number
-    isFloat: boolean
     fieldCount: number
     def: ComponentDefinition
+    fieldTokens: ReadonlyArray<{
+        byteSize: number
+        type: string
+        fieldName: string
+        offset: number
+    }>
     name: string
     sizeof: number
 }>

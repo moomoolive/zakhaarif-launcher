@@ -1,26 +1,17 @@
-import type {
-	ModAccessor,
-} from "zakhaarif-dev-tools"
+import type {ModAccessor} from "zakhaarif-dev-tools"
 
 export type ComponentBuffer = {
-	bufferPtrs: ReadonlyArray<{
-		// pointer for jsBuffer type (elementSize = 0)
-		// will point into JsObjectHeap
-		// otherwise it will point into wasmHeap
-		ptr: number
-		// should be in ascending order
-		// so binary search can be used for lookup
-		readonly id: number
-	
+	// pointer for jsBuffer type (elementSize = 0)
+	// will point into JsObjectHeap
+	// otherwise it will point into wasmHeap
+	bufferPtrs: Uint32Array,
+	meta: ReadonlyArray<{
 		// concatenated into meta field
-		/** size of an element in buffer */
 		// js field size will be 0 (unsized)
 		// otherwise size must be bigger than >= 32 bytes
+		/** size of an element in buffer */
 		readonly elementSize: number
-		readonly isJsBuffer: boolean
-		// concat end
-	}>,
-	readonly fieldCount: number
+	}>
 }
 
 type ArchetypeAccessor = ModAccessor["archs"][string]

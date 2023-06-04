@@ -2,6 +2,7 @@ import type {
 	ComponentDefinition,
 	JsHeapRef,
 } from "zakhaarif-dev-tools"
+import {defineProp} from "../utils"
 
 const RESERVED_LAYOUT_IDS = 1
 const BYTES_PER_32BITS = 4
@@ -55,7 +56,7 @@ type LayoutMeta = {
 }
 
 type NativeComponentMeta = {
-    classId: number
+    id: number
     layoutId: number
     name: string,
     fields: string[]
@@ -77,9 +78,9 @@ export type NativeComponentContext = {
 }
 
 export type NativeDescriptor = Readonly<{
-	classId: number
+	id: number
     name: string,
-    definition: ComponentDefinition
+    def: ComponentDefinition
 }>
 
 export function nativeComponentFactory(
@@ -94,8 +95,8 @@ export function nativeComponentFactory(
 	type LayoutRecord = { fields: string[] }
 	const layoutComponentRecord = new Map<number, LayoutRecord>()
 	for (const component of components) {
-		const {definition, classId, name} = component
-		const fields = orderKeys(component)
+		const {def, id, name} = component
+		const fields = orderKeys(component.def)
         
 		let componentHash = ""
 		for (const field of fields) {
@@ -115,7 +116,7 @@ export function nativeComponentFactory(
 				break
 			}
 			uniqueFieldNames.add(field)
-			componentHash += `${field}:${definition[field]},`
+			componentHash += `${field}:${def[field]},`
 		}
 
 		let layoutId = layoutHashes.size + RESERVED_LAYOUT_IDS
@@ -127,21 +128,16 @@ export function nativeComponentFactory(
 		} else {
 			layoutId = layoutHashes.get(componentHash) || 0
 		}
-		componentLayoutRegistry.set(classId, layoutId)
+		componentLayoutRegistry.set(id, layoutId)
 		componentMeta.push({
-			fields, name, layoutId, sizeof, classId
+			fields, name, layoutId, sizeof, id
 		})
 	}
 
 	const uniqueFieldList = [...uniqueFieldNames].sort()
 	const baseLayout: LayoutMap = {size$: 0, layoutId$: 0}
 	for (const unique of uniqueFieldList) {
-		Object.defineProperty(baseLayout, unique, {
-			value: 0,
-			enumerable: true,
-			configurable: true,
-			writable: false
-		})
+		defineProp(baseLayout, unique, 0)
 	}
 
 	const layoutRegistry = [baseLayout]
@@ -154,12 +150,7 @@ export function nativeComponentFactory(
 		for (let x = 0; x < fields.length; x++) {
 			const field = fields[x]
 			const offset = x
-			Object.defineProperty(layout, field, {
-				value: offset,
-				enumerable: true,
-				configurable: true,
-				writable: false
-			})
+			defineProp(layout, field, offset)
 		}
 		layoutRegistry.push(layout)
 	}
@@ -215,12 +206,7 @@ export function nativeComponentFactory(
 			ref$() { return this }
 			move$() { return this }
 		}
-		Object.defineProperty(View, "name", {
-			value: `PointerView${variant.toUpperCase()}`,
-			configurable: true,
-			enumerable: true
-		})
-	
+		defineProp(View, "name", `PointerView${variant.toUpperCase()}`)
 		const h = jsHeap
 		const [heapvar] = Object.keys({h})
 		const heap = `${heapvar}.${variant}`
@@ -235,7 +221,6 @@ export function nativeComponentFactory(
 				get() {return ${heap}[${computePtr}]},
 				set(v) {${heap}[${computePtr}] = v}
 			}`)(jsHeap)
-			
 			Object.defineProperty(proto, field, getSet)
 		}
 		aosClasses.push(View)
@@ -291,12 +276,8 @@ export function nativeComponentFactory(
 			ref$() { return this }
 			move$() { return this }
 		}
-		Object.defineProperty(View, "name", {
-			value: `PointerViewSoa${variant.toUpperCase()}`,
-			configurable: true,
-			enumerable: true
-		})
-	
+		defineProp(View, "name", `PointerViewSoa${variant.toUpperCase()}`)
+
 		const h = jsHeap
 		const [heapvar] = Object.keys({h})
 		const heap = `${heapvar}.${variant}`
@@ -334,4 +315,4 @@ export function nativeComponentFactory(
 	}
 }
 
-export const orderKeys = (meta: NativeDescriptor) => Object.keys(meta.definition).sort()
+export const orderKeys = (def: ComponentDefinition) => Object.keys(def).sort()

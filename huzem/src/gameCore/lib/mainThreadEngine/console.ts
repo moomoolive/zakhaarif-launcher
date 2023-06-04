@@ -5,6 +5,7 @@ import type {
 	ModConsoleCommand,
 	ParsedConsoleCommandInput,
 } from "zakhaarif-dev-tools"
+import {defineProp} from "../utils"
 
 export function validateCommandInput<
 	T extends ConsoleCommandInputDeclaration
@@ -108,31 +109,22 @@ export function createCommand<T extends ConsoleCommandInputDeclaration>(
 	index: ConsoleCommandIndex,
 	command: ModConsoleCommand<MainThreadEngine, T>
 ) {
-	Object.defineProperty(command.fn, "name", {
-		value: command.name,
-		enumerable: true,
-		configurable: true,
-		writable: false
-	})
+	defineProp(command.fn, "name", command.name)
 	
-	Object.defineProperty(index, command.name, {
-		value: (input: Record<string, string | boolean | number | undefined> = {}) => {
-			if (typeof input === "object" && input !== null && input.args) {
-				console.info(`[${command.name}] arguments`, command.args)
-				return "ok"
-			}
-			const validateResponse = validateCommandInput(command.args || {}, input, command.name)
-			if (validateResponse.length > 0) {
-				console.error(validateResponse)
-				return "error"
-			} 
-			return command.fn(
-				engine, 
-				input as ParsedConsoleCommandInput<NonNullable<typeof command.args>>
-			)  || "ok"
-		},
-		enumerable: true,
-		configurable: true,
-		writable: false
+	type Input = Record<string, string | boolean | number | undefined>
+	defineProp(index, command.name, (input: Input = {}) => {
+		if (typeof input === "object" && input !== null && input.args) {
+			console.info(`[${command.name}] arguments`, command.args)
+			return "ok"
+		}
+		const validateResponse = validateCommandInput(command.args || {}, input, command.name)
+		if (validateResponse.length > 0) {
+			console.error(validateResponse)
+			return "error"
+		} 
+		return command.fn(
+			engine, 
+			input as ParsedConsoleCommandInput<NonNullable<typeof command.args>>
+		)  || "ok"
 	})
 }

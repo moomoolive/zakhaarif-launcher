@@ -18,3 +18,39 @@ Null.prototype = null
 export const EMPTY_OBJECT = {}
 
 export const EMPTY_FUNCTION = () => {}
+
+const propDescriptor = {
+	value: <unknown>null,
+	configurable: true,
+	enumerable: true,
+	writable: false,
+}
+
+/**
+ * Defines a property on an inputted object with optional
+ * arguments to specify descriptors. Nearly identical to
+ * `Object.defineProperty` but avoids the overhead of making
+ * a new object every time an new property is created.
+ */
+export function defineProp<
+    const TObj extends object, 
+    const TValue
+>(
+	object: TObj, 
+	property: string,
+	value: TValue,
+	enumerable = true,
+	writable = false,
+	configurable = true,
+): TObj {
+	propDescriptor.enumerable = enumerable
+	propDescriptor.writable = writable
+	propDescriptor.configurable = configurable
+	propDescriptor.value = value
+	Object.defineProperty(object, property, propDescriptor)
+	// overwrite here in case property value is a large object
+	// which won't be garbage collected if we hang onto the
+	// value
+	propDescriptor.value = null 
+	return object
+}

@@ -31,11 +31,11 @@ export type ComponentDeclaration = {
 }
 
 export type QueryDeclaration<T extends string> = {
-    readonly [key: string]: {
-        readonly [innerkey in T]?: (
-            "required" | "optional" | "without"
-        )
-    }
+    readonly [key: string]: ReadonlyArray<Readonly<{
+        component: T
+        type?: "required" | "optional" | "without"
+        access?: "read" | "write"
+    }>>
 }
 
 export type ExtractModComponentNames<

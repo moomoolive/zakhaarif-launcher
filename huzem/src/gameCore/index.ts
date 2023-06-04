@@ -2,6 +2,7 @@ import {MainScriptArguments} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
 import {createWasmMemory} from "./lib/wasm/coreTypes"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
+import {defineProp} from "./lib/utils"
 
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
@@ -55,18 +56,8 @@ export const main = async (args: MainScriptArguments) => {
 	// These engine properties are added to the 
 	// global object so that they
 	// can be easily accessed from browser console (or repl)
-	Object.defineProperty(globalThis, "zengine", {
-		value: engine,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
-	Object.defineProperty(globalThis, "zconsole", {
-		value: engine.devConsole.index,
-		enumerable: true,
-		writable: false,
-		configurable: true
-	})
+	defineProp(globalThis, "zengine", engine)
+	defineProp(globalThis, "zconsole", engine.devConsole.index)
 
 	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
 		id: "daemon-recommend-style-sheet"
@@ -138,14 +129,17 @@ export const main = async (args: MainScriptArguments) => {
 		window.requestAnimationFrame(engine.gameLoopHandler)
 	}
 
-	window.requestAnimationFrame(function initGameLoop(time: number) {
+	window.requestAnimationFrame((time) => {
 		const response = engine.ignite(time)
 		if (response !== MainEngine.STATUS_CODES.ok) {
 			console.error("engine failed to start, returned with status", response)
 			return
 		}
 		const milliseconds = 1_000
-		setTimeout(() => messageAppShell("readyForDisplay"), milliseconds)
+		setTimeout(
+			() => messageAppShell("readyForDisplay"), 
+			milliseconds
+		)
 		console.info("starting game loop...")
 		window.requestAnimationFrame(engine.gameLoopHandler)
 	})
