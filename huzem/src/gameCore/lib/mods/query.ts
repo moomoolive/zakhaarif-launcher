@@ -13,6 +13,13 @@ export class Query extends Null implements QueryAccessor {
 	modId = 0
 	name = ""
 
+	iteratorComponents = <number[]>[]
+
+	requiredComps = <number[]>[]
+	optionalComps = <number[]>[]
+	withoutComps = <number[]>[]
+	archetypes = <number[]>[]
+
 	next() {
 		return this
 	}

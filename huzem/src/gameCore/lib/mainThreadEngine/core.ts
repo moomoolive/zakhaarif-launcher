@@ -7,6 +7,7 @@ import type {
 	ComponentMetadata,
 	ModMetadata,
 	DependentsWithBrand,
+	Struct,
 } from "zakhaarif-dev-tools"
 import {Mod} from "../mods/mod"
 import {createCommand} from "./console"
@@ -346,7 +347,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 					const arch = new Archetype()
 					stateRef.archetypes.push(arch)
 					defineProp(collection, key, arch)
-					
+
 					arch.id = archId
 					arch.modId = modId
 					arch.name = `${modData.name}_${key}`
@@ -429,14 +430,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 						
 						const compOffset = arch.getComponentOffset(compId)
 						const meta = stateRef.componentMeta[compId]
-						let isFloat = false
-						for (let f = 0; f < meta.fieldTokens.length; f++) {
-							if (meta.fieldTokens[f].type === "f32") {
-								isFloat = true
-								break
-							}
-						}
-
+						const isFloat = meta.fieldTokens[0].type === "f32"
 						const objectDef = comp.initialValue
 						if (isFloat) {
 							const v = floatView.toLayout$(compId)
@@ -455,7 +449,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 				}
 			}
 
-			// initialize queries tbd
+			// initialize queries
 			for (let i = 0; i < mods.length; i++) {
 				const mod = mods[i]
 				const modId = stateRef.mods.length + i
@@ -474,7 +468,93 @@ export class MainEngine extends Null implements MainThreadEngine {
 					query.id = id
 					query.name = `${mod.wrapper.data.name}_${queryName}`
 					query.modId = modId
-					// tbd add component iteratorss
+					
+					const terms = queryRecord[queryName].meta()
+					for (let t = 0; t < terms.length; t++) {
+						const term = terms[t]
+						const compKey = term.key
+						const compId = componentNameToIdMap.get(compKey) || -1
+						const compExists = compId >= 0
+						if (!compExists) {
+							// should warn here?
+							continue
+						}
+						if (term.without) {
+							query.withoutComps.push(compId)
+							continue
+						}
+
+						const meta = stateRef.componentMeta[compId]
+						const isFloat = meta.fieldTokens[0].type === "f32"
+						if (isFloat) {
+							const v = new componentContext.PointerViewSoaF32().toLayout$(compId)
+							query.value.push(v as unknown as Struct)
+						} else {
+							const v = new componentContext.PointerViewSoaI32().toLayout$(compId)
+							query.value.push(v as unknown as Struct)
+						}
+
+						if (term.optional) {
+							query.optionalComps.push(compId)
+						} else {
+							query.requiredComps.push(compId)
+						}
+						query.iteratorComponents.push(compId)
+					}
+
+					const compMap = archComponentMap
+					const initialArchsSet = compMap.get(query.requiredComps[0])
+					if (!initialArchsSet) {
+						// iterators should have at least one required
+						// component for query
+						// warn here?
+						continue
+					}
+					const initialArchs = [...initialArchsSet]
+					query.archetypes = initialArchs
+					for (let t = 1; t < query.requiredComps.length; t++) {
+						const requiredCompId = query.requiredComps[t]
+						const compSet = compMap.get(requiredCompId)
+						if (!compSet) {
+							// warn here ?
+							continue
+						}
+
+						const removeIndexes: number[] = []
+						for (let a = 0; a < initialArchs.length; a++) {
+							const archId = initialArchs[a]
+							const archHasComp = compSet.has(archId)
+							if (!archHasComp) {
+								removeIndexes.push(a)
+							}
+						}
+
+						for (let a = 0; a < removeIndexes.length; a++) {
+							initialArchs.splice(removeIndexes[a], 1)
+						}
+					}
+
+					for (let t = 0; t < query.withoutComps.length; t++) {
+						const withoutCompId = query.requiredComps[t]
+						const compSet = compMap.get(withoutCompId)
+						if (!compSet) {
+							// warn here ?
+							continue
+						}
+
+						const removeIndexes: number[] = []
+						for (let a = 0; a < initialArchs.length; a++) {
+							const archId = initialArchs[a]
+							const archHasComp = compSet.has(archId)
+							if (archHasComp) {
+								removeIndexes.push(a)
+							}
+						}
+
+						for (let a = 0; a < removeIndexes.length; a++) {
+							initialArchs.splice(removeIndexes[a], 1)
+						}
+					}
 				}
 			}
 
