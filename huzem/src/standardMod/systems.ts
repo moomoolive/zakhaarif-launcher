@@ -261,6 +261,20 @@ export const visualChanges: System = ({mods}) => {
 	mesh.position.x = position.x
 	mesh.position.z = position.z
 	mesh.position.y = position.y
+
+	/*const query = zakhaarifStd.queries.visualChanges
+	for (const [pos, render, transform] of query.iter()) {
+		if (transform.isSome()) {
+			const v = transform
+		} else if (transform.isNone()) {
+			const v = transform
+		}
+		const mesh = activeMeshes[render.id]
+		mesh.position.x = pos.x
+		mesh.position.y = pos.y
+		mesh.position.z = pos.z
+	}
+	const arch = zakhaarifStd.archs.player*/
 }
 
 export const render: System = ({mods}) => {

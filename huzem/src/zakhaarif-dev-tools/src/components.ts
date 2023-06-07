@@ -28,15 +28,9 @@ export type TokenToNumber<T extends StructToken> = (
 )
 
 export type Struct<
-    // _TName is only used for intellisense, doesn't have
-    // any functionality
-    _TName extends string = "unnamed",
-    TDef extends StructDefintion = StructDefintion
-> = (
-    { [MemoryLayout]: "struct" }
-    & {
-        [key in keyof TDef]: TDef[key] extends StructToken 
-            ? TokenToNumber<TDef[key]>
-            : never
-    }
-)
+    T extends StructDefintion = StructDefintion
+> = {
+    [key in keyof T]: T[key] extends StructToken 
+        ? TokenToNumber<T[key]>
+        : never
+}

@@ -54,3 +54,5 @@ export function defineProp<
 	propDescriptor.value = null 
 	return object
 }
+
+export const not_implemented = () => { throw new Error("block not implemented yet") }

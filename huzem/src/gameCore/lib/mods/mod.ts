@@ -1,6 +1,5 @@
 import type {
 	ModMetadata,
-	QueryAccessor,
 	ModAccessor,
 } from "zakhaarif-dev-tools"
 import {Null} from "../utils"
@@ -11,7 +10,7 @@ export type CompiledModConfig = {
 	version: string
 	state: object
 	meta: ModMetadata
-	queries: Record<string, QueryAccessor>
+	queries: ModAccessor["queries"]
 	archetypes: ModAccessor["archs"],
 	componentIds: Record<string, number>
 }
@@ -22,7 +21,7 @@ export class Mod extends Null implements ModAccessor {
 	readonly version: string
 	readonly singleton: object
 	readonly meta: ModMetadata
-	readonly queries: Record<string, QueryAccessor>
+	readonly queries: ModAccessor["queries"]
 	readonly archs: ModAccessor["archs"]
 	readonly comps: Record<string, number>
 

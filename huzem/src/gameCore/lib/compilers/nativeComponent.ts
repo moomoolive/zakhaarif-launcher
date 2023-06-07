@@ -27,6 +27,11 @@ export interface BaseNativeViewer<Self extends object> {
 	mut$(): this
 	ref$(): this
 	move$(): this
+
+	// native field properties won't actually be called this
+	// but with will allow mutation of random properties
+	// with number value
+	[key: `_${string}`]: number;
 }
 
 // default layout is "Aos", which stands for struct of arrays. 
@@ -205,6 +210,8 @@ export function nativeComponentFactory(
 			mut$() { return this }
 			ref$() { return this }
 			move$() { return this }
+
+			[key: `_${string}`]: number;
 		}
 		defineProp(View, "name", `PointerView${variant.toUpperCase()}`)
 		const h = jsHeap
@@ -275,6 +282,8 @@ export function nativeComponentFactory(
 			mut$() { return this }
 			ref$() { return this }
 			move$() { return this }
+
+			[key: `_${string}`]: number;
 		}
 		defineProp(View, "name", `PointerViewSoa${variant.toUpperCase()}`)
 

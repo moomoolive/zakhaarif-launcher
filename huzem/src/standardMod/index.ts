@@ -14,6 +14,7 @@ import {DebugLayer} from "babylonjs"
 
 const data = def.data({
 	name: "zakhaarifStd",
+	dependencies: def.deps(),
 	components: {
 		transform: {x: "f32", y: "f32", z: "f32"},
 		velocity: {x: "f32", y: "f32", z: "f32"},
@@ -24,32 +25,33 @@ const data = def.data({
 		collider: {x: "f32", y: "f32", z: "f32"},
 		rendering: {id: "i32"}
 	},
-	state: stateHandler,
-	queries: {
-		visualChanges: [
-			{component: "zakhaarifStd_position", type: "required"},
-			{component: "zakhaarifStd_rendering", type: "required"}
-		],
-	},
-	archetypes: {
-		player: {
-			zakhaarifStd_transform: {},
-			zakhaarifStd_impulse: {},
-			zakhaarifStd_collider: {x: 0.5, y: 1.0, z: 0.5},
-			zakhaarifStd_kinematics: {mass: 10.0, gravityModifier: 1.0},
-			zakhaarifStd_velocity: {},
-			zakhaarifStd_acceleration:  {x: 2_000.0, y: 0.25, z: 2_000.0},
-			zakhaarifStd_position: {x: 2_048.0, y: 100.0, z: 2_048.0},
-			zakhaarifStd_rendering: {}
-		}
-	}
+	state: stateHandler
 })
 
-export type Utils = Zutils<typeof data>
+export type Utils = Zutils<typeof mod>
 export type System = Utils["System"]
 
-export const mod = def({
+export const mod = def.mod({
 	data,
+	queries: {
+		visualChanges: def.query<typeof data>()
+			.required("zakhaarifStd_position")
+			.required("zakhaarifStd_rendering")
+			.optional("zakhaarifStd_transform", true)
+			.build()
+	},
+	archetypes: {
+		player: def.arch<typeof data>()
+			.comp("zakhaarifStd_transform")
+			.comp("zakhaarifStd_impulse")
+			.comp("zakhaarifStd_collider", {x: 0.5, y: 1.0, z: 0.5})
+			.comp("zakhaarifStd_kinematics", {mass: 10.0, gravityModifier: 1.0})
+			.comp("zakhaarifStd_velocity")
+			.comp("zakhaarifStd_acceleration", {x: 2_000.0, y: 0.25, z: 2_000.0})
+			.comp("zakhaarifStd_position", {x: 2_048.0, y: 100.0, z: 2_048.0})
+			.comp("zakhaarifStd_rendering")
+			.build()
+	},
 	onInit: (meta) => {
 		console.info("init called with meta", meta)
 	},
@@ -226,4 +228,3 @@ export const mod = def({
 		})
 	},
 })
-

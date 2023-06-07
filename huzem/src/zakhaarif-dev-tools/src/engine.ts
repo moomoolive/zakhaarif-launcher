@@ -98,7 +98,7 @@ export type MainThreadEngineCore = Readonly<{
      * (__VERY BAD!__) if used incorrectly.
      * */
     wasmHeap: Readonly<{
-        getRawMemory: () => WebAssembly.Memory
+        rawMemory: () => WebAssembly.Memory
         /**  __UNSAFE!__ 
          * 
          * Allocates a given amount of bytes on heap and returns a 

@@ -42,7 +42,7 @@ export class WasmAllocator implements Allocator {
 		}
 	}
 	
-	getRawMemory(): WebAssembly.Memory {
+	rawMemory(): WebAssembly.Memory {
 		return this.wasmMemory
 	}
 

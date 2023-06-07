@@ -12,3 +12,4 @@ export declare const CanAlias: unique symbol
 export declare const PointerType: unique symbol
 
 export declare const InnerMods: unique symbol
+export const InnerValue = Symbol("inner-query")

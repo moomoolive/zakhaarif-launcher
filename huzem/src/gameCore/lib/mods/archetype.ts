@@ -1,4 +1,5 @@
 import type {ModAccessor} from "zakhaarif-dev-tools"
+import {not_implemented} from "../utils"
 
 export type ComponentBuffer = {
 	// pointer for jsBuffer type (elementSize = 0)
@@ -26,7 +27,6 @@ export class Archetype implements ArchetypeAccessor {
 	entityBytes = 0
 	numberOfEntities = 0
 	capacityForEntities = 0
-
 	// should be in ascending order
 	// so binary search can be used for lookup
 	componentIds = <number[]>[]
@@ -36,6 +36,7 @@ export class Archetype implements ArchetypeAccessor {
 	// it's respective buffer should be
 	// at position 2.
 	componentBuffers = <ComponentBuffer[]>[]
+	templatesPtr = 0
 
 	sizeOfEntity(): number {
 		return this.entityBytes
@@ -51,6 +52,10 @@ export class Archetype implements ArchetypeAccessor {
 
 	componentCount(): number {
 		return this.componentIds.length
+	}
+
+	getComponentOffset(_componentId: number): number {
+		return not_implemented()
 	}
 }
 

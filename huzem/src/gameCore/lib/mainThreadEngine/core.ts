@@ -6,7 +6,6 @@ import type {
 	LinkableMod,
 	ComponentMetadata,
 	ModMetadata,
-	QueryAccessor,
 	DependentsWithBrand,
 } from "zakhaarif-dev-tools"
 import {Mod} from "../mods/mod"
@@ -23,6 +22,7 @@ import {
 	nativeComponentFactory,
 	orderKeys
 } from "../compilers/nativeComponent"
+import {Query} from "../mods/query"
 
 export type ModLinkInfo = {
 	wrapper: LinkableMod,
@@ -33,6 +33,22 @@ export type ModLinkInfo = {
 }
 
 const BYTES_PER_32_BITS = 4
+
+const ENTITY_META_COMP = { 
+	id: 0,
+	name: "entityMeta", 
+	def: {entityId: "i32"},
+	fieldTokens: [
+		{
+			byteSize: BYTES_PER_32_BITS,
+			fieldName: "entityId",
+			type: "i32",
+			offset: 0
+		}
+	],
+	sizeof: 1 * BYTES_PER_32_BITS,
+	fieldCount: 1
+} as const satisfies ComponentMetadata
 
 export type EngineConfig = {
     rootCanvas?: HTMLCanvasElement | null
@@ -60,24 +76,11 @@ export class MainEngine extends Null implements MainThreadEngine {
 		jsStates: <object[]>[],
 		componentMeta: <ComponentMetadata[]>[
 			// standard components
-			{ 
-				id: 0,
-				name: "entityMeta", 
-				def: {entityId: "i32"},
-				fieldTokens: [
-					{
-						byteSize: BYTES_PER_32_BITS,
-						fieldName: "entityId",
-						type: "i32",
-						offset: 0
-					}
-				],
-				sizeof: 1 * BYTES_PER_32_BITS,
-				fieldCount: 1
-			}
+			ENTITY_META_COMP
 		],
 		componentIds: <Record<string, number>[]>[],
-		queryCollections: <Record<string, QueryAccessor>[]>[],
+		queries: <Query[]>[],
+		queryCollections: <Record<string, Query>[]>[],
 		archetypes: <Archetype[]>[],
 		archetypeCollections: <Record<string, Archetype>[]>[],
 	}
@@ -226,10 +229,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 			const engine = this
 			const mods = inputMods
 			const stateRef = modStateRef
+			const arr = stateRef.jsStates
 
-			const allStates = mods.map(async (mod, i) => {
-				const {data} = mod.wrapper
-				const response = {ok: true, state: {}, msg: ""}
+			arr.push(await Promise.all(mods.map(async (m, i) => {
+				const {data} = m.wrapper
 				if (!data.state) {
 					return {}
 				}
@@ -238,17 +241,17 @@ export class MainEngine extends Null implements MainThreadEngine {
 				try {
 					return await data.state(meta, engine)
 				} catch (err) {
-					console.error("mod", meta.canonicalUrl, "threw exception during js state initialization", err)
-					response.ok = false
+					const url = meta.canonicalUrl
+					console.error("mod", url, "threw exception during js state initialization", err)
+					status.ok = false
 					status.errors.push({
-						msg: `mod ${meta.canonicalUrl} threw exception during js state initialization ${String(err)}`,
+						msg: `mod ${url} threw exception during js state initialization ${String(err)}`,
 						text: "mod_js_state_init_failed",
 						status: MainEngine.STATUS_CODES.mod_js_state_init_failed
 					})
 					return {}
 				}
-			})
-			stateRef.jsStates.push(await Promise.all(allStates))
+			})))
 		}
 		if (!linkResponse.ok) {
 			return linkResponse
@@ -325,30 +328,36 @@ export class MainEngine extends Null implements MainThreadEngine {
 			type ArchetypeId = number
 			type CompArchMap = Map<ComponentId, Set<ArchetypeId>>
 			const archComponentMap: CompArchMap = new Map()
+			const entityMetaMap = new Set<ArchetypeId>()
+			archComponentMap.set(ENTITY_META_COMP.id, entityMetaMap)
 			for (let i = 0; i < mods.length; i++) {
 				const modId = stateRef.mods.length + i
 				const mod = mods[i]
 				const modData = mod.wrapper.data
-				const archetypes = modData.archetypes || {}
+				const archetypes = mod.wrapper.archetypes || {}
 				type ArchCollection = Record<string, Archetype>
 				const collection = new Null<ArchCollection>()
 				stateRef.archetypeCollections.push(collection)
+				
 				const archKeys = Object.keys(archetypes)
 				for (let a = 0; a < archKeys.length; i++) {
 					const key = archKeys[a]
-					const arch = new Archetype()
 					const archId = stateRef.archetypes.length
+					const arch = new Archetype()
 					stateRef.archetypes.push(arch)
 					defineProp(collection, key, arch)
+					
 					arch.id = archId
 					arch.modId = modId
 					arch.name = `${modData.name}_${key}`
-					const def = archetypes[key]
-					const comps = Object.keys(def)
-					let sizeof = 0
+					const archDef = archetypes[key]
+					const archComps = archDef.meta()
 					
-					for (let c = 0; c < comps.length; i++) {
-						const compKey = comps[c]
+					let sizeof = 0 + ENTITY_META_COMP.sizeof
+					arch.componentIds.push(ENTITY_META_COMP.id)
+					entityMetaMap.add(archId)
+					for (let c = 0; c < archComps.length; i++) {
+						const compKey = archComps[c].key
 						const compId = componentNameToIdMap.get(compKey) || -1
 						const compExists = compId >= 0
 						if (!compExists) {
@@ -369,10 +378,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 					arch.entityBytes = sizeof
 					arch.componentIds.sort()
 
+					const allocator = engine.wasmHeap
 					for (let c = 0; c < arch.componentIds.length; c++) {
 						const compId = arch.componentIds[c]
 						const meta = stateRef.componentMeta[compId]
-						const allocator = engine.wasmHeap
 						const ptrBufferSize = (
 							meta.fieldCount * BYTES_PER_32_BITS
 						)
@@ -380,8 +389,8 @@ export class MainEngine extends Null implements MainThreadEngine {
 							ptrBufferSize,
 							4
 						)
-						const intarrayBuffer = new Uint32Array(
-							allocator.getRawMemory().buffer, 
+						const fieldPtrBuffer = new Uint32Array(
+							allocator.rawMemory().buffer, 
 							bufferPtr, 
 							meta.fieldCount
 						)
@@ -392,19 +401,81 @@ export class MainEngine extends Null implements MainThreadEngine {
 							metabuffer.push({
 								elementSize: token.byteSize
 							})
-							intarrayBuffer[f] = NULL_PTR
+							fieldPtrBuffer[f] = NULL_PTR
 						}
 						arch.componentBuffers.push({
-							bufferPtrs: intarrayBuffer,
+							bufferPtrs: fieldPtrBuffer,
 							meta: metabuffer
 						})
+					}
+
+					const templateCount = 1
+					arch.templatesPtr = allocator.unsafeCalloc(
+						arch.sizeOfEntity() * templateCount,
+						BYTES_PER_32_BITS
+					)
+					const floatView = new componentContext.PointerViewF32()
+					const intView = new componentContext.PointerViewI32()
+					// same process for the rest of templates
+					for (let c = 0; c < archComps.length; c++) {
+						const comp = archComps[c]
+						const compKey = comp.key
+						const compId = componentNameToIdMap.get(compKey) || -1
+						const compExists = compId >= 0
+						if (!compExists) {
+							// should warn here?
+							continue
+						}
+						
+						const compOffset = arch.getComponentOffset(compId)
+						const meta = stateRef.componentMeta[compId]
+						let isFloat = false
+						for (let f = 0; f < meta.fieldTokens.length; f++) {
+							if (meta.fieldTokens[f].type === "f32") {
+								isFloat = true
+								break
+							}
+						}
+
+						const objectDef = comp.initialValue
+						if (isFloat) {
+							const v = floatView.toLayout$(compId)
+							v.p$ = (arch.templatesPtr / BYTES_PER_32_BITS) + compOffset
+							for (const [nativeField, value] of Object.entries(objectDef)) {
+								v[nativeField as `_${string}`] = value
+							}
+						} else {
+							const v = intView.toLayout$(compId)
+							v.p$ = (arch.templatesPtr / BYTES_PER_32_BITS) + compOffset
+							for (const [nativeField, value] of Object.entries(objectDef)) {
+								v[nativeField as `_${string}`] = value
+							}
+						}
 					}
 				}
 			}
 
 			// initialize queries tbd
 			for (let i = 0; i < mods.length; i++) {
-				stateRef.queryCollections.push({})
+				const mod = mods[i]
+				const modId = stateRef.mods.length + i
+				const queryRecord = mod.wrapper.queries || {}
+				
+				const collection = new Null<Record<string, Query>>()
+				stateRef.queryCollections.push(collection)
+				const queryKeys = Object.keys(queryRecord)
+				for (let q = 0; q < queryKeys.length; q++) {
+					const queryName = queryKeys[q]
+					const id = stateRef.queries.length
+					const query = new Query()
+					stateRef.queries.push(query)
+					defineProp(collection, queryName, query)
+
+					query.id = id
+					query.name = `${mod.wrapper.data.name}_${queryName}`
+					query.modId = modId
+					// tbd add component iteratorss
+				}
 			}
 
 			// initialize mod wrapper
@@ -431,7 +502,6 @@ export class MainEngine extends Null implements MainThreadEngine {
 		}
 
 		{ 	// Execute "beforeGameLoop" lifecycle event.
-			// Note: all handlers are executed in parellel 
 			const mods = inputMods
 			const engine = this
 			const response = linkResponse
