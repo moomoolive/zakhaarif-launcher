@@ -79,7 +79,7 @@
     "toml": "^3.0.0",
     "typescript": "^5.0.4",
     "vite": "^3.2.3",
-    "vitest": "^0.25.5",
+    "vitest": "^0.32.0",
     "zakhaarif-dev-tools": "file:huzem/src/zakhaarif-dev-tools/build"
   }
 }

@@ -33,10 +33,10 @@ const propDescriptor = {
  * a new object every time an new property is created.
  */
 export function defineProp<
-    const TObj extends object, 
-    const TValue
+    TObj extends object, 
+    TValue
 >(
-	object: TObj, 
+	object: Readonly<TObj>, 
 	property: string,
 	value: TValue,
 	enumerable = true,
