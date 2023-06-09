@@ -99,7 +99,7 @@ class QueryBuilder<
     // and block all predictions
     TUsedTerms extends string = "$unknown"
 > implements QueryDef {
-    static new<const T extends ModData>() {
+    static new<T extends ModData>() {
         return new QueryBuilder<ExtractComponentMap<T>>()
     }
 
@@ -109,8 +109,8 @@ class QueryBuilder<
     meta(): ReadonlyArray<QueryTermsMeta> { return this.terms }
 
     required<
-        const TKey extends keyof Omit<TComps, TUsedTerms>,
-        const TWrite extends boolean = false
+        TKey extends keyof Omit<TComps, TUsedTerms>,
+        TWrite extends boolean = false
     >(
         componentKey: TKey & string,
         write: TWrite = false as TWrite
@@ -130,8 +130,8 @@ class QueryBuilder<
     }
 
     optional<
-        const TKey extends keyof Omit<TComps, TUsedTerms>,
-        const TWrite extends boolean = false
+        TKey extends keyof Omit<TComps, TUsedTerms>,
+        TWrite extends boolean = false
     >(
         componentKey: TKey,
         write: TWrite = false as TWrite
@@ -151,8 +151,8 @@ class QueryBuilder<
     }
 
     without<
-        const TKey extends keyof Omit<TComps, TUsedTerms>,
-    >(componentKey: TKey): QueryBuilder<
+        TKey extends keyof Omit<TComps, TUsedTerms>,
+    >(componentKey: TKey & string): QueryBuilder<
         TComps, TTerms, TUsedTerms | (TKey & string)
     > {
         this.terms.push({
@@ -193,16 +193,14 @@ class ArchetypeBuilder<
             { [key in T]: TComps[T] } & TDef
         >
     }
-
-    build() { return this }
 }
 
 export const def = {
     data: <
-        const TDeps extends DependentsWithBrand<ReadonlyArray<ModData>>,
-        const TName extends string,
-        const TState extends object,
-        const TComponents extends ComponentDeclaration,
+        TName extends string,
+        TState extends object,
+        TComponents extends ComponentDeclaration,
+        TDeps extends DependentsWithBrand<ReadonlyArray<ModData>> = DependentsWithBrand<readonly []>,
     >(data: ModData<
         TName, 
         TState,
@@ -211,26 +209,33 @@ export const def = {
     >) => data,
 
     mod: <
-        const TData extends ModData,
-        const TQuery extends QueryRecord,
-        const TArchs extends ArchetypeRecord
-    >(zmod: LinkableMod<TData, TQuery, TArchs>) => zmod,
+        TName extends string,
+        TState extends object,
+        TComponents extends ComponentDeclaration,
+        TDeps extends DependentsWithBrand<ReadonlyArray<ModData>>,
+        TQuery extends QueryRecord,
+        TArchs extends ArchetypeRecord
+    >(zmod: LinkableMod<
+        ModData<TName, TState, TComponents, TDeps>, 
+        TQuery, 
+        TArchs
+    >) => zmod,
     
-    components: <const T extends ComponentDeclaration>(component: T) => component,
+    components: <T extends ComponentDeclaration>(component: T) => component,
     
     deps: <
-        const T extends ReadonlyArray<LinkableMod> = []
+        T extends ReadonlyArray<LinkableMod> = readonly []
     >(...deps: DependenciesList<{
         [index in keyof T]: T[index]["data"]
     }>) => deps as DependentsWithBrand<{
         [index in keyof T]: T[index]["data"]
     }>,
         
-    query: <const T extends ModData>() => QueryBuilder.new<T>(),
+    query: <T extends ModData>() => QueryBuilder.new<T>(),
 
-    arch: <const T extends ModData>() => ArchetypeBuilder.new<T>(),
+    arch: <T extends ModData>() => ArchetypeBuilder.new<T>(),
 
-    modUtils<const T extends ModData>() { 
+    modUtils<T extends ModData>() { 
         return this as {
             query: () => ReturnType<typeof QueryBuilder.new<T>>,
             arch: () => ReturnType<typeof ArchetypeBuilder.new<T>>,
@@ -244,7 +249,6 @@ export const def = {
 /*const a = def.mod({
     data : {
         name: "hello_world",
-        dependencies: def.deps(),
         components: {
             vec3: {x: "f32", y: "f32"}
         }
@@ -268,4 +272,5 @@ const query = QueryBuilder.new<typeof b>()
 
 const arch = ArchetypeBuilder.new<typeof b>()
     .comp("hello_world_vec3", {x: 0, y: 0})
-    .comp("herro_pos", {x: 0, y: 0, z: 0})*/
+    .comp("herro_pos", {x: 0, y: 0, z: 0})
+    [InnerValue];*/

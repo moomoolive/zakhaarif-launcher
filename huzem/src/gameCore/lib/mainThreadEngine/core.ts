@@ -607,10 +607,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 	}
 }
 
-type EngineCode = typeof MainEngine.STATUS_CODES[keyof typeof MainEngine.STATUS_CODES]
-type EngineStatusText = keyof typeof MainEngine.STATUS_CODES
+export type EngineCode = typeof MainEngine.STATUS_CODES[keyof typeof MainEngine.STATUS_CODES]
+export type EngineStatusText = keyof typeof MainEngine.STATUS_CODES
 
-type ModLinkStatus = {
+export type ModLinkStatus = {
 	errors: {
 		msg: string 
 		text: EngineStatusText 

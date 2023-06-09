@@ -56,9 +56,9 @@ export type ModData<
     TDeps extends DependentsWithBrand<ReadonlyArray<ModData>> = DependentsWithBrand<ReadonlyArray<any>>
 > = {
     readonly name: TName,
-    readonly dependencies: TDeps
+    readonly dependencies?: TDeps
     readonly components?: TComponentDefs
-    state?: (
+    readonly state?: (
         metadata: ModMetadata,
         engineCore: MainThreadEngineCore, 
     ) => TState | Promise<TState>    
@@ -169,10 +169,10 @@ export type QueryTermsMeta = Readonly<{
     without: boolean
 }>
 
-export type QueryDef = {
+export type QueryDef = Readonly<{
     [InnerValue]: ReadonlyArray<QueryDescriptor>
     meta: () => ReadonlyArray<QueryTermsMeta>
-}
+}>
 
 export type QueryRecord = { 
     readonly [key: string]: QueryDef
@@ -183,10 +183,10 @@ export type ArchetypeCompMeta = Readonly<{
     initialValue: Record<string, number> 
 }>
 
-export type ArchetypeDef = {
+export type ArchetypeDef = Readonly<{
     [InnerValue]: ComponentDeclaration
     meta: () => ReadonlyArray<ArchetypeCompMeta>
-}
+}>
 
 export type ArchetypeRecord = {
     readonly [key: string]: ArchetypeDef
@@ -225,11 +225,11 @@ export interface MainThreadEngine<T extends ModModules = []> extends MainThreadE
     }
 }
 
-export type ModLifeCycleEvents<T extends ModModules> = {
+export type ModLifeCycleEvents<T extends ModModules> = Readonly<{
     onInit?: (metadata: ModMetadata, engineCore: MainThreadEngineCore) => Promise<void> | void
     onBeforeGameLoop?: (engine: MainThreadEngine<T>) => Promise<void> | void
     onExit?: (engine: MainThreadEngine<T>) => Promise<void> | void
-}
+}>
 
 export type LinkableMod<
     TData extends ModData = ModData,

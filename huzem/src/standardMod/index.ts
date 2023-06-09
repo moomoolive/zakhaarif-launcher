@@ -14,7 +14,6 @@ import {DebugLayer} from "babylonjs"
 
 const data = def.data({
 	name: "zakhaarifStd",
-	dependencies: def.deps(),
 	components: {
 		transform: {x: "f32", y: "f32", z: "f32"},
 		velocity: {x: "f32", y: "f32", z: "f32"},
@@ -38,7 +37,6 @@ export const mod = def.mod({
 			.required("zakhaarifStd_position")
 			.required("zakhaarifStd_rendering")
 			.optional("zakhaarifStd_transform", true)
-			.build()
 	},
 	archetypes: {
 		player: def.arch<typeof data>()
@@ -50,7 +48,6 @@ export const mod = def.mod({
 			.comp("zakhaarifStd_acceleration", {x: 2_000.0, y: 0.25, z: 2_000.0})
 			.comp("zakhaarifStd_position", {x: 2_048.0, y: 100.0, z: 2_048.0})
 			.comp("zakhaarifStd_rendering")
-			.build()
 	},
 	onInit: (meta) => {
 		console.info("init called with meta", meta)
