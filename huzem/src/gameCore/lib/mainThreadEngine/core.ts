@@ -64,10 +64,10 @@ export type EngineConfig = {
 export class MainEngine extends Null implements MainThreadEngine {
 	static readonly STATUS_CODES = {
 		ok: 0,
-		mod_before_event_loop_failed: 100,
-		mod_js_state_init_failed: 101,
-		mod_init_hook_failed: 102,
-		mod_package_invalid_type: 103,
+		before_loop_handler_failed: 100,
+		state_handler_failed: 101,
+		init_handler_failed: 102,
+		mod_invalid_type: 103,
 	} as const
 	
 	mods = new Null<{ readonly [key: string]: Mod }>()
@@ -164,8 +164,8 @@ export class MainEngine extends Null implements MainThreadEngine {
 				response.ok = false
 				response.errors.push({
 					msg: `mod ${canonicalUrl} is not typed correctly ${error}`,
-					text: "mod_package_invalid_type",
-					status: MainEngine.STATUS_CODES.mod_package_invalid_type
+					text: "mod_invalid_type",
+					status: MainEngine.STATUS_CODES.mod_invalid_type
 				})
 			}
 		}
@@ -194,69 +194,22 @@ export class MainEngine extends Null implements MainThreadEngine {
 			}
 		}
 
-		{ 	// Execute "init" lifecycle hook for all mods. 
-			const response = linkResponse
-			const mods = inputMods
-			const metadata = modStateRef.metadatas
-			const engine = this
-			const stateRef = modStateRef
-
-			await Promise.all(mods.map(async (mod, i) => {
-				const {wrapper} = mod
-				if (!wrapper.onInit) {
-					return
-				}
-				const modId = stateRef.mods.length + i 
-				const meta = metadata[modId]
-				try {
-					await wrapper.onInit(meta, engine)
-				} catch (err) {
-					console.error("mod", meta.canonicalUrl, "threw exception in init hook", err)
-					response.errors.push({
-						msg: `mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`,
-						text: "mod_init_hook_failed",
-						status: MainEngine.STATUS_CODES.mod_init_hook_failed
-					})
-				}
-			}))
-		}
-		if (!linkResponse.ok) {
-			return linkResponse
+		const initResponse = await runInitEvent(
+			linkResponse, inputMods, this, 
+			modStateRef.metadatas, modStateRef.mods.length, true
+		)
+		if (!initResponse.ok) {
+			return initResponse
 		}
 
-		{	// Initialize mod state singletons for all mods.
-			const status = linkResponse
-			const metadata = modStateRef.metadatas
-			const engine = this
-			const mods = inputMods
-			const stateRef = modStateRef
-			const arr = stateRef.jsStates
-
-			arr.push(await Promise.all(mods.map(async (m, i) => {
-				const {data} = m.wrapper
-				if (!data.state) {
-					return {}
-				}
-				const modId = stateRef.mods.length + i
-				const meta = metadata[modId]
-				try {
-					return await data.state(meta, engine)
-				} catch (err) {
-					const url = meta.canonicalUrl
-					console.error("mod", url, "threw exception during js state initialization", err)
-					status.ok = false
-					status.errors.push({
-						msg: `mod ${url} threw exception during js state initialization ${String(err)}`,
-						text: "mod_js_state_init_failed",
-						status: MainEngine.STATUS_CODES.mod_js_state_init_failed
-					})
-					return {}
-				}
-			})))
+		const stateRes = await createStateSingletons(
+			linkResponse, inputMods, this,
+			modStateRef.metadatas, modStateRef.mods.length, true
+		)
+		if (!stateRes.status.ok) {
+			return stateRes.status
 		}
-		if (!linkResponse.ok) {
-			return linkResponse
-		}
+		modStateRef.jsStates.push(stateRes.singletons)
 		
 		{	// Create mod wrappers for each mod.
 			// Mods wrappers allow mods to reference each 
@@ -581,29 +534,9 @@ export class MainEngine extends Null implements MainThreadEngine {
 			}
 		}
 
-		{ 	// Execute "beforeGameLoop" lifecycle event.
-			const mods = inputMods
-			const engine = this
-			const response = linkResponse
-
-			await Promise.all(mods.map(async (mod) => {
-				if (!mod.wrapper.onBeforeGameLoop) {
-					return
-				}
-				try {
-					await mod.wrapper.onBeforeGameLoop(engine)
-				} catch (err) {
-					console.error("mod", mod.canonicalUrl, "threw exception during before game loop event", err)
-					response.errors.push({
-						msg: `mod ${mod.canonicalUrl} threw exception during before game loop event ${String(err)}`,
-						text: "mod_before_event_loop_failed",
-						status: MainEngine.STATUS_CODES.mod_before_event_loop_failed
-					})
-				}
-			}))
-		}
-
-		return linkResponse
+		return await runBeforeLoopEvent(
+			linkResponse, inputMods, this, true
+		)
 	}
 }
 
@@ -617,4 +550,120 @@ export type ModLinkStatus = {
 		status: EngineCode
 	}[]
 	ok: boolean
+}
+
+export type BeforeLoopInfo = {
+	wrapper: Pick<LinkableMod, "onBeforeLoop">
+	canonicalUrl: string
+}
+
+export async function runBeforeLoopEvent(
+	out: ModLinkStatus,
+	mods: readonly BeforeLoopInfo[],
+	engine: MainThreadEngine,
+	log = false
+): Promise<ModLinkStatus> {
+	const response = out
+	await Promise.all(mods.map(async (mod) => {
+		if (!mod.wrapper.onBeforeLoop) {
+			return
+		}
+		try {
+			await mod.wrapper.onBeforeLoop(engine)
+		} catch (err) {
+			if (log) {
+				console.error("mod", mod.canonicalUrl, "threw exception during before game loop event", err)
+			}
+			response.ok = false
+			response.errors.push({
+				msg: `mod ${mod.canonicalUrl} threw exception during before game loop event ${String(err)}`,
+				text: "before_loop_handler_failed",
+				status: MainEngine.STATUS_CODES.before_loop_handler_failed
+			})
+		}
+	}))
+	return response
+}
+
+export type InitInfo = {
+	wrapper: Pick<LinkableMod, "onInit">
+}
+
+export type InitMeta = {
+	readonly canonicalUrl: string
+}
+
+export async function runInitEvent(
+	out: ModLinkStatus,
+	mods: readonly InitInfo[],
+	engine: MainThreadEngine,
+	metadata: ModMetadata[],
+	idOffset: number,
+	log = false
+): Promise<ModLinkStatus> {
+	const response = out
+	await Promise.all(mods.map(async (mod, i) => {
+		const {wrapper} = mod
+		if (!wrapper.onInit) {
+			return
+		}
+		const modId = idOffset + i 
+		const meta = metadata[modId]
+		try {
+			await wrapper.onInit(meta, engine)
+		} catch (err) {
+			if (log) {
+				console.error("mod", meta.canonicalUrl, "threw exception in init hook", err)
+			}
+			response.ok = false
+			response.errors.push({
+				msg: `mod ${meta.canonicalUrl} threw exception in init hook ${String(err)}`,
+				text: "init_handler_failed",
+				status: MainEngine.STATUS_CODES.init_handler_failed
+			})
+		}
+	}))
+	return response
+}
+
+export type StateInfo = {
+	wrapper: Pick<LinkableMod, "data">
+}
+
+export async function createStateSingletons(
+	out: ModLinkStatus,
+	mods: readonly StateInfo[],
+	engine: MainThreadEngine,
+	metadata: ModMetadata[],
+	idOffset: number,
+	log = false
+): Promise<{
+    status: ModLinkStatus
+    singletons: object[]
+}> {
+	const status = out
+	const singletons = await Promise.all(mods.map(async (m, i) => {
+		const {data} = m.wrapper
+		if (!data.state) {
+			return {}
+		}
+		const modId = idOffset + i
+		const meta = metadata[modId]
+		try {
+			return await data.state(meta, engine)
+		} catch (err) {
+			const url = meta.canonicalUrl
+			if (log) {
+				console.error("mod", url, "threw exception during js state initialization", err)
+			}
+			status.ok = false
+			status.errors.push({
+				msg: `mod ${url} threw exception during js state initialization ${String(err)}`,
+				text: "state_handler_failed",
+				status: MainEngine.STATUS_CODES.state_handler_failed
+			})
+			return {}
+		}
+	}))
+	return {status, singletons}
 }

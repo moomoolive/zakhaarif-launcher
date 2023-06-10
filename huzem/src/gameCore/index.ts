@@ -1,6 +1,6 @@
 import {MainScriptArguments} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
-import {createWasmMemory} from "./lib/wasm/coreTypes"
+import {createWasmMemory, ffiCore} from "./lib/wasm/coreTypes"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 import {defineProp} from "./lib/utils"
 
@@ -40,9 +40,10 @@ export const main = async (args: MainScriptArguments) => {
 	const binaryUrl = new URL(
 		wasmMap.engine_wasm_core, import.meta.url
 	).href
-	const core = await WebAssembly.instantiateStreaming(fetch(binaryUrl), {
-		wbg: {memory: wasmMemory}
-	})
+	const ffi = ffiCore({wasmMemory})
+	const core = await WebAssembly.instantiateStreaming(
+		fetch(binaryUrl), ffi
+	)
 	const engine = new MainEngine({
 		rootCanvas,
 		threadedMode: false,

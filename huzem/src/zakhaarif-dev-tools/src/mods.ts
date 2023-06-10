@@ -208,7 +208,9 @@ export type EcsSystem<T extends ModModules = []> = (
     (engine: MainThreadEngine<T>) => void 
 )
 
-export interface MainThreadEngine<T extends ModModules = []> extends MainThreadEngineCore {
+export interface MainThreadEngine<
+    T extends ModModules = []
+> extends MainThreadEngineCore {
     readonly systems: Readonly<{
         add: (handler: EcsSystem<T>) => number,
     }>
@@ -227,7 +229,7 @@ export interface MainThreadEngine<T extends ModModules = []> extends MainThreadE
 
 export type ModLifeCycleEvents<T extends ModModules> = Readonly<{
     onInit?: (metadata: ModMetadata, engineCore: MainThreadEngineCore) => Promise<void> | void
-    onBeforeGameLoop?: (engine: MainThreadEngine<T>) => Promise<void> | void
+    onBeforeLoop?: (engine: MainThreadEngine<T>) => Promise<void> | void
     onExit?: (engine: MainThreadEngine<T>) => Promise<void> | void
 }>
 

@@ -5,3 +5,14 @@ export function createWasmMemory(): WebAssembly.Memory {
 		initial: 18, maximum: 16384, shared: true
 	})
 }
+
+export function ffiCore(config: {
+	wasmMemory: WebAssembly.Memory
+}) {
+	return {
+		// will prolly move away from wbg soon...
+		wbg: {memory: config.wasmMemory}
+	}
+}
+
+export type WasmCoreFfi = ReturnType<typeof ffiCore>

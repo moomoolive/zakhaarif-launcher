@@ -52,7 +52,7 @@ export const mod = def.mod({
 	onInit: (meta) => {
 		console.info("init called with meta", meta)
 	},
-	onBeforeGameLoop: (engine) => {
+	onBeforeLoop: (engine) => {
 		
 		console.info("before game loop called", engine)
 
