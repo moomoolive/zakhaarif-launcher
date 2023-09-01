@@ -43,6 +43,7 @@ module.exports = {
         "huzem/src/zakhaarif-dev-tools",
         "**/*.local.*",
         "**/*.compiled.*",
-        "huzem/src/gameCore/engine_wasm_core"
+        "huzem/src/gameCore/engine_wasm_core",
+        "proto"
     ]
 }

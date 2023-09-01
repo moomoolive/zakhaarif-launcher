@@ -8,7 +8,6 @@ export interface InitOutput {
   readonly calloc: (a: number, b: number) => number;
   readonly free: (a: number, b: number, c: number) => void;
   readonly realloc: (a: number, b: number, c: number, d: number) => number;
-  readonly rand_fn: () => number;
   readonly __wbindgen_thread_destroy: (a: number, b: number) => void;
   readonly __wbindgen_start: () => void;
 }

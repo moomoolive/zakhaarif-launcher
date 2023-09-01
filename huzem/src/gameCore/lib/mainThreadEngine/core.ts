@@ -7,21 +7,24 @@ import type {
 	ComponentMetadata,
 	ModMetadata,
 	DependentsWithBrand,
-	Struct,
+	//Struct,
 } from "zakhaarif-dev-tools"
 import {Mod} from "../mods/mod"
 import {createCommand} from "./console"
 import {Null, defineProp} from "../utils"
-import {Archetype, ComponentBuffer} from "../mods/archetype"
+import {
+	Archetype, 
+	//ComponentBuffer
+} from "../mods/archetype"
 import {stdlib, MetaManager} from "./standardLibrary"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
 import {
-	NULL_PTR,
+	//NULL_PTR,
 	NativeComponentContext, 
-	nativeComponentFactory,
-	orderKeys
+	//nativeComponentFactory,
+	//orderKeys
 } from "../compilers/nativeComponent"
 import {Query} from "../mods/query"
 
@@ -224,6 +227,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 			const stateRef = modStateRef
 			
 			// initialize components
+			/*
 			const componentNameToIdMap = new Map<string, number>
 			for (let i = 0; i < mods.length; i++) {
 				const mod = mods[i]
@@ -276,9 +280,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 				engine.wasmHeap.jsHeap()
 			)
 			engine.wasm.componentJsBindings = componentContext
-
+			*/ 
+			
 			// initalize archetypes
-			type ComponentId = number
+			/*type ComponentId = number
 			type ArchetypeId = number
 			type CompArchMap = Map<ComponentId, Set<ArchetypeId>>
 			const archComponentMap: CompArchMap = new Map()
@@ -400,9 +405,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 						}
 					}
 				}
-			}
+			}*/
 
 			// initialize queries
+			/*
 			for (let i = 0; i < mods.length; i++) {
 				const mod = mods[i]
 				const modId = stateRef.mods.length + i
@@ -510,6 +516,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 					}
 				}
 			}
+			*/
 
 			// initialize mod wrapper
 			const modIndex = new Null<MainEngine["mods"]>()
@@ -519,15 +526,16 @@ export class MainEngine extends Null implements MainThreadEngine {
 				const modId = originalModLen + i
 				const mod = mods[i]
 				const modData = mod.wrapper.data
+				const state = stateRef.jsStates[modId]
 				const compiled = new Mod({
 					id: modId,
 					name: modData.name,
 					version: mod.semver,
-					state: stateRef.jsStates[modId],
+					state: Array.isArray(state) ? state[0] : state,
 					meta: stateRef.metadatas[modId],
-					queries: stateRef.queryCollections[modId],
-					archetypes: stateRef.archetypeCollections[modId],
-					componentIds: stateRef.componentIds[modId]
+					queries: {},//stateRef.queryCollections[modId],
+					archetypes: {},//stateRef.archetypeCollections[modId],
+					componentIds: {}//stateRef.componentIds[modId]
 				})
 				stateRef.mods.push(compiled)
 				defineProp(modIndex, modData.name, compiled)
