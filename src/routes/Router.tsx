@@ -7,7 +7,7 @@ import {
 import {useState, useEffect, useRef} from "react"
 import {lazyComponent, LazyComponentOptions, LazyComponent} from "../components/Lazy"
 import {AppStore} from "../lib/utils/initAppStore"
-import {AppShellContext, useAppContext} from "./store"
+import {AppShellContext} from "./store"
 import Launcher from "./Launcher"
 import AppLaunch from "./AppLaunch"
 import MadeWith from "./MadeWith"
@@ -45,59 +45,9 @@ const fadeIn = 1
 
 function PageDisplay(): JSX.Element {
 	const location = useLocation()
-	const appContext = useAppContext()
 
 	const [displayLocation, setDisplayLocation] = useState(location)
 	const [transitionStage, setTransitionStage] = useState(fadeIn)
-
-	const sandboxInitialized = useRef(false)
-
-	useEffect(() => {
-		if (
-			sandboxInitialized.current
-            || location.pathname === "/"
-            || location.pathname.includes("/extension")
-		) {
-			return
-		}
-		const initializePromise = {
-			resolve: (_: boolean) => {},
-			reject: (_?: unknown) => {},
-			promise: Promise.resolve(true)
-		}
-		initializePromise.promise = new Promise<boolean>((resolve, reject) => {
-			initializePromise.reject = reject
-			initializePromise.resolve = resolve
-		})
-		appContext.sandboxInitializePromise = initializePromise
-		// Allow the route two frames (16msx2) to build
-		// the dom. Then inject intialization iframe.
-		const milliseconds = 32
-		window.setTimeout(() => {
-			const sandbox = document.createElement("iframe")
-			appContext.logger.info("Registering sandbox iframe...")
-			const handler = (event: MessageEvent) => {
-				const {data} = event
-				if (typeof data !== "string" || data !== "finished") {
-					appContext.logger.warn("sandbox message is incorrectly encoded")
-					appContext.sandboxInitializePromise.resolve(false)
-					return
-				}
-				appContext.sandboxInitializePromise.resolve(true)
-				appContext.logger.info("Sandbox iframe registered! Removing iframe!")
-				window.removeEventListener("message", handler)
-				document.body.removeChild(sandbox)
-			}
-			window.addEventListener("message", handler)
-			sandbox.setAttribute("sandbox", "allow-scripts allow-same-origin")
-			sandbox.allow = ""
-			sandbox.src = import.meta.env.VITE_APP_SANDBOX_ORIGIN + "/"
-			sandbox.width = "0px"
-			sandbox.height = "0px"
-			document.body.appendChild(sandbox)
-		}, milliseconds)
-		sandboxInitialized.current = true
-	}, [location])
 
 	useEffect(() => {
 		if (location.pathname !== displayLocation.pathname) {

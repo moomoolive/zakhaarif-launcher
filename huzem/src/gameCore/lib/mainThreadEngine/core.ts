@@ -6,26 +6,17 @@ import type {
 	LinkableMod,
 	ComponentMetadata,
 	ModMetadata,
-	DependentsWithBrand,
-	//Struct,
+	DependentsWithBrand
 } from "zakhaarif-dev-tools"
 import {Mod} from "../mods/mod"
 import {createCommand} from "./console"
 import {Null, defineProp} from "../utils"
-import {
-	Archetype, 
-	//ComponentBuffer
-} from "../mods/archetype"
+import {Archetype} from "../mods/archetype"
 import {stdlib, MetaManager} from "./standardLibrary"
 import {SystemManager} from "./systems"
 import {WasmCoreApis} from "../wasm/coreTypes"
 import {WasmAllocatorConfig, WasmAllocator} from "../wasm/allocator"
-import {
-	//NULL_PTR,
-	NativeComponentContext, 
-	//nativeComponentFactory,
-	//orderKeys
-} from "../compilers/nativeComponent"
+import {NativeComponentContext} from "../compilers/nativeComponent"
 import {Query} from "../mods/query"
 
 export type ModLinkInfo = {
@@ -93,7 +84,7 @@ export class MainEngine extends Null implements MainThreadEngine {
 	systems = new SystemManager()
 	meta = new MetaManager(this.modState)
 	devConsole = {
-		index: new Null<ConsoleCommandIndex>(),
+		index: <ConsoleCommandIndex>(Object.create(null)),
 		engine: <MainEngine>this,
 		addCommand<T extends ConsoleCommandInputDeclaration>(
 			cmd: ModConsoleCommand<MainThreadEngine, T>
@@ -545,6 +536,10 @@ export class MainEngine extends Null implements MainThreadEngine {
 		return await runBeforeLoopEvent(
 			linkResponse, inputMods, this, true
 		)
+	}
+
+	get console(): ConsoleCommandIndex {
+		return this.devConsole.index
 	}
 }
 

@@ -34,11 +34,6 @@ export type AppStoreConfig = {
 export class AppStore {
 	setTerminalVisibility: (visible: boolean) => void
 	readonly downloadClient: Shabah
-	sandboxInitializePromise: {
-        resolve: (value: boolean) => void
-        reject: (reason?: unknown) => void
-        promise: Promise<boolean>
-    }
 	serviceWorkerTerminal: wRpc<ServiceWorkerRpcs, object>
 	database: AppDatabase
 	readonly browserFeatures: typeof FEATURE_CHECK
@@ -72,12 +67,6 @@ export class AppStore {
 			clientMessageChannel: createClientChannel(DOWNLOAD_CLIENT_CHANNEL_NAME),
 			backendMessageChannel: createBackendChannel(BACKEND_CHANNEL_NAME)
 		})
-        
-		this.sandboxInitializePromise = {
-			resolve: () => {},
-			reject: () => {},
-			promise: Promise.resolve(true)
-		}
 
 		this.eventListenerMap = {
 			downloadprogress: new EventListenerRecord()

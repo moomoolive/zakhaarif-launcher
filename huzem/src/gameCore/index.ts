@@ -4,37 +4,38 @@ import {createWasmMemory, ffiCore} from "./lib/wasm/coreTypes"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
 import {defineProp} from "./lib/utils"
 
+const MOST_RECENT_SAVE = "-1"
+
 export const main = async (args: MainScriptArguments) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
-	const {messageAppShell, initialState, rootElement} = args
-	const {queryState, recommendedStyleSheetUrl} = initialState
-	const inputId = queryState.length < 1 ? "-1" : queryState
-	const gameId = parseInt(inputId, 10)
+	const {
+		rootElement, apis, 
+		queryState, recommendedStyleSheetUrl
+	} = args
+	const gameId = parseInt(queryState || MOST_RECENT_SAVE, 10)
 	if (isNaN(gameId)) {
 		console.error("inputted game id is not a number. game_id =", queryState)
-		messageAppShell("signalFatalError", {details: "invalid game save ID"})
+		apis.signalFatalError({details: "invalid game save ID"})
 		return
 	}
-	const gameSave = await messageAppShell("getSaveFile", gameId)
+	const gameSave = await apis.getSaveFile(gameId)
 	if (!gameSave) {
 		console.error("inputted game id doesn't exist", gameId)
-		messageAppShell("signalFatalError", {
+		apis.signalFatalError({
 			details: "game save doesn't exist",
 		})
 		return
 	}
 	console.info("game save found", gameSave)
-	if (!initialState.configuredPermissions) {
-		const {canonicalUrls} = gameSave.mods
-		console.info("Configuring permissions. cargos", canonicalUrls)
-		await messageAppShell("reconfigurePermissions", {canonicalUrls})
-		return
-	}
 	console.info("Permissions configured! starting game!")
     
-	const rootCanvas = document.createElement("canvas")
-	rootCanvas.id = "root-canvas"
-	rootElement.appendChild(rootCanvas)
+	let rootCanvas = null
+	if (rootElement) {
+		console.info("extension found root element", rootElement.id)
+		rootCanvas = document.createElement("canvas")
+		rootCanvas.id = "root-canvas"
+		rootElement.appendChild(rootCanvas)
+	}
 	
 	const wasmMemory = createWasmMemory()
 	const binaryUrl = new URL(
@@ -54,11 +55,12 @@ export const main = async (args: MainScriptArguments) => {
 	})
 
 	console.info("engine created")
-	// These engine properties are added to the 
-	// global object so that they
-	// can be easily accessed from browser console (or repl)
-	defineProp(globalThis, "zengine", engine)
-	defineProp(globalThis, "zconsole", engine.devConsole.index)
+	
+	// "zext" window property is automatically cleaned up by 
+	// app after extension exits.
+	// Engine is added to window object so that it
+	// can be easily accessed from browser console/repl
+	defineProp(globalThis, "zext", engine, false, true, true)
 
 	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
 		id: "daemon-recommend-style-sheet"
@@ -115,7 +117,7 @@ export const main = async (args: MainScriptArguments) => {
 		for (const {msg, status, text} of linkStatus.errors) {
 			console.error(`(${text}) ${msg} [code = ${status}]`)
 		}
-		messageAppShell("signalFatalError", {
+		apis.signalFatalError({
 			details: "One of game mods is invalid (link error)"
 		})
 		return
@@ -136,11 +138,7 @@ export const main = async (args: MainScriptArguments) => {
 			console.error("engine failed to start, returned with status", response)
 			return
 		}
-		const milliseconds = 1_000
-		setTimeout(
-			() => messageAppShell("readyForDisplay"), 
-			milliseconds
-		)
+		setTimeout(apis.readyForDisplay, 1_000)
 		console.info("starting game loop...")
 		window.requestAnimationFrame(engine.gameLoopHandler)
 	})

@@ -8,7 +8,6 @@ import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAppContext} from "./store"
 import {
 	HuzmaManifest, 
-	NULL_FIELD as CARGO_NULL_FIELD, 
 	NULL_FIELD
 } from "huzma"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
@@ -20,21 +19,23 @@ import {
 	hasUnsafePermissions
 } from "../lib/utils/security/permissionsSummary"
 import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
-import {SandboxFunctions, JsSandbox} from "../lib/jsSandbox/index"
-import {CACHED, ManifestIndex} from "../lib/shabah/backend"
+import {CACHED} from "../lib/shabah/backend"
 import {GAME_EXTENSION_CARGO} from "../standardCargos"
 import {useSearchParams} from "../hooks/searchParams"
+import {ManifestIndex, Shabah} from "../lib/shabah/downloadClient"
+import {DeepReadonly} from "../lib/types/utility"
+import {removeZipExtension} from "../lib/utils/urls/removeZipExtension"
+import {ExtensionModule, ExtensionApis} from "zakhaarif-dev-tools"
+import {sleep} from "../lib/utils/sleep"
+import {nanoid} from "nanoid"
+import {AppDatabase} from "../lib/database/AppDatabase"
+import {Logger} from "../lib/types/app"
 
-export type ExtensionShellFunctions = SandboxFunctions
+const EXTENSION_CONTAINER_ID = "extension-app-root"
 
-const EXTENSION_IFRAME_ID = "extension-frame"
-const NO_EXTENSION_URL = ""
-const IFRAME_CONTAINER_ID = "extension-iframe-container"
-
-const ExtensionShellPage = () => {
+export default function ExtensionShellPage(): JSX.Element {
 	const {
 		downloadClient, 
-		sandboxInitializePromise, 
 		database,
 		logger
 	} = useAppContext()
@@ -72,19 +73,16 @@ const ExtensionShellPage = () => {
 		if (sandbox.current) {
 			sandbox.current.destroy()
 		}
-		logger.info("All extension resouces cleaned up")
-	})
-	const appendSandboxToDom = useRef(async (sandboxContainer: HTMLElement) => {
-		const jsSandbox = sandbox.current
-		if (!jsSandbox) {
-			return
+		const rootElement = document.getElementById(EXTENSION_CONTAINER_ID)
+		if (rootElement && !sandbox.current?.initialized) {
+			while (rootElement.firstChild) {
+				rootElement.removeChild(rootElement.firstChild)
+			}
 		}
-		const sandboxDomElement = await jsSandbox.initialize()
-		sandboxDomElement.style.width = "100%"
-		sandboxDomElement.style.height = "100%"
-
-		// open program frame
-		sandboxContainer.appendChild(sandboxDomElement)
+		if ("zext" in window) {
+			window.zext = null
+		}
+		logger.info("All extension resouces cleaned up")
 	})
 
 	const closeExtension = async () => {
@@ -95,7 +93,7 @@ const ExtensionShellPage = () => {
 	}
 
 	useEffectAsync(async () => {
-		const url = searchParams.get(EXTENSION_SHELL_TARGET) || NO_EXTENSION_URL
+		const url = searchParams.get(EXTENSION_SHELL_TARGET) || ""
 		const canonicalUrl = decodeURIComponent(url)
 
 		if (canonicalUrl.length < 1) {
@@ -117,7 +115,7 @@ const ExtensionShellPage = () => {
 			return
 		}
 
-		if (meta.state !== CACHED || meta.entry === CARGO_NULL_FIELD) {
+		if (meta.state !== CACHED || meta.entry === NULL_FIELD) {
 			setLoading(false)
 			setError(true)
 			setErrorMessage("Invalid File")
@@ -129,7 +127,6 @@ const ExtensionShellPage = () => {
 			meta.canonicalUrl
 		)
 		if (cargoResponse.ok) {
-			await sandboxInitializePromise.promise
 			extensionCargo.current = cargoResponse.data.pkg as HuzmaManifest<Permissions>
 			extensionCargoIndex.current = meta
 			const entryResolvedUrl = meta.resolvedUrl + meta.entry
@@ -150,7 +147,7 @@ const ExtensionShellPage = () => {
 		if (extensionEntry.url.length < 1) {
 			return
 		}
-		const extensionFrameContainer = document.getElementById(IFRAME_CONTAINER_ID)
+		const extensionFrameContainer = document.getElementById(EXTENSION_CONTAINER_ID)
 		if (!extensionFrameContainer) {
 			setError(true)
 			setErrorMessage("Fatal Error Occurred")
@@ -158,11 +155,7 @@ const ExtensionShellPage = () => {
 			setLoading(false)
 			return
 		}
-		const sandboxElement = sandbox.current
-		const sandboxAlreadyLoaded = sandboxElement
-			? !!(document.getElementById(sandboxElement.domElement().id))
-			: false
-		if (sandboxAlreadyLoaded) {
+		if (sandbox.current?.initialized) {
 			logger.warn("Sandbox refused to load because another extension sandbox already exists")
 			return
 		}
@@ -183,9 +176,16 @@ const ExtensionShellPage = () => {
 			return
 		}
 
+		const rootElement = document.getElementById(EXTENSION_CONTAINER_ID)
+		
+		if (!rootElement) {
+			logger.error("couldn't find root element")
+			return
+		}
+		
 		const jsSandbox = new JsSandbox({
+			rootElement: rootElement as HTMLElement,
 			entryUrl: extensionEntry.url,
-			id: EXTENSION_IFRAME_ID,
 			name: `${extensionCargo.current.name}-sandbox`,
 			downloadClient,
 			dependencies: {
@@ -211,7 +211,7 @@ const ExtensionShellPage = () => {
 			},
 		})
 		sandbox.current = jsSandbox
-		appendSandboxToDom.current(extensionFrameContainer)
+		jsSandbox.initialize()
 		return cleanupExtension.current
 	}, [extensionEntry])
 
@@ -274,14 +274,9 @@ const ExtensionShellPage = () => {
 
         
 		<div 
-			id={IFRAME_CONTAINER_ID}
+			id={EXTENSION_CONTAINER_ID}
 			className={`${error || loading ? "hidden" : ""} z-0 animate-fade-in-left fixed left-0 top-0 w-screen h-screen overflow-clip`}
-		>
-			<button 
-				className="absolute animate-pulse bottom-0 right-0 w-10 h-10"
-				onClick={closeExtension}    
-			/>
-		</div>
+		/>
 
 		{!error && loading ? <ExtensionLoadingScreen 
 			onClose={closeExtension}
@@ -291,4 +286,120 @@ const ExtensionShellPage = () => {
 	</div>
 }
 
-export default ExtensionShellPage
+const AUTH_TOKEN_LENGTH = 20
+
+type SandboxMutableState = {
+	readyForDisplay: boolean
+	minimumLoadTimePromise: Promise<boolean>
+	fatalErrorOccurred: boolean
+	authToken: string
+}
+
+type SandboxDependencies = DeepReadonly<{
+    displayExtensionFrame: () => void
+    minimumLoadTime: number
+    queryState: string
+    createFatalErrorMessage: (msg: string, details: string) => void
+    confirmExtensionExit: () => Promise<void>
+    cargoIndex: ManifestIndex
+    cargo: HuzmaManifest<Permissions>
+    recommendedStyleSheetUrl: string
+    database: AppDatabase
+    origin: string
+    logger: Logger
+    downloadClient: Shabah
+}>
+
+export type JsSandboxOptions = {
+    entryUrl: string
+    dependencies: SandboxDependencies
+    name: string
+    downloadClient: Shabah
+	rootElement: HTMLElement | null
+}
+
+export class JsSandbox {
+	private state: SandboxMutableState
+	readonly dependencies: SandboxDependencies
+	initialized = false
+    
+	domElement: HTMLElement | null
+	readonly name: string
+	readonly entry: string
+	readonly downloadClient: DeepReadonly<Shabah>
+
+	constructor(config: JsSandboxOptions) {
+		this.domElement = config.rootElement
+		this.downloadClient = config.downloadClient
+		this.dependencies = config.dependencies
+		this.state = {
+			readyForDisplay: false,
+			minimumLoadTimePromise: sleep(config.dependencies.minimumLoadTime),
+			fatalErrorOccurred: false,
+			authToken: nanoid(AUTH_TOKEN_LENGTH)
+		}
+		this.entry = removeZipExtension(config.entryUrl)
+		this.name = config.name
+	}
+
+	async initialize() {
+		const {entry, dependencies, state} = this
+		const apis: ExtensionApis = {
+			signalFatalError: (config) => {
+				state.fatalErrorOccurred = true
+				dependencies.logger.error("extension encountered fatal error")
+				dependencies.createFatalErrorMessage(
+					"Encountered a fatal error", config.details
+				)
+				return true
+			},
+			readyForDisplay: () => {
+				if (state.readyForDisplay || state.fatalErrorOccurred) {
+					return false
+				}
+				dependencies.logger.info("Extension requested to render display")
+				state.readyForDisplay = true
+				state.minimumLoadTimePromise.then(() => {
+					dependencies.logger.info("rendering extension frame")
+					dependencies.displayExtensionFrame()
+				})
+				return true
+			},
+			getSaveFile: async (id) => {
+				if (id < 0) {
+					return await dependencies.database.gameSaves.latest() || null
+				}
+				return await dependencies.database.gameSaves.getById(id) || null
+			}
+		}
+		let extension: ExtensionModule
+		try {
+			dependencies.logger.info("importing extension", entry)
+			extension = await import(/* @vite-ignore */entry)
+			dependencies.logger.info("successfully imported extension", entry)
+		} catch (err) {
+			dependencies.logger.error("error importing", entry, err)
+			apis.signalFatalError({details: "couldn't find extension entry"})
+			return
+		}
+
+		if (!("main" in extension)) {
+			dependencies.logger.error("extension", entry, "does not export 'main' from ESmodule")
+			apis.signalFatalError({details: "extension encoding is incorrect"})
+			return
+		}
+		this.initialized = true
+		extension.main({
+			queryState: dependencies.queryState,
+			rootUrl: dependencies.cargoIndex.resolvedUrl,
+			recommendedStyleSheetUrl: `${dependencies.origin}/${dependencies.recommendedStyleSheetUrl}`,
+			apis,
+			rootElement: this.domElement
+		})
+	}
+
+	destroy(): boolean {
+		this.dependencies.logger.info(`cleaned up all resources associated with sandbox "${this.name}"`)
+		return true
+	}
+}

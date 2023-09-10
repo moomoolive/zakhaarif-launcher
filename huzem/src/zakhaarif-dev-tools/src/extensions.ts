@@ -1,9 +1,7 @@
-import type {TerminalActions, wRpc, TransferValue} from "w-worker-rpc"
-
 export type FileTransfer = {
-    readonly type: string;
-    readonly length: string;
-    readonly body: ReadableStream<Uint8Array>;
+    readonly type: string
+    readonly length: string
+    readonly body: ReadableStream<Uint8Array>
 }
 
 export type InitialExtensionState = {
@@ -13,25 +11,9 @@ export type InitialExtensionState = {
     recommendedStyleSheetUrl: string
 } 
 
-export type FatalErrorConfig = {
-    details: string
-}
-
-export type EssentialDaemonRpcs = {
-    getFile: (url: string) => Promise<TransferValue<FileTransfer> | null>
-    getInitialState: (_: null) => InitialExtensionState
-    secureContextEstablished: (_: null) => boolean
-    signalFatalError: (config: FatalErrorConfig) => boolean
-    readyForDisplay: (_: null) => boolean
-    exit: (_: null) => Promise<boolean>
-}
 
 export type ReconfigurationConfig = {
     canonicalUrls: string[]
-}
-
-export type EmbedAnyExtensionDaemonRpcs = {
-    reconfigurePermissions: (paramaters: ReconfigurationConfig) => boolean
 }
 
 export type ManualSave = 1
@@ -63,29 +45,25 @@ export type SaveData = {
     }
 } 
 
-export type GameSaveDaemonRpcs = {
+export type FatalErrorConfig = {
+    details: string
+}
+
+export type ExtensionApis = Readonly<{
+	signalFatalError: (config: FatalErrorConfig) => boolean
+    readyForDisplay: () => boolean
     getSaveFile: (id: number) => Promise<SaveData | null>
-    createSave: (_: null) => number
-}
+}>
 
-export type DaemonRpcs = (
-    EssentialDaemonRpcs 
-    & GameSaveDaemonRpcs
-    & EmbedAnyExtensionDaemonRpcs
-)
-
-
-export type MessageAppShell = wRpc<DaemonRpcs, {}>["execute"]
-
-export type MainScriptArguments = {
-    rootElement: HTMLDivElement
-    initialState: InitialExtensionState
-    messageAppShell: MessageAppShell
-    addRpcResponses: (responses: TerminalActions<{}>) => boolean
-    logPrivateDeps: () => void
-}
+export type MainScriptArguments = Readonly<{
+    rootElement: HTMLElement | null
+    queryState: string
+    rootUrl: string
+    recommendedStyleSheetUrl: string
+    apis: ExtensionApis
+}>
 
 export type ExtensionModule = {
-    main: (args?: MainScriptArguments) => any
+    main: (args: MainScriptArguments) => unknown
 }
 
