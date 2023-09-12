@@ -12,7 +12,7 @@ import {
 	faGithub,
 	faGolang
 } from "@fortawesome/free-brands-svg-icons"
-import {bismillah} from "../../lib/utils/consts/arabic"
+import {bismillah} from "../../lib/consts"
 import type {Acknowledgment} from "../../lib/types/app"
 
 type CreditElement = Acknowledgment

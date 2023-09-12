@@ -18,7 +18,7 @@ import {
 	faMagnifyingGlass,
 	faFolder,
 } from "@fortawesome/free-solid-svg-icons"
-import {toGigabytesString} from "../lib/utils/storage/friendlyBytes"
+import {toGigabytesString} from "../lib/util"
 import {useAppContext} from "./store"
 import {Shabah, ManifestIndex} from "../lib/shabah/downloadClient"
 import {HuzmaManifest} from "huzma"
@@ -30,13 +30,25 @@ import {
 } from "../components/FilterChevron"
 import {lazyComponent} from "../components/Lazy"
 import type {Permissions} from "../lib/types/permissions"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import type {FileDetails} from "../components/manifest/CargoFileSystem"
 import {FileSystemBreadcrumbs} from "../components/manifest/FileSystemBreadcrumbs"
 import type {CargoDirectory} from "../components/manifest/CargoFileSystem"
-import {SMALL_SCREEN_MINIMUM_WIDTH_PX} from "../lib/utils/consts/styles"
 import {ScreenSize} from "../components/ScreenSize"
+import {useSearchParams} from "../hooks/searchParams"
+import {roundDecimal} from "../lib/math/rounding"
 import {
+	MILLISECONDS_PER_SECOND, 
+	SEARCH_PARAM_KEYS, 
+	SMALL_SCREEN_MINIMUM_WIDTH_PX
+} from "../lib/consts"
+import {useDebounce} from "../hooks/debounce"
+import {CargoFileSystemSkeleton} from "../components/manifest/CargoFileSystemSkeleton"
+import {debugStatusCode} from "../lib/shabah/debug"
+import {useGlobalConfirm} from "../hooks/globalConfirm"
+import {urlToMime} from "../lib/miniMime"
+
+const {
 	ADDONS_INFO_MODAL, 
 	ADDONS_INSTALL_MODAL, 
 	ADDONS_MODAL, 
@@ -44,15 +56,7 @@ import {
 	ADDONS_UPDATE_MODAL, 
 	ADDONS_VIEWING_CARGO, 
 	ADDONS_VIEWING_FILE_MODAL
-} from "../lib/utils/searchParameterKeys"
-import {useSearchParams} from "../hooks/searchParams"
-import {roundDecimal} from "../lib/math/rounding"
-import {MILLISECONDS_PER_SECOND} from "../lib/utils/consts/time"
-import {useDebounce} from "../hooks/debounce"
-import {CargoFileSystemSkeleton} from "../components/manifest/CargoFileSystemSkeleton"
-import {debugStatusCode} from "../lib/shabah/debug"
-import {useGlobalConfirm} from "../hooks/globalConfirm"
-import {urlToMime} from "../lib/miniMime"
+} = SEARCH_PARAM_KEYS
 
 const fullScreenLoadingOverlay = <div
 	className="fixed bg-neutral-900/80 z-20 w-screen h-screen overflow-clip flex items-center justify-center"

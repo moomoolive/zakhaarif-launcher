@@ -13,61 +13,25 @@ import {Button, Skeleton, Tooltip} from "@mui/material"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {ModLinker} from "../components/mods/ModLinker"
 import {useAppContext} from "./store"
-import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
-import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import {ASCENDING_ORDER, DESCENDING_ORDER, FilterChevron, FilterOrder} from "../components/FilterChevron"
 import {useNavigate} from "react-router-dom"
 import {ManifestIndex} from "../lib/shabah/downloadClient"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import {GAME_EXTENSION_CARGO} from "../standardCargos"
+import {LOCAL_STORAGE_KEYS, SEARCH_PARAM_KEYS} from "../lib/consts"
 
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
+const {SAVE_EXISTS} = LOCAL_STORAGE_KEYS
 const FILTERS = [
 	{text: "Modified", key: "updatedAt"},
 	{text: "Name", key: "name"},
 	{text: "Type", key: "type"},
 ] as const
-
-const gameSavesSkeleton = <div 
-	className="w-full h-full max-w-4xl mx-auto"
->
-	<div 
-		className="w-full h-5/6 mt-14 overflow-y-scroll overflow-x-clip px-2"
-	>
-		<div className="px-2 flex flex-wrap">
-			{new Array<number>(FILTERS.length).fill(1).map((_, index) => {
-				return <div 
-					className="mr-3"
-					key={`filter-skeleton-${index}`}
-				>
-					<Skeleton 
-						animation="wave"
-						height={30}
-						width={50}
-						className="inline-block"
-					/>
-				</div>
-			})}
-		</div>
-
-		{new Array<number>(5).fill(1).map((_, index) => {
-			return <div
-				key={`game-save-skeleton-${index}`}
-				className="w-full"
-			>
-				<Skeleton 
-					animation="wave" 
-					height={80}    
-				/>
-			</div>
-		})}
-	</div>
-</div>
-
 const DO_NOT_SHOW_LINKER = -1
 
 type FilterType = typeof FILTERS[number]["key"]
 
-const LoadGamePage = (): JSX.Element => {
+export default function LoadGamePage(): JSX.Element {
 	const {database} = useAppContext()
 	const confirm = useGlobalConfirm()
 	const navigate = useNavigate()
@@ -167,8 +131,7 @@ const LoadGamePage = (): JSX.Element => {
 			className="w-screen h-screen fixed z-0 flex items-center justify-center"
 		>
 			<BackNavigationButton/>
-
-			{gameSavesSkeleton}
+			<GameSavesSkeleton/>
 		</div>
 	}
 
@@ -338,4 +301,40 @@ const LoadGamePage = (): JSX.Element => {
 	</div>
 }
 
-export default LoadGamePage
+function GameSavesSkeleton(): JSX.Element {
+	return <div 
+		className="w-full h-full max-w-4xl mx-auto"
+	>
+		<div 
+			className="w-full h-5/6 mt-14 overflow-y-scroll overflow-x-clip px-2"
+		>
+			<div className="px-2 flex flex-wrap">
+				{new Array<number>(FILTERS.length).fill(1).map((_, index) => {
+					return <div 
+						className="mr-3"
+						key={`filter-skeleton-${index}`}
+					>
+						<Skeleton 
+							animation="wave"
+							height={30}
+							width={50}
+							className="inline-block"
+						/>
+					</div>
+				})}
+			</div>
+
+			{new Array<number>(5).fill(1).map((_, index) => {
+				return <div
+					key={`game-save-skeleton-${index}`}
+					className="w-full"
+				>
+					<Skeleton 
+						animation="wave" 
+						height={80}    
+					/>
+				</div>
+			})}
+		</div>
+	</div>
+} 

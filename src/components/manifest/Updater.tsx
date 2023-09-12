@@ -8,8 +8,8 @@ import {UpdateCheckResponse} from "../../lib/shabah/updateCheckStatus"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {useAppContext} from "../../routes/store"
 import LoadingIcon from "../LoadingIcon"
-import {cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
-import {sleep} from "../../lib/utils/sleep"
+import {cargoErrorToText} from "../../lib/util"
+import {sleep} from "../../lib/util"
 import {
 	PermissionsSummary, 
 	generatePermissionsSummary,
@@ -17,14 +17,16 @@ import {
 	diffPermissions,
 	PermissionsDifference,
 } from "../../lib/utils/security/permissionsSummary"
-import {ALLOW_UNSAFE_PACKAGES} from "../../lib/utils/localStorageKeys"
+import {LOCAL_STORAGE_KEYS} from "../../lib/consts"
 import {isExtension} from "../../lib/utils/cargos"
 import {HuzmaManifest} from "huzma"
 import {Permissions} from "../../lib/types/permissions"
-import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
+import {readableByteCount} from "../../lib/util"
 import {PermissionsDisplay} from "./PermissionsDisplay"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
 import {GAME_EXTENSION_CARGO, LAUNCHER_CARGO} from "../../standardCargos"
+
+const {ALLOW_UNSAFE_PACKAGES} = LOCAL_STORAGE_KEYS
 
 type UpdateState = "error" | "up-to-date"
 

@@ -15,7 +15,7 @@ import {makeFetchHandler} from "../src/lib/shabah/serviceWorker/fetchHandler"
 import {webCacheFileCache} from "../src/lib/shabah/adaptors/fileCache/webCache"
 import {GlobalConfig, createServiceWorkerRpcs} from "./rpcs"
 import {wRpc} from "w-worker-rpc"
-import type {AppRpcs} from "../src/lib/utils/appRpc"
+import type {AppRpcs} from "../src/lib/util"
 import {createBackendChannel, createClientChannel} from "../src/lib/utils/shabahChannels"
 import type {CompressionStreams} from "../src/lib/types/streams"
 

@@ -1,16 +1,18 @@
 import {Button, Collapse, Tooltip} from "@mui/material"
 import {Link} from "react-router-dom"
-import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
 import {useRef, useState} from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faAngleDown, faAngleUp} from "@fortawesome/free-solid-svg-icons"
-import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAsyncState} from "../hooks/promise"
 import {GAME_EXTENSION_CARGO, STANDARD_CARGOS} from "../standardCargos"
 import {useAppContext} from "./store"
 import {CACHED} from "../lib/shabah/backend"
+import {LOCAL_STORAGE_KEYS, SEARCH_PARAM_KEYS} from "../lib/consts"
 
-const StartMenuPage = () => {
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
+const {SAVE_EXISTS} = LOCAL_STORAGE_KEYS
+
+export default function StartMenuPage(): JSX.Element {
 	const {downloadClient} = useAppContext()
 	const [gameMetadata] = useAsyncState(downloadClient.getCargoIndexByCanonicalUrl(STANDARD_CARGOS[1].canonicalUrl))
 
@@ -170,5 +172,3 @@ const StartMenuPage = () => {
 		</div>
 	</div>
 }
-
-export default StartMenuPage

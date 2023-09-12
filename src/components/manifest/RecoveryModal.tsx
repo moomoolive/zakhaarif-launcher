@@ -7,7 +7,7 @@ import {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {useEffectAsync} from "../../hooks/effectAsync"
 import {isInErrorState} from "../../lib/utils/cargos"
 import {useCloseOnEscape} from "../../hooks/closeOnEscape"
-import {sleep} from "../../lib/utils/sleep"
+import {sleep} from "../../lib/util"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
 
 export type RecoveryModalProps = {

@@ -20,10 +20,12 @@ import type {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {CargoIcon} from "./Icon"
 import {NULL_FIELD as CARGO_NULL_FIELD} from "huzma"
 import {useNavigate} from "react-router-dom"
-import {EXTENSION_SHELL_TARGET} from "../../lib/utils/searchParameterKeys"
 import {UPDATING} from "../../lib/shabah/backend"
 import {nanoid} from "nanoid"
 import {LAUNCHER_CARGO} from "../../standardCargos"
+import {SEARCH_PARAM_KEYS} from "../../lib/consts"
+
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
 
 const ROOT_DIRECTORY_PATH: RootDirectoryPath = "~"
 

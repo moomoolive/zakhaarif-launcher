@@ -2,8 +2,10 @@ import {useState} from "react"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faCheck} from "@fortawesome/free-solid-svg-icons"
 import {TextField} from "@mui/material"
-import {PROFILE_NAME} from "../../lib/utils/localStorageKeys"
 import {useDebounce} from "../../hooks/debounce"
+import {LOCAL_STORAGE_KEYS} from "../../lib/consts"
+
+const {PROFILE_NAME} = LOCAL_STORAGE_KEYS
 
 export function userProfile(): JSX.Element {
 	const optionsDebounce = useDebounce(500)

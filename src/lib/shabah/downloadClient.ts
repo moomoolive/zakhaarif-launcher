@@ -29,7 +29,7 @@ import {
 	BackendMessageChannel
 } from "./backend"
 import {serviceWorkerPolicies} from "./serviceWorkerMeta"
-import {BYTES_PER_MB} from "../utils/consts/storage"
+import {BYTES_PER_MB} from "../consts"
 import {NULL_FIELD, HuzmaManifest} from "huzma"
 import {resultJsonParse} from "../monads/utils/jsonParse"
 import {GeneralPermissions} from "../utils/security/permissionsSummary"
@@ -38,7 +38,7 @@ import {NO_INSTALLATION} from "./utility"
 import {UpdateCheckResponse} from "./updateCheckStatus"
 import {nanoid} from "nanoid"
 import {getFileNameFromUrl} from "../utils/urls/getFilenameFromUrl"
-import {stringBytes} from "../utils/stringBytes"
+import {stringBytes} from "../util"
 import {BackgroundFetchRecord} from "../types/serviceWorkers"
 import {installCore, InstallEventName} from "./serviceWorker/installCore"
 

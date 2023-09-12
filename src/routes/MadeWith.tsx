@@ -8,10 +8,12 @@ import {
 import {useEffect} from "react"
 import {useNavigate, Link} from "react-router-dom"
 import {Tooltip} from "@mui/material"
-import {SETTINGS_TAB} from "../lib/utils/searchParameterKeys"
 import {useToMainMenu} from "../hooks/toMainMenu"
+import {SEARCH_PARAM_KEYS} from "../lib/consts"
 
-const AppLaunchPage = () => {
+const {SETTINGS_TAB} = SEARCH_PARAM_KEYS
+
+export default function AppLaunchPage(): JSX.Element {
 	const navigate = useNavigate()
 	useToMainMenu()
 
@@ -83,5 +85,3 @@ const AppLaunchPage = () => {
 		</div>
 	</>
 }
-
-export default AppLaunchPage

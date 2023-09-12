@@ -2,7 +2,7 @@ import {ERROR_CODES_START, RequestableResource, StatusCode, STATUS_CODES} from "
 import {HuzmaManifest} from "huzma"
 import {NO_INSTALLATION} from "./utility"
 import {DeepReadonly} from "../types/utility"
-import {readableByteCount} from "../utils/storage/friendlyBytes"
+import {readableByteCount} from "../util"
 import {debugStatusCode, DebugStatusName} from "./debug"
 
 type RawDiskMetadata = Readonly<{

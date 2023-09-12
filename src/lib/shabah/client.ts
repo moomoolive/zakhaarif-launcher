@@ -17,7 +17,7 @@ import {resultJsonParse} from "../../lib/monads/utils/jsonParse"
 import {stripRelativePath} from "../utils/urls/stripRelativePath"
 import {addSlashToEnd} from "../utils/urls/addSlashToEnd"
 import {isUrl} from "../utils/urls/isUrl"
-import {stringBytes} from "../utils/stringBytes"
+import {stringBytes} from "../util"
 import {getFileNameFromUrl} from "../utils/urls/getFilenameFromUrl"
 import {removeZipExtension} from "../utils/urls/removeZipExtension"
 

@@ -25,10 +25,16 @@ import type {ManifestIndex} from "../../lib/shabah/downloadClient"
 import {MOD_CARGO_TAG} from "../../config"
 import {useCloseOnEscape} from "../../hooks/closeOnEscape"
 import {DESCENDING_ORDER, FilterOrder} from "../FilterChevron"
-import {sleep} from "../../lib/utils/sleep"
-import {ADDONS_INFO_MODAL, ADDONS_MODAL, ADDONS_VIEWING_CARGO} from "../../lib/utils/searchParameterKeys"
+import {sleep} from "../../lib/util"
 import {Paginator} from "../Paginator"
 import {useDebounce} from "../../hooks/debounce"
+import {SEARCH_PARAM_KEYS} from "../../lib/consts"
+
+const {
+	ADDONS_INFO_MODAL, 
+	ADDONS_MODAL, 
+	ADDONS_VIEWING_CARGO
+} = SEARCH_PARAM_KEYS
 
 type LinkableModProps = {
     mod: ManifestIndex

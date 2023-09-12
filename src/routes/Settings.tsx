@@ -20,145 +20,22 @@ import {
 	faGamepad
 } from "@fortawesome/free-solid-svg-icons"
 import {Divider, IconButton, Tooltip} from "@mui/material"
-import {SETTINGS_TAB} from "../lib/utils/searchParameterKeys"
 import {useSearchParams} from "../hooks/searchParams"
 import {SubPageList} from "./SettingsTabs/index"
-
-type SettingRouteProps = {
-    children: ReactNode
-    returnToHome: () => void
-    className: string
-    onAnimationEnd: () => void
-}
-
-const SettingRoute = ({
-	children, 
-	returnToHome,
-	className,
-	onAnimationEnd
-}: SettingRouteProps) => {
-	return <div
-		className={"fixed z-10 top-0 left-0 md:relative w-screen md:w-2/3 md:py-5 h-screen md:border-l-2 border-solid border-neutral-600 md:h-full bg-neutral-800 "}
-	>
-		<div className="px-2 h-1/12 w-full flex max-w-3xl items-center justify-start">
-			<div className="ml-2 h-full mt-3 md:hidden">
-				<Tooltip title="Back" placement="right">
-					<IconButton onClick={returnToHome}>
-						<FontAwesomeIcon icon={faArrowLeft}/>
-					</IconButton>
-				</Tooltip>
-			</div>
-			<CoolEscapeButton className="w-full h-full hidden md:block"/>
-		</div>
-		<div 
-			className={"p-6 h-11/12 " + className}
-			onAnimationEnd={onAnimationEnd}
-		>
-			{children}
-		</div>
-	</div>
-}
+import {SEARCH_PARAM_KEYS} from "../lib/consts"
 
 type MiniRoutes = {
     readonly [key: string]: () => JSX.Element
 }
 
+const {SETTINGS_TAB} = SEARCH_PARAM_KEYS
 const DO_NOT_DISPLAY_TAB = "none"
-
-type MiniRouterProps<Routes extends MiniRoutes> = {
-    displayLocation: keyof Routes | typeof DO_NOT_DISPLAY_TAB
-    routes: Routes
-    FallbackRoute: (props: {className: string, onAnimationEnd: () => void}) => JSX.Element
-    returnToHome: () => void
-}
-
-const fadeIn = 1
-const fadeOut = 2
-
-function MiniRouter<Routes extends MiniRoutes>({
-	displayLocation, 
-	routes, 
-	FallbackRoute, 
-	returnToHome
-}: MiniRouterProps<Routes>) {
-	const [transition, setTransition] = useState(fadeIn)
-	const [renderedLocation, setRenderedLocation] = useState(displayLocation)
-
-	useEffect(() => {
-		if (displayLocation !== renderedLocation) {
-			setTransition(fadeOut)
-		}
-	}, [displayLocation, renderedLocation])
-
-	if (renderedLocation === DO_NOT_DISPLAY_TAB) {
-		if (transition === fadeOut) {
-			setTransition(fadeIn)
-			setRenderedLocation(displayLocation)
-		}
-		return <FallbackRoute
-			className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
-			onAnimationEnd={() => {
-				if (transition === fadeOut) {
-					setTransition(fadeIn)
-					setRenderedLocation(displayLocation)
-				}
-			}}
-		/>
-	}
-
-
-	const Component = routes[renderedLocation] as () => JSX.Element
-
-	return <SettingRoute 
-		returnToHome={returnToHome}
-		className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
-		onAnimationEnd={() => {
-			if (transition === fadeOut) {
-				setTransition(fadeIn)
-				setRenderedLocation(displayLocation)
-			}
-		}}
-	>
-		<Component/>
-	</SettingRoute>
-    
-}
-
-const OPEN_PAGE_ICON = <FontAwesomeIcon icon={faAngleRight}/>
-
-type SettingSubsection = {
-    id: string
-    icon: IconDefinition
-    name: string
-    contents: ReactNode,
-	tooltip?: string
-    onClick: () => unknown
-    nameStyles?: Partial<{width: string}>
-    contentStyles?: Partial<{width: string}>
-}
-
-const CoolEscapeButton = ({className = ""}= {}): JSX.Element => {
-	return <div className={"text-right " + className}>
-		<Link to="/start">
-			<div className="w-full mb-1">
-				<button className="border-neutral-300 border-solid border text-lg rounded-full px-2.5 py-0.5 hover:bg-neutral-200/10">
-					<FontAwesomeIcon icon={faXmark}/>
-				</button>
-			</div>
-			<div className="w-full uppercase text-xs">
-				<span className="mr-1">
-                    esc
-				</span>
-			</div>
-		</Link>
-	</div>
-}
 
 type SettingsTab = keyof typeof SubPageList | typeof DO_NOT_DISPLAY_TAB
 
 const NO_CLIPBOARD_ACTION = "no-clipboard"
 
-const SettingsPage = (): JSX.Element => {
+export default function SettingsPage(): JSX.Element {
 	const navigate = useNavigate()
 	const {downloadClient} = useAppContext()
 	const [searchParams, setSearchParams] = useSearchParams()
@@ -412,4 +289,126 @@ const SettingsPage = (): JSX.Element => {
 	</div>
 }
 
-export default SettingsPage
+type SettingRouteProps = {
+    children: ReactNode
+    returnToHome: () => void
+    className: string
+    onAnimationEnd: () => void
+}
+
+function SettingRoute ({
+	children, 
+	returnToHome,
+	className,
+	onAnimationEnd
+}: SettingRouteProps): JSX.Element {
+	return <div
+		className={"fixed z-10 top-0 left-0 md:relative w-screen md:w-2/3 md:py-5 h-screen md:border-l-2 border-solid border-neutral-600 md:h-full bg-neutral-800 "}
+	>
+		<div className="px-2 h-1/12 w-full flex max-w-3xl items-center justify-start">
+			<div className="ml-2 h-full mt-3 md:hidden">
+				<Tooltip title="Back" placement="right">
+					<IconButton onClick={returnToHome}>
+						<FontAwesomeIcon icon={faArrowLeft}/>
+					</IconButton>
+				</Tooltip>
+			</div>
+			<CoolEscapeButton className="w-full h-full hidden md:block"/>
+		</div>
+		<div 
+			className={"p-6 h-11/12 " + className}
+			onAnimationEnd={onAnimationEnd}
+		>
+			{children}
+		</div>
+	</div>
+}
+
+type MiniRouterProps<Routes extends MiniRoutes> = {
+    displayLocation: keyof Routes | typeof DO_NOT_DISPLAY_TAB
+    routes: Routes
+    FallbackRoute: (props: {className: string, onAnimationEnd: () => void}) => JSX.Element
+    returnToHome: () => void
+}
+
+const fadeIn = 1
+const fadeOut = 2
+
+function MiniRouter<Routes extends MiniRoutes>({
+	displayLocation, 
+	routes, 
+	FallbackRoute, 
+	returnToHome
+}: MiniRouterProps<Routes>) {
+	const [transition, setTransition] = useState(fadeIn)
+	const [renderedLocation, setRenderedLocation] = useState(displayLocation)
+
+	useEffect(() => {
+		if (displayLocation !== renderedLocation) {
+			setTransition(fadeOut)
+		}
+	}, [displayLocation, renderedLocation])
+
+	if (renderedLocation === DO_NOT_DISPLAY_TAB) {
+		if (transition === fadeOut) {
+			setTransition(fadeIn)
+			setRenderedLocation(displayLocation)
+		}
+		return <FallbackRoute
+			className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
+			onAnimationEnd={() => {
+				if (transition === fadeOut) {
+					setTransition(fadeIn)
+					setRenderedLocation(displayLocation)
+				}
+			}}
+		/>
+	}
+
+
+	const Component = routes[renderedLocation] as () => JSX.Element
+
+	return <SettingRoute 
+		returnToHome={returnToHome}
+		className={`${transition === fadeIn ? "animate-fade-in-left" : "animate-fade-out-left"}`}
+		onAnimationEnd={() => {
+			if (transition === fadeOut) {
+				setTransition(fadeIn)
+				setRenderedLocation(displayLocation)
+			}
+		}}
+	>
+		<Component/>
+	</SettingRoute>
+    
+}
+
+const OPEN_PAGE_ICON = <FontAwesomeIcon icon={faAngleRight}/>
+
+type SettingSubsection = {
+    id: string
+    icon: IconDefinition
+    name: string
+    contents: ReactNode,
+	tooltip?: string
+    onClick: () => unknown
+    nameStyles?: Partial<{width: string}>
+    contentStyles?: Partial<{width: string}>
+}
+
+function CoolEscapeButton({className = ""} = {}): JSX.Element {
+	return <div className={"text-right " + className}>
+		<Link to="/start">
+			<div className="w-full mb-1">
+				<button className="border-neutral-300 border-solid border text-lg rounded-full px-2.5 py-0.5 hover:bg-neutral-200/10">
+					<FontAwesomeIcon icon={faXmark}/>
+				</button>
+			</div>
+			<div className="w-full uppercase text-xs">
+				<span className="mr-1">
+                    esc
+				</span>
+			</div>
+		</Link>
+	</div>
+}

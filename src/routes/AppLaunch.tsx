@@ -1,7 +1,7 @@
 import {useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 import {useToMainMenu} from "../hooks/toMainMenu"
-import {bismillah} from "../lib/utils/consts/arabic"
+import {bismillah} from "../lib/consts"
 
 const AppLaunchPage = () => {
 	const navigate = useNavigate()

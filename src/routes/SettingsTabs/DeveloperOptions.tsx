@@ -1,8 +1,10 @@
 import {useState} from "react"
 import {useAppContext} from "../store"
 import {Divider, Switch} from "@mui/material"
-import {ALLOW_UNSAFE_PACKAGES, VERBOSE_LAUNCHER_LOGS} from "../../lib/utils/localStorageKeys"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
+import {LOCAL_STORAGE_KEYS} from "../../lib/consts"
+
+const {ALLOW_UNSAFE_PACKAGES, VERBOSE_LAUNCHER_LOGS} = LOCAL_STORAGE_KEYS
 
 export function DeveloperOptions(): JSX.Element {
 	const confirm = useGlobalConfirm()

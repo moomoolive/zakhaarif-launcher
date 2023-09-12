@@ -4,7 +4,6 @@ import {useEffectAsync} from "../hooks/effectAsync"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faSadTear} from "@fortawesome/free-solid-svg-icons"
 import {Button, Tooltip} from "@mui/material"
-import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {useAppContext} from "./store"
 import {
 	HuzmaManifest, 
@@ -18,7 +17,6 @@ import {
 	generatePermissionsSummary, 
 	hasUnsafePermissions
 } from "../lib/utils/security/permissionsSummary"
-import {ALLOW_UNSAFE_PACKAGES} from "../lib/utils/localStorageKeys"
 import {CACHED} from "../lib/shabah/backend"
 import {GAME_EXTENSION_CARGO} from "../standardCargos"
 import {useSearchParams} from "../hooks/searchParams"
@@ -26,7 +24,7 @@ import {ManifestIndex, Shabah} from "../lib/shabah/downloadClient"
 import {DeepReadonly} from "../lib/types/utility"
 import {removeZipExtension} from "../lib/utils/urls/removeZipExtension"
 import {ExtensionApis} from "zakhaarif-dev-tools"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import {nanoid} from "nanoid"
 import {AppDatabase} from "../lib/database/AppDatabase"
 import {Logger} from "../lib/types/app"
@@ -35,10 +33,14 @@ import {
 	ExtensionContextObject, 
 	ZakhaarifApisField,
 	ExtensionContextId,
-	ExtensionRootId
+	ExtensionRootId,
+	LOCAL_STORAGE_KEYS,
+	SEARCH_PARAM_KEYS
 } from "../lib/consts"
 import extensionStartUrl from "../lib/extensionStart?url"
 
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
+const {ALLOW_UNSAFE_PACKAGES} = LOCAL_STORAGE_KEYS
 const EXTENSION_CONTAINER_ID = "extension-app-root"
 
 export default function ExtensionShellPage(): JSX.Element {

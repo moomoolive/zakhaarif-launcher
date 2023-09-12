@@ -17,7 +17,7 @@ import {
 import {CargoIcon} from "../../components/manifest/Icon"
 import {isStandardCargo} from "../../lib/utils/cargos"
 import {ManifestIndex} from "../../lib/shabah/downloadClient"
-import {reactiveDate} from "../../lib/utils/dates"
+import {reactiveDate} from "../../lib/util"
 import {MOD_CARGO_TAG, EXTENSION_CARGO_TAG} from "../../config"
 import {
 	Permissions, 
@@ -25,7 +25,7 @@ import {
 	ALLOW_ALL_PERMISSIONS
 } from "../../lib/types/permissions"
 import {cleanPermissions} from "../../lib/utils/security/permissionsSummary"
-import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
+import {readableByteCount} from "../../lib/util"
 import {PermissionsDisplay} from "./PermissionsDisplay"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
 

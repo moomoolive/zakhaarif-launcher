@@ -12,7 +12,7 @@ import {
 	faPlus,
 	faGear,
 } from "@fortawesome/free-solid-svg-icons"
-import {toGigabytesString} from "../../lib/utils/storage/friendlyBytes"
+import {toGigabytesString} from "../../lib/util"
 
 export type LargeAddonMenuProps = {
     cargoCount: number

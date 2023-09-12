@@ -24,13 +24,15 @@ import type {Permissions} from "../../lib/types/permissions"
 import {ManifestIndex, Shabah} from "../../lib/shabah/downloadClient"
 import {MOD_CARGO_TAG, EXTENSION_CARGO_TAG} from "../../config"
 import {useGlobalConfirm} from "../../hooks/globalConfirm"
-import {sleep} from "../../lib/utils/sleep"
+import {sleep} from "../../lib/util"
 import {EXTENSION_METADATA_KEY} from "../../lib/utils/cargos"
-import {ALLOW_UNSAFE_PACKAGES} from "../../lib/utils/localStorageKeys"
+import {LOCAL_STORAGE_KEYS} from "../../lib/consts"
 import {useCloseOnEscape} from "../../hooks/closeOnEscape"
-import {CargoRequestError, cargoErrorToText} from "../../lib/utils/errors/cargoErrors"
+import {CargoRequestError, cargoErrorToText} from "../../lib/util"
 import {CACHED} from "../../lib/shabah/backend"
 import {GAME_EXTENSION_CARGO, LAUNCHER_CARGO} from "../../standardCargos"
+
+const {ALLOW_UNSAFE_PACKAGES} = LOCAL_STORAGE_KEYS
 
 const toCargoIndex = (
 	canonicalUrl: string,

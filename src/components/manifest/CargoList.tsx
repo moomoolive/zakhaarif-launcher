@@ -1,6 +1,6 @@
 import type {ManifestIndex, ManifestState} from "../../lib/shabah/downloadClient"
-import {readableByteCount} from "../../lib/utils/storage/friendlyBytes"
-import {reactiveDate} from "../../lib/utils/dates"
+import {readableByteCount} from "../../lib/util"
+import {reactiveDate} from "../../lib/util"
 import {isMod} from "../../lib/utils/cargos"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faExclamationTriangle, faFolder, faMagnifyingGlass, faRotate} from "@fortawesome/free-solid-svg-icons"

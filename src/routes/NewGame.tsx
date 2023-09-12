@@ -14,16 +14,18 @@ import {Link, useNavigate} from "react-router-dom"
 import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {useAppContext} from "./store"
 import {useEffectAsync} from "../hooks/effectAsync"
-import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import type {ManifestIndex} from "../lib/shabah/downloadClient"
 import {ModLinker} from "../components/mods/ModLinker"
 import {MANUAL_SAVE} from "../lib/database/GameSaves"
-import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import LoadingIcon from "../components/LoadingIcon"
 import {GAME_EXTENSION_CARGO, STANDARD_CARGOS} from "../standardCargos"
+import {LOCAL_STORAGE_KEYS, SEARCH_PARAM_KEYS} from "../lib/consts"
 
-const NewGamePage = () => {
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
+const {SAVE_EXISTS} = LOCAL_STORAGE_KEYS
+
+export default function NewGamePage(): JSX.Element {
 	const navigate = useNavigate()
 	const confirm = useGlobalConfirm()
 	const {database, logger} = useAppContext()
@@ -166,5 +168,3 @@ const NewGamePage = () => {
 		</div>
 	</div>
 }
-
-export default NewGamePage

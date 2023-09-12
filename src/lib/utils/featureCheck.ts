@@ -6,7 +6,11 @@ type FeatureCheck = {
     hardwareRelated: boolean
 }
 
-const feature = (name: string, supported: boolean, hardwareRelated = false): FeatureCheck  => {
+function feature(
+	name: string, 
+	supported: boolean, 
+	hardwareRelated = false
+): FeatureCheck {
 	return {name, supported, hardwareRelated}
 }
 

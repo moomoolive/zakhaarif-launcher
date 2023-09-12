@@ -16,7 +16,9 @@ import {
 } from "@fortawesome/free-solid-svg-icons"
 import {useDebounce} from "../hooks/debounce"
 import terminalLoadingElement from "../components/loadingElements/terminal"
-import {PROFILE_NAME} from "../lib/utils/localStorageKeys"
+import {LOCAL_STORAGE_KEYS} from "../lib/consts"
+
+const {PROFILE_NAME} = LOCAL_STORAGE_KEYS 
 
 const getTerminalOutput = () => document.getElementById("terminal-prompt")
 

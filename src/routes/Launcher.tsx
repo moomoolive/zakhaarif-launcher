@@ -21,104 +21,16 @@ import {useGlobalConfirm} from "../hooks/globalConfirm"
 import {STANDARD_CARGOS} from "../standardCargos"
 import {useAppContext} from "./store"
 import {useNavigate} from "react-router-dom"
-import {APP_LAUNCHED, ASKED_TO_PERSIST} from "../lib/utils/localStorageKeys"
 import {useEffectAsync} from "../hooks/effectAsync"
 import LoadingIcon from "../components/LoadingIcon"
 import {UpdateCheckResponse} from "../lib/shabah/updateCheckStatus"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import {ABORTED, FAILED, UPDATING} from "../lib/shabah/backend"
-import {BYTES_PER_GB} from "../lib/utils/consts/storage"
+import {BYTES_PER_GB, LOCAL_STORAGE_KEYS} from "../lib/consts"
 import {roundDecimal} from "../lib/math/rounding"
 
-const toGigabytes = (bytes: number, minimum: number): number => {
-	const rawGigabytes = bytes / BYTES_PER_GB
-	const rounded = roundDecimal(rawGigabytes, 2)
-	const minimumOrGreater = Math.max(rounded, minimum)
-	return minimumOrGreater
-}
-
-const UnsupportedFeatures = (): JSX.Element => {
-	const {browserFeatures} = useAppContext()
-
-	const [showFeatureDetails, setShowFeatureDetails] = useState(false)
-
-	const {current: insufficentHardware} = useRef(browserFeatures.some(
-		(feature) => feature.hardwareRelated && !feature.supported)
-	)
-	const {current: insufficentSoftware} = useRef(browserFeatures.some(
-		(feature) => !feature.hardwareRelated && !feature.supported)
-	)
-	const {current: requirementText} = useRef((() => {
-		if (insufficentHardware && insufficentSoftware) {
-			return "device & browser"
-		} else if (insufficentHardware) {
-			return "device"
-		} else if (insufficentSoftware) {
-			return "browser"
-		} else {
-			return ""
-		}
-	})())
-
-  
-
-	return <>
-		<div className="text-sm text-yellow-500 mb-3 mt-6">
-			{`Your ${requirementText} ${insufficentSoftware && insufficentHardware ? "don't" : "doesn't"} support all required features.`}<br/>
-			{insufficentSoftware ? <>
-				{"Try using the latest version of Chrome, Firefox, or Safari"}
-			</> : ""}
-		</div>
-
-		<div>
-			<Button 
-				size="small"
-				color="info"
-				onClick={() => setShowFeatureDetails((current) => !current)}
-			>
-				{showFeatureDetails ? "Hide" : "Details"}
-			</Button>
-		</div>
-
-		<Collapse in={showFeatureDetails}>
-			<div className="max-w-sm mx-auto text-left">
-				{browserFeatures.filter(({supported}) => !supported).map((feature, i) => {
-					const hardwareRelated = feature.hardwareRelated || false
-					return <div
-						key={`feature-check-${i}`}
-						className="text-sm mb-1"
-					>
-						<span className="mr-2">
-							{`${hardwareRelated ? "💻" : "🌍"} `}
-							{feature.name
-								.split("-")
-								.map((str) => str[0].toUpperCase() + str.slice(1))
-								.join(" ")}
-						</span>
-						{feature.supported ? <span 
-							className="text-green-500"
-						>
-							<FontAwesomeIcon 
-								icon={faCheck}
-							/>  
-						</span> : <span
-							className="text-red-500"
-						>
-							<FontAwesomeIcon 
-								icon={faTimes}
-							/>  
-						</span>}
-						<span className="ml-2 text-xs text-neutral-500">
-							{hardwareRelated ? "(hardware)" : "(browser)"}
-						</span>
-					</div>
-				})}
-			</div>
-		</Collapse>
-	</>
-}
-
 const APP_TITLE = import.meta.env.VITE_APP_TITLE
+const {APP_LAUNCHED, ASKED_TO_PERSIST} = LOCAL_STORAGE_KEYS
 
 type LauncherState = (
   "uninstalled"
@@ -130,7 +42,7 @@ type LauncherState = (
 
 const NO_DOWNLOAD_LISTENER = "none"
 
-const LauncherRoot = (): JSX.Element => {
+export default function LauncherRoot(): JSX.Element {
 	const confirm = useGlobalConfirm()
 	const app = useAppContext()
 	const {setTerminalVisibility, downloadClient, logger} = app
@@ -626,4 +538,90 @@ const LauncherRoot = (): JSX.Element => {
 	)
 }
 
-export default LauncherRoot
+function UnsupportedFeatures(): JSX.Element {
+	const {browserFeatures} = useAppContext()
+
+	const [showFeatureDetails, setShowFeatureDetails] = useState(false)
+
+	const {current: insufficentHardware} = useRef(browserFeatures.some(
+		(feature) => feature.hardwareRelated && !feature.supported)
+	)
+	const {current: insufficentSoftware} = useRef(browserFeatures.some(
+		(feature) => !feature.hardwareRelated && !feature.supported)
+	)
+	const {current: requirementText} = useRef((() => {
+		if (insufficentHardware && insufficentSoftware) {
+			return "device & browser"
+		} else if (insufficentHardware) {
+			return "device"
+		} else if (insufficentSoftware) {
+			return "browser"
+		} else {
+			return ""
+		}
+	})())
+
+  
+
+	return <>
+		<div className="text-sm text-yellow-500 mb-3 mt-6">
+			{`Your ${requirementText} ${insufficentSoftware && insufficentHardware ? "don't" : "doesn't"} support all required features.`}<br/>
+			{insufficentSoftware ? <>
+				{"Try using the latest version of Chrome, Firefox, or Safari"}
+			</> : ""}
+		</div>
+
+		<div>
+			<Button 
+				size="small"
+				color="info"
+				onClick={() => setShowFeatureDetails((current) => !current)}
+			>
+				{showFeatureDetails ? "Hide" : "Details"}
+			</Button>
+		</div>
+
+		<Collapse in={showFeatureDetails}>
+			<div className="max-w-sm mx-auto text-left">
+				{browserFeatures.filter(({supported}) => !supported).map((feature, i) => {
+					const hardwareRelated = feature.hardwareRelated || false
+					return <div
+						key={`feature-check-${i}`}
+						className="text-sm mb-1"
+					>
+						<span className="mr-2">
+							{`${hardwareRelated ? "💻" : "🌍"} `}
+							{feature.name
+								.split("-")
+								.map((str) => str[0].toUpperCase() + str.slice(1))
+								.join(" ")}
+						</span>
+						{feature.supported ? <span 
+							className="text-green-500"
+						>
+							<FontAwesomeIcon 
+								icon={faCheck}
+							/>  
+						</span> : <span
+							className="text-red-500"
+						>
+							<FontAwesomeIcon 
+								icon={faTimes}
+							/>  
+						</span>}
+						<span className="ml-2 text-xs text-neutral-500">
+							{hardwareRelated ? "(hardware)" : "(browser)"}
+						</span>
+					</div>
+				})}
+			</div>
+		</Collapse>
+	</>
+}
+
+function toGigabytes(bytes: number, minimum: number): number {
+	const rawGigabytes = bytes / BYTES_PER_GB
+	const rounded = roundDecimal(rawGigabytes, 2)
+	const minimumOrGreater = Math.max(rounded, minimum)
+	return minimumOrGreater
+}

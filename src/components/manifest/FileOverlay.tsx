@@ -11,7 +11,7 @@ import {
 	faXmark,
 } from "@fortawesome/free-solid-svg-icons"
 import {Tooltip, IconButton, Divider} from "@mui/material"
-import {BYTES_PER_MB} from "../../lib/utils/consts/storage"
+import {BYTES_PER_MB} from "../../lib/consts"
 import {useCloseOnEscape} from "../../hooks/closeOnEscape"
 import {MimeIcon} from "./MimeIcon"
 

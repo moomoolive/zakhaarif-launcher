@@ -12,18 +12,22 @@ import {
 } from "@mui/material"
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome"
 import {faArrowLeft, faMagnifyingGlass} from "@fortawesome/free-solid-svg-icons"
-import {EXTENSION_SHELL_TARGET} from "../lib/utils/searchParameterKeys"
 import {CargoIcon} from "../components/manifest/Icon"
 import {FilterOrder, FilterChevron, DESCENDING_ORDER, ASCENDING_ORDER} from "../components/FilterChevron"
-import {SAVE_EXISTS} from "../lib/utils/localStorageKeys"
-import {sleep} from "../lib/utils/sleep"
+import {sleep} from "../lib/util"
 import {roundDecimal} from "../lib/math/rounding"
-import {MILLISECONDS_PER_SECOND} from "../lib/utils/consts/time"
+import {
+	LOCAL_STORAGE_KEYS, 
+	MILLISECONDS_PER_SECOND, 
+	SEARCH_PARAM_KEYS
+} from "../lib/consts"
 import {Paginator} from "../components/Paginator"
 import {useDebounce} from "../hooks/debounce"
 import {EXTENSION_CARGO_TAG} from "../config"
 import {GAME_EXTENSION_CARGO, LAUNCHER_CARGO} from "../standardCargos"
 
+const {EXTENSION_SHELL_TARGET} = SEARCH_PARAM_KEYS
+const {SAVE_EXISTS} = LOCAL_STORAGE_KEYS
 const SEARCH_BAR_ID = "extensions-search-bar"
 
 type FilterTypes = "updated" | "name"

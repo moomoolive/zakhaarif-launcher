@@ -1,4 +1,4 @@
-import {type} from "../utils/betterTypeof"
+import {betterTypeof} from "../util"
 import {Result} from "../monads/result"
 
 const messageTypes = {
@@ -264,7 +264,7 @@ export type CommandsList = ReadonlyArray<
 >
 
 export const isValidInputDefinition = (input: unknown) => {
-	if (type(input) !== "object") {
+	if (betterTypeof(input) !== "object") {
 		return false
 	}
 	const definition = input as Record<string, unknown>
