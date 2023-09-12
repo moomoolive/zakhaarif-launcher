@@ -25,11 +25,19 @@ import {useSearchParams} from "../hooks/searchParams"
 import {ManifestIndex, Shabah} from "../lib/shabah/downloadClient"
 import {DeepReadonly} from "../lib/types/utility"
 import {removeZipExtension} from "../lib/utils/urls/removeZipExtension"
-import {ExtensionModule, ExtensionApis} from "zakhaarif-dev-tools"
+import {ExtensionApis} from "zakhaarif-dev-tools"
 import {sleep} from "../lib/utils/sleep"
 import {nanoid} from "nanoid"
 import {AppDatabase} from "../lib/database/AppDatabase"
 import {Logger} from "../lib/types/app"
+import {
+	ExtensionFrameId, 
+	ExtensionContextObject, 
+	ZakhaarifApisField,
+	ExtensionContextId,
+	ExtensionRootId
+} from "../lib/consts"
+import extensionStartUrl from "../lib/extensionStart?url"
 
 const EXTENSION_CONTAINER_ID = "extension-app-root"
 
@@ -73,23 +81,15 @@ export default function ExtensionShellPage(): JSX.Element {
 		if (sandbox.current) {
 			sandbox.current.destroy()
 		}
-		const rootElement = document.getElementById(EXTENSION_CONTAINER_ID)
-		if (rootElement && !sandbox.current?.initialized) {
-			while (rootElement.firstChild) {
-				rootElement.removeChild(rootElement.firstChild)
-			}
-		}
-		if ("zext" in window) {
-			window.zext = null
-		}
 		logger.info("All extension resouces cleaned up")
 	})
 
 	const closeExtension = async () => {
 		if (!await confirm({title: "Are you sure you want to return to main menu?", confirmButtonColor: "warning"})) {
-			return
+			return false
 		}
 		navigate("/start")
+		return true
 	}
 
 	useEffectAsync(async () => {
@@ -141,6 +141,10 @@ export default function ExtensionShellPage(): JSX.Element {
 		setErrorMessage("Files Not Found")
 		logger.error("extension exists in index, but was not found")
 		setLoading(false)
+		return () => {
+			setParentReplContext(null)
+			setExtensionArgs(null)
+		}
 	}, [])
 
 	useEffect(() => {
@@ -300,7 +304,7 @@ type SandboxDependencies = DeepReadonly<{
     minimumLoadTime: number
     queryState: string
     createFatalErrorMessage: (msg: string, details: string) => void
-    confirmExtensionExit: () => Promise<void>
+    confirmExtensionExit: () => Promise<boolean>
     cargoIndex: ManifestIndex
     cargo: HuzmaManifest<Permissions>
     recommendedStyleSheetUrl: string
@@ -322,6 +326,7 @@ export class JsSandbox {
 	private state: SandboxMutableState
 	readonly dependencies: SandboxDependencies
 	initialized = false
+	private iframeElement = null as HTMLIFrameElement | null
     
 	domElement: HTMLElement | null
 	readonly name: string
@@ -343,63 +348,124 @@ export class JsSandbox {
 	}
 
 	async initialize() {
-		const {entry, dependencies, state} = this
-		const apis: ExtensionApis = {
-			signalFatalError: (config) => {
-				state.fatalErrorOccurred = true
-				dependencies.logger.error("extension encountered fatal error")
-				dependencies.createFatalErrorMessage(
-					"Encountered a fatal error", config.details
-				)
-				return true
-			},
-			readyForDisplay: () => {
-				if (state.readyForDisplay || state.fatalErrorOccurred) {
-					return false
-				}
-				dependencies.logger.info("Extension requested to render display")
-				state.readyForDisplay = true
-				state.minimumLoadTimePromise.then(() => {
-					dependencies.logger.info("rendering extension frame")
-					dependencies.displayExtensionFrame()
-				})
-				return true
-			},
-			getSaveFile: async (id) => {
-				if (id < 0) {
-					return await dependencies.database.gameSaves.latest() || null
-				}
-				return await dependencies.database.gameSaves.getById(id) || null
-			}
-		}
-		let extension: ExtensionModule
-		try {
-			dependencies.logger.info("importing extension", entry)
-			extension = await import(/* @vite-ignore */entry)
-			dependencies.logger.info("successfully imported extension", entry)
-		} catch (err) {
-			dependencies.logger.error("error importing", entry, err)
-			apis.signalFatalError({details: "couldn't find extension entry"})
-			return
-		}
-
-		if (!("main" in extension)) {
-			dependencies.logger.error("extension", entry, "does not export 'main' from ESmodule")
-			apis.signalFatalError({details: "extension encoding is incorrect"})
-			return
-		}
-		this.initialized = true
-		extension.main({
+		const {entry, dependencies} = this
+		const {logger,} = dependencies
+		const apis = createExtensionApis(dependencies, this.state)
+		setExtensionArgs(apis)
+		const iframe = document.createElement("iframe")
+		const frameId: ExtensionFrameId = "extension-frame"
+		iframe.id = frameId
+		iframe.title = "extension-iframe"
+		iframe.name = "extension-document"
+		const extensionContext: ExtensionContextObject = {
 			queryState: dependencies.queryState,
 			rootUrl: dependencies.cargoIndex.resolvedUrl,
 			recommendedStyleSheetUrl: `${dependencies.origin}/${dependencies.recommendedStyleSheetUrl}`,
-			apis,
-			rootElement: this.domElement
-		})
+			entryUrl: entry,
+		}
+		const extensionIgniteUrl = new URL(extensionStartUrl, import.meta.url)
+		const contextId: ExtensionContextId = "extension-context-node"
+		const rootId: ExtensionRootId = "extension-root"
+		const iframedoc = `<!DOCTYPE html>
+		<html lang="en">
+		  <head>
+			<meta charset="UTF-8" />
+			<meta id="${contextId}" content='${JSON.stringify(extensionContext)}' />
+			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		  </head>
+		  <body>
+			<div id="${rootId}"></div>
+			<script type="module" src="${extensionIgniteUrl.href}"></script>
+		  </body>
+		</html>`
+		logger.info("starting extension frame...")
+		iframe.srcdoc = iframedoc
+		iframe.style.width = "100%"
+		iframe.style.height = "100%"
+		if (this.domElement) {
+			this.domElement.appendChild(iframe)
+		}
+		this.initialized = true
+		logger.info("extension frame initialized")
 	}
 
 	destroy(): boolean {
+		if (this.iframeElement) {
+			this.iframeElement.remove()
+		}
+		setParentReplContext(null)
+		if (!import.meta.env.DEV) {
+			setExtensionArgs(null)
+		}
 		this.dependencies.logger.info(`cleaned up all resources associated with sandbox "${this.name}"`)
 		return true
 	}
+}
+
+function createExtensionApis(
+	dependencies: SandboxDependencies,
+	state: SandboxMutableState
+): ExtensionApis {
+	return {
+		addToParentReplContext: setParentReplContext,
+		signalFatalError: (config) => {
+			state.fatalErrorOccurred = true
+			dependencies.logger.error("extension encountered fatal error")
+			dependencies.createFatalErrorMessage(
+				"Encountered a fatal error", config.details
+			)
+			return true
+		},
+		readyForDisplay: () => {
+			if (state.readyForDisplay || state.fatalErrorOccurred) {
+				return false
+			}
+			dependencies.logger.info("Extension requested to render display")
+			state.readyForDisplay = true
+			state.minimumLoadTimePromise.then(() => {
+				dependencies.logger.info("rendering extension frame")
+				dependencies.displayExtensionFrame()
+			})
+			return true
+		},
+		getSaveFile: async (id) => {
+			if (id < 0) {
+				return await dependencies.database.gameSaves.latest() || null
+			}
+			return await dependencies.database.gameSaves.getById(id) || null
+		},
+		exitExtension: async (_) => {
+			return await dependencies.confirmExtensionExit()
+		}
+	}
+}
+
+function setParentReplContext(value: unknown): boolean {
+	if (typeof window === "undefined") {
+		return false
+	}
+	const zakhaarifExtension = "zext"
+	Object.defineProperty(window, zakhaarifExtension, {
+		value: value,
+		configurable: true,
+		writable: false,
+		enumerable: true
+	})
+	return true
+}
+
+function setExtensionArgs(
+	args: ExtensionApis | null
+): boolean {
+	if (typeof window === "undefined") {
+		return false
+	}
+	const zakhaarifArguments: ZakhaarifApisField = "yzapis"
+	Object.defineProperty(window, zakhaarifArguments, {
+		value: args,
+		configurable: true,
+		writable: false,
+		enumerable: true
+	})
+	return true
 }

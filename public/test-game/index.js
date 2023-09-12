@@ -1,5 +1,5 @@
 /**
- * @param {import("zakhaarif-dev-tools").MainScriptArguments} args 
+ * @param {import("zakhaarif-dev-tools").MainScriptConfig} args 
  * @returns 
  */
 export const main = async (args) => {

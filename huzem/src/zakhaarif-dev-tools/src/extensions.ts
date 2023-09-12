@@ -53,17 +53,20 @@ export type ExtensionApis = Readonly<{
 	signalFatalError: (config: FatalErrorConfig) => boolean
     readyForDisplay: () => boolean
     getSaveFile: (id: number) => Promise<SaveData | null>
+    addToParentReplContext: (value: unknown) => boolean
+    exitExtension: (config?: { force?: boolean }) => Promise<boolean>
 }>
 
-export type MainScriptArguments = Readonly<{
+export type MainScriptConfig = Readonly<{
     rootElement: HTMLElement | null
     queryState: string
     rootUrl: string
     recommendedStyleSheetUrl: string
+    entryUrl: string
     apis: ExtensionApis
 }>
 
 export type ExtensionModule = {
-    main: (args: MainScriptArguments) => unknown
+    main: (args: MainScriptConfig) => unknown
 }
 

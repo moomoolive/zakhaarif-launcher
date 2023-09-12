@@ -19,7 +19,7 @@ const EXTENSION_LOADING_MESSAGES = [
 ] as const
 
 export type ExtensionLoadingScreenProps = {
-    onClose: () => Promise<void>
+    onClose: () => Promise<unknown>
     isRetry: boolean
 }
 

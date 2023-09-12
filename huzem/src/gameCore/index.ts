@@ -1,12 +1,11 @@
-import {MainScriptArguments} from "zakhaarif-dev-tools"
+import {MainScriptConfig} from "zakhaarif-dev-tools"
 import {MainEngine, ModLinkInfo} from "./lib/mainThreadEngine/core"
 import {createWasmMemory, ffiCore} from "./lib/wasm/coreTypes"
 import {wasmMap} from "../wasmBinaryPaths.mjs"
-import {defineProp} from "./lib/utils"
 
 const MOST_RECENT_SAVE = "-1"
 
-export const main = async (args: MainScriptArguments) => {
+export const main = async (args: MainScriptConfig) => {
 	console.info("[🌟 GAME LOADED] script args =", args)
 	const {
 		rootElement, apis, 
@@ -27,7 +26,6 @@ export const main = async (args: MainScriptArguments) => {
 		return
 	}
 	console.info("game save found", gameSave)
-	console.info("Permissions configured! starting game!")
     
 	let rootCanvas = null
 	if (rootElement) {
@@ -54,13 +52,24 @@ export const main = async (args: MainScriptArguments) => {
 		coreInstance: core.instance,
 	})
 
+	engine.devConsole.addCommand({
+		name: "exitGame",
+		fn: async () => {
+			const confirmed = await apis.exitExtension()
+			const text = confirmed 
+				? "confirmed extension exit" 
+				: "denied extension exit"
+			console.info(text)
+			return text
+		}
+	})
+
 	console.info("engine created")
 	
-	// "zext" window property is automatically cleaned up by 
-	// app after extension exits.
-	// Engine is added to window object so that it
-	// can be easily accessed from browser console/repl
-	defineProp(globalThis, "zext", engine, false, true, true)
+	const replRes = apis.addToParentReplContext(engine)
+	if (!replRes) {
+		console.warn("failed to add engine to parent repl")
+	}
 
 	engine.std.css.addGlobalSheet(recommendedStyleSheetUrl, {
 		id: "daemon-recommend-style-sheet"
@@ -138,8 +147,8 @@ export const main = async (args: MainScriptArguments) => {
 			console.error("engine failed to start, returned with status", response)
 			return
 		}
-		setTimeout(apis.readyForDisplay, 1_000)
 		console.info("starting game loop...")
 		window.requestAnimationFrame(engine.gameLoopHandler)
 	})
+	setTimeout(apis.readyForDisplay, 1_000)
 }

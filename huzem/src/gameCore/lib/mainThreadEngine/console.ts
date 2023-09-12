@@ -109,7 +109,12 @@ export function createCommand<T extends ConsoleCommandInputDeclaration>(
 	index: ConsoleCommandIndex,
 	command: ModConsoleCommand<MainThreadEngine, T>
 ) {
-	defineProp(command.fn, "name", command.name, true, false, true)
+	Object.defineProperty(command.fn, "name", {
+		value: command.name,
+		configurable: true,
+		writable: false,
+		enumerable: true
+	})
 	
 	type Input = Record<string, string | boolean | number | undefined>
 	defineProp(index, command.name, (input: Input = {}) => {

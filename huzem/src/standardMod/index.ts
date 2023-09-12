@@ -207,19 +207,27 @@ export const mod = def.mod({
 		engine.devConsole.addCommand({
 			name: "gldebugger",
 			args: {show: "boolean?"},
-			fn: (gameEngine, input) => {
-				if (input.show === undefined) {
-					return "no valid options detected"
+			fn: ({mods}, input) => {
+				const {debugLayer} = mods.zakhaarifStd.mutState().scene
+				const showOptions = {
+					embedMode: true,
+					overlay: true
 				}
-				const {scene} = gameEngine.mods.zakhaarifStd.mutState()
+				if (Object.keys(input).length < 1) {
+					if (debugLayer.isVisible()) {
+						debugLayer.hide()
+						return "closed"
+					} else {
+						debugLayer.show(showOptions)
+						return "open"
+					}
+				}
+				
 				if (!input.show) {
-					scene.debugLayer.hide()
+					debugLayer.hide()
 					return "closed"
 				}
-				scene.debugLayer.show({
-					embedMode: true,
-					overlay: true,
-				})
+				debugLayer.show(showOptions)
 				return "opened"
 			}
 		})
